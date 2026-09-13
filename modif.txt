@@ -1,0 +1,4 @@
+les connexion entré sortie sont trop complexe, je clique pour connecter ça me propose la sortie du premier et une entré du 2eme, enfaite mieux fusionne entré et sortie en 1 seul truc, qui permet la connexion des zones(avec equivalence altitude pour les 2 si je rentre tout en haut de 1 je sort tout en haut de l'autre en pourcentage de hauteur du portail(bien pour le nom portail))
+pour les élément de décors du mode édit j'ai rajouter le dossier déco item qui contient d'autre dossier avec le nom des zones pour faire des sections dans le mode édit, dedans j'ai mis la première plaque de frame a découper pour les integrer dans le mode a la place des actuel qui n'ont pas d'images
+
+

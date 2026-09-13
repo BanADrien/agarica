@@ -1,0 +1,33 @@
+low revoir la marche de base de agarica
+
+
+
+
+
+idée forme : 
+
+courses : 
+autruche (oiseau)
+arraigné (insecte, marche sur les mur dans les zone murale(grotte))
+chat (félin, discret)
+
+
+vol : 
+chouette (oiseau, vois dans le noir)
+mouche (insecte, double saut plus haut mais tres petit et plus lent)
+
+
+nage : 
+espadon (aquatique, inflige des degat en fonction de la vitesse acumulé(avancer a peu pret dans la meme direction pour accelerer))
+poisson chat(félin, aquatique)
+
+
+
+
+compétence : 
+requin, croc devant 
+calamard, nuage d'ancre camoufle perte agro
+singe, jet de pierre
+cerf geant : cours tout droit a l'infini tant que le joueur ne l'arrete pas ou qu'il percute un mur
+
+""félin, aquatique, reptile, volatile, instecte, canidé, cervidé ""

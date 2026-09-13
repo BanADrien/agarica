@@ -1,0 +1,103 @@
+LEGEND OF AGARICA — Liste des elements graphiques (sprites) a importer
+=======================================================================
+
+Format attendu pour chaque personnage : UNE feuille PNG (fond transparent),
+UNE ligne = UNE animation, colonnes = frames de gauche a droite dans
+l'ordre de lecture. Peu importe que les lignes/frames ne soient pas
+parfaitement alignees sur une grille (feuilles generees par IA) : le
+script tools/split_spritesheet.py decoupe automatiquement (detection par
+composantes connexes) et normalise toutes les frames a une taille unique
+alignee en bas, pour eviter tout saut/jitter en jeu.
+
+Une fois une feuille deposee dans assets/sprites/<nom>.png, prevenir pour
+lancer la decoupe + le branchement dans le code.
+
+-----------------------------------------------------------------------
+1. AGARICA — forme humaine de base
+   FAIT : assets/sprites/agarica.png
+-----------------------------------------------------------------------
+- Idle (immobile)                    : 6 frames
+- Marche                             : 6 frames generees (5 utilisees)
+- Course                             : 6 frames (2 recyclees comme pose
+  statique montee/descente de saut, faute de ligne de saut dediee)
+- [Manquant, optionnel] Attaque a la dague : pas de sprite dedie
+  actuellement, juste un flash de teinte rose sur la pose en cours.
+
+-----------------------------------------------------------------------
+2. LOUP — forme Loup d'Agarica (sprint), reutilise pour le boss "Loup
+   Alpha" (teinte plus sombre)
+   FAIT : assets/sprites/loup.png
+-----------------------------------------------------------------------
+- Course (sprint)                    : 6 frames
+- Saut / bond                        : 4 frames (2 utilisees comme pose
+  statique montee/descente, pas jouees en boucle)
+- Attaque (morsure)                  : 3 frames
+
+-----------------------------------------------------------------------
+3. CORBEAU / AIGLE — ennemi Corbeau (Zone 4) ET forme Aigle d'Agarica
+   (double-saut + piquet)
+   FAIT : assets/sprites/piaf.png
+-----------------------------------------------------------------------
+- Vol (battement d'ailes)            : 4 frames
+- Glisse (plane, ailes stables)      : 4 frames
+- Piquet (descente rapide)           : 5 frames
+
+-----------------------------------------------------------------------
+4. ARAIGNEE — ennemi fixe (Zone 3, garde une toile)
+   PLACEHOLDER actuel : silhouette geometrique generee par code
+-----------------------------------------------------------------------
+- Idle / statique                    : 1 pose suffit, elle ne bouge pas
+- [Optionnel] Idle anime             : leger mouvement de pattes/abdomen
+- [Optionnel] Pose de defaite        : pas indispensable, la mort est
+  deja simulee par un fondu + retrecissement generique
+
+-----------------------------------------------------------------------
+5. LOUP SANGUINAIRE — ennemi patrouilleur/chargeur (Zone 2)
+   PLACEHOLDER actuel : silhouette geometrique generee par code
+   (distinct du Loup du joueur : contour rouge/oeil rouge au lieu de
+   vert/rose)
+-----------------------------------------------------------------------
+- Patrouille / marche                : 4 a 6 frames
+- Charge (course rapide)             : 4 a 6 frames
+- [Optionnel] Attaque / morsure      : pas indispensable, le contact
+  simple suffit au gameplay actuel
+
+-----------------------------------------------------------------------
+6. XARA — compagnon araignee (suit Agarica en permanence)
+   PLACEHOLDER actuel : silhouette geometrique generee par code
+-----------------------------------------------------------------------
+- Idle / suivi                       : 1 a 2 frames (le leger flottement
+  est deja simule par code, une vraie anim est un bonus)
+- [Optionnel] Etat "excitee"         : reaction pres d'un ennemi ou
+  pendant une transformation d'Agarica, actuellement un simple
+  changement de couleur des yeux sur la meme texture
+
+-----------------------------------------------------------------------
+7. TOILE D'ARAIGNEE (Web) — obstacle au sol (Zone 3)
+   PLACEHOLDER actuel : motif de fils procedural
+-----------------------------------------------------------------------
+- Purement decoratif, pas d'animation necessaire.
+
+-----------------------------------------------------------------------
+8. BOSS "LOUP ALPHA" — prevu, pas encore construit (Zone 5)
+-----------------------------------------------------------------------
+- Reutilise les sprites du Loup (#2) a plus grande echelle + teinte
+  rouge sombre : AUCUN nouvel asset requis pour la premiere version.
+- [Optionnel] Un vrai sprite dedie si envie d'un rendu de boss unique
+  (mêmes animations que #2 : course/saut/attaque).
+
+-----------------------------------------------------------------------
+DECOR / ENVIRONNEMENT — choix de DA volontairement procedural (GDD
+section 8 : "pas d'animation dessinee a la main complexe"), pas de
+sprite a fournir sauf envie explicite de remplacer :
+-----------------------------------------------------------------------
+- Fond degrade nuit/lune, ligne d'arbres, tuiles de sol : generes par
+  code (src/utils/LevelKit.js).
+
+=========================================================================
+PRIORITE SUGGEREE si tu veux continuer a fournir des feuilles :
+  1. Loup sanguinaire (ennemi le plus vu, encore en silhouette)
+  2. Araignee (idem)
+  3. Xara (compagne visible en permanence a l'ecran)
+  4. Boss Loup Alpha dedie (facultatif, le recyclage du Loup fonctionne deja)
+=========================================================================

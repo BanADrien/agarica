@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Legend of Agarica</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0d0b1a;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-family: sans-serif;
+    }
+    #game-container {
+      width: 100vw;
+      height: 100vh;
+      box-shadow: 0 0 40px rgba(140, 100, 220, 0.4);
+    }
+
+    #editor-ui {
+      display: none;
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 240px;
+      height: 100vh;
+      overflow-y: auto;
+      background: #17112a;
+      border-left: 1px solid #4a3f6b;
+      color: #e8d9ff;
+      font-size: 13px;
+      box-sizing: border-box;
+      padding: 10px;
+      z-index: 10;
+    }
+    #editor-ui h3 {
+      margin: 4px 0 10px;
+      font-size: 15px;
+      color: #cbb6ff;
+    }
+    #editor-ui .editor-section {
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #2c2447;
+    }
+    #editor-ui label {
+      display: block;
+      margin-bottom: 4px;
+      color: #a99bd6;
+    }
+    #editor-ui .tool-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    #editor-ui button, #editor-ui select, #editor-ui input[type="text"], #editor-ui input[type="number"] {
+      font-family: sans-serif;
+      font-size: 12px;
+      background: #241c3f;
+      color: #e8d9ff;
+      border: 1px solid #4a3f6b;
+      border-radius: 4px;
+      padding: 5px 6px;
+      width: 100%;
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+    #editor-ui input[type="number"], #editor-ui input[type="text"] {
+      cursor: text;
+    }
+    #editor-ui button:hover {
+      background: #362a5c;
+    }
+    #editor-ui button.active {
+      background: #6b4fb3;
+      border-color: #9c7fe0;
+    }
+    #editor-ui .row {
+      display: flex;
+      gap: 4px;
+    }
+    #editor-ui .row > * {
+      flex: 1;
+    }
+    #editor-status {
+      color: #8fe6c4;
+      min-height: 32px;
+      line-height: 1.4;
+    }
+    body.editor-mode #game-container {
+      width: calc(100vw - 240px);
+    }
+
+    /* Vue d'ensemble des zones (retour utilisateur : "un vrai menu simple
+       UX" -- miniatures + positions arrangeables plutôt qu'une simple liste
+       déroulante). Même palette que #editor-ui, en plein écran par-dessus. */
+    #zones-overview-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0d0b1a;
+      z-index: 50;
+    }
+    #zones-overview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      background: #17112a;
+      border-bottom: 1px solid #4a3f6b;
+    }
+    #zones-overview-header h3 {
+      margin: 0;
+      color: #cbb6ff;
+      font-family: sans-serif;
+      font-size: 16px;
+    }
+    #zones-overview-header .row {
+      display: flex;
+      gap: 8px;
+    }
+    #zones-overview-header button {
+      font-family: sans-serif;
+      font-size: 12px;
+      background: #241c3f;
+      color: #e8d9ff;
+      border: 1px solid #4a3f6b;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    #zones-overview-header button:hover {
+      background: #362a5c;
+    }
+    #zones-overview-canvas {
+      position: relative;
+      width: 100%;
+      height: calc(100vh - 53px);
+      overflow: auto;
+    }
+    #zones-overview-lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3000px;
+      height: 2000px;
+      pointer-events: none;
+      /* Au-dessus des cartes (retour utilisateur : "je peux pas retirer
+         une liaison") -- les cartes sont ajoutées APRÈS ce <svg> dans le
+         DOM, donc s'affichaient par-dessus par défaut (même ordre
+         d'empilement) : le rond "×" au milieu d'une ligne pouvait se
+         retrouver caché sous une carte voisine, jamais cliquable. Le fond
+         du <svg> reste totalement transparent aux clics (pointer-events:
+         none ci-dessus) : seuls les éléments enfants qui le redéfinissent
+         explicitement (les ronds "×", cf. drawZoneConnections) captent
+         quoi que ce soit -- les boutons des cartes restent cliquables
+         normalement. */
+      z-index: 1;
+    }
+    .zone-card {
+      position: absolute;
+      width: 180px;
+      background: #17112a;
+      border: 1px solid #4a3f6b;
+      border-radius: 6px;
+      padding: 8px;
+      box-sizing: border-box;
+      color: #e8d9ff;
+      font-family: sans-serif;
+      font-size: 12px;
+      cursor: grab;
+      user-select: none;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    }
+    .zone-card.dragging {
+      cursor: grabbing;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+      z-index: 2;
+    }
+    .zone-card canvas {
+      display: block;
+      width: 100%;
+      height: 90px;
+      border-radius: 4px;
+      background: #0d0b1a;
+      margin-bottom: 6px;
+    }
+    .zone-card .zone-card-name {
+      font-weight: bold;
+      color: #cbb6ff;
+      margin-bottom: 6px;
+      word-break: break-all;
+    }
+    .zone-card button {
+      font-family: sans-serif;
+      font-size: 11px;
+      background: #241c3f;
+      color: #e8d9ff;
+      border: 1px solid #4a3f6b;
+      border-radius: 4px;
+      padding: 4px 6px;
+      width: 100%;
+      cursor: pointer;
+    }
+    .zone-card button:hover {
+      background: #362a5c;
+    }
+    .zone-card-new {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #a99bd6;
+      border-style: dashed;
+    }
+    .zone-card-new button {
+      cursor: pointer;
+    }
+
+    /* Rond de connexion (retour utilisateur : "connecter/déconnecter les
+       zones avec des rond où j'appuie et je sélectionne les zones") --
+       posé en haut à droite de chaque carte, jamais en conflit avec les
+       boutons Charger/Télécharger du bas. */
+    .zone-card-connector {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border-radius: 50%;
+      background: #6b4fb3;
+      border: 2px solid #cbb6ff;
+      cursor: pointer;
+    }
+    .zone-card-connector:hover {
+      background: #8a6fd6;
+    }
+    .zone-card-connector.armed {
+      background: #ff6666;
+      border-color: #ffb3b3;
+      box-shadow: 0 0 8px #ff6666;
+    }
+
+    /* Fenêtre de connexion (choix de quelle sortie de chaque zone relier)
+       -- retour utilisateur : "comme une zone doit avoir plusieurs sorties
+       [...] ça me met un choix de la zone à connecter de chaque zones
+       entre elle". */
+    .zone-connect-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #17112a;
+      border: 1px solid #4a3f6b;
+      border-radius: 8px;
+      padding: 16px;
+      width: 340px;
+      color: #e8d9ff;
+      font-family: sans-serif;
+      font-size: 13px;
+      z-index: 60;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+    }
+    .zone-connect-modal h4 {
+      margin: 0 0 12px;
+      color: #cbb6ff;
+      font-size: 15px;
+    }
+    .zone-connect-field {
+      margin-bottom: 10px;
+    }
+    .zone-connect-field label {
+      display: block;
+      margin-bottom: 4px;
+      color: #a99bd6;
+      font-size: 12px;
+    }
+    .zone-connect-field select {
+      width: 100%;
+      font-family: sans-serif;
+      font-size: 12px;
+      background: #241c3f;
+      color: #e8d9ff;
+      border: 1px solid #4a3f6b;
+      border-radius: 4px;
+      padding: 5px 6px;
+    }
+    .zone-connect-modal .row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .zone-connect-modal .row button {
+      flex: 1;
+      font-family: sans-serif;
+      font-size: 12px;
+      background: #241c3f;
+      color: #e8d9ff;
+      border: 1px solid #4a3f6b;
+      border-radius: 4px;
+      padding: 6px;
+      cursor: pointer;
+    }
+    .zone-connect-modal .row button:hover {
+      background: #362a5c;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <div id="editor-ui">
+    <h3>Éditeur de niveau</h3>
+
+    <div class="editor-section">
+      <button id="btn-zones-overview">Zones</button>
+    </div>
+
+    <div class="editor-section">
+      <label>Outil</label>
+      <div class="tool-buttons">
+        <button data-tool="ground" class="active">Sol</button>
+        <button data-tool="erase">Effacer sol</button>
+        <button data-tool="ground-back">Sol arrière-plan</button>
+        <button data-tool="erase-back">Effacer arrière-plan</button>
+        <button data-tool="spawn">Spawn joueur</button>
+        <button data-tool="portal">Portail</button>
+        <button data-tool="totem">Totem</button>
+        <button data-tool="enemy">Ennemi</button>
+        <button data-tool="water">Eau</button>
+        <button data-tool="prop">Décor</button>
+        <button data-tool="campfire">Feu de camp</button>
+        <button data-tool="delete">Supprimer</button>
+      </div>
+    </div>
+
+    <div class="editor-section" id="material-section">
+      <label>Matériau du sol</label>
+      <select id="material-select">
+        <option value="dirt">Terre</option>
+      </select>
+    </div>
+
+    <div class="editor-section" id="subtype-section" style="display:none">
+      <label id="subtype-label">Type</label>
+      <select id="subtype-select"></select>
+    </div>
+
+    <div class="editor-section">
+      <label>Taille du niveau (px)</label>
+      <div class="row">
+        <input id="level-width-input" type="number" step="64" value="2400" />
+        <input id="level-height-input" type="number" step="64" value="540" />
+      </div>
+      <button id="apply-size-btn" style="margin-top:4px">Appliquer</button>
+    </div>
+
+    <div class="editor-section">
+      <label>Nom du niveau à enregistrer</label>
+      <input id="level-name-input" type="text" placeholder="ex: zone2, sous_grotte..." />
+    </div>
+
+    <div class="editor-section">
+      <button id="btn-playtest">Playtest</button>
+      <div class="row" style="margin-top:4px">
+        <button id="btn-save">Enregistrer</button>
+        <button id="btn-load">Importer un .json</button>
+      </div>
+      <button id="btn-new" style="margin-top:4px">Nouveau niveau</button>
+      <input type="file" id="file-input" accept=".json" style="display:none" />
+    </div>
+
+    <div class="editor-section" style="border-bottom:none">
+      <label>État</label>
+      <div id="editor-status"></div>
+    </div>
+  </div>
+
+  <div id="zones-overview-overlay">
+    <div id="zones-overview-header">
+      <h3>Vue d'ensemble des zones</h3>
+      <button id="btn-close-zones-overview">Fermer</button>
+    </div>
+    <div id="zones-overview-canvas">
+      <svg id="zones-overview-lines"></svg>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script src="src/utils/LevelKit.js"></script>
+  <script src="src/data/zone1_data.js"></script>
+  <script src="src/data/zone2_data.js"></script>
+  <script src="src/data/zone3_data.js"></script>
+  <script src="src/data/zone4_data.js"></script>
+  <script src="src/data/zone5_data.js"></script>
+  <script src="src/data/zone_aquatique_data.js"></script>
+  <script src="src/data/sous_grotte_data.js"></script>
+  <script src="src/entities/Player.js"></script>
+  <script src="src/entities/Xara.js"></script>
+  <script src="src/entities/LoupSanguinaire.js"></script>
+  <script src="src/entities/Araignee.js"></script>
+  <script src="src/entities/Web.js"></script>
+  <script src="src/entities/Feather.js"></script>
+  <script src="src/entities/Corbeau.js"></script>
+  <script src="src/entities/LoupAlpha.js"></script>
+  <script src="src/entities/Crapaud.js"></script>
+  <script src="src/scenes/BootScene.js"></script>
+  <script src="src/scenes/PrologueScene.js"></script>
+  <script src="src/scenes/Zone1Scene.js"></script>
+  <script src="src/scenes/Zone2Scene.js"></script>
+  <script src="src/scenes/Zone3Scene.js"></script>
+  <script src="src/scenes/SousGrotteScene.js"></script>
+  <script src="src/scenes/Zone4Scene.js"></script>
+  <script src="src/scenes/ZoneAquatiqueScene.js"></script>
+  <script src="src/scenes/Zone5Scene.js"></script>
+  <script src="src/scenes/EndScreenScene.js"></script>
+  <script src="src/scenes/EditorScene.js"></script>
+  <script src="src/scenes/CampfireMenuScene.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
