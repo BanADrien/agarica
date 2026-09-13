@@ -607,6 +607,7 @@ function goToScene(scene, key, data) {
   scene.__transitioningAway = true;
   scene.cameras.main.fadeOut(FADE_DURATION, ...FADE_COLOR);
   scene.cameras.main.once('camerafadeoutcomplete', () => {
+    scene.scene.stop();
     scene.scene.start(key, data);
   });
 }
@@ -814,7 +815,7 @@ function groundSurfaceYAt(scene, x, referenceY) {
 // Idempotent : le flag protège contre un second déclenchement. Vérifié à
 // chaque frame via `scene.events.on('update', ...)` plutôt qu'un collider
 // dédié : pas besoin de toucher la boucle update() de chaque Zone*Scene.
-function addAbilityShrine(scene, x, y, flagName, message) {
+function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   const totemType = TOTEM_TYPE_BY_FLAG[flagName] || 'wolf';
   const alreadyHas = !!scene.registry.get(flagName);
   const textureKey = `totem-${totemType}-${alreadyHas ? 'dim' : 'lit'}`;
@@ -825,7 +826,7 @@ function addAbilityShrine(scene, x, y, flagName, message) {
   y += TOTEM_GROUND_SINK;
   const marker = scene.physics.add.staticSprite(x, y, textureKey);
   marker.setOrigin(0.5, 1);
-  marker.setScale(TOTEM_SCALE);
+  marker.setScale(scale);
   marker.body.updateFromGameObject();
 
   const prompt = scene.add.text(x, y - marker.displayHeight - 14, 'Appuie sur E', {
@@ -837,6 +838,12 @@ function addAbilityShrine(scene, x, y, flagName, message) {
   }).setOrigin(0.5).setVisible(false);
 
   scene.events.on('update', () => {
+    // Cf. `currentLevelScene` : ce listener n'est jamais retiré au départ
+    // de la zone (persiste sur `scene.events`, réutilisé d'une visite à
+    // l'autre) -- sans ce garde-fou il continuerait à tourner sur un
+    // `marker`/`scene.player` d'une visite précédente, potentiellement déjà
+    // détruits, après un retour dans cette même zone.
+    if (scene !== currentLevelScene) return;
     if (scene.registry.get(flagName)) {
       prompt.setVisible(false);
       return;
@@ -926,11 +933,11 @@ const CAMPFIRE_INTERACT_RANGE = 70;
 // fichier) EN PARALLÈLE -- vrai menu à glisser-déposer (formes/
 // compétences/totems), plus le bricolage Graphics/Text+touches d'avant
 // (retour utilisateur : "fais un vrai menu propre... glisser déposer").
-function addCampfire(scene, x, y) {
+function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
   ensureCampfireAnimation(scene);
   scene.add.sprite(x, y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`)
     .setOrigin(0.5, 1)
-    .setScale(CAMPFIRE_SCALE)
+    .setScale(scale)
     .play(ANIM_CAMPFIRE_BURN_KEY);
 
   const prompt = scene.add.text(x, y - 90, 'Appuie sur E pour te reposer', {
@@ -942,6 +949,9 @@ function addCampfire(scene, x, y) {
   }).setOrigin(0.5).setVisible(false);
 
   scene.events.on('update', () => {
+    // Cf. `currentLevelScene` (même raison que dans addAbilityShrine) :
+    // ce listener persiste d'une visite à l'autre de la zone.
+    if (scene !== currentLevelScene) return;
     // Menu ouvert (scène séparée, cf. CampfireMenuScene.update() pour sa
     // propre fermeture E/Échap) : le prompt "Appuie sur E" (texte MONDE,
     // pas écran) resterait sinon affiché par-dessus, inchangé depuis juste
@@ -1446,8 +1456,32 @@ function getExitTriggerRect(exit) {
 // leur propre logique bien avant ça, ex: Zone4Scene et `enterFrom` --
 // les deux coexistent sans conflit, `sceneData` n'est jamais consommé
 // qu'une fois par clé).
+// Cf. son affectation dans buildLevelFromData et son usage dans
+// updateLevelFromData/addAbilityShrine/addCampfire pour le pourquoi : sert
+// à ignorer les frames fantômes d'une zone quittée dont Phaser continue
+// d'appeler update() (cause exacte non identifiée, contournée au niveau
+// appli plutôt qu'au niveau moteur).
+let currentLevelScene = null;
+
 function buildLevelFromData(scene, data, sceneData) {
   fadeInScene(scene);
+  // Retour utilisateur : "je ne peux plus retourner a la zone1, ça me met
+  // un écran vide" -- `goToScene` pose `__transitioningAway = true` sur LA
+  // SCÈNE (cf. son commentaire) pour ignorer les frames suivantes tant que
+  // le fondu est en cours, mais ne le repasse JAMAIS à false lui-même.
+  // Phaser réutilise la MÊME instance de scène à chaque `scene.start(...)`
+  // (`create()` est rappelé, mais les propriétés posées à la volée comme
+  // celle-ci survivent) : une fois qu'on est sorti UNE fois d'une zone, le
+  // verrou reste posé pour de bon sur cette instance -- la 2e tentative de
+  // sortie de cette MÊME zone (aller-retour, ex: zonetest <-> zone1) ne
+  // déclenchait donc plus jamais rien (goToScene retourne immédiatement à
+  // sa ligne `if (scene.__transitioningAway) return;`). Invisible tant
+  // qu'aucune zone n'était traversée dans les deux sens -- jamais remarqué
+  // avant le premier portail aller-retour de ce projet. Réinitialisé ici,
+  // au tout début de chaque `create()` (donc à chaque (re)entrée dans la
+  // zone), pour n'empêcher que les déclenchements multiples PENDANT un même
+  // passage, jamais les passages suivants.
+  scene.__transitioningAway = false;
 
   const { width, height } = scene.scale;
   const levelWidth = data.levelWidth || width;
@@ -1549,6 +1583,26 @@ function buildLevelFromData(scene, data, sceneData) {
   // Désarmé pour ce seul `portalId` jusqu'à ce que le joueur cesse de
   // toucher son rectangle une première fois (cf. updateLevelFromData).
   scene.__spawnPortalId = (enteredAt && enteredAt.portalId) || null;
+  // Retour utilisateur : "je ne peux plus retourner a la zone1, ça me met
+  // un écran vide" (partie 2, après le fix de `__transitioningAway`
+  // ci-dessus) -- vérifié empiriquement : après un aller-retour de zone,
+  // l'ANCIENNE instance de la zone quittée continue de recevoir des appels
+  // update() de Phaser (son `scene.player`/`scene.xara` d'alors ont bien
+  // été détruits entre-temps -- `this.scene` y vaut `undefined` -- mais
+  // rien n'empêchait `updateLevelFromData`/les callbacks `scene.events.on
+  // ('update', ...)` posés par `addAbilityShrine`/`addCampfire` de
+  // continuer à tourner dessus, plantant sur ces objets détruits et
+  // empêchant la vraie zone courante de jamais recevoir sa propre frame
+  // "sortie déjà quittée" (cf. reset de `__spawnPortalId` plus bas, jamais
+  // atteint une fois le crash lancé). Pourquoi Phaser continue d'appeler
+  // update() sur cette instance après `goToScene` reste incompris (son
+  // `sys.settings.active`/`status` lisent pourtant RUNNING) -- plutôt que
+  // de percer ce mystère plus loin, on tranche au niveau appli : un seul
+  // pointeur module-level (`currentLevelScene`) vers la DERNIÈRE zone
+  // construite ; toute frame reçue par une instance qui n'est plus celle-là
+  // (donc forcément une frame fantôme d'une zone quittée) est ignorée sans
+  // toucher à aucun objet potentiellement détruit.
+  currentLevelScene = scene;
   scene.player = new Player(scene, spawn.x, spawn.y);
   scene.xara = new Xara(scene, scene.player);
   scene.physics.add.collider(scene.player, scene.ground);
@@ -1607,7 +1661,7 @@ function buildLevelFromData(scene, data, sceneData) {
 
   for (const t of data.totems || []) {
     const y = groundSurfaceYAt(scene, t.x, t.y) ?? t.y;
-    addAbilityShrine(scene, t.x, y, t.flag, t.message || '');
+    addAbilityShrine(scene, t.x, y, t.flag, t.message || '', t.scale || TOTEM_SCALE);
   }
 
   for (const p of data.props || []) {
@@ -1623,7 +1677,7 @@ function buildLevelFromData(scene, data, sceneData) {
   // position brute stockée) : cf. leur commentaire respectif.
   for (const c of data.campfires || []) {
     const y = groundSurfaceYAt(scene, c.x, c.y) ?? c.y;
-    addCampfire(scene, c.x, y);
+    addCampfire(scene, c.x, y, c.scale || CAMPFIRE_SCALE);
   }
 
   // Retour utilisateur : "une zone doit avoir plusieurs sorties" -- `exits`
@@ -1751,6 +1805,11 @@ function drawHud(scene) {
 // Boucle `update()` commune à une scène construite par buildLevelFromData —
 // même contenu que ce que chaque Zone*Scene répète à la main aujourd'hui.
 function updateLevelFromData(scene, time, delta) {
+  // Cf. le commentaire sur `currentLevelScene` (déclaration plus haut) et
+  // celui dans buildLevelFromData -- une zone quittée peut continuer à
+  // recevoir des frames update() fantômes ; ignorées ici avant de toucher
+  // le moindre objet (player/xara/...) potentiellement déjà détruit.
+  if (scene !== currentLevelScene) return;
   // `scene.create()` attend maintenant `resolveZoneData(...)` (une
   // promesse IndexedDB, cf. son commentaire) avant d'appeler
   // buildLevelFromData -- Phaser continue d'appeler update() à chaque

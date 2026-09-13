@@ -55,7 +55,7 @@ const config = {
   scene: [
     BootScene, PrologueScene,
     Zone1Scene, Zone3Scene, Zone2Scene, SousGrotteScene, Zone4Scene,
-    ZoneAquatiqueScene, Zone5Scene,
+    ZoneAquatiqueScene, Zone5Scene, ZonetestScene,
     EndScreenScene,
     EditorScene, PlaytestScene,
     CampfireMenuScene,

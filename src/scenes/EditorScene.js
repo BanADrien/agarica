@@ -58,6 +58,16 @@ const EDITOR_ENEMY_PATROL_HALF_WIDTH = 150;
 const EDITOR_MARKER_HIT_RADIUS = 26;
 // Cf. pushUndo/undo plus bas.
 const EDITOR_UNDO_MAX = 50;
+// Retour utilisateur : "modifier permet de sélectionner un élément pour le
+// déplacer/l'agrandir" -- outil 'modify', cf. findMarkerNear/selectMarker/
+// moveSelectedMarker/le listener 'wheel' plus bas. Seuls les éléments avec
+// une vraie image (pas les marqueurs cercle+lettre spawn/ennemi) ont un
+// agrandissement qui a un sens.
+const EDITOR_RESIZABLE_KINDS = new Set(['totem', 'campfire', 'prop']);
+const EDITOR_GROUND_SNAPPED_KINDS = new Set(['totem', 'campfire', 'prop']);
+const EDITOR_SCALE_STEP = 0.03;
+const EDITOR_MIN_SCALE = 0.08;
+const EDITOR_MAX_SCALE = 2.5;
 const EDITOR_ENEMY_MARKER_COLORS = { araignee: 0xcc4477, loup: 0x8888ff, corbeau: 0x6644aa };
 const EDITOR_ENEMY_MARKER_LABELS = { araignee: 'A', loup: 'L', corbeau: 'C' };
 
@@ -118,6 +128,14 @@ class EditorScene extends Phaser.Scene {
     // depuis ce changement) restent lues normalement (cf. applyLevelData).
     this.portalDragStart = null;
     this.portalPreview = null;
+    // Outil 'modify' (retour utilisateur : "une option modifier qui permet
+    // de selectionner un element de le deplacer l'agrandir") : cf.
+    // selectMarker/moveSelectedMarker/handleModifyWheel plus bas.
+    this.selectedMarker = null;
+    this.modifyDragOffset = null;
+    this.modifyDragPushed = false;
+    this.modifyResizePushed = false;
+    this.modifyResizeTimer = null;
     // Annuler (retour utilisateur : "rajoute le ctrl Z dans le mode editor
     // quand je supprime ou rajoute un truc ça l'annule") : cf. pushUndo/undo
     // plus bas.
@@ -155,12 +173,21 @@ class EditorScene extends Phaser.Scene {
     });
 
     this.gridGraphics = this.add.graphics();
+    // Contour de sélection de l'outil 'modify' (cf. updateSelectionVisual) --
+    // profondeur fixe pour rester au-dessus de n'importe quel élément
+    // (sol/décor/totem...) peu importe l'ordre dans lequel ils ont été
+    // ajoutés à la scène.
+    this.selectionGraphics = this.add.graphics().setDepth(1000);
     this.refreshWorldBounds();
     this.redrawGround();
 
     this.input.on('pointerdown', (p) => this.onPointerDown(p));
     this.input.on('pointermove', (p) => this.onPointerMove(p));
     this.input.on('pointerup', (p) => this.onPointerUp(p));
+    // Molette = redimensionner l'élément sélectionné (outil 'modify', cf.
+    // handleModifyWheel) -- pas de zoom caméra dans cet éditeur, la molette
+    // était jusqu'ici totalement inutilisée, aucun conflit.
+    this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => this.handleModifyWheel(deltaY));
 
     EditorScene.wireUI();
     EditorScene.syncUIFromScene(this);
@@ -320,7 +347,23 @@ class EditorScene extends Phaser.Scene {
       return;
     }
     if (this.tool === 'delete') {
+      // Retour utilisateur : "ne peux pas etre maintenu pour supprimer tout
+      // ce que je touche" -- un seul snapshot pour tout le glisser (même
+      // recette que la peinture de sol ci-dessus), `deleteNear` elle-même ne
+      // pousse plus d'annulation (cf. son commentaire) : onPointerMove
+      // rappelle juste deleteNear en continu pendant que le bouton reste
+      // enfoncé, sans ajouter de nouveaux crans d'annulation.
+      this.pushUndo();
       this.deleteNear(p.x, p.y);
+      return;
+    }
+    if (this.tool === 'modify') {
+      const marker = this.findMarkerNear(p.x, p.y);
+      this.selectMarker(marker);
+      if (marker) {
+        this.modifyDragOffset = { x: p.x - marker.entry.x, y: p.y - marker.entry.y };
+        this.modifyDragPushed = false;
+      }
       return;
     }
     if (EDITOR_CLICK_TOOLS.has(this.tool)) {
@@ -340,6 +383,15 @@ class EditorScene extends Phaser.Scene {
       this.updateWaterPreview(p.x, p.y);
     } else if (this.tool === 'portal' && this.portalDragStart) {
       this.updatePortalPreview(p.x, p.y);
+    } else if (this.tool === 'delete') {
+      this.deleteNear(p.x, p.y);
+    } else if (this.tool === 'modify' && this.selectedMarker && this.modifyDragOffset) {
+      // Cf. onPointerDown : un seul snapshot pour tout le glisser, poussé au
+      // tout premier mouvement plutôt qu'au clic (un simple clic de
+      // sélection, sans jamais bouger la souris, ne doit pas créer de cran
+      // d'annulation vide).
+      if (!this.modifyDragPushed) { this.pushUndo(); this.modifyDragPushed = true; }
+      this.moveSelectedMarker(p.x - this.modifyDragOffset.x, p.y - this.modifyDragOffset.y);
     }
   }
 
@@ -352,6 +404,7 @@ class EditorScene extends Phaser.Scene {
       const p = this.worldPointFromPointer(pointer);
       this.finishPortalDrag(p.x, p.y);
     }
+    this.modifyDragOffset = null;
     this.waterDragStart = null;
     this.portalDragStart = null;
     this.lastPaintedCell = null;
@@ -676,19 +729,37 @@ class EditorScene extends Phaser.Scene {
     });
   }
 
-  deleteNear(worldX, worldY) {
+  // Retour utilisateur : "supprimé ne prend pas toute l'image" -- pour un
+  // décor/totem/feu de camp affiché en GRAND (une vraie image, cf. placeAt),
+  // cliquer loin de son point d'ancrage (le pied de l'image, cf. setOrigin
+  // (0.5,1)) mais toujours DANS l'image ne touchait rien : seule la distance
+  // à l'ancre comptait (EDITOR_MARKER_HIT_RADIUS, pensé pour les petits
+  // marqueurs cercle+lettre spawn/ennemi). Un marqueur est maintenant aussi
+  // détecté si le point clique tombe dans les vrais bounds affichés de son
+  // image (m.obj[0].getBounds()) -- en PLUS du rayon existant (jamais à sa
+  // place, seulement en complément : les petits marqueurs sans image restent
+  // cliquables avec la même marge généreuse qu'avant).
+  findMarkerNear(worldX, worldY) {
     let best = null;
-    let bestDist = EDITOR_MARKER_HIT_RADIUS;
+    let bestDist = Infinity;
     for (const m of this.markers) {
       // Sortie : plus une ligne verticale (cf. placeAt), un point comme
       // les autres -- même calcul de proximité, plus de cas particulier.
       const p = m.kind === 'water' ? { x: m.entry.x + m.entry.width / 2, y: m.entry.y + m.entry.height / 2 }
         : { x: m.entry.x, y: m.entry.y };
       const d = Phaser.Math.Distance.Between(worldX, worldY, p.x, p.y);
+      const primary = m.obj[0];
+      const hitsBounds = primary && primary.getBounds ? primary.getBounds().contains(worldX, worldY) : false;
+      if (!(d < EDITOR_MARKER_HIT_RADIUS || hitsBounds)) continue;
       if (d < bestDist) { bestDist = d; best = m; }
     }
+    return best;
+  }
+
+  deleteNear(worldX, worldY) {
+    const best = this.findMarkerNear(worldX, worldY);
     if (!best) return;
-    this.pushUndo();
+    if (best === this.selectedMarker) this.selectMarker(null);
     for (const o of best.obj) o.destroy();
     if (best.sourceArray) {
       const i = best.sourceArray.indexOf(best.entry);
@@ -707,9 +778,95 @@ class EditorScene extends Phaser.Scene {
     this.markers = this.markers.filter((m) => m !== best);
   }
 
+  // Retour utilisateur : "je veux une option modifier qui permet de
+  // selectionner un element de le deplacer l'agrandir etc" -- outil
+  // 'modify' : réutilise le même hit-test que Supprimer (findMarkerNear) au
+  // lieu d'un système de sélection séparé. Sélectionner un AUTRE marqueur
+  // (ou cliquer dans le vide, marker=null) remplace toujours la sélection en
+  // cours -- un seul élément modifiable à la fois.
+  selectMarker(marker) {
+    this.selectedMarker = marker || null;
+    this.updateSelectionVisual();
+  }
+
+  // Rectangle en pointillés jaunes autour des bounds RÉELS de l'image
+  // sélectionnée (pas un simple point comme les marqueurs cercle+lettre) --
+  // redessiné à chaque déplacement/redimensionnement plutôt que suivi
+  // automatiquement, pour rester juste même après un changement d'échelle.
+  updateSelectionVisual() {
+    if (!this.selectionGraphics) return;
+    this.selectionGraphics.clear();
+    if (!this.selectedMarker) return;
+    const b = this.selectedMarker.obj[0].getBounds();
+    this.selectionGraphics.lineStyle(2, 0xffe066, 1);
+    this.selectionGraphics.strokeRect(b.x - 4, b.y - 4, b.width + 8, b.height + 8);
+  }
+
+  // Déplace le marqueur sélectionné à cette position monde -- même calage
+  // sol que placeAt pour les types qui y sont posés dessus (totem/feu de
+  // camp/décor), sinon la position brute (ennemi/spawn, cf. placeAt).
+  moveSelectedMarker(worldX, worldY) {
+    const m = this.selectedMarker;
+    if (!m) return;
+    const entry = m.entry;
+    entry.x = worldX;
+    entry.y = EDITOR_GROUND_SNAPPED_KINDS.has(m.kind)
+      ? (this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY)
+      : worldY;
+
+    if (m.kind === 'totem') {
+      m.obj[0].setPosition(entry.x, entry.y + TOTEM_GROUND_SINK);
+    } else if (m.kind === 'campfire') {
+      m.obj[0].setPosition(entry.x, entry.y + CAMPFIRE_SINK);
+    } else if (m.kind === 'enemy') {
+      m.obj[0].setPosition(entry.x, entry.y);
+      // obj[1] (s'il existe) : bande de patrouille, recentrée avec lui pour
+      // rester cohérente avec patrolMinX/patrolMaxX (cf. placeAt).
+      if (entry.patrolMinX !== undefined) {
+        entry.patrolMinX = entry.x - EDITOR_ENEMY_PATROL_HALF_WIDTH;
+        entry.patrolMaxX = entry.x + EDITOR_ENEMY_PATROL_HALF_WIDTH;
+        if (m.obj[1]) m.obj[1].setPosition(entry.x, entry.y);
+      }
+    } else {
+      m.obj[0].setPosition(entry.x, entry.y);
+    }
+    this.updateSelectionVisual();
+  }
+
+  // Molette pendant que l'outil 'modify' a un élément redimensionnable
+  // sélectionné (cf. EDITOR_RESIZABLE_KINDS) -- un seul cran d'annulation
+  // pour tout un geste de défilement continu (même esprit que le glisser de
+  // peinture/suppression/déplacement), fermé 600ms après le dernier
+  // ajustement plutôt que sur un événement de fin de molette (le navigateur
+  // n'en fournit pas de fiable).
+  handleModifyWheel(deltaY) {
+    const m = this.selectedMarker;
+    if (this.tool !== 'modify' || !m || !EDITOR_RESIZABLE_KINDS.has(m.kind)) return;
+    if (!this.modifyResizePushed) {
+      this.pushUndo();
+      this.modifyResizePushed = true;
+    }
+    clearTimeout(this.modifyResizeTimer);
+    this.modifyResizeTimer = setTimeout(() => { this.modifyResizePushed = false; }, 600);
+
+    const fallback = m.kind === 'totem' ? TOTEM_SCALE : m.kind === 'campfire' ? CAMPFIRE_SCALE : PROP_SCALE;
+    const current = m.entry.scale || fallback;
+    const next = Phaser.Math.Clamp(
+      current - Math.sign(deltaY) * EDITOR_SCALE_STEP,
+      EDITOR_MIN_SCALE,
+      EDITOR_MAX_SCALE,
+    );
+    m.entry.scale = next;
+    m.obj[0].setScale(next);
+    this.updateSelectionVisual();
+  }
+
   setTool(tool) {
     this.tool = tool;
     this.lastPaintedCell = null;
+    // Changer d'outil quitte le mode Modifier : le contour de sélection ne
+    // doit pas rester affiché pendant qu'un autre outil est utilisé.
+    if (tool !== 'modify') this.selectMarker(null);
   }
 
   applyLevelSize(width, height) {
@@ -724,6 +881,11 @@ class EditorScene extends Phaser.Scene {
     if (this.waterPreview) this.waterPreview.destroy();
     this.groundImages = [];
     this.markers = [];
+    // `this.markers` vient d'être vidé (tous les objets détruits) : une
+    // sélection en cours (outil 'modify') pointerait sinon vers un marqueur
+    // fantôme (Ctrl+Z, chargement d'une autre zone...).
+    this.selectMarker(null);
+    this.modifyDragOffset = null;
     this.data = EditorScene.emptyLevelData();
     // Repartir de zéro (ou charger une autre zone, cf. applyLevelData plus
     // bas qui appelle newLevel() en premier) efface l'historique -- annuler
@@ -1047,8 +1209,11 @@ class EditorScene extends Phaser.Scene {
     this.redrawGround();
     for (const entry of this.data.totems) {
       const totemType = TOTEM_TYPE_BY_FLAG[entry.flag] || 'wolf';
-      // + TOTEM_GROUND_SINK : cf. placeAt, même raison.
-      const obj = this.add.image(entry.x, entry.y + TOTEM_GROUND_SINK, `totem-${totemType}-lit`).setOrigin(0.5, 1).setScale(TOTEM_SCALE);
+      // + TOTEM_GROUND_SINK : cf. placeAt, même raison. `entry.scale` (posé
+      // par l'outil 'modify', cf. handleModifyWheel) prime sur la constante
+      // par défaut si présent -- sinon un totem redimensionné reviendrait à
+      // sa taille d'origine à chaque rechargement de la zone.
+      const obj = this.add.image(entry.x, entry.y + TOTEM_GROUND_SINK, `totem-${totemType}-lit`).setOrigin(0.5, 1).setScale(entry.scale || TOTEM_SCALE);
       this.markers.push({ kind: 'totem', entry, obj: [obj], sourceArray: this.data.totems });
     }
     for (const entry of this.data.enemies) {
@@ -1065,7 +1230,8 @@ class EditorScene extends Phaser.Scene {
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
     for (const entry of this.data.campfires) {
-      const obj = this.add.image(entry.x, entry.y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE);
+      // `entry.scale` : cf. le commentaire équivalent sur les totems ci-dessus.
+      const obj = this.add.image(entry.x, entry.y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(entry.scale || CAMPFIRE_SCALE);
       this.markers.push({ kind: 'campfire', entry, obj: [obj], sourceArray: this.data.campfires });
     }
     for (const entry of this.data.water) {

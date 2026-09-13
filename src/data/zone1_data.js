@@ -39,6 +39,38 @@ const ZONE1_DATA = {
       message: "Tu sens la force du Loup s'éveiller en toi.\nShift ou double-tap : sprint",
     },
   ],
-  exit: { x: 2370, targetScene: 'Zone3Scene', data: {} },
+  exits: [
+    { x: 2370, targetScene: 'Zone3Scene', data: {} },
+    // Retour utilisateur : "la connexion de zone1 a zonetest ne se fais
+    // pas" -- ce portail avait été posé à x=2378.6 dans l'éditeur, à 8.6px
+    // seulement de la sortie Zone3 ci-dessus (x=2370). Comme cette dernière
+    // n'a pas de `height` (déclencheur pleine hauteur, cf. getExitTriggerRect
+    // dans LevelKit.js) et que les deux rectangles de déclenchement
+    // (largeur EXIT_TRIGGER_WIDTH=64) se chevauchaient largement, la boucle
+    // `for (const exit of scene.__exits)` (LevelKit.js) tombait TOUJOURS sur
+    // la sortie Zone3 en premier : ce portail-ci ne pouvait jamais se
+    // déclencher, quel que soit son propre paramétrage. Décalé à x=2100
+    // (>64px des deux voisins : sortie Zone3 à 2370, totem à 2250) pour ne
+    // plus jamais partager son rectangle de déclenchement avec un autre --
+    // reste sur le même sol plat (gy=7/8, surface 448) que le reste de la
+    // fin de zone, ajustable à la main dans l'éditeur si besoin.
+    {
+      x: 2100,
+      y: 283.302752293578,
+      height: 307.08256880733944,
+      targetScene: 'ZonetestScene',
+      data: { enterId: 'entry_mtzke73s_dgr3' },
+      portalId: 'entry_mtynumy9_34s8',
+    },
+  ],
+  entries: [
+    {
+      id: 'entry_mtynumy9_34s8',
+      x: 2100,
+      y: 283.302752293578,
+      height: 307.08256880733944,
+      portalId: 'entry_mtynumy9_34s8',
+    },
+  ],
   helpText: 'Fleches/QSD : deplacement — Espace : sauter',
 };
