@@ -1,0 +1,13 @@
+{
+  "liveServer.settings.port": 5500,
+  "liveServer.settings.root": "/",
+  "liveServer.settings.file": "index.html",
+  "liveServer.settings.ignoreFiles": [
+    ".vscode/**",
+    ".claude/**",
+    "tools/**",
+    "**/*.py",
+    "**/*.md",
+    "**/*.txt"
+  ]
+}

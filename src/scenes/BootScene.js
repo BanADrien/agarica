@@ -250,6 +250,11 @@ class BootScene extends Phaser.Scene {
     for (let i = 0; i < ARBRE_COUNT; i++) {
       this.load.image(`${ARBRE_TEXTURE_PREFIX}${i}`, `assets/decors/arbres_frames/arbre_${i}.png`);
     }
+    // Sous-bois (buissons/fougères/champignons, voir addUndergrowth dans
+    // LevelKit.js), découpés depuis les 2 dernières rangées de arbres.png.
+    for (let i = 0; i < SOUS_BOIS_COUNT; i++) {
+      this.load.image(`${SOUS_BOIS_TEXTURE_PREFIX}${i}`, `assets/decors/sous_bois_frames/sous_bois_${i}.png`);
+    }
     // Plantes de premier plan (touffes au sol + lianes au plafond, voir
     // addProceduralGroundPlants/HangingPlants dans LevelKit.js), découpées
     // depuis assets/decors/plantes.png (préfixe b/h du nom de fichier = bas/haut).

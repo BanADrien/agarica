@@ -184,12 +184,14 @@ const ARBRE_TEXTURE_PREFIX = 'decor-arbre-';
 // 1.15 (pas 0.75) : les arbres paraissaient chétifs/trop bas par rapport au
 // sol une fois celui-ci agrandi (cf. GROUND_TILE_SIZE) — plus grands pour
 // dominer réellement le sol plutôt que de flotter au même gabarit qu'avant.
-const ARBRE_BASE_SCALE = 1.15;
+// Puis 1.35 (retour utilisateur : "les arbres au fond sont un peu trop bas
+// et petits", cf. aussi ARBRE_GROUND_CLEARANCE).
+const ARBRE_BASE_SCALE = 1.35;
 // Espacement élargi en conséquence : au même espacement qu'avant, des
 // arbres 53% plus grands se seraient chevauchés en un mur de feuillage
 // continu au lieu d'une forêt dispersée.
-const ARBRE_SPACING_MIN = 160;
-const ARBRE_SPACING_MAX = 280;
+const ARBRE_SPACING_MIN = 180;
+const ARBRE_SPACING_MAX = 320;
 // Marge de chaque côté d'une fosse/zone d'eau : un élément planté juste au
 // bord paraîtrait plaqué sur le vide plutôt que clairement dedans ou dehors.
 // Partagée par la forêt (plan3) et les plantes de sol (plan1).
@@ -220,7 +222,9 @@ const ARBRE_SINK = 6;
 // tronc derrière ce bloc bien plus haut qu'avant ("on ne voit que les
 // feuilles"). Remonte le pied de l'arbre d'à peu près la hauteur visible
 // du sol pour qu'il reparte de la ligne d'herbe plutôt que du bord d'écran.
-const ARBRE_GROUND_CLEARANCE = 70;
+// 75 : remontés en même temps que ARBRE_BASE_SCALE ("un peu trop bas" à 70),
+// puis redescendus ("un peu trop haut" à 100, "encore trop haut, un peu" à 85).
+const ARBRE_GROUND_CLEARANCE = 75;
 
 function addProceduralForest(scene, height, levelWidth, avoidRanges = []) {
   scatterAlongLevel(scene, levelWidth, avoidRanges, ARBRE_SPACING_MIN, ARBRE_SPACING_MAX, (x) => {
@@ -651,6 +655,49 @@ const TOTEM_SCALE = 0.35;
 // props/le feu de camp, qui n'ont pas ce problème).
 const TOTEM_GROUND_SINK = 16;
 
+// Plantes devant le socle de chaque totem (retour utilisateur : "mettre des
+// plantes devant les totems par défaut pour mieux les intégrer") -- mêmes
+// frames que le sous-bois (cf. addUndergrowth) : un buisson de chaque côté,
+// tourné vers l'extérieur, et une petite touffe au centre. Indices dans
+// assets/decors/sous_bois_frames/ : 1-5 = buissons/fougères (rangée 3 de
+// arbres.png), 6-13 = petites touffes (rangée 4).
+// Retour utilisateur suivant : "les plantes sont trop hautes autour des
+// totems, mets-les au même niveau que les autres" -- d'abord posées DEVANT
+// le sol principal (base entièrement visible, donc plus hautes que le
+// sous-bois voisin dont le pied passe derrière la frange d'herbe). Désormais
+// au même enfoncement (SOUS_BOIS_SINK) et sur le même plan que le sous-bois,
+// cf. sendBehindFrontGround : totem ET plantes passent juste derrière le sol
+// principal, les plantes restant devant le totem.
+const TOTEM_PLANT_SIDE_INDICES = [1, 2, 3, 4, 5];
+const TOTEM_PLANT_CENTER_INDICES = [6, 7, 8, 9, 11, 13];
+const TOTEM_PLANT_SIDE_SCALE = 0.34;
+const TOTEM_PLANT_CENTER_SCALE = 0.38;
+// Écart horizontal des buissons latéraux, en fraction de la largeur affichée
+// du totem (depuis son centre).
+const TOTEM_PLANT_SIDE_OFFSET = 0.5;
+
+// `surfaceY` : haut visuel de la case de sol sous le totem (cf.
+// groundSurfaceYAt), pas le bas du totem déjà enfoncé.
+function addTotemPlants(scene, x, surfaceY, totemWidth) {
+  const y = surfaceY + SOUS_BOIS_SINK;
+  const jitter = () => Phaser.Math.FloatBetween(0.9, 1.1);
+  const offset = totemWidth * TOTEM_PLANT_SIDE_OFFSET;
+  return [
+    addUndergrowthImage(scene, x - offset, y, pickUndergrowthVariant(scene, TOTEM_PLANT_SIDE_INDICES, x - offset, y), TOTEM_PLANT_SIDE_SCALE * jitter(), true),
+    addUndergrowthImage(scene, x + offset, y, pickUndergrowthVariant(scene, TOTEM_PLANT_SIDE_INDICES, x + offset, y), TOTEM_PLANT_SIDE_SCALE * jitter(), false),
+    addUndergrowthImage(scene, x, y, pickUndergrowthVariant(scene, TOTEM_PLANT_CENTER_INDICES, x, y), TOTEM_PLANT_CENTER_SCALE * jitter(), Math.random() < 0.5),
+  ];
+}
+
+// Place les objets donnés juste derrière le sol principal (dans l'ordre :
+// le premier reste le plus en arrière), sans toucher à leur profondeur --
+// cf. `scene.__frontGroundFirstImage`, posé par buildLevelFromData.
+function sendBehindFrontGround(scene, objects) {
+  const anchor = scene.__frontGroundFirstImage;
+  if (!anchor) return;
+  for (const obj of objects) scene.children.moveBelow(obj, anchor);
+}
+
 // Bannière "transformation débloquée" : popup plein écran bref au premier
 // déblocage, en plus du texte flottant déjà présent sur le totem. Retour
 // utilisateur : "j'ai changé les popups, si tu veux bien les refaire" --
@@ -828,6 +875,8 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   marker.setOrigin(0.5, 1);
   marker.setScale(scale);
   marker.body.updateFromGameObject();
+  const plants = addTotemPlants(scene, x, y - TOTEM_GROUND_SINK, marker.displayWidth);
+  sendBehindFrontGround(scene, [marker, ...plants]);
 
   const prompt = scene.add.text(x, y - marker.displayHeight - 14, 'Appuie sur E', {
     fontFamily: 'sans-serif',
@@ -1329,6 +1378,178 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
   return images;
 }
 
+// Sous-bois (assets/decors/sous_bois_frames/, découpés depuis les 2
+// DERNIÈRES rangées de assets/decors/arbres.png -- buissons, fougères,
+// champignons -- voir tools/crop_sous_bois.py) : dispersés au hasard comme la
+// forêt du plan3 (essence, échelle, miroir, espacement variable, cf.
+// addProceduralForest), mais sur un plan intermédiaire -- devant le sol de
+// fond (groundBackCells), derrière le sol principal (groundCells), cf. ordre
+// de rendu dans buildLevelFromData -- et sans parallaxe (scrollFactor par
+// défaut, 1) : ils défilent avec le sol réel sur lequel ils sont posés, leur
+// pied caché derrière la frange d'herbe du sol principal.
+const SOUS_BOIS_COUNT = 14;
+const SOUS_BOIS_TEXTURE_PREFIX = 'decor-sous-bois-';
+const SOUS_BOIS_BASE_SCALE = 0.45;
+// Retour utilisateur : "y en a pas assez sur les longues lignes" -- resserré
+// depuis 90-220 (environ 1 élément toutes les 2-3 tuiles au lieu de 4-5).
+const SOUS_BOIS_SPACING_MIN = 45;
+const SOUS_BOIS_SPACING_MAX = 110;
+// Bas du cadre enfoncé sous le HAUT de la case de surface : la ligne d'herbe
+// dessinée sur dirt_t/tl/tr tombe vers le 1er quart de la case (cf.
+// AUTOTILE_GRASS_HITBOX_FRACTION), sa frange de mousse descend plus bas --
+// assez pour que les rochers/l'herbe de la base passent derrière elle
+// plutôt que de flotter au-dessus du sol.
+const SOUS_BOIS_SINK = 24;
+// Retrait minimal entre le bord d'un élément et le bout de son tronçon de
+// sol : les tuiles de coin (tl/tr) arrondissent déjà le bord, un élément
+// calé pile dessus déborderait visuellement au-dessus du vide.
+const SOUS_BOIS_EDGE_INSET = 8;
+// Un tronçon court ne peut pas accueillir les plus larges éléments : quelques
+// tirages de variante avant d'abandonner cet emplacement, pour qu'un petit
+// élément (rangée du bas de la planche) ait sa chance plutôt que rien.
+const SOUS_BOIS_FIT_ATTEMPTS = 4;
+// Retour utilisateur : "au moins une plante par étage de plateforme qui fait
+// au moins 3 tuiles et 1 chance sur deux pour les lignes de 2 tuiles" -- la
+// dispersion à espacement aléatoire seule pouvait laisser un tronçon entier
+// vide (premier pas tiré au-delà de son bout, ou variantes trop larges).
+const SOUS_BOIS_GUARANTEED_RUN_TILES = 3;
+const SOUS_BOIS_SHORT_RUN_TILES = 2;
+const SOUS_BOIS_SHORT_RUN_CHANCE = 0.5;
+// Retour utilisateur : "fais en sorte que des plantes identiques ne puissent
+// pas être à côté" -- une variante déjà posée à moins de cette distance
+// (centre à centre, même hauteur de sol) est exclue du tirage. Au-delà du
+// pas de dispersion maximal, pour couvrir aussi les voisins immédiats les
+// plus espacés. Partagé avec les plantes des totems (cf. addTotemPlants).
+const SOUS_BOIS_SAME_VARIANT_MIN_DISTANCE = 160;
+
+// `scene.__undergrowthPlants` (remis à zéro par buildLevelFromData) : toutes
+// les plantes posées dans la zone, pour pickUndergrowthVariant.
+function isUndergrowthVariantNearby(scene, variant, x, baseY) {
+  return (scene.__undergrowthPlants || []).some((p) => p.variant === variant
+    && Math.abs(p.x - x) < SOUS_BOIS_SAME_VARIANT_MIN_DISTANCE
+    && Math.abs(p.baseY - baseY) < GROUND_TILE_SIZE);
+}
+
+function pickUndergrowthVariant(scene, candidates, x, baseY) {
+  const allowed = candidates.filter((variant) => !isUndergrowthVariantNearby(scene, variant, x, baseY));
+  // Repli sur la liste complète seulement si TOUTES les candidates sont déjà
+  // prises autour (jamais avec les 14 du sous-bois, possible en théorie pour
+  // une petite liste comme celles des totems).
+  return Phaser.Utils.Array.GetRandom(allowed.length ? allowed : candidates);
+}
+
+function addUndergrowthImage(scene, x, baseY, variant, scale, flipX) {
+  if (!scene.__undergrowthPlants) scene.__undergrowthPlants = [];
+  scene.__undergrowthPlants.push({ x, baseY, variant });
+  return scene.add.image(x, baseY, `${SOUS_BOIS_TEXTURE_PREFIX}${variant}`)
+    .setOrigin(0.5, 1)
+    .setScale(scale)
+    .setFlipX(flipX);
+}
+
+// Uniquement sur le SOL PRINCIPAL (groundCells), jamais au-dessus d'un vide :
+// une case de sol "de surface" est une case de sol principal sans autre case
+// de sol principal au-dessus -- plateformes d'une seule case d'épaisseur
+// comprises. Le sol de fond (groundBackCells) ne compte PAS comme obstacle
+// (retour utilisateur : "quand y a un sol de fond ça apparaît pas ou
+// derrière" -- la 1re version excluait toute surface avec du sol de fond
+// au-dessus) : ce plan est justement dessiné devant lui. Les cases de
+// surface contiguës d'une même rangée forment un tronçon ; chaque élément
+// doit tenir en entier sur son tronçon (jamais à cheval sur une fosse),
+// avoir la place en hauteur (pas enfoncé dans un plafond de sol principal)
+// et rester hors de l'eau.
+function addUndergrowth(scene, data) {
+  const front = new Set((data.groundCells || []).map(([gx, gy]) => gridCellKey(gx, gy)));
+  const isOpen = (gx, gy) => !front.has(gridCellKey(gx, gy));
+  const water = (data.water || []).map((w) => new Phaser.Geom.Rectangle(w.x, w.y, w.width, w.height));
+
+  const surfaceRows = new Map();
+  for (const [gx, gy] of data.groundCells || []) {
+    if (!isOpen(gx, gy - 1)) continue;
+    if (!surfaceRows.has(gy)) surfaceRows.set(gy, new Set());
+    surfaceRows.get(gy).add(gx);
+  }
+
+  for (const [gy, gxSet] of surfaceRows) {
+    const gxs = [...gxSet].sort((a, b) => a - b);
+    let runStart = 0;
+    for (let i = 1; i <= gxs.length; i++) {
+      if (i < gxs.length && gxs[i] === gxs[i - 1] + 1) continue;
+      scatterUndergrowthOnRun(scene, gxs[runStart], gxs[i - 1], gy, isOpen, water);
+      runStart = i;
+    }
+  }
+}
+
+function scatterUndergrowthOnRun(scene, gxStart, gxEnd, gy, isOpen, water) {
+  const left = gxStart * GROUND_TILE_SIZE + SOUS_BOIS_EDGE_INSET;
+  const right = (gxEnd + 1) * GROUND_TILE_SIZE - SOUS_BOIS_EDGE_INSET;
+  const baseY = gy * GROUND_TILE_SIZE + SOUS_BOIS_SINK;
+
+  const fits = (x, width, height) => {
+    if (x - width / 2 < left || x + width / 2 > right) return false;
+    const rect = new Phaser.Geom.Rectangle(x - width / 2, baseY - height, width, height);
+    if (water.some((w) => Phaser.Geom.Intersects.RectangleToRectangle(rect, w))) return false;
+    const gxFrom = Math.floor(rect.left / GROUND_TILE_SIZE);
+    const gxTo = Math.floor((rect.right - 1) / GROUND_TILE_SIZE);
+    const gyTop = Math.floor(rect.top / GROUND_TILE_SIZE);
+    for (let cgx = gxFrom; cgx <= gxTo; cgx++) {
+      for (let cgy = gyTop; cgy < gy; cgy++) {
+        if (!isOpen(cgx, cgy)) return false;
+      }
+    }
+    return true;
+  };
+
+  const frameOf = (variant) => scene.textures.getFrame(`${SOUS_BOIS_TEXTURE_PREFIX}${variant}`);
+  const place = (x, variant, scale) => addUndergrowthImage(scene, x, baseY, variant, scale, Math.random() < 0.5);
+
+  // Placement "garanti" : toutes les variantes dans un ordre aléatoire, à une
+  // position libre tirée au hasard sur le tronçon, plutôt qu'à la position
+  // imposée par le pas de dispersion -- ne renonce que si AUCUNE variante ne
+  // tient nulle part (plafond trop bas, eau, voisine identique...).
+  const placeAnywhere = () => {
+    const variants = Phaser.Utils.Array.Shuffle([...Array(SOUS_BOIS_COUNT).keys()]);
+    for (const variant of variants) {
+      const frame = frameOf(variant);
+      const scale = SOUS_BOIS_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.15);
+      const width = frame.width * scale;
+      if (width > right - left) continue;
+      for (let attempt = 0; attempt < SOUS_BOIS_FIT_ATTEMPTS; attempt++) {
+        const x = Phaser.Math.FloatBetween(left + width / 2, right - width / 2);
+        if (isUndergrowthVariantNearby(scene, variant, x, baseY)) continue;
+        if (!fits(x, width, frame.height * scale)) continue;
+        place(x, variant, scale);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const runTiles = gxEnd - gxStart + 1;
+  if (runTiles < SOUS_BOIS_SHORT_RUN_TILES) return;
+  if (runTiles < SOUS_BOIS_GUARANTEED_RUN_TILES) {
+    if (Math.random() < SOUS_BOIS_SHORT_RUN_CHANCE) placeAnywhere();
+    return;
+  }
+
+  let placedCount = 0;
+  let x = left + Phaser.Math.Between(0, SOUS_BOIS_SPACING_MIN);
+  while (x < right) {
+    for (let attempt = 0; attempt < SOUS_BOIS_FIT_ATTEMPTS; attempt++) {
+      const variant = pickUndergrowthVariant(scene, [...Array(SOUS_BOIS_COUNT).keys()], x, baseY);
+      const frame = frameOf(variant);
+      const scale = SOUS_BOIS_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.15);
+      if (!fits(x, frame.width * scale, frame.height * scale)) continue;
+      place(x, variant, scale);
+      placedCount++;
+      break;
+    }
+    x += Phaser.Math.Between(SOUS_BOIS_SPACING_MIN, SOUS_BOIS_SPACING_MAX);
+  }
+  if (placedCount === 0) placeAnywhere();
+}
+
 function gridToWorld(gx, gy) {
   return { x: gx * GROUND_TILE_SIZE + GROUND_TILE_SIZE / 2, y: gy * GROUND_TILE_SIZE + GROUND_TILE_SIZE / 2 };
 }
@@ -1523,8 +1744,17 @@ function buildLevelFromData(scene, data, sceneData) {
   // le sol normal pour rester derrière lui -- purement visuel, aucun corps
   // physique (cf. `options.back` dans renderAutotileGrid).
   renderAutotileGrid(scene, null, data.groundBackCells || [], { back: true });
+  // Entre les deux sols : devant le fond, derrière le sol principal (cf.
+  // addUndergrowth). Même condition que le reste du décor générique.
+  // Réutilisée d'une visite à l'autre (même instance de scène, cf.
+  // __transitioningAway plus haut) : repartir d'une liste vide.
+  scene.__undergrowthPlants = [];
+  if (data.decor !== false) addUndergrowth(scene, data);
   scene.ground = scene.physics.add.staticGroup();
-  renderAutotileGrid(scene, scene.ground, data.groundCells || []);
+  // Premier visuel du sol principal : repère pour glisser juste derrière lui
+  // des objets créés plus tard (totems et leurs plantes, cf.
+  // sendBehindFrontGround).
+  scene.__frontGroundFirstImage = renderAutotileGrid(scene, scene.ground, data.groundCells || [])[0];
 
   // `scene.water` gardé (comme scene.ground/scene.enemies) : l'overlap qui
   // arme `player.inWater` (cf. Player.js, forme Pieuvre automatique) doit
