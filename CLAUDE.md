@@ -17,6 +17,21 @@ Jeu-cadeau d'anniversaire : metroidvania-lite 2D, inspiré du personnage DnD "Ag
 - `src/scenes/` — une scène par zone/écran (Boot, Zone1, Zone2, Zone3, EndScreen...).
 - `assets/` — sprites, sons, musiques (ajoutés au fil des tickets).
 
+### Tuiles de terrain : deux jeux interchangeables
+
+`AUTOTILE_TILESET` dans `src/utils/LevelKit.js` bascule entre les deux. Ils ont exactement
+les mêmes 21 noms de fichiers et les mêmes rôles, donc c'est le seul truc à changer :
+
+- `'floor'` — le jeu d'origine (IA), `assets/decors/autotile_frames/`, découpé de
+  `floor.png` par `tools/crop_autotile.py`.
+- `'tuiles'` — le pixel art dessiné à la main, `assets/decors/tuiles_frames/`, généré par
+  `tools/cut_tuiles.py` depuis `assets/decors/tuiles.png` (grille de 24 px).
+  **Relancer le script après toute retouche de `tuiles.png`.**
+
+Aucune logique de rendu ne dépend du jeu actif : les compensations que l'art doit respecter
+(étirement `AUTOTILE_CORNER_HEIGHT_BOOST`, hitbox aux 3/4, miroirs de `dirt_angle`/`coin`)
+sont expliquées dans l'en-tête de `tools/cut_tuiles.py`.
+
 ## Gameplay clé (voir GDD section 3-4)
 
 - Déplacement : flèches / QSD.

@@ -1038,6 +1038,36 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
 // vertical exposé sur le côté plutôt que tourné vers le ciel) a été retirée
 // de l'éditeur quand floor.png est passé à une planche terre uniquement,
 // plutôt que de réutiliser les mêmes tuiles sous un faux choix "Roche".
+// DEUX jeux de tuiles de terrain interchangeables. Ils contiennent
+// exactement les mêmes 21 fichiers, aux mêmes noms et dans les mêmes rôles,
+// donc basculer de l'un à l'autre = changer AUTOTILE_TILESET ci-dessous et
+// rien d'autre : aucune constante de ce fichier n'est retouchée, aucune
+// scène n'est modifiée, renderAutotileGrid ne sait même pas lequel est
+// actif.
+//   'floor'  -- le jeu d'origine, généré par IA puis découpé de
+//               assets/decors/floor.png par tools/crop_autotile.py.
+//               Grosses images (283 à 1254 px) réduites à l'affichage :
+//               terre brune, bancs de rochers gris sur les bords exposés,
+//               canopée de mousse et champignons sur le dessus.
+//   'tuiles' -- le pixel art dessiné à la main, généré par
+//               tools/cut_tuiles.py depuis assets/decors/tuiles.png.
+//               Tuiles de 24 px agrandies à l'affichage, donc filtre au
+//               plus proche voisin obligatoire (`pixelArt` ci-dessous, cf.
+//               BootScene) : en filtrage linéaire — le défaut de Phaser,
+//               correct pour tout le reste des assets, qui sont dessinés
+//               en grand puis RÉDUITS — un caillou de 3 px devient une
+//               bouillie floue.
+// Les compensations que l'art doit respecter pour rester interchangeable
+// (hauteur des tuiles du haut étirée par AUTOTILE_CORNER_HEIGHT_BOOST,
+// hitbox aux 3/4, miroirs de dirt_angle/coin) sont documentées côté
+// génération, dans l'en-tête de tools/cut_tuiles.py.
+const AUTOTILE_TILESET = 'tuiles';
+const AUTOTILE_TILESETS = {
+  floor: { dir: 'assets/decors/autotile_frames', pixelArt: false },
+  tuiles: { dir: 'assets/decors/tuiles_frames', pixelArt: true },
+};
+const AUTOTILE_TILESET_DIR = AUTOTILE_TILESETS[AUTOTILE_TILESET].dir;
+
 const AUTOTILE_POSITIONS = ['tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br'];
 const AUTOTILE_PREFIX = { dirt: 'autotile-dirt-' };
 // Les 3 positions du haut (tl/t/tr) ont une haute touffe d'herbe dessinée

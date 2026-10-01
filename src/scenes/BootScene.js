@@ -198,7 +198,7 @@ class BootScene extends Phaser.Scene {
     // utilisé uniquement par les niveaux construits dans EditorScene.js
     // (les 8 Zone*Scene actuelles ne migrent pas dessus).
     for (const pos of AUTOTILE_POSITIONS) {
-      this.load.image(`autotile-dirt-${pos}`, `assets/decors/autotile_frames/dirt_${pos}.png`);
+      this.load.image(`autotile-dirt-${pos}`, `${AUTOTILE_TILESET_DIR}/dirt_${pos}.png`);
     }
     // dirt_t2/tl2/tr2 existent toujours dans assets/decors/autotile_frames/
     // mais ne sont plus chargées/utilisées du tout (retour utilisateur :
@@ -210,7 +210,7 @@ class BootScene extends Phaser.Scene {
     // a besoin d'un pourtour rocheux fermé de tous les côtés, pas juste du
     // haut -- assets/decors/plateforme.png, 3 variantes.
     for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) {
-      this.load.image(`autotile-dirt-platform${i}`, `assets/decors/autotile_frames/dirt_platform${i}.png`);
+      this.load.image(`autotile-dirt-platform${i}`, `${AUTOTILE_TILESET_DIR}/dirt_platform${i}.png`);
     }
     // Variantes de la case "intérieure" (fill, aucun bord exposé, voir
     // DIRT_CENTER_VARIANT_COUNT dans LevelKit.js), découpées de la même
@@ -219,7 +219,7 @@ class BootScene extends Phaser.Scene {
     // varier une grande zone de terre pleine au lieu de répéter la même
     // case partout.
     for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) {
-      this.load.image(`autotile-dirt-c-var${i}`, `assets/decors/autotile_frames/dirt_c_var${i}.png`);
+      this.load.image(`autotile-dirt-c-var${i}`, `${AUTOTILE_TILESET_DIR}/dirt_c_var${i}.png`);
     }
     // Coins intérieurs (escalier en blocs carrés, cf.
     // AUTOTILE_INNER_CORNER_TEXTURE/FLIP_X/FLIP_Y dans LevelKit.js) : 2
@@ -228,8 +228,8 @@ class BootScene extends Phaser.Scene {
     // commentaire dans LevelKit.js). Dessinées à part (pas une case de
     // floor.png), mais recadrées au même format carré que les autres par
     // tools/crop_autotile.py.
-    this.load.image('autotile-dirt-angle', 'assets/decors/autotile_frames/dirt_angle.png');
-    this.load.image('autotile-dirt-coin', 'assets/decors/autotile_frames/coin.png');
+    this.load.image('autotile-dirt-angle', `${AUTOTILE_TILESET_DIR}/dirt_angle.png`);
+    this.load.image('autotile-dirt-coin', `${AUTOTILE_TILESET_DIR}/coin.png`);
     // Décors "déco item" plaçables dans l'éditeur, groupés par section (cf.
     // DECOR_SECTIONS dans LevelKit.js et tools/crop_deco_items.py) --
     // chaque item vient de assets/decors/deco_item_frames/<section>/
@@ -266,8 +266,32 @@ class BootScene extends Phaser.Scene {
     }
   }
 
+  // Jeu de tuiles en pixel art (cf. AUTOTILE_TILESET dans LevelKit.js) :
+  // ses tuiles de 24 px sont AGRANDIES à GROUND_TILE_SIZE (64), alors que
+  // tout le reste des assets du jeu est dessiné en grand puis réduit. Le
+  // filtrage linéaire par défaut de Phaser (jamais changé, et le bon
+  // réglage pour tous ces assets réduits) transforme un caillou de 3 px en
+  // bouillie floue : filtre au plus proche voisin forcé sur ces
+  // textures-là uniquement. Rien à faire pour le jeu 'floor', dont les
+  // grandes images veulent justement le filtrage linéaire — d'où le drapeau
+  // `pixelArt` par jeu de tuiles plutôt qu'un `pixelArt: true` global dans
+  // la config (main.js), qui ferait créneler tout le reste.
+  static applyTilesetFilter(scene) {
+    if (!AUTOTILE_TILESETS[AUTOTILE_TILESET].pixelArt) return;
+    const keys = AUTOTILE_POSITIONS.map((pos) => `autotile-dirt-${pos}`);
+    keys.push('autotile-dirt-angle', 'autotile-dirt-coin');
+    for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) keys.push(`autotile-dirt-platform${i}`);
+    for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) keys.push(`autotile-dirt-c-var${i}`);
+    for (const key of keys) {
+      const texture = scene.textures.get(key);
+      if (texture) texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+  }
+
   create() {
     const { width, height } = this.scale;
+
+    BootScene.applyTilesetFilter(this);
 
     // Mode édition (index.html?editor, cf. main.js) : les assets sont
     // chargés (BootScene reste le seul point d'entrée qui précharge tout),
