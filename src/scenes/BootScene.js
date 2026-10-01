@@ -197,39 +197,21 @@ class BootScene extends Phaser.Scene {
     // matériau), indépendant du système de sol à une rangée ci-dessus,
     // utilisé uniquement par les niveaux construits dans EditorScene.js
     // (les 8 Zone*Scene actuelles ne migrent pas dessus).
-    for (const pos of AUTOTILE_POSITIONS) {
-      this.load.image(`autotile-dirt-${pos}`, `${AUTOTILE_TILESET_DIR}/dirt_${pos}.png`);
+    // Les 21 cases du jeu de tuiles actif (cf. BootScene.autotileFiles) ; les
+    // jeux alternatifs du manifest (clé de zone `tileset`) sont chargés sous
+    // `<id>:<clé>`.
+    for (const [key, file] of BootScene.autotileFiles()) {
+      this.load.image(key, `${AUTOTILE_TILESET_DIR}/${file}`);
     }
-    // dirt_t2/tl2/tr2 existent toujours dans assets/decors/autotile_frames/
-    // mais ne sont plus chargées/utilisées du tout (retour utilisateur :
-    // "vire tr2 et tl2 des construction", puis "retire t2 de la liste des
-    // tuiles") -- ne pas les rebrancher sans qu'il le redemande.
-    // Plateforme flottante (cf. AUTOTILE_PLATFORM_VARIANT_COUNT dans
-    // LevelKit.js) : une case "herbe du dessus" sans aucune case en dessous
-    // (vrai bloc isolé, pas juste le dessus d'une masse de terre continue)
-    // a besoin d'un pourtour rocheux fermé de tous les côtés, pas juste du
-    // haut -- assets/decors/plateforme.png, 3 variantes.
-    for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) {
-      this.load.image(`autotile-dirt-platform${i}`, `${AUTOTILE_TILESET_DIR}/dirt_platform${i}.png`);
+    if (typeof TILESET_MANIFEST !== 'undefined') {
+      // Seulement les cases présentes (cf. ASSET_PRESENT, StoryKit.js).
+      for (const [id, def] of Object.entries(TILESET_MANIFEST)) {
+        for (const [key, file] of BootScene.autotileFiles()) {
+          const path = `${def.dir}/${file}`;
+          if (assetPresent(path)) this.load.image(`${id}:${key}`, path);
+        }
+      }
     }
-    // Variantes de la case "intérieure" (fill, aucun bord exposé, voir
-    // DIRT_CENTER_VARIANT_COUNT dans LevelKit.js), découpées de la même
-    // planche (les 7 cases hors du bloc 3x3 classique) — piochées au hasard
-    // à la place de la tuile `autotile-dirt-c` unique ci-dessus, pour
-    // varier une grande zone de terre pleine au lieu de répéter la même
-    // case partout.
-    for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) {
-      this.load.image(`autotile-dirt-c-var${i}`, `${AUTOTILE_TILESET_DIR}/dirt_c_var${i}.png`);
-    }
-    // Coins intérieurs (escalier en blocs carrés, cf.
-    // AUTOTILE_INNER_CORNER_TEXTURE/FLIP_X/FLIP_Y dans LevelKit.js) : 2
-    // images (haut/bas), chacune retournée en miroir pour ses 2 orientations
-    // gauche/droite plutôt que 4 fichiers séparés (jamais tournées, cf. ce
-    // commentaire dans LevelKit.js). Dessinées à part (pas une case de
-    // floor.png), mais recadrées au même format carré que les autres par
-    // tools/crop_autotile.py.
-    this.load.image('autotile-dirt-angle', `${AUTOTILE_TILESET_DIR}/dirt_angle.png`);
-    this.load.image('autotile-dirt-coin', `${AUTOTILE_TILESET_DIR}/coin.png`);
     // Décors "déco item" plaçables dans l'éditeur, groupés par section (cf.
     // DECOR_SECTIONS dans LevelKit.js et tools/crop_deco_items.py) --
     // chaque item vient de assets/decors/deco_item_frames/<section>/
@@ -264,6 +246,23 @@ class BootScene extends Phaser.Scene {
     for (const i of PLANTE_HANGING_INDICES) {
       this.load.image(`${PLANTE_HANGING_PREFIX}${i}`, `assets/decors/plantes_frames/hplante_${i}.png`);
     }
+    // Art Codex de la démo (persos, objets, UI, fonds) : cf. StoryKit.js. Les
+    // fichiers pas encore générés échouent en 404 sans bloquer le jeu
+    // (placeholders dessinés par code à la place).
+    loadManifestAssets(this);
+  }
+
+  // [clé de texture, nom de fichier] des 21 cases d'un jeu de tuiles
+  // (« 9-slice » de terre + plateformes + variantes de centre + coins
+  // intérieurs, cf. tools/crop_autotile.py / tools/cut_tuiles.py).
+  // dirt_t2/tl2/tr2 existent encore sur disque mais ne sont plus utilisées
+  // (retour utilisateur) : ne pas les rebrancher sans qu'il le redemande.
+  static autotileFiles() {
+    const files = AUTOTILE_POSITIONS.map((pos) => [`autotile-dirt-${pos}`, `dirt_${pos}.png`]);
+    for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) files.push([`autotile-dirt-platform${i}`, `dirt_platform${i}.png`]);
+    for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) files.push([`autotile-dirt-c-var${i}`, `dirt_c_var${i}.png`]);
+    files.push(['autotile-dirt-angle', 'dirt_angle.png'], ['autotile-dirt-coin', 'coin.png']);
+    return files;
   }
 
   // Jeu de tuiles en pixel art (cf. AUTOTILE_TILESET dans LevelKit.js) :
@@ -289,35 +288,41 @@ class BootScene extends Phaser.Scene {
   }
 
   create() {
-    const { width, height } = this.scale;
-
     BootScene.applyTilesetFilter(this);
+    const params = new URLSearchParams(window.location.search);
 
     // Mode édition (index.html?editor, cf. main.js) : les assets sont
     // chargés (BootScene reste le seul point d'entrée qui précharge tout),
     // mais on saute l'écran-titre normal pour aller droit à l'éditeur.
-    if (new URLSearchParams(window.location.search).has('editor')) {
+    if (params.has('editor')) {
       this.scene.start('EditorScene');
       return;
     }
 
-    // Fond dégradé violet nuit -> vert lunaire, en attendant la vraie DA.
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0x1a1030, 0x1a1030, 0x1f3d2b, 0x1f3d2b, 1);
-    bg.fillRect(0, 0, width, height);
+    // Raccourci de développement : `?zone=foret_sombre_1` (id de zone ou clé
+    // de scène) démarre directement cette zone ; `&flags=xaraMet,hearts=2`
+    // pose des flags (valeur JSON, `true` si absente) ; `&load` part de la
+    // sauvegarde existante.
+    const zone = params.get('zone');
+    if (zone) {
+      if (params.has('load')) loadGame(this.game);
+      for (const part of (params.get('flags') || '').split(',').filter(Boolean)) {
+        const [k, raw] = part.split('=');
+        let v = true;
+        if (raw !== undefined) {
+          try { v = JSON.parse(raw); } catch (e) { v = raw; }
+        }
+        this.registry.set(k, v);
+      }
+      const entry = storyZoneEntry(zone);
+      const key = entry ? entry.scene : zone;
+      if (this.scene.get(key)) {
+        this.scene.start(key, params.has('enter') ? { enterId: params.get('enter') } : undefined);
+        return;
+      }
+      console.warn(`?zone=${zone} : scène inconnue, retour à l'écran-titre.`);
+    }
 
-    this.add.text(width / 2, height / 2, 'Legend of Agarica', {
-      fontFamily: 'sans-serif',
-      fontSize: '32px',
-      color: '#e8d9ff',
-    }).setOrigin(0.5);
-
-    this.add.text(width / 2, height / 2 + 40, 'Appuie sur une touche pour commencer', {
-      fontFamily: 'sans-serif',
-      fontSize: '16px',
-      color: '#a99bd6',
-    }).setOrigin(0.5);
-
-    this.input.keyboard.once('keydown', () => goToScene(this, 'PrologueScene'));
+    this.scene.start('TitleScene');
   }
 }

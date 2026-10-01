@@ -551,6 +551,9 @@ const FORM_BODY_BBOX = {
   agarica: AGARICA_BODY_BBOX, eagle: EAGLE_BODY_BBOX, wolf: WOLF_BODY_BBOX, octopus: OCTOPUS_BODY_BBOX,
 };
 function playerFullDisplaySize(form) {
+  // Singe : pas de bbox mesurée (art Codex pas encore là) -- même gabarit
+  // de frappe que l'humaine plutôt qu'une bbox humaine à l'échelle du singe.
+  if (form === 'monkey') form = 'agarica';
   const cfg = FORMS[form] || FORMS.agarica;
   const bbox = FORM_BODY_BBOX[form] || FORM_BODY_BBOX.agarica;
   return {
@@ -604,6 +607,66 @@ const TRANSFO_WOLF_BODY = transfoBodyConfig(TRANSFO_WOLF_FRAME_WIDTH, TRANSFO_WO
 const TRANSFO_EAGLE_BODY = transfoBodyConfig(TRANSFO_FRAME_WIDTH, TRANSFO_FRAME_HEIGHT, TRANSFO_SCALE);
 const TRANSFO_PIEUVRE_BODY = transfoBodyConfig(TRANSFO_PIEUVRE_FRAME_WIDTH, TRANSFO_PIEUVRE_FRAME_HEIGHT, TRANSFO_PIEUVRE_SCALE);
 const TRANSFO_WOLF_EAGLE_BODY = transfoBodyConfig(TRANSFO_WOLF_EAGLE_FRAME_WIDTH, TRANSFO_WOLF_EAGLE_FRAME_HEIGHT, TRANSFO_WOLF_EAGLE_SCALE);
+
+// --- Emplacements de formes (démo histoire) -------------------------------
+// SOL = loup, AÉRIEN = singe OU aigle (exclusifs, choisis au feu de camp),
+// EAU = pieuvre. `equippedForms` garde son format historique (tableau de 3,
+// lu par LevelKit : sanctuaires, triche Ctrl+Shift+D) mais est normalisé en
+// [sol, aérien, eau] ; `airForm` (registre) mémorise le choix aérien.
+const AIR_FORM_IDS = ['eagle', 'monkey'];
+const FORM_FLAG_BY_ID = {
+  wolf: 'hasWolfForm', eagle: 'hasEagleForm', monkey: 'hasMonkeyForm', octopus: 'hasOctopusForm',
+};
+// Double saut SANS forme aérienne : simple, un peu moins haut, aucune
+// transformation. Singe : plus court que l'Aigle (eagleJumpVelocity = -550,
+// inchangé : les anciennes zones sont calibrées dessus).
+const BASE_DOUBLE_JUMP_VELOCITY = -450;
+const MONKEY_JUMP_VELOCITY = -500;
+// Art Codex (manifest `singe`, `agarica_extra`) dessiné face à DROITE,
+// contrairement à la feuille humaine historique (face à gauche).
+const MONKEY_FACES_RIGHT = true;
+const AGARICA_EXTRA_FACES_RIGHT = true;
+const MONKEY_TRANSFO_MS = 200;
+const MONKEY_RELEASE_POSE_MS = 250;
+const HURT_POSE_MS = 300;
+const THROW_POSE_MS = 220;
+
+// Écrit une clé persistante : storySet (sauvegarde auto, Fondation) si
+// disponible, sinon le registre Phaser brut.
+function playerStateSet(scene, key, value) {
+  if (typeof storySet === 'function') storySet(key, value);
+  else scene.registry.set(key, value);
+}
+
+// Config de forme bâtie depuis le manifest (texture réelle ou placeholder) :
+// hitbox au gabarit HUMAIN affiché (cf. transfoBodyConfig), pas de bbox
+// mesurée tant que l'art n'existe pas -- même jeu de hitbox avec ou sans art.
+function manifestFormConfig(scene, id, anim) {
+  const tex = manifestInitialTexture(scene, id, anim);
+  const src = scene.textures.get(tex).getSourceImage();
+  const def = getAssetManifest()[id] || {};
+  const scale = def.scale || 1;
+  return {
+    texture: tex, scale, frameWidth: src.width, frameHeight: src.height,
+    body: transfoBodyConfig(src.width, src.height, scale),
+  };
+}
+
+// Joue `${id}-${anim}` si l'anim manifest existe, sinon pose la texture de
+// repli (placeholder) : le jeu marche à l'identique avec ou sans art.
+function playManifestOn(sprite, id, anim) {
+  const key = `${id}-${anim}`;
+  if (sprite.scene.anims.exists(key)) {
+    // Anim non bouclée déjà jouée jusqu'au bout : on garde sa dernière frame
+    // (sinon play() la relancerait à chaque frame, cf. formTransitionActive).
+    const cur = sprite.anims.currentAnim;
+    if (cur && cur.key === key && !sprite.anims.isPlaying) return;
+    sprite.anims.play(key, true);
+  } else {
+    sprite.anims.stop();
+    sprite.setTexture(manifestInitialTexture(sprite.scene, id, anim));
+  }
+}
 
 // Vie/énergie/compétences (FEAT modif.txt) : cœurs + énergie + des
 // compétences actives, une par type d'animal à terme (félin/canidé/
@@ -794,7 +857,9 @@ function ensureOursAnimations(scene) {
 // compétence qui n'a pas ces champs). `hudColor` : couleur de sa case dans
 // le HUD bas-gauche (cf. drawHud dans LevelKit.js), indépendante de l'art
 // en jeu. Futures compétences = juste une nouvelle entrée ici, aucune des
-// méthodes ci-dessus n'a besoin de changer.
+// méthodes ci-dessus n'a besoin de changer. Autres entrées : `crapaud`
+// (Crapaud.js), `pierre` et `papillon` (Projectiles.js, compétences
+// instantanées via `onActivate`, + `onHitEnemy` optionnel, cf. PLAN_DEV.md).
 const SKILL_DEFS = {
   ours: {
     label: 'Ours — Fracas au sol',
@@ -937,6 +1002,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // de déséquiper une forme) sans risque de blocage si les 3 sont
     // débloquées.
     this.equippedForms = scene.registry.get('equippedForms') || [null, null, null];
+    // Forme singe (démo histoire) + emplacement aérien (cf. AIR_FORM_IDS).
+    this.hasMonkeyForm = scene.registry.get('hasMonkeyForm') || false;
+    // Formes aériennes déjà connues à la création : seule une forme débloquée
+    // EN COURS de jeu (totem, cinématique, triche) devient automatiquement
+    // la forme aérienne active, cf. syncFormSlots().
+    this.airFormsSeen = { eagle: this.hasEagleForm, monkey: this.hasMonkeyForm };
+    this.airForm = this.resolveInitialAirForm(scene.registry.get('airForm'));
+    this.applyAirForm(this.airForm);
 
     // Vie/énergie (cf. HEART_MAX/ENERGY_MAX plus haut) : persistées au
     // registry comme les capacités ci-dessus, jamais réinitialisées à
@@ -1095,6 +1168,57 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // d'œil à l'attaque du Corbeau, mêmes frames d'animation).
     this.eagleDiveGravity = 1600;
     this.eagleDiveMaxSpeed = 700;
+    this.baseDoubleJumpVelocity = BASE_DOUBLE_JUMP_VELOCITY;
+    this.monkeyJumpVelocity = MONKEY_JUMP_VELOCITY;
+    // Forme prise par le 2e saut en cours ('eagle' | 'monkey' | null = double
+    // saut de base) -- remise à null à l'atterrissage.
+    this.airJumpForm = null;
+    // Liane tenue (forme singe, cf. Liane.js) ou null. `vineMomentumSpeed` :
+    // élan horizontal conservé après le lâcher, jusqu'à l'atterrissage (sinon
+    // moveMaxSpeed=190 le rabotait aussitôt).
+    this.vine = null;
+    this.lastVine = null;
+    this.vineReleasedAt = -Infinity;
+    this.vineMomentumSpeed = 0;
+    this.monkeyReleasePoseUntil = 0;
+    this.hurtPoseUntil = 0;
+    this.throwPoseUntil = 0;
+    // Compétence dont la hitbox (getSkillHitbox) est active, ex. 'ours' --
+    // la Fondation s'en sert pour réserver la destruction des mossBlocks à
+    // l'Ours. `lastSkillId` : dernière compétence lancée (y compris
+    // instantanées : pierre, papillon).
+    this.skillHitboxId = null;
+    this.lastSkillId = null;
+    FORMS.monkey = manifestFormConfig(scene, 'singe', 'jump');
+    ensureManifestAnims(scene, 'singe');
+    ensureManifestAnims(scene, 'transfo_singe');
+    ensureManifestAnims(scene, 'agarica_extra');
+    // Transfo singe : jouée seulement si l'art existe (sinon bascule nette).
+    this.monkeyTransfoAnimKey = null;
+    this.monkeyTransfoReverseKey = null;
+    if (hasManifestArt(scene, 'transfo_singe')) {
+      const tdef = getAssetManifest().transfo_singe;
+      const tAnim = Object.keys(tdef.anims || {})[0];
+      const fwdKey = `transfo_singe-${tAnim}`;
+      if (scene.anims.exists(fwdKey)) {
+        this.monkeyTransfoAnimKey = fwdKey;
+        this.monkeyTransfoReverseKey = `${fwdKey}-reverse`;
+        if (!scene.anims.exists(this.monkeyTransfoReverseKey)) {
+          const frames = scene.anims.get(fwdKey).frames.map((f) => ({ key: f.textureKey })).reverse();
+          scene.anims.create({ key: this.monkeyTransfoReverseKey, frames, frameRate: frames.length / (MONKEY_TRANSFO_MS / 1000), repeat: 0 });
+        }
+        this.monkeyTransfoCfg = manifestFormConfig(scene, 'transfo_singe', tAnim);
+      }
+    }
+    // Triche Ctrl+Shift+D (écouteur principal dans LevelKit, qui ignore le
+    // singe) : débloque aussi la forme singe, sans la rendre active (l'aigle
+    // posé par LevelKit reste la forme aérienne -- anciennes zones).
+    scene.input.keyboard.on('keydown-D', (event) => {
+      if (!event.ctrlKey || !event.shiftKey || !this.active) return;
+      this.hasMonkeyForm = true;
+      this.airFormsSeen.monkey = true;
+      playerStateSet(scene, 'hasMonkeyForm', true);
+    });
     this.jumpsUsed = 0;
     this.justJumped = false;
     // Détecte l'atterrissage (transition air -> sol) pour la pose Loup
@@ -1158,6 +1282,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
   update() {
     this.justJumped = false;
+    this.syncFormSlots();
     const left = this.cursors.left.isDown || this.keys.left.isDown;
     const right = this.cursors.right.isDown || this.keys.right.isDown;
     const leftJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.left)
@@ -1182,6 +1307,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const wasWolfForm = this.form === 'wolf';
     const wasEagleForm = this.form === 'eagle';
     const wasOctopusForm = this.form === 'octopus';
+    const wasMonkeyForm = this.form === 'monkey';
     let transitionTriggeredThisFrame = false;
 
     if (Phaser.Input.Keyboard.JustDown(this.skillKeys.slot1)) this.tryActivateSkill(0, now);
@@ -1200,6 +1326,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.skillHitboxPendingRect = null;
     }
     if (this.skillHitboxRect && now >= this.skillActiveUntil) this.skillHitboxRect = null;
+    if (!this.skillHitboxRect && !this.skillHitboxPendingRect) this.skillHitboxId = null;
     // Fin de la transformation temporaire (cf. SKILL_DEFS/tryActivateSkill) :
     // pour une compétence sans art dédié, retire le placeholder teinte +
     // agrandissement posé à l'activation. Pour une compétence AVEC art (cf.
@@ -1335,20 +1462,67 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (onGround) {
       this.jumpsUsed = 0;
       this.wolfJumpCarry = false;
+      this.airJumpForm = null;
+      this.vineMomentumSpeed = 0;
+    }
+
+    // Lianes (forme singe, cf. Liane.js) : accroche automatique en l'air,
+    // balancement pendulaire (gauche/droite pompe l'élan), Saut = lâcher
+    // avec l'élan, S = se laisser tomber. Sans singe actif : simple décor.
+    const airForm = this.getActiveAirForm();
+    const monkeyActive = !swimming && airForm === 'monkey';
+    let jumpConsumed = false;
+    if (this.vine && (!monkeyActive || onGround || !this.vine.alive)) this.releaseVine(false, now);
+    if (this.vine) {
+      if (jumpJustPressed) {
+        this.releaseVine(true, now);
+        jumpConsumed = true;
+      } else if (downHeld) {
+        this.releaseVine(false, now);
+      } else {
+        const dtSec = Math.min(this.scene.game.loop.delta, 50) / 1000;
+        const target = this.vine.stepSwing(this, dir, dtSec);
+        if (this.body.blocked.left || this.body.blocked.right) this.vine.bounceOffWall();
+        this.setAcceleration(0, 0);
+        this.setDrag(0, 0);
+        this.body.maxVelocity.x = 1200;
+        this.setVelocity((target.x - this.x) / dtSec, (target.y - this.y) / dtSec);
+      }
+    } else if (monkeyActive && !onGround && typeof findGrabbableVine === 'function') {
+      const vine = findGrabbableVine(this.scene, this, now);
+      if (vine) this.grabVine(vine, now);
+    }
+    // Élan conservé après un lâcher de liane : vitesse max relevée et frein
+    // aérien réduit jusqu'à l'atterrissage (ou la prochaine liane).
+    if (!this.vine && this.vineMomentumSpeed > 0 && !onGround) {
+      this.body.maxVelocity.x = Math.max(maxSpeed, this.vineMomentumSpeed);
+      this.setDragX(150);
     }
 
     // Vrai une seule frame, celle du saut de base (pas le double-saut) —
     // Xara s'en sert pour mimiquer ce saut si elle est à portée (cf.
     // XARA_JUMP_RANGE dans Xara.js). Remise à faux au début de chaque
     // update() (cf. tout en haut), jamais laissée traîner.
-    if (jumpJustPressed && onGround) this.justJumped = true;
+    if (jumpJustPressed && onGround && !jumpConsumed) this.justJumped = true;
 
-    if (jumpJustPressed) {
+    if (jumpJustPressed && !jumpConsumed && !this.vine) {
       if (onGround) {
         this.setVelocityY(this.jumpVelocity);
         this.jumpsUsed = 1;
         this.wolfJumpCarry = sprinting;
-      } else if (!swimming && this.hasEagleForm && this.formEquipped('eagle') && this.jumpsUsed < 2) {
+      } else if (!swimming && airForm !== 'eagle' && this.jumpsUsed < 2) {
+        // Double saut de base (aucune forme aérienne) ou saut court du singe
+        // (transformation visuelle singe, cf. sélection de forme plus bas).
+        this.jumpsUsed += 1;
+        if (this.jumpsUsed === 2) {
+          this.airJumpForm = airForm === 'monkey' ? 'monkey' : null;
+          this.setVelocityY(airForm === 'monkey' ? this.monkeyJumpVelocity : this.baseDoubleJumpVelocity);
+          this.wolfJumpCarry = false;
+          if (airForm !== 'monkey') this.spawnAirJumpPuff();
+        } else {
+          this.setVelocityY(this.jumpVelocity);
+        }
+      } else if (!swimming && airForm === 'eagle' && this.jumpsUsed < 2) {
         // Pose actuelle (montée ou descente du 1er saut) au moment précis
         // du double-saut : décide quelle des deux séquences de
         // transformation jouer (cf. TRANSFO_RISE/FALL_START_KEY).
@@ -1361,6 +1535,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.jumpsUsed += 1;
         if (this.jumpsUsed === 2) {
           this.setVelocityY(this.eagleJumpVelocity);
+          this.airJumpForm = 'eagle';
           if (fromWolf) {
             this.beginFormTransition(now, ANIM_TRANSFO_WOLF_TO_EAGLE_KEY, this.eagleTransformDuration, TRANSFO_WOLF_EAGLE_SCALE, TRANSFO_WOLF_EAGLE_BODY, true);
           } else {
@@ -1374,7 +1549,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    const falling = this.body.velocity.y > 0 && this.form !== 'eagle';
+    const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine;
     this.body.gravity.y = falling ? this.fallGravityBonus : 0;
 
     // Descente en piqué : S maintenu remplace le plané par une accélération
@@ -1402,7 +1577,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.inWater && !(this.hasOctopusForm && this.formEquipped('octopus'))) {
       this.hitByEnemy();
     }
-    this.body.setAllowGravity(!swimming);
+    this.body.setAllowGravity(!swimming && !this.vine);
     if (swimming) {
       const swimUp = this.cursors.up.isDown || this.keys.up.isDown;
       const vy = swimUp ? -this.swimSpeed : downHeld ? this.swimSpeed : 0;
@@ -1413,8 +1588,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (swimming) {
       this.setForm('octopus');
-    } else if (!onGround && this.jumpsUsed >= 2) {
+    } else if (this.vine) {
+      this.setForm('monkey');
+    } else if (!onGround && this.jumpsUsed >= 2 && this.airJumpForm === 'eagle') {
       this.setForm('eagle');
+    } else if (!onGround && this.airJumpForm === 'monkey') {
+      this.setForm('monkey');
     } else if (this.attackDashActive || sprinting || (this.wolfJumpCarry && this.jumpsUsed < 2)) {
       // attackDashActive : garde la forme Loup figée pendant toute la ruée,
       // insensible à un micro-rebond d'une frame de `onGround` (rebond
@@ -1483,7 +1662,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // La feuille est dessinée face à gauche, comme la forme humaine.
       this.beginFormTransition(now, ANIM_TRANSFO_TO_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);
     } else if (!transitionTriggeredThisFrame && leavingOctopus) {
-      this.beginFormTransition(now, ANIM_TRANSFO_TO_HUMAN_FROM_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);
+      this.beginFormTransition(now, ANIM_TRANSFO_TO_HUMAN_FROM_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming
+      && this.monkeyTransfoAnimKey && this.form === 'monkey' && !wasMonkeyForm) {
+      // Transfo singe (manifest `transfo_singe`) : seulement si l'art existe,
+      // sinon bascule nette sur la silhouette (ou le placeholder) du singe.
+      const tcfg = this.monkeyTransfoCfg;
+      this.beginFormTransition(now, this.monkeyTransfoAnimKey, MONKEY_TRANSFO_MS, tcfg.scale, tcfg.body, MONKEY_FACES_RIGHT);
+    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming
+      && this.monkeyTransfoReverseKey && this.form === 'agarica' && wasMonkeyForm) {
+      const tcfg = this.monkeyTransfoCfg;
+      this.beginFormTransition(now, this.monkeyTransfoReverseKey, MONKEY_TRANSFO_MS, tcfg.scale, tcfg.body, MONKEY_FACES_RIGHT);
     }
 
     // Compétence avec art dédié (cf. SKILL_DEFS.ours, `animKey`) en cours :
@@ -1503,7 +1691,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       ? this.formTransitionFacesRight
       : skillArtActive
         ? activeSkillDef.facesRight
-        : (this.form === 'wolf' || this.form === 'eagle');
+        : (this.form === 'wolf' || this.form === 'eagle' || (this.form === 'monkey' && MONKEY_FACES_RIGHT));
     this.setFlipX(defaultFacesRight ? this.facingDir < 0 : this.facingDir > 0);
 
     if (this.formTransitionActive) {
@@ -1587,7 +1775,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.applyBodyForScale(FORMS[this.form].scale, FORMS[this.form].body);
 
       if (this.form === 'agarica') {
-        if (this.isAttacking) {
+        // Poses Codex optionnelles (manifest `agarica_extra`, face à DROITE) :
+        // utilisées seulement si l'art existe, sinon comportement historique.
+        const extra = (anim) => hasManifestArt(this.scene, 'agarica_extra', anim);
+        if (now < this.hurtPoseUntil && !this.isAttacking && extra('hurt')) {
+          this.applyAgaricaExtraPose('hurt');
+        } else if (this.isAttacking || now < this.throwPoseUntil) {
           this.anims.play(ANIM_AGARICA_ATTACK_KEY, true);
           // Canvas différent de celui d'idle/marche (cf. AGARICA_ATTACK_BODY)
           // : hitbox dédiée pour rester correctement centrée/calée au sol
@@ -1599,6 +1792,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           this.applyBodyForScale(AGARICA_ATTACK_SCALE, AGARICA_ATTACK_BODY);
         } else if (onGround) {
           this.anims.play(dir !== 0 ? ANIM_WALK_KEY : ANIM_IDLE_KEY, true);
+        } else if (extra(this.body.velocity.y < 0 ? 'jump_rise' : 'jump_fall')) {
+          this.applyAgaricaExtraPose(this.body.velocity.y < 0 ? 'jump_rise' : 'jump_fall');
         } else {
           this.anims.stop();
           this.setTexture(this.body.velocity.y < 0 ? JUMP_RISE_TEXTURE : JUMP_FALL_TEXTURE);
@@ -1614,8 +1809,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // haut dans cette même frame (cf. setFlipX). Texture de base non
         // flippée = face à GAUCHE (cf. commentaire sur defaultFacesRight),
         // donc "avant" = x plus petit quand !flipX, x plus grand quand flipX.
+        // `facingDir` (pas flipX) : équivalent pour la feuille historique, et
+        // reste juste pour les poses `agarica_extra` (convention de flip inverse).
         this.body.setOffset(
-          this.body.offset.x + (this.flipX ? AGARICA_BODY_FORWARD_SHIFT : -AGARICA_BODY_FORWARD_SHIFT),
+          this.body.offset.x + this.facingDir * AGARICA_BODY_FORWARD_SHIFT,
           this.body.offset.y,
         );
       } else if (this.form === 'wolf') {
@@ -1646,6 +1843,21 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           // Battement d'ailes tant qu'elle monte encore (juste après le
           // double-saut), glisse ailes déployées pendant tout le plané.
           this.anims.play(this.body.velocity.y < 0 ? ANIM_PIAF_FLY_KEY : ANIM_PIAF_GLIDE_KEY, true);
+        }
+      } else if (this.form === 'monkey') {
+        // Singe (manifest `singe` : jump/liane_hang/liane_swing/release_flip)
+        // -- placeholder tant que l'art n'existe pas. Sur une liane sans art
+        // singe mais avec les poses `agarica_extra`, Agarica suspendue.
+        const sc = this.scene;
+        if (this.vine) {
+          const want = Math.abs(this.vine.omega) > 0.8 ? 'liane_swing' : 'liane_hang';
+          if (hasManifestArt(sc, 'singe', want)) playManifestOn(this, 'singe', want);
+          else if (hasManifestArt(sc, 'singe', 'liane_hang')) playManifestOn(this, 'singe', 'liane_hang');
+          else if (hasManifestArt(sc, 'agarica_extra', want)) this.applyAgaricaExtraPose(want);
+          else if (hasManifestArt(sc, 'agarica_extra', 'liane_hang')) this.applyAgaricaExtraPose('liane_hang');
+          else playManifestOn(this, 'singe', 'liane_hang');
+        } else {
+          playManifestOn(this, 'singe', now < this.monkeyReleasePoseUntil ? 'release_flip' : 'jump');
         }
       } else if (this.form === 'octopus') {
         // Pas d'attaque du tout pour cette forme (cf. le garde-fou
@@ -1803,6 +2015,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.energy < def.cost) return; // pas de retour visuel dédié pour l'instant (TODO UI : flash de la barre ?)
     this.energy -= def.cost;
     this.scene.registry.set('energy', this.energy);
+    this.lastSkillId = skillId;
+    // Compétence INSTANTANÉE (cf. SKILL_DEFS.pierre/papillon dans
+    // Projectiles.js) : `onActivate` fait tout (projectile, nuée...), sans
+    // transformation ni hitbox getSkillHitbox().
+    if (typeof def.onActivate === 'function') {
+      this.skillCooldownEndTime = now + (def.cooldownMs ?? 300);
+      def.onActivate(this, now);
+      return;
+    }
     // Léger cooldown propre à la compétence (pas juste borné par le coût en
     // énergie) : évite un spam à 2 activations la même frame si jamais le
     // coût devient très faible plus tard (totems ?).
@@ -1847,6 +2068,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // de la zone (cf. update()), pas sa position -- figée ici, au moment du
     // cast, comme avant.
     const delay = def.hitboxDelayMs || 0;
+    this.skillHitboxId = skillId;
     if (delay > 0) {
       this.skillHitboxRect = null;
       this.skillHitboxPendingRect = rect;
@@ -1889,6 +2111,157 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     return this.equippedForms.includes(key);
   }
 
+  // --- Emplacements de formes (sol / aérien / eau) -------------------------
+
+  isFormUnlocked(id) {
+    return !!this[FORM_FLAG_BY_ID[id]];
+  }
+
+  // Forme aérienne réellement utilisable ('eagle' | 'monkey' | null).
+  getActiveAirForm() {
+    return this.airForm && this.isFormUnlocked(this.airForm) ? this.airForm : null;
+  }
+
+  // Choix initial : `airForm` du registre s'il est valide ; sinon déduit
+  // d'`equippedForms` (anciennes sauvegardes / triche : aigle prioritaire) ;
+  // jamais choisi et rien d'équipé → la forme aérienne débloquée (aigle si
+  // les deux), pour qu'une forme obtenue sans feu de camp marche aussitôt.
+  resolveInitialAirForm(regAir) {
+    if (regAir === null) return null;
+    if (regAir && this.isFormUnlocked(regAir)) return regAir;
+    const inSlots = AIR_FORM_IDS.filter((id) => this.equippedForms.includes(id) && this.isFormUnlocked(id));
+    if (inSlots.length) return inSlots.includes('eagle') ? 'eagle' : inSlots[0];
+    if (regAir === undefined && this.equippedForms.every((f) => !f)) {
+      if (this.hasEagleForm) return 'eagle';
+      if (this.hasMonkeyForm) return 'monkey';
+    }
+    return null;
+  }
+
+  // Normalise `equippedForms` en [sol, aérien, eau] et écrit `airForm` +
+  // `equippedForms` au registre. NOUVEAU tableau à chaque fois : la
+  // détection de changement externe (triche) compare la référence.
+  applyAirForm(id) {
+    this.airForm = AIR_FORM_IDS.includes(id) ? id : null;
+    const slots = [
+      this.equippedForms.includes('wolf') ? 'wolf' : null,
+      this.airForm,
+      this.equippedForms.includes('octopus') ? 'octopus' : null,
+    ];
+    this.equippedForms = slots;
+    this.equippedFormsRef = slots;
+    playerStateSet(this.scene, 'equippedForms', slots);
+    playerStateSet(this.scene, 'airForm', this.airForm);
+  }
+
+  // API du feu de camp : équipe une forme dans SON emplacement (le singe
+  // remplace l'aigle et inversement).
+  equipForm(id) {
+    if (AIR_FORM_IDS.includes(id)) {
+      this.applyAirForm(id);
+      return;
+    }
+    const slotIdx = id === 'wolf' ? 0 : id === 'octopus' ? 2 : -1;
+    if (slotIdx === -1) return;
+    const next = this.equippedForms.slice();
+    next[slotIdx] = id;
+    this.equippedForms = next;
+    this.applyAirForm(this.airForm);
+  }
+
+  unequipForm(id) {
+    if (AIR_FORM_IDS.includes(id)) {
+      if (this.airForm === id) this.applyAirForm(null);
+      return;
+    }
+    this.equippedForms = this.equippedForms.map((f) => (f === id ? null : f));
+    this.applyAirForm(this.airForm);
+  }
+
+  // Appelée en tête d'update() : rattrape les changements faits hors de
+  // Player (totem LevelKit, cinématique storySet, triche Ctrl+Shift+D).
+  syncFormSlots() {
+    const reg = this.scene.registry;
+    for (const flag of Object.values(FORM_FLAG_BY_ID)) {
+      if (!this[flag] && reg.get(flag)) this[flag] = true;
+    }
+    // Une forme aérienne débloquée en cours de jeu devient la forme active.
+    for (const id of AIR_FORM_IDS) {
+      if (this.isFormUnlocked(id) && !this.airFormsSeen[id]) {
+        this.airFormsSeen[id] = true;
+        this.applyAirForm(id);
+        return;
+      }
+    }
+    if (this.equippedForms !== this.equippedFormsRef) {
+      // Tableau remplacé de l'extérieur (triche) ou muté par un totem.
+      const inSlots = AIR_FORM_IDS.filter((id) => this.equippedForms.includes(id));
+      const air = inSlots.length === 1 ? inSlots[0]
+        : inSlots.length > 1 ? (inSlots.includes(this.airForm) ? this.airForm : 'eagle')
+          : null;
+      this.applyAirForm(air);
+      return;
+    }
+    const regAir = reg.get('airForm');
+    if (regAir !== undefined && regAir !== this.airForm) this.applyAirForm(regAir);
+  }
+
+  // --- Lianes (forme singe) --------------------------------------------------
+
+  grabVine(vine, now) {
+    this.vine = vine;
+    vine.attach(this);
+    this.jumpsUsed = 1;
+    this.airJumpForm = 'monkey';
+    this.vineMomentumSpeed = 0;
+    this.wolfJumpCarry = false;
+    this.scene.events.emit('vine-grab', vine);
+  }
+
+  // `withJump` : lâcher par Saut (élan + petite impulsion vers le haut) ;
+  // sinon simple chute (S, forme retirée, coup reçu...).
+  releaseVine(withJump, now) {
+    const vine = this.vine;
+    if (!vine) return;
+    const v = vine.detach(this);
+    this.vine = null;
+    this.lastVine = vine;
+    this.vineReleasedAt = now;
+    let vx = v.vx;
+    let vy = v.vy;
+    if (withJump) {
+      vx *= VINE_RELEASE_SPEED_MULT;
+      vy = Math.min(vy, 0) + VINE_RELEASE_BOOST_Y;
+      this.monkeyReleasePoseUntil = now + MONKEY_RELEASE_POSE_MS;
+    }
+    this.setVelocity(vx, vy);
+    this.vineMomentumSpeed = Math.min(Math.abs(vx), VINE_MAX_CARRY_SPEED);
+    this.body.maxVelocity.x = Math.max(this.body.maxVelocity.x, this.vineMomentumSpeed);
+    this.scene.events.emit('vine-release', vine);
+  }
+
+  // Petit nuage sous les pieds pour le double saut de base (pas de transfo).
+  spawnAirJumpPuff() {
+    const g = this.scene.add.circle(this.x, this.y, 10, 0xe8f6ff, 0.55).setDepth(this.depth);
+    this.scene.tweens.add({
+      targets: g, scaleX: 2.2, scaleY: 0.8, alpha: 0, duration: 260, onComplete: () => g.destroy(),
+    });
+  }
+
+  applyAgaricaExtraPose(anim) {
+    this.extraPoseCfg = this.extraPoseCfg || {};
+    const cfg = this.extraPoseCfg[anim] || (this.extraPoseCfg[anim] = manifestFormConfig(this.scene, 'agarica_extra', anim));
+    playManifestOn(this, 'agarica_extra', anim);
+    this.applyBodyForScale(cfg.scale, cfg.body);
+    this.setFlipX(AGARICA_EXTRA_FACES_RIGHT ? this.facingDir < 0 : this.facingDir > 0);
+  }
+
+  // Rectangle de la nuée de papillons (soin) en cours, ou null -- PAS
+  // renvoyé par getSkillHitbox() : le papillon ne doit jamais blesser.
+  getHealHitbox() {
+    return this.papillonSwarm && this.papillonSwarm.active ? this.papillonSwarm.rect : null;
+  }
+
   // Petite portion d'énergie gagnée par coup porté (mêlée ET plume, cf.
   // l'overlap dans LevelKit.js et Feather.js) — façon SOUL de Hollow Knight,
   // seule source de recharge hors feu de camp (cf. refillAtCampfire).
@@ -1919,6 +2292,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   hitByEnemy() {
     if (this.isInvulnerable) return;
     this.isInvulnerable = true;
+    if (this.vine) this.releaseVine(false, this.scene.time.now);
+    this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;
     this.hearts -= 1;
     this.scene.registry.set('hearts', this.hearts);
     this.setTint(0xff4d6d);

@@ -39,6 +39,7 @@ class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
     this.direction = 1;
     this.isCharging = false;
     this.hp = 3;
+    this.maxHp = 3;
     this.defeated = false;
   }
 
@@ -70,13 +71,21 @@ class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
   }
 
   // 3 PV (dérogation assumée à la règle "1 PV" du GDD, cf. section 11).
-  takeHit() {
+  // LevelKit (damageEnemy) n'appelle takeHit qu'UNE fois par attaque grâce
+  // à son verrou par token : chaque appel ici est donc un vrai coup.
+  takeHit(source) {
     if (this.defeated) return;
     this.hp -= 1;
     if (this.hp <= 0) {
       this.defeat();
       return;
     }
+    // Recul + fin de charge : le coup se lit, et le joueur a le temps de respirer.
+    // `source` LevelKit = {kind, player, token} ; accepte aussi un objet positionné.
+    const ref = source && (typeof source.x === 'number' ? source : source.player);
+    const fromX = ref && typeof ref.x === 'number' ? ref.x : this.x - this.direction;
+    this.direction = this.x >= fromX ? 1 : -1;
+    this.isCharging = false;
     this.setTintFill(0xffffff);
     this.scene.time.delayedCall(120, () => {
       if (!this.defeated) this.setTint(LOUP_ALPHA_TINT);
@@ -96,4 +105,10 @@ class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
       onComplete: () => this.destroy(),
     });
   }
+}
+
+if (typeof ENEMY_REGISTRY !== 'undefined') {
+  ENEMY_REGISTRY.loupAlpha = (scene, e) => new LoupAlpha(
+    scene, e.x, e.y, e.patrolMinX ?? e.x - 150, e.patrolMaxX ?? e.x + 150,
+  );
 }

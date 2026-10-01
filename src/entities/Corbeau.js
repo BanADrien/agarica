@@ -46,6 +46,8 @@ class Corbeau extends Phaser.Physics.Arcade.Sprite {
     this.direction = 1;
     this.isDiving = false;
     this.isReturning = false;
+    // LevelKit réapplique setAllowGravity(false) après group.add (qui la remet).
+    this.noGravity = true;
     this.defeated = false;
   }
 
@@ -99,4 +101,10 @@ class Corbeau extends Phaser.Physics.Arcade.Sprite {
       onComplete: () => this.destroy(),
     });
   }
+}
+
+if (typeof ENEMY_REGISTRY !== 'undefined') {
+  ENEMY_REGISTRY.corbeau = (scene, e) => new Corbeau(
+    scene, e.x, e.y, e.patrolMinX ?? e.x - 150, e.patrolMaxX ?? e.x + 150, e.diveDepth ?? 220,
+  );
 }

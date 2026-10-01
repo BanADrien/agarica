@@ -314,11 +314,16 @@ function addProceduralHangingPlants(scene, levelWidth) {
   });
 }
 
-function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = []) {
+// `background` (optionnel, clé de zone `background`) : id d'un fond de
+// ITEM_MANIFEST (texture `item-<id>`) qui remplace le ciel plan4 ; plan4 reste
+// le repli tant que l'image n'existe pas.
+function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null) {
   const coverWidth = Math.ceil(levelWidth * 1.4);
-  const scale = height / DECOR_SOURCE_HEIGHT;
+  const bgKey = background && scene.textures.exists(`item-${background}`) ? `item-${background}` : 'decor-plan4';
+  const sourceHeight = bgKey === 'decor-plan4' ? DECOR_SOURCE_HEIGHT : scene.textures.get(bgKey).getSourceImage().height;
+  const scale = height / sourceHeight;
 
-  scene.add.tileSprite(-100, 0, coverWidth, height, 'decor-plan4')
+  scene.add.tileSprite(-100, 0, coverWidth, height, bgKey)
     .setOrigin(0, 0)
     .setTileScale(scale, scale)
     .setScrollFactor(0.08);
@@ -622,6 +627,7 @@ function goToScene(scene, key, data) {
 // lumineux tant que la capacité n'est pas récupérée, éteint une fois
 // obtenue (au lieu de simplement disparaître).
 const TOTEM_TYPE_BY_FLAG = {
+  hasMonkeyForm: 'monkey',
   hasWolfForm: 'wolf',
   hasEagleForm: 'eagle',
   hasOctopusForm: 'octopus',
@@ -735,6 +741,7 @@ const UNLOCK_POPUP_TEXT_OFFSET_Y = 600 - 1086 / 2;
 // images) -- nom de la forme + le geste qui la déclenche, même vocabulaire
 // que les commentaires de Player.js (sprint/double-saut/nage auto).
 const FORM_UNLOCK_LABEL = {
+  monkey: 'Forme Singe\nAccroche aux lianes',
   wolf: 'Forme Loup\nSprint (Shift ou double-tap)',
   eagle: 'Forme Aigle\nDouble-saut',
   octopus: 'Forme Pieuvre\nNage automatique',
@@ -763,10 +770,13 @@ function showFormUnlockPopup(scene, totemType) {
   // Icône + texte : posés dès maintenant (mêmes coordonnées écran fixes que
   // la pancarte, jamais recalculées) mais invisibles (alpha 0) jusqu'à ce
   // que la pousse soit terminée -- cf. onComplete de l'anim plus bas.
+  // Forme sans icône historique (singe) : icône du manifest ou placeholder.
+  const iconKey = scene.textures.exists(`form-icon-${totemType}`) ? `form-icon-${totemType}`
+    : (scene.textures.exists('item-form_icone_singe') && totemType === 'monkey' ? 'item-form_icone_singe' : manifestPlaceholderKey(scene, 'form_icone_singe'));
   const icon = scene.add.image(
     banner.x,
     banner.y + UNLOCK_POPUP_MEDALLION_OFFSET_Y * targetScale,
-    `form-icon-${totemType}`,
+    iconKey,
   ).setScrollFactor(0).setDepth(UNLOCK_POPUP_DEPTH + 1).setAlpha(0);
   icon.setScale((UNLOCK_POPUP_MEDALLION_DIAMETER * targetScale) / icon.width);
 
@@ -859,13 +869,23 @@ function groundSurfaceYAt(scene, x, referenceY) {
   return best;
 }
 
+// Totem sans art historique (singe) : image du manifest `totem_<type>_<état>`
+// (ou son placeholder) à la place de `totem-<type>-<état>`.
+function totemTextureKey(scene, totemType, state) {
+  const key = `totem-${totemType}-${state}`;
+  if (scene.textures.exists(key)) return key;
+  const itemId = `totem_${totemType}_${state}`;
+  if (scene.textures.exists(`item-${itemId}`)) return `item-${itemId}`;
+  return manifestPlaceholderKey(scene, itemId);
+}
+
 // Idempotent : le flag protège contre un second déclenchement. Vérifié à
 // chaque frame via `scene.events.on('update', ...)` plutôt qu'un collider
 // dédié : pas besoin de toucher la boucle update() de chaque Zone*Scene.
 function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   const totemType = TOTEM_TYPE_BY_FLAG[flagName] || 'wolf';
   const alreadyHas = !!scene.registry.get(flagName);
-  const textureKey = `totem-${totemType}-${alreadyHas ? 'dim' : 'lit'}`;
+  const textureKey = totemTextureKey(scene, totemType, alreadyHas ? 'dim' : 'lit');
 
   // Cf. TOTEM_GROUND_SINK : `y` (déjà calé sur la limite de grille par
   // l'appelant) est légèrement enfoncé pour que le socle touche vraiment
@@ -893,7 +913,7 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     // `marker`/`scene.player` d'une visite précédente, potentiellement déjà
     // détruits, après un retour dans cette même zone.
     if (scene !== currentLevelScene) return;
-    if (scene.registry.get(flagName)) {
+    if (scene.registry.get(flagName) || isWorldFrozen(scene)) {
       prompt.setVisible(false);
       return;
     }
@@ -924,7 +944,8 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     }
     // Éteint plutôt que détruit : le totem reste planté là, juste sans
     // lueur, comme une capacité déjà récupérée.
-    marker.setTexture(`totem-${totemType}-dim`);
+    marker.setTexture(totemTextureKey(scene, totemType, 'dim'));
+    if (isStoryScene(scene)) saveGame(scene, { silent: true });
     prompt.setVisible(false);
     showFormUnlockPopup(scene, totemType);
 
@@ -1005,7 +1026,7 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     // propre fermeture E/Échap) : le prompt "Appuie sur E" (texte MONDE,
     // pas écran) resterait sinon affiché par-dessus, inchangé depuis juste
     // avant l'ouverture.
-    if (scene.scene.isActive('CampfireMenuScene')) {
+    if (isWorldFrozen(scene)) {
       prompt.setVisible(false);
       return;
     }
@@ -1020,6 +1041,15 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     // pendant que les touches de direction, elles, ne font plus rien.
     scene.player.setVelocity(0, 0);
     scene.scene.launch('CampfireMenuScene', { player: scene.player });
+    // Les zones de l'histoire sont déclarées APRÈS le menu dans main.js : sans
+    // ça le menu serait dessiné sous la zone.
+    scene.scene.bringToTop('CampfireMenuScene');
+    // Sauvegarde à chaque feu de camp (zones de l'histoire seulement : les
+    // zones de test ne doivent pas écraser la progression).
+    if (isStoryScene(scene)) {
+      saveGame(scene);
+      scene.scene.get('CampfireMenuScene').events.once('shutdown', () => saveGame(scene, { silent: true }));
+    }
   });
 }
 
@@ -1317,6 +1347,11 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       const prefix = AUTOTILE_PREFIX[material] || AUTOTILE_PREFIX.dirt;
       textureKey = `${prefix}${pos}`;
     }
+    // Jeu de tuiles alternatif de la zone (clé `tileset`, cf. TILESET_MANIFEST
+    // et BootScene) : mêmes noms de cases, préfixés `<id>:` ; case absente →
+    // jeu par défaut. Les boosts de hauteur restent indexés sur la clé d'origine.
+    const visualKey = options.tileset && scene.textures.exists(`${options.tileset}:${textureKey}`)
+      ? `${options.tileset}:${textureKey}` : textureKey;
     const { x: cx, y: cy } = gridToWorld(gx, gy);
 
     // tl/tr (retour utilisateur : "c'est plutôt tr et tl qui sont trop bas,
@@ -1392,7 +1427,7 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
     if (isBackLayer && !AUTOTILE_GRASS_TOP_POSITIONS.has(pos)) {
       images.push(scene.add.rectangle(cx, cy, GROUND_TILE_SIZE, GROUND_TILE_SIZE, AUTOTILE_BACKLAYER_TINT, 1));
     }
-    const img = scene.add.image(cx, tileCenterY, textureKey)
+    const img = scene.add.image(cx, tileCenterY, visualKey)
       .setDisplaySize(baseSize, displayHeight)
       .setFlipX(flipAngleX)
       .setFlipY(flipAngleY);
@@ -1733,6 +1768,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // zone), pour n'empêcher que les déclenchements multiples PENDANT un même
   // passage, jamais les passages suivants.
   scene.__transitioningAway = false;
+  // État « histoire » (PNJ, déclencheurs, verrous de cinématique...) remis à
+  // zéro à chaque visite, cf. StoryKit.js.
+  resetStoryState(scene, data);
 
   const { width, height } = scene.scale;
   const levelWidth = data.levelWidth || width;
@@ -1763,7 +1801,7 @@ function buildLevelFromData(scene, data, sceneData) {
   const levelRightPad = 200;
 
   if (data.decor !== false) {
-    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || []);
+    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], data.background);
     addCaveCeiling(scene, levelWidth);
   }
   setupDebugToggle(scene);
@@ -1773,7 +1811,7 @@ function buildLevelFromData(scene, data, sceneData) {
   // dans l'éditeur (outil 'ground-back', jamais automatique), rendu AVANT
   // le sol normal pour rester derrière lui -- purement visuel, aucun corps
   // physique (cf. `options.back` dans renderAutotileGrid).
-  renderAutotileGrid(scene, null, data.groundBackCells || [], { back: true });
+  renderAutotileGrid(scene, null, data.groundBackCells || [], { back: true, tileset: data.tileset });
   // Entre les deux sols : devant le fond, derrière le sol principal (cf.
   // addUndergrowth). Même condition que le reste du décor générique.
   // Réutilisée d'une visite à l'autre (même instance de scène, cf.
@@ -1784,7 +1822,7 @@ function buildLevelFromData(scene, data, sceneData) {
   // Premier visuel du sol principal : repère pour glisser juste derrière lui
   // des objets créés plus tard (totems et leurs plantes, cf.
   // sendBehindFrontGround).
-  scene.__frontGroundFirstImage = renderAutotileGrid(scene, scene.ground, data.groundCells || [])[0];
+  scene.__frontGroundFirstImage = renderAutotileGrid(scene, scene.ground, data.groundCells || [], { tileset: data.tileset })[0];
 
   // `scene.water` gardé (comme scene.ground/scene.enemies) : l'overlap qui
   // arme `player.inWater` (cf. Player.js, forme Pieuvre automatique) doit
@@ -1863,8 +1901,19 @@ function buildLevelFromData(scene, data, sceneData) {
   // (donc forcément une frame fantôme d'une zone quittée) est ignorée sans
   // toucher à aucun objet potentiellement détruit.
   currentLevelScene = scene;
+  // `scene.restart()` / sortie de zone : sans ça, update() tournerait sur
+  // l'ancien joueur détruit tant que la nouvelle visite n'a pas fini de se
+  // construire (resolveZoneData est asynchrone).
+  scene.events.once('shutdown', () => {
+    hideBossBar(scene);
+    scene.player = null;
+    scene.xara = null;
+    if (currentLevelScene === scene) currentLevelScene = null;
+  });
   scene.player = new Player(scene, spawn.x, spawn.y);
-  scene.xara = new Xara(scene, scene.player);
+  // Xara peut être absente (`xara: false`, ou zone de l'histoire avant sa
+  // rencontre) : cf. shouldSpawnXara dans StoryKit.js pour la règle.
+  scene.xara = shouldSpawnXara(scene, data) ? new Xara(scene, scene.player) : null;
   scene.physics.add.collider(scene.player, scene.ground);
   scene.cameras.main.startFollow(scene.player, true, 1, 1);
 
@@ -1882,38 +1931,41 @@ function buildLevelFromData(scene, data, sceneData) {
 
   scene.enemies = scene.physics.add.group();
   for (const e of data.enemies || []) {
-    const patrolMinX = e.patrolMinX ?? e.x - 150;
-    const patrolMaxX = e.patrolMaxX ?? e.x + 150;
-    let enemy = null;
-    if (e.type === 'araignee') enemy = new Araignee(scene, e.x, e.y);
-    else if (e.type === 'loup') enemy = new LoupSanguinaire(scene, e.x, e.y, patrolMinX, patrolMaxX);
-    else if (e.type === 'loupAlpha') enemy = new LoupAlpha(scene, e.x, e.y, patrolMinX, patrolMaxX);
-    else if (e.type === 'corbeau') enemy = new Corbeau(scene, e.x, e.y, patrolMinX, patrolMaxX, e.diveDepth ?? 220);
-    else if (e.type === 'crapaud') enemy = new Crapaud(scene, e.x, e.y);
-    if (enemy) {
-      // `group.add()` réinitialise `body.allowGravity` à `true`, écrasant le
-      // `setAllowGravity(false)` posé dans le constructeur de ces deux
-      // ennemis (fixe/volant) — sans ce rattrapage ils tombent hors du
-      // niveau dès l'ajout au groupe (vérifié : chute mesurée en jeu).
-      scene.enemies.add(enemy);
-      if (e.type === 'araignee' || e.type === 'corbeau') enemy.body.setAllowGravity(false);
-      // L'araignée fixe n'attaque pas au contact (seule sa toile est un
-      // obstacle, cf. Web.js/Zone3Scene d'origine) : sans ce marqueur, le
-      // contact simple avec elle blesserait le joueur comme n'importe quel
-      // autre ennemi via l'overlap générique ci-dessous.
-      if (e.type === 'araignee') enemy.harmless = true;
+    // Registre data-driven (cf. ENEMY_REGISTRY dans StoryKit.js, chaque
+    // fichier d'entité peut s'y enregistrer) à la place de l'ancienne chaîne
+    // if/else par type.
+    const factory = ENEMY_REGISTRY[e.type];
+    if (!factory) {
+      console.warn(`buildLevelFromData : type d'ennemi inconnu "${e.type}"`);
+      continue;
     }
+    const enemy = factory(scene, {
+      ...e,
+      patrolMinX: e.patrolMinX ?? e.x - 150,
+      patrolMaxX: e.patrolMaxX ?? e.x + 150,
+    });
+    if (!enemy) continue;
+    // `group.add()` réinitialise `body.allowGravity` à `true`, écrasant le
+    // `setAllowGravity(false)` posé dans le constructeur des ennemis fixes/
+    // volants — sans ce rattrapage ils tombent hors du niveau dès l'ajout.
+    scene.enemies.add(enemy);
+    if (enemy.noGravity || e.type === 'araignee' || e.type === 'corbeau') enemy.body.setAllowGravity(false);
+    // L'araignée fixe n'attaque pas au contact (seule sa toile gêne).
+    if (e.type === 'araignee' && enemy.harmless === undefined) enemy.harmless = true;
   }
   scene.physics.add.collider(scene.enemies, scene.ground);
   scene.physics.add.overlap(scene.player, scene.enemies, (player, enemy) => {
-    if (player.isInvulnerable || enemy.defeated) return;
+    if (player.isInvulnerable || enemy.defeated || isWorldFrozen(scene)) return;
     const hitbox = player.getAttackHitbox();
     if (hitbox && Phaser.Geom.Intersects.RectangleToRectangle(hitbox, enemy.getBounds())) {
-      enemy.defeat();
-      // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT dans
-      // Player.js) — même règle que le tir de plume (cf. Feather.js), donc
-      // factorisée dans gainEnergy() plutôt que dupliquée ici et là.
-      player.gainEnergy(ENERGY_PER_HIT);
+      // Un coup = un seul dégât, même si la fenêtre d'attaque couvre plusieurs
+      // frames (cf. damageEnemy) ; le piqué de l'aigle frappe au contact, au
+      // plus une fois toutes les 400 ms.
+      const token = player.isAttacking ? `melee-${player.attackEndTime}` : `dive-${Math.floor(scene.time.now / 400)}`;
+      if (damageEnemy(scene, enemy, { kind: player.isAttacking ? 'melee' : 'dive', player, token })) {
+        // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT).
+        player.gainEnergy(ENERGY_PER_HIT);
+      }
     } else if (!enemy.harmless) {
       player.hitByEnemy();
     }
@@ -1951,6 +2003,27 @@ function buildLevelFromData(scene, data, sceneData) {
   scene.__exits = data.exits || (data.exit ? [data.exit] : []);
 
   createHud(scene);
+
+  // Clés de données additionnelles (PNJ, déclencheurs, mousse, script de
+  // zone...) : cf. LEVEL_DATA_HANDLERS dans StoryKit.js / PLAN_DEV.md.
+  runLevelDataHandlers(scene, data);
+  storyOnZoneEnter(scene, data, sceneData);
+}
+
+// Inflige un coup à un ennemi : `takeHit(source)` s'il existe (ennemis à
+// plusieurs PV, boss), sinon `defeat()`. `source.token` identifie l'attaque
+// (mêlée, plume, compétence) : un même token ne touche qu'une fois le même
+// ennemi -- corrige le Loup Alpha (hp 3) tué en un seul coup, quand la
+// fenêtre de mêlée touchait sur plusieurs frames. Vrai si le coup a porté.
+function damageEnemy(scene, enemy, source = {}) {
+  if (!enemy || enemy.defeated || !enemy.active) return false;
+  if (source.token != null) {
+    if (enemy.__lastHitToken === source.token) return false;
+    enemy.__lastHitToken = source.token;
+  }
+  if (typeof enemy.takeHit === 'function') enemy.takeHit(source);
+  else enemy.defeat();
+  return true;
 }
 
 // Cœurs (cf. HEART_MAX dans Player.js) + barre d'énergie (cf. ENERGY_MAX) :
@@ -2077,35 +2150,55 @@ function updateLevelFromData(scene, time, delta) {
   // encore (scene.player/ground/enemies tous undefined). Sans ce retour
   // anticipé, la toute première frame plantait presque à coup sûr sur
   // `scene.player.update()` un peu plus bas.
-  if (!scene.player) return;
-  // CampfireMenuScene active (cf. addCampfire, lancée EN PARALLÈLE plutôt
-  // qu'un flag sur cette scène) : monde entièrement gelé (aucun mouvement
-  // joueur/Xara/ennemi, aucune sortie de zone) tant qu'elle ne s'est pas
-  // arrêtée elle-même (cf. sa propre update()) -- seul le HUD continue
-  // d'être dessiné ici, le menu se dessine lui-même dans sa propre scène.
-  if (!scene.scene.isActive('CampfireMenuScene')) {
+  if (!scene.player || !scene.player.active || !scene.player.body) return;
+  // Monde gelé (cf. isWorldFrozen dans StoryKit.js : menu du feu de camp,
+  // dialogue, inventaire, carte, cinématique) : aucun mouvement joueur/Xara/
+  // ennemi, aucune sortie de zone -- seul le HUD continue d'être dessiné ici,
+  // les overlays se dessinent eux-mêmes dans leur propre scène.
+  if (isWorldFrozen(scene)) {
+    freezeWorldBodies(scene);
+  } else {
     scene.player.update();
-    scene.xara.update(time, delta);
+    if (scene.xara) scene.xara.update(time, delta);
     scene.enemies.children.iterate((enemy) => enemy && enemy.update(scene.player));
 
     // Zone de dégâts d'une compétence active (cf. getSkillHitbox/SKILL_DEFS
     // dans Player.js) : vérifiée manuellement contre TOUS les ennemis, pas
-    // via un `physics.add.overlap` comme l'attaque de mêlée habituelle
-    // ci-dessus — cette zone est bien plus large que le corps d'Agarica
-    // (touche des deux côtés), un ennemi dedans ne serait pas forcément en
-    // contact physique avec elle. `enemy.defeat()` protège déjà contre un
-    // second appel (cf. `this.defeated`), mais le check `!enemy.defeated`
-    // ici évite en plus de créditer de l'énergie plusieurs fois pour le même
-    // ennemi pendant les quelques frames où la fenêtre reste active.
+    // via un `physics.add.overlap` comme l'attaque de mêlée -- cette zone est
+    // bien plus large que le corps d'Agarica. Un seul coup par activation et
+    // par ennemi (token, cf. damageEnemy). La compétence `papillon` soigne
+    // les ennemis corrompus (`heal()`) au lieu de frapper.
     const skillHitbox = scene.player.getSkillHitbox();
     if (skillHitbox) {
+      const skillId = scene.player.activeSkillId;
+      const token = `skill-${skillId}-${scene.player.skillActiveUntil}`;
+      if (scene.__lastSkillEventToken !== token) {
+        scene.__lastSkillEventToken = token;
+        // Pour les boss/scripts hors du groupe `enemies` (Kainati, Ghil't...).
+        scene.events.emit('player-skill', { skillId, rect: skillHitbox, token });
+      }
+      const def = typeof SKILL_DEFS !== 'undefined' ? SKILL_DEFS[skillId] : null;
+      const heals = skillId === 'papillon' || (def && def.heals);
       scene.enemies.children.iterate((enemy) => {
         if (!enemy || enemy.defeated) return;
-        if (Phaser.Geom.Intersects.RectangleToRectangle(skillHitbox, enemy.getBounds())) {
-          enemy.defeat();
+        if (!Phaser.Geom.Intersects.RectangleToRectangle(skillHitbox, enemy.getBounds())) return;
+        if (heals) {
+          if (enemy.corrupted && typeof enemy.heal === 'function' && enemy.__lastHitToken !== token) {
+            enemy.__lastHitToken = token;
+            enemy.heal({ kind: 'skill', skillId, player: scene.player, token });
+          }
+          return;
+        }
+        if (damageEnemy(scene, enemy, { kind: 'skill', skillId, player: scene.player, token })) {
           scene.player.gainEnergy(ENERGY_PER_HIT);
         }
       });
+    }
+
+    // Clés de zone dynamiques (cf. LEVEL_UPDATE_HOOKS, StoryKit.js).
+    for (const hook of LEVEL_UPDATE_HOOKS) {
+      hook(scene, time, delta);
+      if (scene.__transitioningAway) break;
     }
 
     // Plusieurs sorties possibles désormais (cf. scene.__exits) : déclenche
@@ -2162,4 +2255,17 @@ function updateLevelFromData(scene, time, delta) {
   // disparaître au Shift+A/Shift+J pendant que le menu est ouvert.
   drawCombatDebugOverlays(scene);
   drawHud(scene);
+}
+
+// Pendant un gel, la physique continue (gravité) : on coupe l'élan horizontal
+// du joueur (sauf s'il est piloté par une cinématique, cf. playerMove) et
+// celui des ennemis, sinon ils glisseraient sur leur dernière vitesse.
+function freezeWorldBodies(scene) {
+  const player = scene.player;
+  if (player.body && !scene.__playerScripted) player.setVelocityX(0);
+  scene.enemies.children.iterate((enemy) => {
+    if (!enemy || !enemy.body || !enemy.body.enable) return;
+    enemy.body.setVelocityX(0);
+    if (!enemy.body.allowGravity) enemy.body.setVelocityY(0);
+  });
 }
