@@ -6,6 +6,9 @@
 // de la place pour charger d'un bord à l'autre sans que l'écran défile trop.
 const ARENE_GHILT_DATA = {
   zoneName: "Arène de Ghil't",
+  // Décor/tuiles de l'acte 2 (repli sur le décor par défaut tant que l'art manque).
+  background: 'fond_arene_ghilt',
+  tileset: 'tuiles_corrompues',
   levelWidth: 1344,
   levelHeight: 540,
   // Voile verdâtre léger : on est au cœur de la corruption (géré par la Fondation).

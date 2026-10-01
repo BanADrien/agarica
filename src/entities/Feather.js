@@ -59,22 +59,26 @@ class Feather extends Phaser.Physics.Arcade.Sprite {
       if (this.active) this.destroy();
     });
 
-    // Défait un ennemi au contact, comme n'importe quelle attaque (cf. les
-    // overlaps joueur/ennemis dans chaque Zone*Scene) — auto-suffisant ici
-    // plutôt que de faire câbler cet overlap par chaque scène. `takeHit()`
-    // en priorité : le Loup Alpha (boss, 3 PV) s'en sert au lieu de
-    // `defeat()` direct pour ne pas mourir en un seul coup (cf. LoupAlpha.js).
+    // Touche un ennemi au contact via `damageEnemy` (LevelKit) : takeHit/
+    // defeat + verrou anti-double-coup par `token` (unique par plume, une
+    // plume ne compte qu'une fois même si l'overlap se répète avant destroy).
+    // `x`/`y` : position du tir, utilisée pour le recul des ennemis corrompus.
+    this.hitToken = `feather-${++Feather.nextTokenId}`;
     if (scene.enemies) {
       scene.physics.add.overlap(this, scene.enemies, (feather, enemy) => {
-        if (enemy.defeated) return;
-        if (typeof enemy.takeHit === 'function') enemy.takeHit();
-        else enemy.defeat();
+        if (!feather.active) return;
+        const hit = damageEnemy(scene, enemy, {
+          kind: 'feather', token: feather.hitToken, player: scene.player, x: feather.x, y: feather.y,
+        });
+        if (!hit) return;
         // Même petite portion d'énergie que l'attaque au sol (cf.
-        // ENERGY_PER_HIT dans Player.js) — un tir de plume compte comme un
-        // coup porté au même titre qu'un coup de dague.
+        // ENERGY_PER_HIT dans Player.js).
         if (scene.player) scene.player.gainEnergy(ENERGY_PER_HIT);
         feather.destroy();
       });
     }
   }
 }
+
+// Compteur global des jetons de coup (cf. constructeur).
+Feather.nextTokenId = 0;

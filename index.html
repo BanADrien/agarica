@@ -18,7 +18,7 @@
     }
     #game-container {
       width: 100vw;
-      height: 100vh;tu p
+      height: 100vh;
       box-shadow: 0 0 40px rgba(140, 100, 220, 0.4);
     }
 
@@ -91,6 +91,25 @@
       color: #8fe6c4;
       min-height: 32px;
       line-height: 1.4;
+    }
+    #editor-ui details summary {
+      cursor: pointer;
+      color: #a99bd6;
+      margin-bottom: 6px;
+    }
+    #editor-ui details label {
+      margin-top: 6px;
+    }
+    #editor-ui label.inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #selection-info, #zone-extra-keys {
+      font-size: 11px;
+      color: #a99bd6;
+      word-break: break-all;
+      margin-top: 4px;
     }
     body.editor-mode #game-container {
       width: calc(100vw - 240px);
@@ -320,6 +339,7 @@
 
     <div class="editor-section">
       <button id="btn-zones-overview">Zones</button>
+      <select id="zone-quick-select" style="margin-top:4px"></select>
     </div>
 
     <div class="editor-section">
@@ -338,6 +358,20 @@
         <button data-tool="campfire">Feu de camp</button>
         <button data-tool="delete">Supprimer</button>
         <button data-tool="modify">Modifier</button>
+      </div>
+      <!-- Éléments de l'histoire (PNJ, déclencheurs, mousse, lianes...) :
+           options remplies par EditorScene.wireUI (EDITOR_STORY_KINDS). -->
+      <select id="tool-more-select" style="margin-top:4px">
+        <option value="">Plus d'outils (histoire)…</option>
+      </select>
+    </div>
+
+    <div class="editor-section" id="selection-section" style="display:none">
+      <label>Élément sélectionné</label>
+      <div id="selection-info"></div>
+      <div class="row" style="margin-top:4px">
+        <button id="btn-selection-props">Propriétés…</button>
+        <button id="btn-selection-json">JSON…</button>
       </div>
     </div>
 
@@ -361,6 +395,25 @@
       </div>
       <button id="apply-size-btn" style="margin-top:4px">Appliquer</button>
     </div>
+
+    <details class="editor-section" id="zone-props-section">
+      <summary>Propriétés de la zone</summary>
+      <label>Nom affiché (zoneName)</label>
+      <input id="zone-name-input" type="text" placeholder="ex: Forêt sombre" />
+      <label>Fond (background)</label>
+      <select id="zone-background-select"></select>
+      <label>Tuiles (tileset)</label>
+      <select id="zone-tileset-select"></select>
+      <label>Xara</label>
+      <select id="zone-xara-select">
+        <option value="">Défaut (si rencontrée)</option>
+        <option value="false">Absente (xara: false)</option>
+      </select>
+      <label>Script de zone (ZONE_SCRIPTS)</label>
+      <input id="zone-script-input" type="text" placeholder="ex: kainati_arene" />
+      <label class="inline"><input id="zone-tall-input" type="checkbox" /> Niveau haut (tallLevel)</label>
+      <div id="zone-extra-keys"></div>
+    </details>
 
     <div class="editor-section">
       <label>Nom du niveau à enregistrer</label>

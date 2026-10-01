@@ -5,6 +5,8 @@
 // aussi les halos de lumière autour d'Agarica et des papillons.
 const TROU_SOMBRE_DATA = {
   zoneName: 'Le trou sombre',
+  background: 'fond_trou_sombre',
+  tileset: 'tuiles_corrompues',
   levelWidth: 1344,
   levelHeight: 540,
   // Très sombre (géré par la Fondation) ; les halos du script percent le noir.
