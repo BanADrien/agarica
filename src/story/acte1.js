@@ -272,6 +272,7 @@ CUTSCENES.bosquet_bannissement = [
     { who: 'pere_chef', text: 'Agarica, fille du bosquet d\'Émeraude… tu es bannie. Tu partiras avant l\'aube.' },
   ] },
   { shake: { ms: 250, intensity: 0.004 } },
+  { playerPose: 'sad' },
   { say: [
     { who: 'agarica', text: 'Père… Où veux-tu que j\'aille ? Je n\'ai jamais dépassé la lisière.' },
     { who: 'pere_chef', text: '…' },
@@ -299,6 +300,7 @@ CUTSCENES.bosquet_porte = (scene) => {
   }
   return [
     { playerFace: 'right' },
+    { playerPose: 'sad' },
     { say: ['Agarica franchit les portes du seul foyer qu\'elle ait jamais connu.'] },
     { title: { title: 'Bannie', sub: 'Le bosquet d\'Émeraude se referme derrière elle', hold: 1800 } },
     { fadeOut: 1000 },
@@ -442,6 +444,7 @@ const FS1_AMAS_X = 2752;
 const FS1_XARA_X = 1344;
 
 CUTSCENES.fs1_desespoir = (scene) => [
+  { playerPose: 'sad' },
   { wait: 1900 },
   { say: [
     'Les portes de l\'est se sont refermées. Derrière elles, plus un bruit.',
@@ -451,6 +454,9 @@ CUTSCENES.fs1_desespoir = (scene) => [
       ? { who: 'agarica', text: 'Et toi, Amanite… Je t\'ai suppliée de la reposer. Où es-tu, maintenant ?' }
       : { who: 'agarica', text: 'Et toi, Amanite… Tu m\'avais promis de rapporter l\'idole. Où es-tu, maintenant ?' },
     { who: 'agarica', text: 'Je n\'ai jamais dépassé la lisière. Je ne sais même pas où aller.' },
+  ] },
+  { playerPose: null },
+  { say: [
     { who: 'agarica', text: '… Allez, Agarica. Pleurer ne fera pas reculer la mousse. Un pas, puis un autre.' },
   ] },
   { toast: 'Avance dans la forêt →' },
@@ -458,7 +464,9 @@ CUTSCENES.fs1_desespoir = (scene) => [
 
 CUTSCENES.fs1_rencontre = [
   { playerFace: 'right' },
+  { playerPose: 'sad' },
   { say: [{ who: 'xara', name: '???', text: 'Tu pleures bien fort, pour quelqu\'un qui se promène seule la nuit.' }] },
+  { playerPose: null },
   { playerMove: { toX: FS1_XARA_X - 110 } },
   { npcFace: { npc: 'xara', dir: 'player' } },
   { npcAnim: { npc: 'xara', anim: 'talk' } },
@@ -614,6 +622,18 @@ function acte1DrawMossDecor(scene, spots) {
   }
 }
 
+// Après un feu de camp, une chute de cœurs ramène au feu plutôt qu'à
+// l'entrée de la zone (Player.hitByEnemy réapparaît en spawnX/spawnY).
+function acte1RespawnAfter(scene, points) {
+  const p = scene.player;
+  for (const pt of points) {
+    if (p.x > pt.x && (p.spawnX ?? 0) < pt.x) {
+      p.spawnX = pt.x;
+      p.spawnY = pt.y - 4;
+    }
+  }
+}
+
 ZONE_SCRIPTS.foret_sombre_1 = {
   create(scene) {
     const st = { amasDone: !!storyGet('moss_foret_sombre_1_amas_racines'), nextRefill: 0 };
@@ -629,6 +649,7 @@ ZONE_SCRIPTS.foret_sombre_1 = {
     const st = scene.__acte1;
     if (!st) return;
     const p = scene.player;
+    acte1RespawnAfter(scene, [{ x: 1640, y: 448 }]);
     const amas = scene.__story.mossBlocks[0];
     if (!st.amasDone && amas && amas.destroyed) {
       st.amasDone = true;
@@ -829,9 +850,9 @@ function acte1Fs2DrawPlante(scene) {
 // Le grand arbre, au loin (parallaxe lente) : il se lève à l'horizon au fil
 // de la zone et domine l'écran près de la sortie vers ses racines.
 function acte1Fs2DrawGrandArbre(scene) {
-  const g = scene.add.graphics().setScrollFactor(0.15, 1);
-  const cx = 1350;
-  g.fillStyle(0x161230, 1);
+  const g = scene.add.graphics().setScrollFactor(0.15, 1).setAlpha(0.92);
+  const cx = 1390; // ≈ x 650 à l'écran quand la caméra est en bout de zone
+  g.fillStyle(0x120d26, 1);
   g.fillRect(cx - 55, 120, 110, 420);
   g.fillTriangle(cx - 55, 540, cx - 160, 540, cx - 55, 400);
   g.fillTriangle(cx + 55, 540, cx + 170, 540, cx + 55, 380);
@@ -839,7 +860,7 @@ function acte1Fs2DrawGrandArbre(scene) {
     g.fillCircle(cx + dx, dy, r);
   }
   // Liseré de lune sur la cime.
-  g.lineStyle(3, 0x7b6bd6, 0.5);
+  g.lineStyle(4, 0x9d8cf0, 0.7);
   g.beginPath();
   g.arc(cx - 20, -20, 90, Math.PI * 1.05, Math.PI * 1.75);
   g.strokePath();
@@ -927,6 +948,7 @@ ZONE_SCRIPTS.foret_sombre_2 = {
     const st = scene.__acte1;
     if (!st) return;
     const p = scene.player;
+    acte1RespawnAfter(scene, [{ x: 3430, y: 448 }]);
     // Totem du loup touché (LevelKit pose le flag) : Xara explique la course.
     if (!st.hadWolf && storyGet('hasWolfForm')) {
       st.hadWolf = true;

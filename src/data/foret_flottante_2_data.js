@@ -35,6 +35,8 @@ const FORET_FLOTTANTE_2_DATA = {
   avoidRanges: [[0, 4096]],
   playerSpawn: { x: 120, y: 280 },
   fall: { y: 600, mode: 'hurt' },
+  // Points de reprise : ruines (I3), île d'Amanite (I4), rampe d'envol (T3).
+  checkpoints: [{ x: 1120, y: 320 }, { x: 1600, y: 384 }, { x: 3240, y: 192 }],
   props: [
     { type: 'bosquet_standing_stone', x: 1120, y: 320, scale: 0.3 },
     { type: 'bosquet_mossy_rock', x: 1310, y: 320, scale: 0.3 },

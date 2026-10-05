@@ -26,7 +26,12 @@ const FORET_SOMBRE_1_DATA = {
     ...groundRow(0, 60, [7, 8]),     // sol continu
     ...groundRow(8, 10, [6]),        // tronc couché (petit saut)
     ...groundRow(20, 22, [6]),       // la souche de Xara (x 1280-1408)
-    ...groundRow(30, 33, [5]),       // branche basse du sous-bois (optionnelle)
+    // Rocher du sous-bois en escalier : jamais de face de 2 cases qui part
+    // du sol (le joueur pouvait rester coincé contre, cf. hitbox 3/4 des
+    // tuiles d'herbe) ; idem dans foret_sombre_2.
+    ...groundRow(30, 31, [6]),
+    ...groundRow(31, 32, [5, 6]),
+    ...groundRow(32, 33, [6]),
     ...groundRow(36, 38, [4]),       // branche haute (vue sur l'amas)
     ...groundRow(42, 44, [0, 1, 2, 3]), // mur de racines : du haut de l'écran jusqu'à l'amas
     ...groundRow(41, 42, [0, 1]),    // départ des racines (silhouette moins carrée)

@@ -17,8 +17,10 @@
 // ---------------------------------------------------------------------------
 function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0) {
   // Fente lumineuse dans l'écorce (même langage visuel que le passage du totem de l'arène).
-  const glow = scene.add.ellipse(x, y, 70, h, color, 0.3).setDepth(2);
-  const core = scene.add.ellipse(x, y, 40, h - 24, 0x1a1428, 0.9).setDepth(2);
+  const glow = scene.add.ellipse(x, y, 70, h, color, 0.3);
+  const core = scene.add.ellipse(x, y, 40, h - 24, 0x1a1428, 0.9);
+  storyPutBehindPlayer(scene, glow);
+  storyPutBehindPlayer(scene, core);
   scene.tweens.add({ targets: glow, alpha: 0.65, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   return { glow, core };
 }
@@ -44,7 +46,8 @@ function arbreMotes(scene, x1, x2, y1, y2, count, colors) {
 
 // Plaques de mousse décoratives (tunnel des racines), sans corps.
 function arbreMossDecor(scene, x, y, w, flip = false) {
-  const g = scene.add.graphics({ x, y }).setDepth(2);
+  const g = scene.add.graphics({ x, y });
+  storyPutBehindPlayer(scene, g);
   const rnd = new Phaser.Math.RandomDataGenerator([`arbre${x},${y}`]);
   const dir = flip ? 1 : -1; // pousse vers le haut (sol) ou vers le bas (plafond)
   for (let i = 0; i < 6; i++) {
@@ -54,6 +57,40 @@ function arbreMossDecor(scene, x, y, w, flip = false) {
   for (let i = 0; i < 5; i++) {
     g.fillStyle(0x9bff5a, 0.7).fillCircle(rnd.realInRange(-w / 2, w / 2), dir * rnd.realInRange(2, 14), rnd.realInRange(1.5, 3));
   }
+  return g;
+}
+
+// Tronc du grand arbre (placeholder dessiné) : écorce violet sombre, sillons,
+// liseré de lumière lunaire et coulures de mousse ; s'évase en racines au pied.
+function arbreDrawTrunk(scene, x1, x2, top, bottom) {
+  const g = scene.add.graphics();
+  const w = x2 - x1;
+  g.fillStyle(0x241a2c, 1);
+  g.fillPoints([
+    { x: x1, y: top }, { x: x2, y: top }, { x: x2, y: bottom - 140 },
+    { x: x2 + 90, y: bottom }, { x: x1 - 90, y: bottom }, { x: x1, y: bottom - 140 },
+  ], true);
+  const rnd = new Phaser.Math.RandomDataGenerator(['tronc']);
+  // Sillons verticaux de l'écorce.
+  for (let i = 0; i < 9; i++) {
+    const gx = x1 + 30 + (w - 60) * (i / 8) + rnd.realInRange(-12, 12);
+    g.lineStyle(rnd.realInRange(3, 6), 0x150f1c, 0.9);
+    g.beginPath();
+    g.moveTo(gx, top);
+    for (let y = top; y <= bottom - 100; y += 60) g.lineTo(gx + Math.sin(y / 90 + i) * 8, y);
+    g.strokePath();
+  }
+  // Liseré lunaire (bord gauche) et ombre (bord droit).
+  g.fillStyle(0x5a4a7a, 0.55).fillRect(x1, top, 10, bottom - 140 - top);
+  g.fillStyle(0x0d0912, 0.5).fillRect(x2 - 18, top, 18, bottom - 140 - top);
+  // Coulures de mousse qui grimpent le long du tronc.
+  for (let i = 0; i < 14; i++) {
+    const mx = rnd.realInRange(x1 + 20, x2 - 20);
+    const my = rnd.realInRange(top + 40, bottom - 60);
+    g.fillStyle(i % 2 ? 0x2f5a2a : 0x3e7a2c, 0.85).fillEllipse(mx, my, rnd.realInRange(18, 36), rnd.realInRange(30, 70));
+    g.fillStyle(0x9bff5a, 0.55).fillCircle(mx + rnd.realInRange(-6, 6), my + rnd.realInRange(-10, 10), 2.5);
+  }
+  sendBehindFrontGround(scene, [g]);
   return g;
 }
 
@@ -168,10 +205,19 @@ ZONE_SCRIPTS.grand_arbre_racines = {
   create(scene, data) {
     const st = { cfg: (data && data.rockfall) || null, timer: 600 };
     scene.__arbre = st;
+    arbreDrawTrunk(scene, 1540, 2120, -420, 448);
+    // Bord droit, sous la grande branche : mur invisible (le monde physique
+    // continue 200 px plus loin). Pas de pilier de tuiles : un mur de 2 cases
+    // ou plus partant du sol coince Agarica contre l'angle des tuiles.
+    const wall = scene.add.zone(3216, 270, 32, 540);
+    scene.physics.add.existing(wall, true);
+    scene.physics.add.collider(scene.player, wall);
+    if (scene.enemies) scene.physics.add.collider(scene.enemies, wall);
     // La fente de l'épreuve du singe, au bout des lianes (corniche gauche).
     arbreGlowPassage(scene, 40, -190, 120);
     // Lumière de la cime, en haut à droite (sortie vers l'arène).
-    const cime = scene.add.ellipse(3170, -260, 120, 200, 0xffe9a8, 0.12).setDepth(2);
+    const cime = scene.add.ellipse(3170, -260, 120, 200, 0xffe9a8, 0.12);
+    storyPutBehindPlayer(scene, cime);
     scene.tweens.add({ targets: cime, alpha: 0.25, duration: 1600, yoyo: true, repeat: -1 });
     // La mousse dense qui remonte le tunnel (sol et plafond).
     [420, 560, 900, 1040].forEach((x, i) => arbreMossDecor(scene, x, 448, 70 + (i % 2) * 20));
@@ -184,6 +230,13 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     const st = scene.__arbre;
     const cfg = st && st.cfg;
     const p = scene.player;
+    // Le feu de camp de la fourche sert aussi de point de reprise : une
+    // chute de cœurs plus haut ne renvoie pas tout en bas de l'arbre.
+    if (st && p && !st.forkSpawn && p.body.blocked.down && p.x > 1344 && p.x < 1728 && p.y < 100 && p.y > 0) {
+      st.forkSpawn = true;
+      p.spawnX = 1600;
+      p.spawnY = 60;
+    }
     // Les guetteurs de Kainati se taisent une fois leur roi apaisé.
     if (!cfg || !p || storyGet('kainatiDefeated')) return;
     const onBranch = p.x > cfg.x1 - 80 && p.x < cfg.x2 + 80 && p.y < cfg.surfaceY + 40 && p.y > cfg.surfaceY - 260;
@@ -305,7 +358,8 @@ ZONE_SCRIPTS.monde_spirituel = {
   create(scene) {
     const done = storyGet('mondeSpirituelFini');
     // L'arbre spirituel (placeholder dessiné : tronc translucide + couronne de lumière).
-    const tree = scene.add.graphics().setDepth(1);
+    const tree = scene.add.graphics();
+    sendBehindFrontGround(scene, [tree]);
     tree.fillStyle(0x9fe3ff, 0.16).fillEllipse(2620, 120, 620, 300);
     tree.fillStyle(0xbfe8a0, 0.12).fillEllipse(2560, 60, 420, 200);
     tree.fillStyle(0x7fd8c8, 0.28).fillRoundedRect(2560, 120, 110, 330, 30);
@@ -344,7 +398,7 @@ CUTSCENES.epreuve_intro = [
     { who: 'kainati', name: 'Voix de Kainati', text: 'Mon peuple grimpe ici depuis la première sève. Personne ne touche le sol.' },
     { who: 'kainati', name: 'Voix de Kainati', text: 'Monte jusqu\'à la lumière, tout là-haut. Le talisman de mon peuple t\'y attend.' },
   ] },
-  { camera: { x: 1760, y: -200, ms: 1700 } },
+  { camera: { x: 200, y: -200, ms: 1700 } },
   { wait: 900 },
   { cameraFollow: true },
   { toast: { text: 'Les lanternes sont des points de reprise : une chute te ramène à la dernière allumée.', ms: 3600 } },
@@ -374,19 +428,36 @@ CUTSCENES.epreuve_talisman = [
     { who: 'xara', text: 'Une pierre bien lancée vaut mieux qu\'une lame trop près des crocs. Ce vieux singe est sage.' },
     { who: 'agarica', text: 'Merci, Kainati. Merci à ton peuple.' },
   ] },
-  { toast: { text: 'Lancer de pierre : il coûte un peu d\'énergie. Le passage à droite redescend vers les racines.', ms: 4000 } },
+  { call: (scene) => epreuveOuvrirSommet(scene, false) },
+  { toast: { text: 'Lancer de pierre : il coûte un peu d\'énergie. La fente, à gauche, redescend vers les racines.', ms: 4000 } },
 ];
+
+// La fente du sommet (raccourci vers les racines) ne s'ouvre qu'une fois le
+// talisman pris : sinon l'élan de la dernière liane y jetterait Agarica.
+const EPREUVE_SINGE_SORTIE_SOMMET = { x: 16, y: -250, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
+
+function epreuveOuvrirSommet(scene, instant) {
+  if (scene.__epreuveSommet) return;
+  scene.__epreuveSommet = true;
+  scene.__exits = scene.__exits || [];
+  scene.__exits.push(EPREUVE_SINGE_SORTIE_SOMMET);
+  const p = arbreGlowPassage(scene, 34, -250, 110);
+  if (!instant) [p.glow, p.core].forEach((o) => { o.setScale(0.1); scene.tweens.add({ targets: o, scale: 1, duration: 900, ease: 'Back.Out' }); });
+}
 
 ZONE_SCRIPTS.epreuve_singe = {
   create(scene) {
+    scene.__epreuveSommet = false;
     // Au sommet : un autel de pierre et un rai de lumière, visibles de loin.
-    const g = scene.add.graphics().setDepth(1);
-    g.fillStyle(0xffe9a8, 0.08).fillRect(1740, -400, 120, 150);
-    g.fillStyle(0x4a4058, 1).fillRoundedRect(1772, -284, 56, 28, 6);
-    g.fillStyle(0x6d6480, 1).fillRoundedRect(1780, -292, 40, 10, 4);
-    const beam = scene.add.rectangle(1800, -330, 60, 140, 0xffe9a8, 0.12).setDepth(1);
+    const g = scene.add.graphics();
+    g.fillStyle(0xffe9a8, 0.08).fillRect(50, -400, 120, 210);
+    g.fillStyle(0x4a4058, 1).fillRoundedRect(82, -220, 56, 28, 6);
+    g.fillStyle(0x6d6480, 1).fillRoundedRect(90, -228, 40, 10, 4);
+    const beam = scene.add.rectangle(110, -320, 60, 200, 0xffe9a8, 0.12);
+    storyPutBehindPlayer(scene, beam);
+    storyPutBehindPlayer(scene, g);
     scene.tweens.add({ targets: beam, alpha: 0.28, duration: 1300, yoyo: true, repeat: -1 });
-    arbreGlowPassage(scene, 1890, -320, 110);
-    arbreMotes(scene, 400, 1900, -380, 420, 16, [0xbfe8a0, 0xffe9a8, 0x9bff5a]);
+    arbreMotes(scene, 0, 1700, -380, 420, 16, [0xbfe8a0, 0xffe9a8, 0x9bff5a]);
+    if (storyGet('talismanSinge')) epreuveOuvrirSommet(scene, true);
   },
 };

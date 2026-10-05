@@ -343,8 +343,14 @@ ZONE_SCRIPTS.kainati_arene = {
     // Forme singe (Liane.js) : une vraie prise de liane compte comme un rebond.
     st.onVineGrab = (vine) => { if (vine && !st.disposed) kainatiOnVineUsed(scene, st, vine); };
     scene.events.on('vine-grab', st.onVineGrab);
+    // Le dernier cœur perdu gèle le monde le temps de la pose `death`
+    // (Player.hitByEnemy, ~1,1 s) puis recharge les cœurs : update() (coupé
+    // pendant le gel) ne voyait jamais `hearts <= 0`. On écoute le registre.
+    st.onHearts = (parent, value) => { if (!st.disposed && value <= 0) st.dying = true; };
+    scene.registry.events.on('changedata-hearts', st.onHearts);
     scene.events.once('shutdown', () => {
       st.disposed = true;
+      scene.registry.events.off('changedata-hearts', st.onHearts);
       scene.input.keyboard.off('keydown-E', st.onKeyE);
       scene.events.off('vine-grab', st.onVineGrab);
       kainatiHideBar(scene, st);

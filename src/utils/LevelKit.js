@@ -2263,6 +2263,10 @@ function updateLevelFromData(scene, time, delta) {
 function freezeWorldBodies(scene) {
   const player = scene.player;
   if (player.body && !scene.__playerScripted) player.setVelocityX(0);
+  // L'accélération de course (Player.update) restait appliquée pendant le
+  // gel : Agarica glissait (~30 px/s) pendant un dialogue, jusqu'à tomber
+  // d'un bord de ravin. Player.update la repose à chaque frame une fois dégelé.
+  if (player.body) player.setAccelerationX(0);
   scene.enemies.children.iterate((enemy) => {
     if (!enemy || !enemy.body || !enemy.body.enable) return;
     enemy.body.setVelocityX(0);

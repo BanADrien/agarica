@@ -82,6 +82,7 @@ class DialogueScene extends Phaser.Scene {
     const name = line.name !== undefined ? line.name : speaker.name;
     const narrator = who === 'narrateur';
     const B = DIALOGUE_BOX;
+    storyDialogueLinePose(this.scene.get(this.parentKey), line);
 
     this.drawPortrait(narrator ? null : (line.portrait || who), speaker.initial || name, speaker.color);
     this.drawNamePlate(narrator ? '' : name, speaker.color);

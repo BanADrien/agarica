@@ -1778,7 +1778,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // Poses Codex optionnelles (manifest `agarica_extra`, face à DROITE) :
         // utilisées seulement si l'art existe, sinon comportement historique.
         const extra = (anim) => hasManifestArt(this.scene, 'agarica_extra', anim);
-        if (now < this.hurtPoseUntil && !this.isAttacking && extra('hurt')) {
+        if (this.storyPose && extra(this.storyPose)) {
+          // Pose narrative tenue (cf. setPlayerStoryPose dans StoryKit, chute de mort).
+          this.applyAgaricaExtraPose(this.storyPose);
+        } else if (now < this.hurtPoseUntil && !this.isAttacking && extra('hurt')) {
           this.applyAgaricaExtraPose('hurt');
         } else if (this.isAttacking || now < this.throwPoseUntil) {
           this.anims.play(ANIM_AGARICA_ATTACK_KEY, true);
@@ -2302,7 +2305,20 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.setTint(0xff4d6d);
     this.setVelocity(0, 0);
     const depleted = this.hearts <= 0;
-    this.scene.time.delayedCall(300, () => {
+    // Dernier cœur perdu : pose `death` (art Codex agarica_extra) tenue un
+    // instant avant la réapparition, monde gelé via __cutsceneLock pour que
+    // ni les ennemis ni les touches n'interfèrent. Sans art : comme avant.
+    const deathPose = depleted && this.form === 'agarica' && hasManifestArt(this.scene, 'agarica_extra', 'death');
+    if (deathPose) {
+      this.storyPose = 'death';
+      this.applyAgaricaExtraPose('death');
+      this.scene.__cutsceneLock = (this.scene.__cutsceneLock || 0) + 1;
+    }
+    this.scene.time.delayedCall(deathPose ? 1100 : 300, () => {
+      if (deathPose) {
+        this.storyPose = null;
+        this.scene.__cutsceneLock = Math.max(0, (this.scene.__cutsceneLock || 0) - 1);
+      }
       if (depleted) {
         this.hearts = this.maxHearts;
         this.scene.registry.set('hearts', this.hearts);

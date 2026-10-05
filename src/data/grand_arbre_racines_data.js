@@ -5,9 +5,9 @@
 //
 // Plan (grille 64 ; surface d'une case gy = gy*64 ; sol y=448) :
 //   x 0-256      pied de l'arbre : arrivée de la forêt sombre (bas-gauche)
-//   x 256-1216   TUNNEL de racines (plafond gy 3-4) : créature de mousse ;
+//   x 256-1280   TUNNEL de racines (plafond gy 3-4) : créature de mousse ;
 //                son toit (y=192) est un chemin de racines (singe corrompu)
-//   x 1344-1536  butte de racine (y=320), marche vers le toit
+//   x 1344-1600  butte de racine (y=320, marches y=384), marche vers le toit
 //   x 1344-1728  BRANCHE DE LA FOURCHE (y=64) : feu de camp. Deux routes :
 //     à gauche   branche d'élan (y=-128) → 3 LIANES au-dessus du vide → corniche
 //                (x 0-320, y=-128) et fente de l'ÉPREUVE DU SINGE. Sans singe,
@@ -32,19 +32,21 @@ const GRAND_ARBRE_RACINES_DATA = {
   groundCells: [
     // (groundRow : borne de fin exclue)
     ...groundRow(0, 50, [7, 8]),    // sol au pied de l'arbre, sur toute la largeur
-    ...groundRow(4, 19, [3, 4]),    // plafond du tunnel = toit de racines (x 256-1216, y=192)
+    ...groundRow(4, 20, [3, 4]),    // plafond du tunnel = toit de racines (x 256-1280, y=192)
     ...groundRow(9, 11, [6]),       // racine en travers du tunnel (petit saut)
-    ...groundRow(21, 24, [5, 6]),   // butte de racine (x 1344-1536, y=320)
+    // Butte de racine (x 1408-1536, y=320) avec une marche d'une case de chaque
+    // côté (y=384) : jamais de mur de 2 cases au ras du sol (on s'y coince
+    // contre l'angle intérieur des tuiles, cf. rapport Acte 1 – Arbre).
+    ...groundRow(21, 22, [6]),
+    ...groundRow(22, 24, [5, 6]),
+    ...groundRow(24, 25, [6]),
     ...groundRow(21, 27, [1]),      // branche de la fourche (x 1344-1728, y=64)
     ...groundRow(15, 19, [-2]),     // branche d'élan vers les lianes (x 960-1216, y=-128)
     ...groundRow(0, 5, [-2]),       // corniche de l'épreuve du singe (x 0-320, y=-128)
     ...groundRow(29, 32, [-1]),     // branche intermédiaire (x 1856-2048, y=0)
     ...groundRow(34, 50, [-3]),     // grande branche haute (x 2176-3200, y=-192)
   ],
-  // Le tronc, en second plan (purement visuel), derrière les branches.
-  groundBackCells: [
-    ...groundRow(24, 33, [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]),
-  ],
+  // Le tronc (x ~1540-2120) est dessiné par le script de zone, derrière les branches.
   playerSpawn: { x: 110, y: 412 },
   // Lianes de l'épreuve : décor sans la forme singe (Xara le remarque).
   // (x, y = attache en haut ; bas à ~110 px au-dessus de la branche d'élan.)

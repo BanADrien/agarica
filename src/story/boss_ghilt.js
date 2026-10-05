@@ -411,6 +411,18 @@ ZONE_SCRIPTS.ghilt_arene = {
     });
     ghOn(scene, 'ghilt-healed', () => ghiltSoin(scene, st));
     ghOn(scene, 'ghilt-player-down', () => ghiltPlayerDown(scene, st));
+    // Le dernier cœur perdu gèle le monde le temps de la pose `death`
+    // (Player.hitByEnemy, ~1,1 s) puis remet les cœurs au maximum : Ghilt.update
+    // (coupé pendant le gel) ne voyait donc jamais `hearts <= 0`, et la phase
+    // n'était plus relancée. On écoute directement le registre.
+    const onHearts = (parent, value) => {
+      const b = st.boss;
+      if (value > 0 || !b || !b.active || b.playerDownFired) return;
+      b.playerDownFired = true;
+      scene.events.emit('ghilt-player-down', b);
+    };
+    scene.registry.events.on('changedata-hearts', onHearts);
+    scene.events.once('shutdown', () => scene.registry.events.off('changedata-hearts', onHearts));
 
     const run = phase === 1 ? ghiltIntroPhase1 : ghiltIntroPhase2;
     run(scene, st).catch((e) => console.error('ghilt intro', e));

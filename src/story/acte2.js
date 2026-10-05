@@ -98,8 +98,28 @@ function a2SkyWash(scene, color, alpha) {
   const { width, height } = scene.scale;
   const rect = scene.add.rectangle(0, 0, width, height, color, alpha).setOrigin(0).setScrollFactor(0);
   const bg = scene.children.list.find((o) => o.type === 'TileSprite');
-  if (bg) scene.children.moveAbove(rect, bg);
+  if (bg) a2PlaceAbove(scene, rect, bg);
   return rect;
+}
+
+// Place `obj` juste au-dessus de `ref` dans la liste d'affichage. (Phaser
+// `children.moveAbove` ne fait RIEN si `obj` est déjà plus haut que `ref`,
+// n'importe où dans la liste : un objet créé après coup restait donc devant
+// tout le décor, joueur compris.)
+function a2PlaceAbove(scene, obj, ref) {
+  const list = scene.children;
+  const i = list.getIndex(ref);
+  if (i < 0 || !obj) return;
+  list.moveTo(obj, list.getIndex(obj) > i ? i + 1 : i);
+}
+
+// Plafond au bord haut de l'écran : la caméra de ces zones ne défile pas
+// verticalement (pas de `tallLevel`), alors qu'un double saut ou l'aigle
+// emmènerait Agarica jusqu'à 250-340 px plus haut, hors de l'écran. Le monde
+// physique garde sa largeur et son bas, seul son haut est ramené à y = 0.
+function a2Ceiling(scene) {
+  const b = scene.physics.world.bounds;
+  scene.physics.world.setBounds(b.x, 0, b.width, b.bottom);
 }
 
 // Interactions propres à l'acte 2 (plante, panneau) : invite « E : … » à
@@ -423,7 +443,7 @@ async function a2GalterTechnique(scene, d, g, tech) {
     a2Float(scene, g.x, g.y - 85, 'Piège du Ranger !', '#ffd27a');
     // Il pose le piège… derrière lui, sans regarder.
     const trapX = clampX(g.x - dir * 45);
-    const trap = scene.add.graphics({ x: trapX, y: d.gy }).setDepth(g.depth - 1);
+    const trap = scene.add.graphics({ x: trapX, y: d.gy }).setDepth(g.depth);
     trap.lineStyle(3, 0xc9a26b, 1);
     trap.strokeEllipse(0, -3, 34, 10);
     await a2Wait(scene, 500);
@@ -433,11 +453,15 @@ async function a2GalterTechnique(scene, d, g, tech) {
     await a2Tween(scene, { targets: g, x: trapX, duration: 380 });
     // Le collet se referme : Galter pend la tête en bas.
     trap.destroy();
-    const rope = scene.add.graphics().setDepth(g.depth - 1);
+    // Origine du sprite aux pieds : retourné à 180°, il s'étend VERS LE BAS
+    // depuis ses pieds. On remonte donc les pieds d'une hauteur de sprite
+    // pour qu'il pende tête en bas au-dessus du sol (et non la tête dans la terre).
+    const feetY = d.gy - g.displayHeight - 24;
+    const rope = scene.add.graphics().setDepth(g.depth);
     rope.lineStyle(2, 0xc9a26b, 1);
-    rope.lineBetween(trapX, -10, trapX, d.gy - 110);
+    rope.lineBetween(trapX, -10, trapX, feetY);
     scene.cameras.main.shake(100, 0.004);
-    await a2Tween(scene, { targets: g, y: d.gy - 40, angle: 180, duration: 260, ease: 'Back.easeOut' });
+    await a2Tween(scene, { targets: g, y: feetY, angle: 180, duration: 260, ease: 'Back.easeOut' });
     a2Float(scene, g.x, g.y - 110, 'Ce n\'était PAS prévu.', '#ffd27a');
     await a2Wait(scene, 1400);
     rope.destroy();
@@ -483,6 +507,9 @@ async function a2DuelFinish(scene, reason) {
     g.playManifest('idle');
   }
   hideBossBar(scene);
+  // Les murs du duel tombent AVANT la cinématique : elle fait marcher Agarica
+  // jusqu'à x 1680, au-delà du mur droit (x 1560) — elle s'y bloquait.
+  a2Ff1EndDuel(scene);
   await runCutscene(scene, 'galter_fin_duel');
 }
 
@@ -530,6 +557,7 @@ function a2DrawTotemRuin(scene, x, y, h, tint = 0x7c6a58) {
 
 ZONE_SCRIPTS.acte2_ff1 = {
   create(scene) {
+    a2Ceiling(scene);
     scene.__a2 = { duel: null, walls: null };
     a2InteractReset(scene);
     a2Ff1Atmosphere(scene);
@@ -573,7 +601,7 @@ Object.assign(DIALOGUES, {
   ],
   amanite_apres: [
     { who: 'agarica', text: 'Amanite, attends !' },
-    { who: 'agarica', text: '… Elle n\'était pas comme ça, avant. Elle voulait aider, elle aussi.' },
+    { who: 'agarica', text: '… Elle n\'était pas comme ça, avant. Elle voulait aider, elle aussi.', pose: 'sad' },
     { who: 'xara', text: 'Elle veut toujours sauver la forêt. C\'est bien ce qui m\'inquiète.' },
     { who: 'xara', text: 'Plus haut, sur l\'île au-dessus de nous : un totem t\'attend. Un double saut devrait suffire.' },
   ],
@@ -718,13 +746,14 @@ function a2Ff2Decor(scene) {
   far.fillEllipse(1500, 470, 900, 160);
   far.fillStyle(0x6fdc3a, 0.25);
   far.fillEllipse(1500, 440, 500, 60);
-  if (bg) scene.children.moveAbove(far, st.sky);
+  if (bg) a2PlaceAbove(scene, far, st.sky);
   a2DrawTotemRuin(scene, 1150, 320 + 16, 70);
   a2DrawTotemRuin(scene, 1370, 320 + 16, 40, 0x8a7a66);
 }
 
 ZONE_SCRIPTS.acte2_ff2 = {
   create(scene) {
+    a2Ceiling(scene);
     scene.__a2 = { hadEagle: !!storyGet('hasEagleForm'), revealQueued: false, beast: null };
     a2InteractReset(scene);
     a2Ff2Decor(scene);
@@ -889,6 +918,7 @@ function a2ClairiereOpenPath(scene, animate) {
 
 ZONE_SCRIPTS.acte2_clairiere = {
   create(scene, data) {
+    a2Ceiling(scene);
     const cfg = data.plante || { x: 1200, radius: 230 };
     const st = { cfg, arrivalPending: false, gate: null };
     scene.__a2 = st;
@@ -1095,6 +1125,12 @@ function a2CrashFlight(scene) {
     const cam = scene.cameras.main;
     if (scene.xara) scene.xara.setVisible(false);
     scene.__playerScripted = true;
+    // La chute finale traverse le bas de l'écran : sans ça, la règle `fall`
+    // de la zone (cf. updateStoryFall) ramènerait Agarica sur la rampe en lui
+    // ôtant un cœur au beau milieu de la cinématique. On quitte la zone juste
+    // après, la règle est reposée à la prochaine visite.
+    if (scene.__story) scene.__story.fall = null;
+    p.body.setCollideWorldBounds(false); // la chute sort franchement de l'écran
     p.setAcceleration(0, 0);
     p.setDrag(0, 0);
     p.body.setAllowGravity(false);
@@ -1215,6 +1251,7 @@ function a2DrawRampe(scene, x) {
 
 ZONE_SCRIPTS.acte2_hutte = {
   create(scene, data) {
+    a2Ceiling(scene);
     const cfg = data.hutte || { x: 1000, sentierX: 420, rampeX: 2688 };
     scene.__a2 = { cfg };
     a2InteractReset(scene);
@@ -1225,7 +1262,7 @@ ZONE_SCRIPTS.acte2_hutte = {
     far.fillEllipse(1500, 500, 1100, 200);
     far.fillStyle(0x6fdc3a, 0.22);
     far.fillEllipse(1500, 460, 640, 70);
-    scene.children.moveAbove(far, sky);
+    a2PlaceAbove(scene, far, sky);
     a2DrawHutte(scene, cfg.x);
     a2DrawRampe(scene, cfg.rampeX);
     a2AddInteract(scene, {
@@ -1453,6 +1490,7 @@ function a2Fc1CloseBehind(scene, animate) {
 
 ZONE_SCRIPTS.acte2_fc1 = {
   create(scene) {
+    a2Ceiling(scene);
     scene.__a2 = { tufts: [], butterflies: null };
     a2InteractReset(scene);
     a2DrawCrater(scene, 170);
@@ -1540,7 +1578,7 @@ Object.assign(DIALOGUES, {
     { who: 'amanite', text: 'Recule, Agarica. C\'est fini. Le Fléau ne fera plus de mal à personne.' },
     { who: 'agarica', text: 'Il était guéri ! La mousse était partie… il respirait, tu l\'as vu !' },
     { who: 'amanite', text: 'J\'ai vu une bête qui reprenait des forces. La mauvaise herbe, ça repousse.' },
-    { who: 'agarica', text: 'Tu viens de détruire la seule preuve qu\'on pouvait les sauver…' },
+    { who: 'agarica', text: 'Tu viens de détruire la seule preuve qu\'on pouvait les sauver…', pose: 'sad' },
     { who: 'amanite', text: 'J\'ai sauvé le bosquet. Toi, tu jouais avec des papillons.' },
     { who: 'amanite', text: 'Je rentre leur annoncer la nouvelle. Eux, au moins, sauront qui remercier.' },
   ],
@@ -1608,11 +1646,11 @@ Object.assign(DIALOGUES, {
     { who: 'amanite', text: 'Non, Agarica. Toi, tu soignes. Moi, je finis le travail.' },
   ],
   br_apres: [
-    { who: 'agarica', text: '…' },
+    { who: 'agarica', text: '…', pose: 'sad' },
     { who: 'pere_chef', text: 'Agarica. Je t\'ai bannie pour un mensonge. Je n\'avais pas su voir le reste.' },
     { who: 'pere_chef', text: 'Tu es partie sans rien connaître du monde. Tu reviens avec un remède… et avec la vérité.' },
     { who: 'agarica', text: 'Père… je voulais seulement la protéger. Elle, et la forêt.' },
-    { who: 'pere_chef', text: 'Je sais. Ce soir, ma fille, tu dormiras chez toi.' },
+    { who: 'pere_chef', text: 'Je sais. Ce soir, ma fille, tu dormiras chez toi.', pose: null },
   ],
   br_galter_source: [
     { who: 'galter', text: 'Pas de fête trop longue, mes amis. Ghil\'t n\'était pas la source de la mousse.' },

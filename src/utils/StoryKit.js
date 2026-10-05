@@ -817,6 +817,37 @@ function resolveDialogueLines(scene, linesOrId) {
   return lines.map((l) => (typeof l === 'string' ? { who: 'narrateur', text: l } : l));
 }
 
+// Poses narratives d'Agarica (manifest `agarica_extra` : talk, sad, cast,
+// receive_item, death…). Sans art, ne fait rien (comportement historique).
+// Le monde est gelé pendant dialogues/cinématiques (Player.update ne tourne
+// plus) : la pose est donc appliquée directement, et Player.update la
+// respecte tant que `player.storyPose` est posé.
+function setPlayerStoryPose(scene, anim) {
+  const p = scene && scene.player;
+  if (!p || !p.active || p.form !== 'agarica' || typeof p.applyAgaricaExtraPose !== 'function') return;
+  if (anim && hasManifestArt(scene, 'agarica_extra', anim)) {
+    p.storyPose = anim;
+    p.applyAgaricaExtraPose(anim);
+  } else if (!anim && p.storyPose) {
+    p.storyPose = null;
+    // Retour à l'idle historique (feuille face à GAUCHE → flip quand on regarde à droite).
+    if (scene.anims.exists(ANIM_IDLE_KEY)) p.anims.play(ANIM_IDLE_KEY, true);
+    p.applyBodyForScale(FORMS.agarica.scale, FORMS.agarica.body);
+    p.setFlipX(p.facingDir > 0);
+  }
+}
+
+// Appelée par DialogueScene à chaque réplique : `line.pose` explicite, sinon
+// Agarica prend la pose `talk` quand c'est elle qui parle (sauf pose tenue
+// par la cinématique, ex. `sad`).
+function storyDialogueLinePose(scene, line) {
+  const p = scene && scene.player;
+  if (!p || !line) return;
+  if (line.pose !== undefined) setPlayerStoryPose(scene, line.pose);
+  else if (line.who === 'agarica' && (!p.storyPose || p.storyPose === 'talk')) setPlayerStoryPose(scene, 'talk');
+  else if (p.storyPose === 'talk') setPlayerStoryPose(scene, null);
+}
+
 let storyDialogueChain = Promise.resolve();
 
 // Promesse résolue à la fin avec `{ lastChoice, choices }` (indices des choix faits).
@@ -835,6 +866,7 @@ function showDialogue(scene, linesOrId) {
       lines,
       parentKey: scene.scene.key,
       onDone: (result) => {
+        if (scene.player && scene.player.storyPose === 'talk') setPlayerStoryPose(scene, null);
         scene.__storyFreeze = Math.max(0, (scene.__storyFreeze || 0) - 1);
         releaseStoryInput(scene);
         resolve(result);
@@ -889,6 +921,7 @@ function runCutscene(scene, idOrSteps) {
     scene.__cutsceneLock = Math.max(0, (scene.__cutsceneLock || 0) - 1);
     if (scene.__cutsceneLock === 0) {
       scene.__playerScripted = false;
+      setPlayerStoryPose(scene, null);
       // Caméra déplacée par la cinématique et jamais rendue : on la rend.
       if (scene.__cameraDetached && scene.player && scene.player.active) storyCameraFollow(scene);
       releaseStoryInput(scene);
@@ -1031,7 +1064,15 @@ const CUTSCENE_STEP_HANDLERS = {
     return new Promise((resolve) => scene.tweens.add({ targets: npc, alpha: 1, duration: 300, onComplete: resolve }));
   },
   playerMove: (scene, v) => cutscenePlayerMove(scene, v),
-  playerFace: (scene, dir) => { if (scene.player) storyFacePlayer(scene.player, dir === 'left' ? -1 : 1); },
+  playerFace: (scene, dir) => {
+    const p = scene.player;
+    if (!p) return;
+    storyFacePlayer(p, dir === 'left' ? -1 : 1);
+    // Pose tenue : la feuille agarica_extra a la convention de flip inverse.
+    if (p.storyPose) p.applyAgaricaExtraPose(p.storyPose);
+  },
+  // `{playerPose: 'sad'}` (tenue jusqu'à `{playerPose: null}` ou la fin de la cinématique).
+  playerPose: (scene, anim) => setPlayerStoryPose(scene, anim || null),
   camera: (scene, { x, y, ms = 800 }) => {
     const cam = scene.cameras.main;
     cam.stopFollow();

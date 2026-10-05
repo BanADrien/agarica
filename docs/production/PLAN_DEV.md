@@ -290,6 +290,34 @@ Le passage `mossWalls` de `foret_sombre_2` (ouvert avec le repulsif) mène à un
 (cœur bonus / raccourci). Les anciennes zones (Zone1…Zone5, zonetest, SousGrotte,
 ZoneAquatique) restent intactes, accessibles depuis le menu titre « Zones de test ».
 
+### Forêt sombre (acte 1) — connexions, flags, mur de répulsif
+- `foret_sombre_1` — entrées `from_bosquet` (x 140, arrivée du bannissement) et
+  `from_foret_sombre_2` (x 3700). Sortie droite → `ForetSombre2Scene` `{enterId:
+  'from_foret_sombre_1'}`. Pas de retour au bosquet (bannie). Amas `mossBlocks` id
+  `amas_racines` (flag `moss_foret_sombre_1_amas_racines`) sous un mur de racines ;
+  le trigger `talisman` donne `{skill:'ours'}` + énergie pleine (filet : le talisman
+  recharge l'énergie près de l'amas tant qu'il n'est pas brisé). Feu de camp x 1640.
+- `foret_sombre_2` — entrées `from_foret_sombre_1` (x 110), `from_racines` (x 5760,
+  pour la sortie gauche des racines), `from_hutte_morgat` (x 4960, DANS la poche
+  derrière le mur : le sentier de la hutte y débouche). Sorties : gauche →
+  `ForetSombre1Scene` `from_foret_sombre_2` ; droite → `GrandArbreRacinesScene`
+  `{enterId: 'from_foret_sombre'}` ; fond de la poche (x 5080) → `HutteMorgatScene`
+  `{enterId: 'from_foret_sombre'}` (accessible seulement mur ouvert).
+- Mur de répulsif : `mossWalls` id **`mur_repulsif_foret_sombre`** (flag
+  `mosswall_foret_sombre_2_mur_repulsif_foret_sombre`), x 4384, sous le surplomb ;
+  s'ouvre des deux côtés avec l'objet `repulsif`. Derrière : graine de chêne-cœur
+  → flag **`coeurBonusForet`** = +1 cœur max permanent (lu par
+  `Player.recomputeTotemBonuses`).
+- Autres flags : `xaraMet` (FS1), `hasWolfForm` (totem FS2, sur la butte x 896,
+  accessible sans loup), `planteVue` (trigger `plante`, FS2). Ravin de 5 cases
+  (x 1152-1472) : loup obligatoire ; ravin de 9 cases (x 2816-3392) :
+  `hiddenPlatforms` gx 46-48 et 51-52 (gy 6) révélées par le loup. Mare aux trois
+  poissons dessinée par le script (pas de clé `water`). `levelHeight: 720` +
+  `fall: {y: 620, mode: 'hurt'}` pour que les chutes se déclenchent.
+- Level design : éviter une face de 2 cases ou plus qui part directement du sol
+  (le joueur peut rester coincé contre, à cause de la hitbox 3/4 des tuiles
+  d'herbe) — préférer des marches d'une case.
+
 Formes : emplacement **sol** = loup ; emplacement **aérien** = singe OU aigle (exclusifs,
 choix au feu de camp) ; sans forme aérienne, double saut de base simple (sans
 transformation). Singe : saut moins haut + accroche auto aux lianes + balancement ;
@@ -329,3 +357,9 @@ Détails compétences (agent Formes) :
 Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
 (`src/story/acte2.js`, zones 8-16), Éditeur (`src/scenes/EditorScene.js`, `index.html`
 #editor-ui) pour placer les nouvelles clés.
+
+## Poses narratives d'Agarica (orchestrateur, 2026-10-05)
+Art Codex `agarica_extra` importé (rangées jump_rise, jump_fall, hurt, death, talk, sad ; liane_hang/liane_swing/cast/receive_item à venir).
+- Étape de cinématique `{playerPose: 'sad'}` (tenue jusqu'à `{playerPose: null}` ou fin de cinématique). Une réplique de dialogue peut aussi porter `pose: 'cast'`.
+- Automatique : Agarica prend `talk` quand elle parle (`who: 'agarica'`), sauf pose tenue ; `death` au dernier cœur perdu (1,1 s, monde gelé) ; `hurt` / `jump_*` dans Player.update.
+- Sans art pour une pose : aucun effet (comportement historique). Helper : `setPlayerStoryPose(scene, anim|null)`.

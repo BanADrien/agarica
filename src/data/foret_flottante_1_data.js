@@ -31,6 +31,9 @@ const FORET_FLOTTANTE_1_DATA = {
   playerSpawn: { x: 110, y: 412 },
   fall: { y: 600, mode: 'hurt' },
   campfires: [{ x: 820, y: 448 }],
+  // Points de reprise (mort = retour ici, pas au tout début de la zone) :
+  // sur la corniche de Galter et à l'entrée du belvédère, après les corbeaux.
+  checkpoints: [{ x: 2050, y: 256 }, { x: 3060, y: 128 }],
   props: [
     { type: 'bosquet_signpost', x: 600, y: 448, scale: 0.35 },
     { type: 'bosquet_log_pile', x: 700, y: 448, scale: 0.35 },

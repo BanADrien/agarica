@@ -46,7 +46,7 @@ const MONDE_SPIRITUEL_DATA = {
   checkpoints: [
     { x: 420, y: MONDE_SPIRITUEL_SURFACE_Y },
     { x: 1470, y: 384 },
-    { x: 2330, y: MONDE_SPIRITUEL_SURFACE_Y },
+    { x: 2400, y: MONDE_SPIRITUEL_SURFACE_Y }, // là où l'on marche après l'atterrissage
   ],
   fall: { y: 520, mode: 'respawn' },
   triggers: [

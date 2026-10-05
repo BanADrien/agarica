@@ -11,10 +11,10 @@
 //   x 1472-2816  sous-bois du loup sanguinaire ; la piste du loup commence
 //   x 2816-3392  ravin de 9 cases : deux plateformes cachées (révélées par
 //                le loup) + pistes
-//   x 3392-3968  clairière préservée : mare aux trois poissons (pont de
+//   x 3392-3968  clairière préservée : feu de camp (x 3430), mare aux trois poissons (pont de
 //                bois), plante résistante sur la branche d'un arbre mort
 //                (gx 55-57, y=64 : hors d'atteinte), crapaud corrompu
-//   x 3968-5248  surplomb (gx 65-81, gy 2-3) : le chemin passe DESSUS ;
+//   x 3968-5248  surplomb (gx 65-81, gy 3, surface y=192) : le chemin passe DESSUS ;
 //                dessous, la poche fermée par le mur de mousse
 //                `mur_repulsif_foret_sombre` (répulsif, acte 2) → cœur secret
 //                + vieux sentier vers la hutte de Morgat
@@ -28,6 +28,10 @@ const FORET_SOMBRE_2_DATA = {
   zoneSub: 'Le sentier des ravins',
   ambient: { tint: 0x070b22, darkness: 0.28 },
   script: 'foret_sombre_2',
+  // Trouée dans la forêt d'arrière-plan (coordonnées de la couche d'arbres,
+  // parallaxe 0.35) : elle s'ouvre à l'écran près de la sortie, pour laisser
+  // voir le grand arbre dessiné au loin par le script.
+  avoidRanges: [[2000, 2600]],
   fall: { y: 620, mode: 'hurt' },
   groundCells: [
     // (groundRow : borne de fin exclue)
@@ -35,30 +39,40 @@ const FORET_SOMBRE_2_DATA = {
     ...groundRow(5, 7, [6]),         // tronc couché
     ...groundRow(10, 12, [6]),       // marche de la butte
     ...groundRow(12, 16, [5, 6]),    // butte du totem (surface y=320)
+    ...groundRow(16, 17, [6]),       // marche côté ravin (pas de face de 2 cases depuis le sol)
     // gx 18-22 : RAVIN DE 5 CASES
     ...groundRow(23, 44, [7, 8]),    // sous-bois
-    ...groundRow(30, 32, [5]),       // branche basse
+    ...groundRow(30, 31, [6]),       // rocher moussu, en escalier
+    ...groundRow(31, 32, [5, 6]),
+    ...groundRow(32, 33, [6]),
     ...groundRow(34, 37, [4]),       // branche haute (élan du loup)
     // gx 44-52 : RAVIN DE 9 CASES (plateformes cachées : hiddenPlatforms)
     ...groundRow(53, 92, [7, 8]),    // clairière, surplomb, sortie
     ...groundRow(55, 58, [1]),       // branche de l'arbre mort : la plante (hors d'atteinte)
-    ...groundRow(62, 64, [4]),       // corniche pour monter sur le surplomb (on passe dessous)
-    ...groundRow(65, 82, [2, 3]),    // le surplomb (chemin principal)
+    ...groundRow(61, 62, [6]),       // marchepied vers la corniche
+    ...groundRow(62, 65, [4]),       // corniche vers le surplomb ; on passe dessous
+    ...groundRow(65, 82, [3]),       // le surplomb (chemin principal, surface y=192)
     ...groundRow(80, 82, [4, 5, 6]), // fond de la poche secrète
-    ...groundRow(83, 85, [4]),       // corniche de retour (venant des racines)
+    // Escalier de retour (venant des racines) vers le surplomb : marches d'une
+    // case, sans fente où rester coincé contre le fond de la poche.
+    ...groundRow(82, 83, [4, 5, 6]),
+    ...groundRow(83, 84, [5, 6]),
+    ...groundRow(84, 85, [6]),
   ],
   playerSpawn: { x: 110, y: 412 },
   hiddenPlatforms: [
-    { gx: 46, gy: 6, w: 2 },
-    { gx: 50, gy: 6, w: 2 },
+    { gx: 46, gy: 6, w: 3 },   // x 2944-3136 (2 cases de vide avant)
+    { gx: 51, gy: 6, w: 2 },   // x 3264-3392 (2 cases de vide avant), puis la rive
   ],
   tracks: [
     { x: 260, y: FORET_SOMBRE_2_SURFACE_Y, w: 800 },   // la bête est passée par le sentier
     { x: 1500, y: FORET_SOMBRE_2_SURFACE_Y, w: 1300 }, // … puis file vers le grand ravin
-    { x: 2944, y: 384, w: 128 },
-    { x: 3200, y: 384, w: 128 },
+    { x: 2944, y: 384, w: 192 },
+    { x: 3264, y: 384, w: 128 },
     { x: 3400, y: FORET_SOMBRE_2_SURFACE_Y, w: 240 },
   ],
+  // Feu de camp à la sortie du grand ravin : soin et sauvegarde après les chutes.
+  campfires: [{ x: 3430, y: FORET_SOMBRE_2_SURFACE_Y }],
   totems: [
     { x: 896, y: 320, flag: 'hasWolfForm', message: 'Forme du loup !' },
   ],
@@ -73,21 +87,20 @@ const FORET_SOMBRE_2_DATA = {
     { type: 'bosquet_tree_stump', x: 1060, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
     { type: 'bosquet_mossy_rock', x: 1560, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.45 },
     { type: 'bosquet_bush_round', x: 2600, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
-    { type: 'bosquet_bush_flowering', x: 3460, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
     { type: 'bosquet_bush_flowering', x: 3830, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
     { type: 'bosquet_mossy_rock', x: 5420, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.5 },
   ],
   enemies: [
     { type: 'loup', x: 2350, y: 400, patrolMinX: 2000, patrolMaxX: 2700 },
     // Fixe, langue vers la droite : on l'approche par derrière (venant de l'ouest).
-    { type: 'crapaud_corrompu', x: 3880, y: 400 },
+    { type: 'crapaud_corrompu', x: 3880, y: 400, hp: 1 },
   ],
   // Mur de mousse vivante à l'entrée de la poche, sous le surplomb : s'ouvre
   // avec le répulsif de Morgat (acte 2). Id cité dans PLAN_DEV.md.
   mossWalls: [{ id: 'mur_repulsif_foret_sombre', x: 4384, y: 352, w: 64, h: 192 }],
   triggers: [
     { id: 'empreintes', x: 380, w: 40, cutscene: 'fs2_empreintes' },
-    { id: 'ravin', x: 1110, w: 40, forbids: { hasWolfForm: true }, cutscene: 'fs2_ravin' },
+    { id: 'ravin', x: 1088, y: 420, w: 128, h: 80, forbids: { hasWolfForm: true }, cutscene: 'fs2_ravin' },
     { id: 'ravin_large', x: 2700, w: 40, cutscene: 'fs2_ravin_large' },
     { id: 'plante', x: 3470, w: 40, cutscene: 'fs2_plante' },
     { id: 'mur', x: 4250, w: 40, cutscene: 'fs2_mur' },
