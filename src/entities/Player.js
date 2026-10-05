@@ -2096,7 +2096,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       const body = TOTEM_BODIES[t.body];
       bonus[body.statKey] += body.perStack;
     }
-    this.maxHearts = HEART_MAX + bonus.heartBonus;
+    // +1 cœur permanent : secret de la forêt sombre 2 (flag d'histoire
+    // `coeurBonusForet`, cf. src/story/acte1.js), cumulé au bonus de totem.
+    const storyHeartBonus = this.scene && this.scene.registry.get('coeurBonusForet') ? 1 : 0;
+    this.maxHearts = HEART_MAX + bonus.heartBonus + storyHeartBonus;
     this.maxEnergy = ENERGY_MAX + bonus.energyBonus;
     this.skillSizeMultiplier = 1 + bonus.skillSizeBonus;
     this.hearts = Math.min(this.hearts, this.maxHearts);

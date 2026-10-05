@@ -1522,7 +1522,10 @@ function updateStoryFall(scene) {
   const onGround = player.body.blocked.down || player.body.touching.down;
   const atWorldBottom = player.body.bottom >= scene.physics.world.bounds.bottom - 1;
   if (onGround && !atWorldBottom && (!fall || player.y < fall.y - 40)) st.safePos = { x: player.x, y: player.y };
-  if (!fall || player.y <= fall.y) return;
+  // Le bas du monde physique vaut `levelHeight` (540) : posé dessus, le joueur
+  // n'atteint jamais `fall.y` (600 par défaut) et resterait coincé au fond du
+  // vide. Toucher le bas du monde compte donc aussi comme une chute.
+  if (!fall || (player.y <= fall.y && !atWorldBottom)) return;
   if (fall.mode === 'scene' && fall.scene) {
     const entry = storyZoneEntry(fall.scene);
     goToScene(scene, entry ? entry.scene : fall.scene, fall.data);

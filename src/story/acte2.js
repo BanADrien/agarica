@@ -58,8 +58,16 @@ function a2Walls(scene, xs) {
     scene.physics.add.existing(z, true);
     group.add(z);
   }
-  scene.physics.add.collider(scene.player, group);
+  // Le collider est gardé sur le groupe : le détruire AVANT le groupe (un
+  // collider orphelin fait planter la physique au pas suivant).
+  group.__a2Collider = scene.physics.add.collider(scene.player, group);
   return group;
+}
+
+function a2DestroyWalls(group) {
+  if (!group) return;
+  if (group.__a2Collider) { group.__a2Collider.destroy(); group.__a2Collider = null; }
+  group.destroy(true);
 }
 
 // Halo additif doux (dégradé radial) pour la lumière, les fleurs, le totem.
@@ -302,7 +310,7 @@ async function a2GalterComicJump(scene) {
 
 function a2Ff1EndDuel(scene) {
   const st = scene.__a2;
-  if (st && st.walls) { st.walls.destroy(true); st.walls = null; }
+  if (st && st.walls) { a2DestroyWalls(st.walls); st.walls = null; }
   hideBossBar(scene);
 }
 
@@ -872,7 +880,7 @@ async function a2PlantePick(scene) {
 function a2ClairiereOpenPath(scene, animate) {
   const st = scene.__a2;
   if (st.exitHutte && !scene.__exits.includes(st.exitHutte)) scene.__exits.push(st.exitHutte);
-  if (st.gate) { st.gate.destroy(true); st.gate = null; }
+  if (st.gate) { a2DestroyWalls(st.gate); st.gate = null; }
   if (typeof spawnButterflies !== 'function') return;
   const fromX = animate ? st.cfg.x : 2050;
   const list = spawnButterflies(scene, fromX, 300, 5, { radius: 30 });
