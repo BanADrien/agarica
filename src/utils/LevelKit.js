@@ -1279,6 +1279,7 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
   const isBackLayer = !!options.back;
   const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
   const images = [];
+  const tileBodies = []; // corps créés, cf. arêtes internes en fin de fonction
   for (const [gx, gy, material] of cells) {
     const hasNorth = solid.has(gridCellKey(gx, gy - 1));
     const hasSouth = solid.has(gridCellKey(gx, gy + 1));
@@ -1373,6 +1374,8 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
 
     if (groundGroup && !isBackLayer) {
       const tile = groundGroup.create(cx, cy, GROUND_HITBOX_KEY).setVisible(false);
+      tile.__cell = { gx, gy };
+      tileBodies.push(tile);
       if (AUTOTILE_GRASS_TOP_POSITIONS.has(pos)) {
         // Retour utilisateur : deux essais précédents ici (un rectangle
         // uniformément rehaussé du même `heightBoost` que l'image, puis un
@@ -1439,7 +1442,25 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
   // sans ce refresh, la case restait solide sur toute sa hauteur d'origine
   // (le joueur tombait au travers de la partie "retirée" comme si de rien
   // n'était, ou pire, traversait toute la plateforme).
-  if (groundGroup && !isBackLayer) groundGroup.refresh();
+  if (groundGroup && !isBackLayer) {
+    groundGroup.refresh();
+    // Arêtes INTERNES (correctif "paroi qui coince") : une face collée à une
+    // autre case pleine ne doit jamais repousser un corps. Sans ça, la case
+    // pleine SOUS un mur (hitbox entière, haut à y) dépasse de 16 px la case
+    // d'herbe voisine (hitbox aux 3/4) : la séparation Arcade en Y (passe en
+    // premier, tolère overlapBias = 20 px) la traitait comme une marche et
+    // perchait Agarica 16 px plus haut contre le mur. Le petit bout de face
+    // latérale ainsi désactivé est toujours couvert par la case du mur
+    // au-dessus (corps du joueur bien plus haut que 16 px).
+    for (const tile of tileBodies) {
+      const { gx, gy } = tile.__cell;
+      const cc = tile.body.checkCollision;
+      cc.up = !solid.has(gridCellKey(gx, gy - 1));
+      cc.down = !solid.has(gridCellKey(gx, gy + 1));
+      cc.left = !solid.has(gridCellKey(gx - 1, gy));
+      cc.right = !solid.has(gridCellKey(gx + 1, gy));
+    }
+  }
   return images;
 }
 
@@ -1954,21 +1975,13 @@ function buildLevelFromData(scene, data, sceneData) {
     if (e.type === 'araignee' && enemy.harmless === undefined) enemy.harmless = true;
   }
   scene.physics.add.collider(scene.enemies, scene.ground);
+  // Contact des corps : dégâts subis, sauf si la portée de l'attaque couvre
+  // l'ennemi (le coup lui-même est porté par tryPlayerMeleeHit, aussi testé
+  // chaque frame SANS contact dans updateLevelFromData).
   scene.physics.add.overlap(scene.player, scene.enemies, (player, enemy) => {
     if (player.isInvulnerable || enemy.defeated || isWorldFrozen(scene)) return;
-    const hitbox = player.getAttackHitbox();
-    if (hitbox && Phaser.Geom.Intersects.RectangleToRectangle(hitbox, enemy.getBounds())) {
-      // Un coup = un seul dégât, même si la fenêtre d'attaque couvre plusieurs
-      // frames (cf. damageEnemy) ; le piqué de l'aigle frappe au contact, au
-      // plus une fois toutes les 400 ms.
-      const token = player.isAttacking ? `melee-${player.attackEndTime}` : `dive-${Math.floor(scene.time.now / 400)}`;
-      if (damageEnemy(scene, enemy, { kind: player.isAttacking ? 'melee' : 'dive', player, token })) {
-        // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT).
-        player.gainEnergy(ENERGY_PER_HIT);
-      }
-    } else if (!enemy.harmless) {
-      player.hitByEnemy();
-    }
+    if (tryPlayerMeleeHit(scene, player, enemy)) return;
+    if (!enemy.harmless) player.hitByEnemy();
   });
 
   for (const t of data.totems || []) {
@@ -2008,6 +2021,24 @@ function buildLevelFromData(scene, data, sceneData) {
   // zone...) : cf. LEVEL_DATA_HANDLERS dans StoryKit.js / PLAN_DEV.md.
   runLevelDataHandlers(scene, data);
   storyOnZoneEnter(scene, data, sceneData);
+}
+
+// Mêlée / piqué de l'aigle contre UN ennemi : vrai si la portée de l'attaque
+// (player.getAttackHitbox) recouvre ses bounds -- qu'il y ait ou non contact
+// des corps (correctif : avant, le coup n'était testé que dans l'overlap des
+// corps, donc la lame d'Agarica ne touchait qu'au corps à corps). Un coup =
+// un seul dégât, même si la fenêtre d'attaque couvre plusieurs frames (token,
+// cf. damageEnemy) ; le piqué de l'aigle frappe au plus toutes les 400 ms.
+function tryPlayerMeleeHit(scene, player, enemy) {
+  if (!enemy || enemy.defeated || !enemy.active) return false;
+  const hitbox = player.getAttackHitbox();
+  if (!hitbox || !Phaser.Geom.Intersects.RectangleToRectangle(hitbox, enemy.getBounds())) return false;
+  const token = player.isAttacking ? `melee-${player.attackEndTime}` : `dive-${Math.floor(scene.time.now / 400)}`;
+  if (damageEnemy(scene, enemy, { kind: player.isAttacking ? 'melee' : 'dive', player, token })) {
+    // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT).
+    player.gainEnergy(ENERGY_PER_HIT);
+  }
+  return true;
 }
 
 // Inflige un coup à un ennemi : `takeHit(source)` s'il existe (ennemis à
@@ -2161,6 +2192,11 @@ function updateLevelFromData(scene, time, delta) {
     scene.player.update();
     if (scene.xara) scene.xara.update(time, delta);
     scene.enemies.children.iterate((enemy) => enemy && enemy.update(scene.player));
+    // Portée de la mêlée testée contre TOUS les ennemis, pas seulement ceux
+    // dont le corps touche Agarica (cf. tryPlayerMeleeHit).
+    if (scene.player.getAttackHitbox()) {
+      scene.enemies.getChildren().slice().forEach((enemy) => tryPlayerMeleeHit(scene, scene.player, enemy));
+    }
 
     // Zone de dégâts d'une compétence active (cf. getSkillHitbox/SKILL_DEFS
     // dans Player.js) : vérifiée manuellement contre TOUS les ennemis, pas

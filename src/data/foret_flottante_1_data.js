@@ -48,12 +48,17 @@ const FORET_FLOTTANTE_1_DATA = {
   ],
   triggers: [
     { id: 'intro', x: 330, w: 64, cutscene: 'ff1_intro' },
-    { id: 'vue', x: 3200, w: 64, cutscene: 'ff1_vue' },
+    // Juste après le point de reprise du belvédère, hors de portée de la
+    // créature de mousse (correctif : elle frappait à la fin de la cinématique).
+    { id: 'vue', x: 3090, w: 64, cutscene: 'ff1_vue' },
   ],
   enemies: [
-    { type: 'corbeau', x: 2620, y: 110, patrolMinX: 2450, patrolMaxX: 2800, diveDepth: 200 },
-    { type: 'corbeau', x: 2900, y: 70, patrolMinX: 2760, patrolMaxX: 3050, diveDepth: 160 },
-    { type: 'mousse_creature', x: 3330, y: 100, patrolMinX: 3180, patrolMaxX: 3450 },
+    // Corbeaux adoucis (playtest : trop agressifs sur P3-P5) : piqué moins
+    // profond et plus lent, pause plus longue entre deux piqués ; le 2e ne
+    // survole plus l'entrée du belvédère (point de reprise x 3060).
+    { type: 'corbeau', x: 2620, y: 110, patrolMinX: 2480, patrolMaxX: 2720, diveDepth: 175, diveSpeed: 240, diveCooldown: 3400 },
+    { type: 'corbeau', x: 2880, y: 60, patrolMinX: 2780, patrolMaxX: 2960, diveDepth: 140, diveSpeed: 240, diveCooldown: 3400 },
+    { type: 'mousse_creature', x: 3400, y: 100, patrolMinX: 3330, patrolMaxX: 3460 },
   ],
   // Visible mais inutilisable sans l'aigle (il n'agit que sur le plané) : on le
   // remarque ici, on s'en sert dans les îles flottantes.

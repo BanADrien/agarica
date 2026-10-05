@@ -104,7 +104,13 @@ class Corbeau extends Phaser.Physics.Arcade.Sprite {
 }
 
 if (typeof ENEMY_REGISTRY !== 'undefined') {
-  ENEMY_REGISTRY.corbeau = (scene, e) => new Corbeau(
-    scene, e.x, e.y, e.patrolMinX ?? e.x - 150, e.patrolMaxX ?? e.x + 150, e.diveDepth ?? 220,
-  );
+  ENEMY_REGISTRY.corbeau = (scene, e) => {
+    const c = new Corbeau(
+      scene, e.x, e.y, e.patrolMinX ?? e.x - 150, e.patrolMaxX ?? e.x + 150, e.diveDepth ?? 220,
+    );
+    // Réglages optionnels par zone (corbeaux plus doux, ex. forêt flottante 1).
+    if (e.diveCooldown != null) c.diveCooldown = e.diveCooldown;
+    if (e.diveSpeed != null) c.diveSpeed = e.diveSpeed;
+    return c;
+  };
 }

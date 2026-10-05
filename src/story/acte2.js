@@ -871,12 +871,18 @@ function a2DrawMossCarpet(scene, cx, radius, levelWidth) {
     if (Math.abs(x - cx) < radius) continue;
     const near = Math.abs(x - cx) < radius + 70;
     const y = storyGroundY(scene, x, 448);
-    g.fillStyle(rnd.pick([0x2f5a2a, 0x3e7a2c, 0x274d22]), near ? 0.6 : 0.95);
-    g.fillEllipse(x, y + 4, rnd.realInRange(30, 52), rnd.realInRange(12, 22));
-    if (rnd.frac() < 0.3) {
-      g.fillStyle(0x9bff5a, 0.7);
-      g.fillCircle(x + rnd.realInRange(-10, 10), y, 2.5);
-    }
+    // Correctif contraste (vert sombre sur herbe verte = invisible) : même
+    // code couleur que les amas de mousse (drawMossVisual, StoryKit) -- socle
+    // presque noir, bosses vertes, reflets vert toxique bien visibles.
+    const a = near ? 0.65 : 1;
+    const w = rnd.realInRange(34, 56);
+    g.fillStyle(0x10200f, 0.92 * a);
+    g.fillEllipse(x, y + 3, w, rnd.realInRange(16, 24));
+    g.fillStyle(rnd.pick([0x2f5a2a, 0x3e7a2c, 0x274d22]), a);
+    g.fillEllipse(x + rnd.realInRange(-6, 6), y, w * 0.6, rnd.realInRange(9, 14));
+    g.fillStyle(0x9bff5a, 0.85 * a);
+    g.fillCircle(x + rnd.realInRange(-14, 14), y - rnd.realInRange(0, 5), rnd.realInRange(2, 3.5));
+    if (rnd.frac() < 0.5) g.fillCircle(x + rnd.realInRange(-16, 16), y + rnd.realInRange(-2, 6), 2);
   }
   // Cercle propre : herbe vive et petites fleurs.
   const yC = storyGroundY(scene, cx, 448);

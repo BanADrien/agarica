@@ -671,11 +671,16 @@ function showStoryBanner(scene, { kicker, title, desc = '', itemId = null, color
 }
 
 // Petit texte informatif en haut de l'écran (indices de Xara, messages).
+// En haut de l'écran (correctif : à y 318, juste au-dessus d'Agarica, il
+// recouvrait les invites « E : … » affichées sur les PNJ/objets proches).
+// Sous le bord haut, entre le HUD (en haut à gauche) et les bandeaux (y 70).
+const STORY_TOAST_Y = 42;
+
 function showToast(scene, text, ms = 2600) {
   if (scene.__storyToast && scene.__storyToast.active) scene.__storyToast.destroy();
-  const t = scene.add.text(scene.scale.width / 2, 318, text, {
+  const t = scene.add.text(scene.scale.width / 2, STORY_TOAST_Y, text, {
     fontFamily: 'sans-serif', fontSize: '15px', color: STORY_UI.text, align: 'center',
-    backgroundColor: '#2a1f45', padding: { x: 12, y: 7 }, wordWrap: { width: 620 },
+    backgroundColor: '#2a1f45', padding: { x: 12, y: 7 }, wordWrap: { width: 590 }, // ne déborde pas sur le HUD
   }).setOrigin(0.5).setScrollFactor(0).setDepth(2050).setAlpha(0);
   scene.__storyToast = t;
   scene.tweens.add({ targets: t, alpha: 1, duration: 200 });

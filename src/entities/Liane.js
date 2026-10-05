@@ -25,6 +25,11 @@ const VINE_MAX_CARRY_SPEED = 560;
 // le long de la liane (fraction de la hauteur balistique restante).
 const VINE_CLIMB_FRACTION = 0.6;
 const VINE_CLIMB_SPEED = 380; // px/s
+// Longueur de balancier minimale (fraction de la liane) : correctif, une prise
+// en pleine montée (après un double saut) faisait remonter les mains presque
+// jusqu'à l'attache -> balancier trop court, lâcher sans élan. Une prise plus
+// haute que ce seuil redescend doucement jusqu'à lui (même vitesse).
+const VINE_MIN_SWING_FRACTION = 0.6;
 const VINE_COLOR = 0x3f7a3a;
 const VINE_LEAF_COLOR = 0x6fbf5a;
 
@@ -135,7 +140,8 @@ class Liane {
     this.omega = Phaser.Math.Clamp((tangential / this.swingR) * 0.85, -VINE_MAX_OMEGA, VINE_MAX_OMEGA);
     const g = this.scene.physics.world.gravity.y;
     const climb = vy < 0 ? (vy * vy) / (2 * g) * VINE_CLIMB_FRACTION : 0;
-    this.climbTargetR = Phaser.Math.Clamp(this.swingR - climb, VINE_MIN_GRAB_R, this.length);
+    const minSwingR = Math.max(VINE_MIN_GRAB_R, this.length * VINE_MIN_SWING_FRACTION);
+    this.climbTargetR = Phaser.Math.Clamp(this.swingR - climb, minSwingR, this.length);
     this.grabbedBy = player;
   }
 
@@ -144,6 +150,8 @@ class Liane {
     const g = this.scene.physics.world.gravity.y;
     if (this.climbTargetR < this.swingR) {
       this.swingR = Math.max(this.climbTargetR, this.swingR - VINE_CLIMB_SPEED * dt);
+    } else if (this.climbTargetR > this.swingR) {
+      this.swingR = Math.min(this.climbTargetR, this.swingR + VINE_CLIMB_SPEED * dt);
     }
     const r = this.swingR;
     let alpha = -(g / r) * Math.sin(this.theta);

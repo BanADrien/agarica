@@ -629,6 +629,11 @@ const AGARICA_EXTRA_FACES_RIGHT = true;
 const MONKEY_TRANSFO_MS = 200;
 const MONKEY_RELEASE_POSE_MS = 250;
 const HURT_POSE_MS = 300;
+// Invulnérabilité après un coup (cf. hitByEnemy) : durée totale, et
+// clignotement pendant la partie qui suit le flash rouge.
+const HIT_INVULN_MS = 950;
+const HIT_BLINK_MS = 90;
+const HIT_BLINK_ALPHA = 0.35;
 const THROW_POSE_MS = 220;
 
 // Écrit une clé persistante : storySet (sauvegarde auto, Fondation) si
@@ -2314,7 +2319,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.applyAgaricaExtraPose('death');
       this.scene.__cutsceneLock = (this.scene.__cutsceneLock || 0) + 1;
     }
-    this.scene.time.delayedCall(deathPose ? 1100 : 300, () => {
+    const flashMs = deathPose ? 1100 : 300;
+    this.scene.time.delayedCall(flashMs, () => {
       if (deathPose) {
         this.storyPose = null;
         this.scene.__cutsceneLock = Math.max(0, (this.scene.__cutsceneLock || 0) - 1);
@@ -2326,7 +2332,21 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       }
       this.setVelocity(0, 0);
       this.clearTint();
-      this.isInvulnerable = false;
+      // Correctif : 300 ms d'invulnérabilité laissaient une salve (pierres de
+      // Kainati) enlever 3 cœurs d'affilée. Elle dure maintenant
+      // HIT_INVULN_MS au total, signalée par un clignotement (alpha). Après
+      // une réapparition (cœurs rechargés), pas de rallonge : comme avant.
+      const rest = depleted ? 0 : HIT_INVULN_MS - flashMs;
+      if (rest <= 0) { this.isInvulnerable = false; return; }
+      const blink = this.scene.time.addEvent({
+        delay: HIT_BLINK_MS, loop: true,
+        callback: () => { if (this.active) this.setAlpha(this.alpha < 1 ? 1 : HIT_BLINK_ALPHA); },
+      });
+      this.scene.time.delayedCall(rest, () => {
+        blink.remove(false);
+        if (this.active) this.setAlpha(1);
+        this.isInvulnerable = false;
+      });
     });
   }
 }

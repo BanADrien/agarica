@@ -94,7 +94,7 @@ const FORET_SOMBRE_2_DATA = {
   enemies: [
     { type: 'loup', x: 2350, y: 400, patrolMinX: 2000, patrolMaxX: 2700 },
     // Fixe, langue vers la droite : on l'approche par derrière (venant de l'ouest).
-    { type: 'crapaud_corrompu', x: 3880, y: 400, hp: 1 },
+    { type: 'crapaud_corrompu', x: 3880, y: 400 },
   ],
   // Mur de mousse vivante à l'entrée de la poche, sous le surplomb : s'ouvre
   // avec le répulsif de Morgat (acte 2). Id cité dans PLAN_DEV.md.
