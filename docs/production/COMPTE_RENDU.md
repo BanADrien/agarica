@@ -115,6 +115,12 @@ Toutes les scènes se chargent sans erreur JS : titre, anciennes zones, toutes l
 7. Contraste de la clairière.
 8. Mise à jour de CLAUDE.md.
 
+### Correctifs moteur — INTERROMPUS (2026-10-05, à ta demande)
+- Le travail partiel n'est pas testé, donc il a été mis de côté sur la branche `wip/correctifs-moteur` (commit `f830795`).
+- La branche `feature/demo-histoire` reste sur le code testé, pour ton playtest.
+- Pour reprendre : `git switch wip/correctifs-moteur`, vérifier et tester, puis fusionner.
+- Les 8 points de la liste plus haut restent ouverts, sauf la mise à jour de CLAUDE.md, qui est faite.
+
 ## RESTE À FAIRE
 
 1. Finir les correctifs moteur (en cours).
