@@ -12,10 +12,17 @@ Jeu-cadeau d'anniversaire : metroidvania-lite 2D, inspiré du personnage DnD "Ag
 
 ## Structure du projet
 
-- `index.html` — page unique, charge Phaser (CDN) puis `src/main.js`.
-- `src/main.js` — config Phaser + scènes.
-- `src/scenes/` — une scène par zone/écran (Boot, Zone1, Zone2, Zone3, EndScreen...).
-- `assets/` — sprites, sons, musiques (ajoutés au fil des tickets).
+- `index.html` — page unique : charge Phaser (CDN) puis tous les scripts dans l'ordre
+  (LevelKit, StoryKit, data, entités, histoire, scènes, `src/main.js`). Tout est global.
+- `src/main.js` — config Phaser + liste des scènes. `?editor` → éditeur de niveaux,
+  `?zone=foret_sombre_1&flags=xaraMet,…` → démarre directement une zone.
+- `src/utils/LevelKit.js` (construction d'une zone depuis ses données, sol, combat, HUD) et
+  `src/utils/StoryKit.js` (dialogues, cinématiques, sauvegarde, inventaire, PNJ, déclencheurs…).
+- `src/data/<zone>_data.js` (données de zone écrites à la main), `src/scenes/` (une scène
+  gabarit par zone + Boot/Title/Prologue/EndScreen/menus), `src/entities/`, `src/story/`
+  (scripts d'actes et de boss : `acte1.js`, `acte1_arbre.js`, `acte2.js`, `boss_*.js`).
+- `assets/` — art ; `docs/production/` — **PLAN_DEV.md (contrat d'API, fait foi)**,
+  ARCHITECTURE.md, COMPTE_RENDU.md, INVENTAIRE_ASSETS.md ; `histoire/` — narration.
 
 ### Tuiles de terrain : deux jeux interchangeables
 
@@ -32,16 +39,31 @@ Aucune logique de rendu ne dépend du jeu actif : les compensations que l'art do
 (étirement `AUTOTILE_CORNER_HEIGHT_BOOST`, hitbox aux 3/4, miroirs de `dirt_angle`/`coin`)
 sont expliquées dans l'en-tête de `tools/cut_tuiles.py`.
 
-## Gameplay clé (voir GDD section 3-4)
+## Gameplay et histoire (démo, voir docs/production/PLAN_DEV.md)
 
-- Déplacement : flèches / QSD.
-- Saut simple, 2e saut en l'air = transformation visuelle **Aigle** (plané léger).
-- Sprint (Shift ou double-tap direction) = transformation visuelle **Loup** (vitesse x1.5-2).
-- Transformation = automatique et visuelle (changement de sprite pendant l'action), jamais un
-  menu ou un bouton dédié.
-- Compagnon **Xara** (araignée) : suit Agarica à distance avec délai, pas de combat.
-- 1 seul niveau, 3 zones courtes (intro / passage Aigle / passage Loup), 2-3 ennemis max,
-  1 PV chacun.
+- Démo complète en **16 zones** (2 actes) : bosquet → forêt sombre 1-2 → racines du grand
+  arbre → arène de Kainati (boss épargné) → monde spirituel → épreuve du singe (optionnelle)
+  → forêt flottante 1-2 → clairière de la plante → hutte de Morgat → forêt corrompue →
+  arène de Ghil't (défaite imposée) → trou sombre → Ghil't phase 2 (soin) → retour au
+  bosquet → écran de fin. Anciennes zones de test (Zone1-5, SousGrotte, ZoneAquatique,
+  Zonetest) intactes, via le titre « Zones de test ».
+- Contrôles : flèches / QD, saut Z/↑/Espace (double saut de base), Shift sprint, S piqué /
+  lâcher, K ou clic attaque, E interagir, A/F/R compétences, I inventaire, M carte.
+- **Formes** débloquées par l'histoire, automatiques (jamais un bouton) : sol = **Loup**
+  (sprint, pistes, plateformes cachées), aérien = **Singe** (lianes) OU **Aigle** (plané,
+  courants d'air) au choix, eau = **Pieuvre**. **Compétences** (énergie) : ours, pierre,
+  papillon (soigne les corrompus). **Feux de camp** : soin, sauvegarde, menu formes /
+  compétences / totems (monde gelé).
+- **Compagnon Xara** (araignée) : suit Agarica, parle, pas de combat.
+- **StoryKit** : nouvelles clés de zone (npcs, triggers, pickups, mossBlocks, vines,
+  checkpoints, fall, script…), `CUTSCENES`/`DIALOGUES`, sauvegarde localStorage auto.
+- **Art Codex** : tout élément sans image s'affiche en placeholder. Après toute génération
+  d'images (manifest `src/data/asset_manifest.js`), lancer
+  `python tools/import_codex_assets.py` (régénère `src/data/asset_present.js`).
+- **Tests** : `python tools/playtest.py --port 88xx --scene ForetSombre1Scene --flags
+  xaraMet=true --keys "ArrowRight:1500" --js "…" --shot x.png` (Edge headless, code de
+  sortie 1 si erreur JS). Ne pas utiliser `tools/dev_server.py` pour tester : son Save
+  réécrit les fichiers de zone.
 
 ## Direction artistique
 
@@ -49,23 +71,16 @@ Silhouettes sombres façon Hollow Knight, palette réduite : violet nuit / vert 
 touches de rose (clin d'œil au tatouage d'Agarica). Pas d'animation dessinée à la main
 complexe — formes géométriques stylisées, silhouette + contour lumineux.
 
-## Roadmap (tickets, voir GDD section 10 pour le détail)
+## État et suite
 
-1. Setup projet Phaser (page vide, boucle de jeu de base) — **en cours**
-2. Déplacement + saut simple + collisions décor
-3. Double-saut → forme Aigle + plané
-4. Sprint → forme Loup + vitesse
-5. Compagnon Xara (suivi + réaction)
-6. Zone 1 (intro, sans ennemi)
-7. Zone 2 (vide à franchir + Loup sanguinaire)
-8. Zone 3 (toiles d'araignée + Araignée fixe)
-9. Écran de fin personnalisé
-10. Polish (couleurs, lumière lunaire, son)
+Histoire de la démo entièrement construite et jouable de bout en bout. Reste (voir
+COMPTE_RENDU.md) : playtest humain complet + équilibrage, art Codex restant, son/musique.
 
 ## Conventions de travail
 
-- Avancer ticket par ticket dans l'ordre ci-dessus, ne pas anticiper les zones/ennemis avant
-  que le mouvement de base ne soit solide.
-- Rester dans le budget technique du GDD (pas de vraie IA d'ennemis, pas de vrai metroidvania
-  avec grande carte) sauf demande explicite d'ajouter une idée bonus (section 11 du GDD).
-- Tester dans le navigateur après chaque ticket avant de passer au suivant.
+- Respecter le contrat d'API de PLAN_DEV.md (rétro-compatible) ; données de zone écrites à la
+  main, compatibles éditeur ; commentaires en français expliquant le « pourquoi ».
+- Rester dans le budget technique du GDD (pas de vraie IA d'ennemis, pas de grande carte)
+  sauf demande explicite.
+- Tester avec le harnais (toutes les scènes doivent sortir en code 0) et dans le navigateur
+  avant de passer à la suite.

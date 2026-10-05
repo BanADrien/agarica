@@ -71,72 +71,55 @@ Toutes les scènes se chargent sans erreur JS : titre, anciennes zones, toutes l
 - Bouton « Oublier le brouillon » dans l'écran Zones.
 - Le portail avec équivalence de hauteur (todo_me) était déjà fait.
 
-### Acte 1 (`src/story/acte1.js`) — PARTIEL
-- **FAIT : `bosquet`, jouable de bout en bout.**
-  - PNJ du village : Bran, Tilda, Sauge, Orme, le père, la garde.
-  - Les 3 cochons et un tutoriel discret.
-  - Séquence d'aide : gratter 3 plaques de mousse, échec sur l'amas, une créature de mousse surgit.
-  - Le père donne le talisman de l'ours, puis le vol de l'idole (avec un choix) et le bannissement → forêt sombre 1.
-- **À FAIRE : zones 2 à 7, encore des squelettes à sol plat.** Plans prévus par l'agent :
-  - **`foret_sombre_1`** :
-    - entrée `from_bosquet` et désespoir d'Agarica ;
-    - PNJ Xara (`{id:'xara', sprite:'xara_extra'}`), indices sur Maexxna, puis `{xaraJoin:true}` ;
-    - un amas `mossBlocks` coincé sous un mur de racines qui monte jusqu'en haut de l'écran ;
-    - un déclencheur « le talisman réagit » : `{skill:'ours'}` et énergie remplie (l'ours coûte 35, l'énergie démarre à 0) ;
-    - une `mousse_creature` et un feu de camp ;
-    - sortie vers `from_foret_sombre_1`.
-  - **`foret_sombre_2`** :
-    - un ravin de 5 tuiles (franchissable seulement en loup) avant le totem du loup ;
-    - un ravin de 9 tuiles avec `hiddenPlatforms` et `tracks` ;
-    - la mare aux 3 poissons, dessinée par le script : la clé `water` blesse Agarica sans la pieuvre ;
-    - la plante perchée hors d'atteinte (`planteVue`) ;
-    - le mur `mur_repulsif_foret_sombre` avec un secret +1 cœur ;
-    - entrées `from_foret_sombre_1`, `from_racines` et **`from_hutte_morgat`** (demandée par l'acte 2), plus une sortie vers `HutteMorgatScene` `{enterId:'from_foret_sombre'}`.
-  - **`grand_arbre_racines`** :
-    - `tallLevel`, tunnels, `singe_corrompu`, pierres qui tombent, feu de camp ;
-    - lianes menant à l'épreuve du singe (accessible seulement en singe) ;
-    - sortie vers l'arène `from_racines` ; entrées `from_arene`, `from_foret_sombre`, `from_epreuve`.
-  - **`monde_spirituel`** :
-    - `KainatiEsprit.guide(...)`, `{form:'hasMonkeyForm'}` et explications singe/aigle ;
-    - lianes au-dessus d'un vide (`fall: respawn` + `checkpoints`) ;
-    - retour vers l'arène `from_monde_spirituel`.
-  - **`epreuve_singe`** :
-    - course de lianes avec checkpoints ;
-    - talisman du singe en haut → `talismanSinge` + `{skill:'pierre'}` ;
-    - retour vers les racines.
-  - Les dialogues de Kainati (`kainati_intro`, `kainati_victoire`, `kainati_calme`) sont encore les textes par défaut, qui sont corrects. Ne pas ajouter de `vines` à l'arène : le script du boss les lit déjà.
-- **Mesures de saut** (pour faire les niveaux) :
-  - saut simple : 172 px de haut, environ 175 px de portée ;
-  - double saut de base : 245 px ;
-  - saut en sprint loup : environ 363 px de portée ; double saut en sprint loup : environ 514 px.
+## Vague 3 (2026-10-05) — commit `5a1c67c`
 
-### Acte 2 (`src/story/acte2.js`) — ÉCRIT, PEU TESTÉ
-- Zones 8 à 16 construites avec un vrai level design, dialogues et cinématiques :
-  - forêt flottante 1 : Galter, son duel comique et la carte ;
-  - forêt flottante 2 : totem de poche, Amanite, totem de l'aigle, courants d'air ;
-  - clairière de la plante, puis hutte de Morgat : fleur → répulsif, puis le crash ;
-  - forêt corrompue : réveil, note de Galter, amas à l'ours, mur à ouvrir au répulsif ;
-  - retour au bosquet et fin.
-- Les dialogues de Ghil't et du trou sombre ont été réécrits.
-- **Testé jusqu'au bout : seulement `bosquet_retour`** (cinématique finale → écran de fin). Les autres zones se chargent sans erreur, mais n'ont pas été jouées.
-- **À vérifier en priorité** :
-  - le duel de Galter ;
-  - le saut vers le totem de l'aigle et les planés de la forêt flottante 2 ;
-  - l'arrivée en plané dans la clairière ;
-  - la cinématique du crash jusqu'à la forêt corrompue ;
-  - l'amas et le mur de la forêt corrompue ;
-  - l'enchaînement forêt corrompue → arène → trou → arène → retour au bosquet.
-- **Risques connus** : avec l'aigle, Agarica peut sortir par le haut de l'écran (la caméra ne défile pas verticalement) ; le voile de ciel de jour reste à vérifier visuellement.
+### Acte 1 — FAIT, joué de bout en bout par script
+- **Forêt sombre 1** :
+  - désespoir d'Agarica (pose triste) et rencontre avec Xara (indices sur Maexxna) ;
+  - amas de mousse, le talisman révèle la compétence de l'ours ;
+  - créature de mousse et feu de camp.
+- **Forêt sombre 2** :
+  - ravin franchissable seulement en loup, totem du loup ;
+  - grand ravin avec plateformes cachées et pistes du loup ;
+  - mare aux 3 poissons, plante perchée (`planteVue`) ;
+  - mur au répulsif → secret +1 cœur et chemin vers la hutte de Morgat.
+- **Racines du grand arbre** : zone verticale, pierres qui tombent, singes corrompus, feu de camp, lianes vers l'épreuve.
+- **Arène** : textes de Kainati réécrits ; le dialogue « calme » change selon la progression.
+- **Monde spirituel** : l'esprit de Kainati guide le joueur et donne la forme singe.
+- **Épreuve du singe** (optionnelle) : course de lianes avec checkpoints → talisman du singe et compétence pierre.
+
+### Acte 2 — FAIT, joué de bout en bout par script (8 bugs corrigés)
+- Galter et son duel, carte, îles, Amanite, totem de l'aigle, planés, clairière, Morgat, crash, forêt corrompue, Ghil't (chute, trou sombre, soin, Amanite), retour au bosquet, écran de fin.
+- Corrections principales :
+  - blocage à la fin du duel ;
+  - Agarica sortait par le haut de l'écran ;
+  - les chutes dans le vide ne se déclenchaient jamais (corrigé pour tout le jeu) ;
+  - une mort pendant le combat contre Ghil't ne relançait plus la phase.
+- La sauvegarde et le bouton « Continuer » ont été vérifiés.
+- **Limite des tests** : ils ont été joués par un robot, pas par une personne. Les combats ont été traversés avec les dégâts sur Agarica désactivés.
+
+### Images Codex (en cours de production par l'utilisateur)
+- Importées et branchées :
+  - `agarica_extra` p1-p2 (saut, blessure, mort, parole, tristesse, avec les poses automatiques en dialogue et cinématique) ;
+  - Xara (`xara_extra`, à refaire : marges trop justes), le père, Amanite, Galter, Morgat ;
+  - Kainati en cours.
+- Suivi de Codex : `docs/production/RAPPORT_CODEX.md`.
+
+### Correctifs moteur — EN COURS
+1. Agarica se coince contre une paroi de 2 cases.
+2. L'attaque au corps à corps ne touche que si les corps se chevauchent.
+3. L'invulnérabilité après un coup est trop courte (une salve de Kainati peut tuer d'un coup).
+4. Une liane saisie en montant donne un balancier trop court.
+5. Réglages de la forêt flottante 1.
+6. Les messages à l'écran recouvrent les invites « E : … ».
+7. Contraste de la clairière.
+8. Mise à jour de CLAUDE.md.
 
 ## RESTE À FAIRE
 
-1. **Acte 1, zones 2 à 7** (plans ci-dessus). C'est le seul vrai trou du parcours : pour l'instant on passe du bosquet à des zones à sol plat sans contenu.
-   Vérifier ensuite l'acte 2 (liste ci-dessus).
-2. Faire un playtest complet de bout en bout (titre → fin) par une personne, puis équilibrer : difficulté des boss, hauteurs de saut.
-3. Générer les images avec Codex (`CODEX_SPRITES_A_GENERER.md`), puis lancer `python tools/import_codex_assets.py`. Après l'import, ajuster le placement de Kainati suspendu à la liane et l'orientation de Ghil't.
-4. Son et musique : rien n'est fait (voir `histoire/MUSIQUE_ET_AMBIANCES.md`).
-5. Mettre à jour `CLAUDE.md` : la roadmap des 10 tickets est dépassée par l'histoire actuelle.
-6. Éléments mineurs :
-   - pas de pose dédiée pour grimper aux lianes ;
-   - un brouillon IndexedDB de l'éditeur écrase le fichier de zone au lancement (vider les brouillons si une zone ne change pas) ;
-   - les anciennes zones de test ne sont plus dans le parcours principal.
+1. Finir les correctifs moteur (en cours).
+2. **Playtest humain complet**, du titre à la fin, puis équilibrage : difficulté des boss, des corbeaux, de l'épreuve du singe.
+3. Finir les images Codex : P1 restants (singe, Ghil't, objets, portraits, boîte de dialogue, fonds), puis P2 et P3. Ensuite, ajuster Kainati suspendu à la liane et l'orientation de Ghil't avec les vraies images.
+4. Il n'existe pas de fond `fond_foret_sombre` dans le manifest : la forêt sombre utilise le ciel par défaut. À ajouter si souhaité.
+5. Son et musique : rien n'est fait (`histoire/MUSIQUE_ET_AMBIANCES.md`).
+6. Mineur : le brouillon IndexedDB de l'éditeur masque le fichier de zone (bouton « Oublier le brouillon » dans l'écran Zones).
