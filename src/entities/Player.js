@@ -657,6 +657,70 @@ function manifestFormConfig(scene, id, anim) {
   };
 }
 
+// Analyse alpha d'une texture (une fois par clé, mise en cache) : boîte
+// opaque et « poing » (point le plus haut de la silhouette : la main levée
+// des poses suspendues). Sert à caler l'art Codex, dont le cadrage varie
+// d'une planche à l'autre, sur la taille et la prise d'Agarica.
+const TEXTURE_ALPHA_CACHE = new Map();
+function textureAlphaInfo(scene, key) {
+  if (TEXTURE_ALPHA_CACHE.has(key)) return TEXTURE_ALPHA_CACHE.get(key);
+  let info = null;
+  try {
+    if (scene.textures.exists(key)) {
+      const img = scene.textures.get(key).getSourceImage();
+      const w = img.width;
+      const h = img.height;
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, w, h).data;
+      let top = -1;
+      let bottom = -1;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          if (d[(y * w + x) * 4 + 3] > 128) {
+            if (top < 0) top = y;
+            bottom = y;
+            break;
+          }
+        }
+      }
+      if (top >= 0) {
+        let sx = 0;
+        let n = 0;
+        for (let y = top; y < Math.min(h, top + 20); y++) {
+          for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 128) { sx += x; n++; }
+        }
+        info = { w, h, top, bottom, fistX: sx / n, fistY: top + 10 };
+      }
+    }
+  } catch (e) {
+    info = null;
+  }
+  TEXTURE_ALPHA_CACHE.set(key, info);
+  return info;
+}
+
+// Échelle à laquelle la silhouette de la texture `key` a la même hauteur
+// opaque que l'idle humaine historique (~85 px) -- jamais plus grande que
+// `maxScale` (l'échelle du manifest) : on ne fait que réduire l'art trop
+// grand (pose `talk`, `receive_item`, 1re frame de la transfo singe), pour
+// qu'Agarica ne grandisse pas d'un coup en changeant de pose.
+function scaleMatchingHumanHeight(scene, key, maxScale) {
+  const ref = textureAlphaInfo(scene, 'agarica-idle-0');
+  const t = textureAlphaInfo(scene, key);
+  if (!ref || !t) return maxScale;
+  const target = (ref.bottom - ref.top) * HUMAN_SCALE;
+  return Math.min(maxScale, target / Math.max(1, t.bottom - t.top));
+}
+
+// Poses `agarica_extra` où Agarica est DEBOUT (silhouette comparable à
+// l'idle) : leur art est dessiné plus grand que les autres rangées
+// (mesuré : talk ~99 px, receive_item ~112 px contre ~85 px à l'idle).
+const AGARICA_EXTRA_STANDING_ANIMS = ['talk', 'receive_item', 'cast'];
+
 // Joue `${id}-${anim}` si l'anim manifest existe, sinon pose la texture de
 // repli (placeholder) : le jeu marche à l'identique avec ou sans art.
 function playManifestOn(sprite, id, anim) {
@@ -1212,7 +1276,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           const frames = scene.anims.get(fwdKey).frames.map((f) => ({ key: f.textureKey })).reverse();
           scene.anims.create({ key: this.monkeyTransfoReverseKey, frames, frameRate: frames.length / (MONKEY_TRANSFO_MS / 1000), repeat: 0 });
         }
-        this.monkeyTransfoCfg = manifestFormConfig(scene, 'transfo_singe', tAnim);
+        // 1re frame = Agarica encore humaine : ramenée à la hauteur de l'idle
+        // (l'art la dessine ~109 px de haut à l'échelle du manifest, d'où un
+        // sursaut de taille au début de la transfo) ; la dernière frame, le
+        // singe, tombe alors à ~67 px, proche du singe au repos (~64 px).
+        const tcfg = manifestFormConfig(scene, 'transfo_singe', tAnim);
+        const tScale = scaleMatchingHumanHeight(scene, tcfg.texture, tcfg.scale);
+        this.monkeyTransfoCfg = { ...tcfg, scale: tScale, body: transfoBodyConfig(tcfg.frameWidth, tcfg.frameHeight, tScale) };
       }
     }
     // Triche Ctrl+Shift+D (écouteur principal dans LevelKit, qui ignore le
@@ -1409,7 +1479,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.tapSprintDirection = null;
     }
 
-    const onGround = this.body.blocked.down || this.body.touching.down;
+    // `velocity.y >= 0` : le pas physique d'Arcade est fixe (60 Hz) alors
+    // qu'update() suit l'affichage -- sur un écran 120/144 Hz, la frame qui
+    // suit un saut voit encore `blocked.down` (le corps n'a pas encore
+    // bougé) : jumpsUsed retombait à 0 et le double saut devenait un simple
+    // 2e saut, sans singe (constaté en test headless, ~240 images/s). Un
+    // corps vraiment posé n'a jamais de vitesse verticale négative.
+    const onGround = (this.body.blocked.down || this.body.touching.down) && this.body.velocity.y >= 0;
     // Exposée sur l'instance (pas juste locale) : Xara s'en sert pour savoir
     // quand afficher sa propre pose de saut pendant le saut de base d'Agarica.
     this.onGround = onGround;
@@ -1683,6 +1759,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // prend le pas sur la forme sous-jacente pendant sa fenêtre de transfo,
     // le temps d'afficher sa propre silhouette animée -- calculé une seule
     // fois ici, réutilisé pour le flip ET le bloc texture/anim plus bas.
+    // Origine décalée pour la prise de liane (cf. applyVineArtAnchor) : remise
+    // à (0.5, 1) chaque frame AVANT les blocs ci-dessous, qui supposent tous
+    // les pieds à l'origine ; la branche liane la repose si besoin.
+    this.resetVineArtAnchor();
     const activeSkillDef = this.activeSkillId ? SKILL_DEFS[this.activeSkillId] : null;
     const skillArtActive = !!(this.skillTransformActive && activeSkillDef && activeSkillDef.animKey);
 
@@ -1859,8 +1939,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         const sc = this.scene;
         if (this.vine) {
           const want = Math.abs(this.vine.omega) > 0.8 ? 'liane_swing' : 'liane_hang';
-          if (hasManifestArt(sc, 'singe', want)) playManifestOn(this, 'singe', want);
-          else if (hasManifestArt(sc, 'singe', 'liane_hang')) playManifestOn(this, 'singe', 'liane_hang');
+          if (hasManifestArt(sc, 'singe', want)) { playManifestOn(this, 'singe', want); this.applyVineArtAnchor(); }
+          else if (hasManifestArt(sc, 'singe', 'liane_hang')) { playManifestOn(this, 'singe', 'liane_hang'); this.applyVineArtAnchor(); }
           else if (hasManifestArt(sc, 'agarica_extra', want)) this.applyAgaricaExtraPose(want);
           else if (hasManifestArt(sc, 'agarica_extra', 'liane_hang')) this.applyAgaricaExtraPose('liane_hang');
           else playManifestOn(this, 'singe', 'liane_hang');
@@ -2259,9 +2339,42 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     });
   }
 
+  // Art singe suspendu : le poing levé est dessiné 64-96 px au-dessus des
+  // pieds, alors que la physique tient les mains à VINE_HANG_OFFSET (58 px,
+  // cf. Liane.js -- portée de prise calibrée sur les niveaux). Plutôt que de
+  // changer cette physique, on cale le DESSIN : l'origine passe sur le poing
+  // de la frame courante, posé sur le point de prise ; le corps physique est
+  // compensé pour ne pas bouger d'un pixel. Le flipX de Phaser miroite la
+  // texture dans le même cadre : d'où W - x quand Agarica regarde à gauche.
+  applyVineArtAnchor() {
+    const info = textureAlphaInfo(this.scene, this.texture.key);
+    if (!info || typeof VINE_HANG_OFFSET === 'undefined') return;
+    const W = this.frame.realWidth;
+    const H = this.frame.realHeight;
+    const fx = this.flipX ? W - info.fistX : info.fistX;
+    this.setOrigin(Phaser.Math.Clamp(fx / W, 0, 1), (info.fistY + VINE_HANG_OFFSET / this.scaleY) / H);
+    const b = FORMS.monkey.body;
+    this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
+    this.vineArtAnchored = true;
+  }
+
+  resetVineArtAnchor() {
+    if (!this.vineArtAnchored) return;
+    this.vineArtAnchored = false;
+    this.setOrigin(0.5, 1);
+  }
+
   applyAgaricaExtraPose(anim) {
     this.extraPoseCfg = this.extraPoseCfg || {};
-    const cfg = this.extraPoseCfg[anim] || (this.extraPoseCfg[anim] = manifestFormConfig(this.scene, 'agarica_extra', anim));
+    let cfg = this.extraPoseCfg[anim];
+    if (!cfg) {
+      cfg = manifestFormConfig(this.scene, 'agarica_extra', anim);
+      if (AGARICA_EXTRA_STANDING_ANIMS.includes(anim)) {
+        const scale = scaleMatchingHumanHeight(this.scene, cfg.texture, cfg.scale);
+        cfg = { ...cfg, scale, body: transfoBodyConfig(cfg.frameWidth, cfg.frameHeight, scale) };
+      }
+      this.extraPoseCfg[anim] = cfg;
+    }
     playManifestOn(this, 'agarica_extra', anim);
     this.applyBodyForScale(cfg.scale, cfg.body);
     this.setFlipX(AGARICA_EXTRA_FACES_RIGHT ? this.facingDir < 0 : this.facingDir > 0);

@@ -1,0 +1,57 @@
+{
+  "pere_chef": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "amanite": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "galter": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "morgat": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "agarica_extra": {
+    "status": "à refaire",
+    "note": "p3 validée ; p4 nouvelle tentative à petite échelle.",
+    "log": "imports/agarica_extra_force.log"
+  },
+  "xara_extra": {
+    "status": "à refaire",
+    "note": "Bande entre rangées mesurée à 45 px ; minimum demandé 60 px."
+  },
+  "kainati": {
+    "status": "à refaire",
+    "note": "p2/p3 conformes en espacement ; p1 écarts 23 et 8px ; p4 format corrigé à contrôler.",
+    "log": "imports/kainati_force.log"
+  },
+  "singe": {
+    "status": "fait",
+    "note": "25 frames, six animations ; import ciblé sans avertissement. Contrôle visuel : aucune frame vide ou coupée. Marges mesurées : >=67 px entre rangées, >=71 px horizontalement. Référence du singe brun utilisée.",
+    "log": "imports/singe.log"
+  },
+  "transfo_singe": {
+    "status": "à refaire",
+    "note": "Généré ; contrôle visuel et dimensionnel en cours.",
+    "log": "imports/transfo_singe_force.log"
+  },
+  "kainati_esprit": {
+    "status": "à refaire",
+    "note": "Marges corrigées ; contrôle visuel en cours.",
+    "log": "imports/kainati_esprit_force.log"
+  },
+  "ghilt": {
+    "status": "à refaire",
+    "note": "Quatre planches corrigées ; contrôle visuel final en cours.",
+    "log": "imports/ghilt_force.log"
+  },
+  "ghilt_gueri": {
+    "status": "à refaire",
+    "note": "Dernier écart corrigé ; contrôle final.",
+    "log": "imports/ghilt_gueri_force.log"
+  }
+}

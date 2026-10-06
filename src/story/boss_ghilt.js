@@ -678,7 +678,14 @@ async function ghiltSoin(scene, st) {
   ghSet(scene, 'amaniteKilledGhilt', true);
   await ghWait(scene, 900);
   ghAnim(amanite, 'idle');
+  // Elle se tourne vers Agarica pour lui parler ; enregistrée dans scene.npcs
+  // pour que StoryKit joue son anim `talk` pendant ses répliques.
+  amanite.setFlipX(player.x < amanite.x);
+  scene.npcs = scene.npcs || {};
+  scene.npcs.amanite = amanite;
   await ghSay(scene, 'ghilt_amanite');
+  delete scene.npcs.amanite;
+  amanite.setFlipX(!fromLeft);
   ghAnim(amanite, 'walk_angry');
   await ghTween(scene, {
     targets: amanite, x: cam.scrollX + (fromLeft ? cam.width + 80 : -80), duration: 1600, ease: 'Sine.easeIn',
@@ -689,7 +696,10 @@ async function ghiltSoin(scene, st) {
   const galter = ghSprite(scene, cam.scrollX - 50, ghArenaGroundY(scene, 100), 'galter', 'walk');
   await ghTween(scene, { targets: galter, x: player.x - 90, duration: 1500, ease: 'Sine.easeOut' });
   ghAnim(galter, 'idle');
+  scene.npcs = scene.npcs || {};
+  scene.npcs.galter = galter;
   await ghSay(scene, 'ghilt_galter');
+  delete scene.npcs.galter;
   await ghBlackout(scene, 900);
   ghLock(scene, false);
   goToScene(scene, 'BosquetRetourScene', { enterId: 'from_arene' });

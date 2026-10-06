@@ -4,6 +4,7 @@ class BootScene extends Phaser.Scene {
   }
 
   preload() {
+    this.createLoadingScreen();
     // Sprites forme humaine : fichiers individuels (un par frame), générés
     // à partir de assets/sprites/agarica.png via tools/split_spritesheet.py
     // (voir AGARICA_ANIM_ROWS dans Player.js pour le mapping ligne -> anim).
@@ -252,6 +253,94 @@ class BootScene extends Phaser.Scene {
     loadManifestAssets(this);
   }
 
+  // Écran de chargement (rien n'est encore chargé : tout est dessiné par
+  // code). Une liane qui pousse le long d'une barre de bois, des fleurs roses
+  // qui s'ouvrent aux quarts, une phrase d'ambiance qui change. Détruit à la
+  // fin du chargement.
+  createLoadingScreen() {
+    const { width, height } = this.scale;
+    const ui = typeof STORY_UI !== 'undefined' ? STORY_UI : { serif: 'Georgia, serif', pink: 0xff9fc9, vineLight: 0x8fe3b8, vine: 0x3f7a52 };
+    const objs = [];
+    const bg = this.add.graphics();
+    bg.fillGradientStyle(0x1a1430, 0x1a1430, 0x0d0b1a, 0x0d0b1a, 1, 1, 1, 1);
+    bg.fillRect(0, 0, width, height);
+    // Lune et halo.
+    for (let r = 120; r > 0; r -= 15) {
+      bg.fillStyle(0xc9b8f0, 0.025);
+      bg.fillCircle(width / 2, 170, r);
+    }
+    // Pleine lune (un croissant découpé par un disque laisserait voir le
+    // disque sur le halo) : quelques taches lavande pour le relief.
+    bg.fillStyle(0xfff3d6, 0.92);
+    bg.fillCircle(width / 2, 170, 32);
+    bg.fillStyle(0xd9cdf0, 0.55);
+    bg.fillCircle(width / 2 - 10, 162, 7);
+    bg.fillCircle(width / 2 + 12, 180, 5);
+    bg.fillCircle(width / 2 + 6, 156, 3);
+    objs.push(bg);
+    const title = this.add.text(width / 2, 268, 'Legend of Agarica', {
+      fontFamily: ui.serif, fontSize: '40px', fontStyle: 'bold', color: '#ffe9f5',
+      stroke: '#15101f', strokeThickness: 6, padding: { x: 20, y: 14 },
+    }).setOrigin(0.5);
+    title.setShadow(0, 0, '#ff9fc9', 16, true, true);
+    objs.push(title);
+
+    const barW = 420;
+    const barX = (width - barW) / 2;
+    const barY = 352;
+    const frame = this.add.graphics();
+    frame.fillStyle(0x241510, 1);
+    frame.fillRoundedRect(barX - 6, barY - 6, barW + 12, 24, 12);
+    frame.fillStyle(0x4a2f22, 1);
+    frame.fillRoundedRect(barX - 3, barY - 3, barW + 6, 18, 9);
+    frame.fillStyle(0x15101f, 1);
+    frame.fillRoundedRect(barX, barY, barW, 12, 6);
+    objs.push(frame);
+    const fill = this.add.graphics();
+    objs.push(fill);
+    const pct = this.add.text(width / 2, barY + 36, '0 %', {
+      fontFamily: 'sans-serif', fontSize: '13px', color: '#a99bd6',
+    }).setOrigin(0.5);
+    objs.push(pct);
+    const lines = [
+      'La lune se lève sur la forêt d\'Émeraude…',
+      'Xara tisse sa toile…',
+      'La mousse frémit dans l\'ombre…',
+      'Les lucioles s\'éveillent…',
+    ];
+    const flavor = this.add.text(width / 2, barY + 70, lines[0], {
+      fontFamily: ui.serif, fontSize: '16px', fontStyle: 'italic', color: '#c9b8f0', padding: { x: 6, y: 4 },
+    }).setOrigin(0.5);
+    objs.push(flavor);
+
+    const draw = (v) => {
+      const w = Math.max(6, barW * v);
+      fill.clear();
+      fill.fillStyle(ui.vine, 1);
+      fill.fillRoundedRect(barX, barY, w, 12, 6);
+      fill.fillStyle(ui.vineLight, 0.45);
+      fill.fillRoundedRect(barX + 2, barY + 2, Math.max(2, w - 4), 4, 2);
+      // Fleurs roses aux quarts déjà atteints, petite feuille en tête.
+      for (let q = 1; q <= 3; q++) {
+        if (v < q / 4) continue;
+        fill.fillStyle(ui.pink, 1);
+        fill.fillCircle(barX + barW * q / 4, barY + 6, 5);
+        fill.fillStyle(0xffe9f5, 1);
+        fill.fillCircle(barX + barW * q / 4, barY + 6, 1.8);
+      }
+      fill.fillStyle(ui.vineLight, 1);
+      fill.fillEllipse(barX + w + 2, barY + 2, 12, 6);
+      pct.setText(`${Math.round(v * 100)} %`);
+      flavor.setText(lines[Math.min(lines.length - 1, Math.floor(v * lines.length))]);
+    };
+    draw(0);
+    this.load.on('progress', draw);
+    this.load.once('complete', () => {
+      this.load.off('progress', draw);
+      for (const o of objs) o.destroy();
+    });
+  }
+
   // [clé de texture, nom de fichier] des 21 cases d'un jeu de tuiles
   // (« 9-slice » de terre + plateformes + variantes de centre + coins
   // intérieurs, cf. tools/crop_autotile.py / tools/cut_tuiles.py).
@@ -323,6 +412,7 @@ class BootScene extends Phaser.Scene {
       console.warn(`?zone=${zone} : scène inconnue, retour à l'écran-titre.`);
     }
 
-    this.scene.start('TitleScene');
+    // `fromBoot` : l'écran-titre commence par « Appuie sur une touche ».
+    this.scene.start('TitleScene', { fromBoot: true });
   }
 }

@@ -43,7 +43,10 @@ const GRAND_ARBRE_ARENE_DATA = {
   kainatiArena: {
     minX: 512,          // bords de l'arène (rideaux de mousse + caméra figée)
     maxX: 1472,
-    floorY: GRAND_ARBRE_ARENE_SURFACE_Y,
+    // Haut de la HITBOX du sol (tuiles d'herbe aux 3/4 : 16 px sous le haut de
+    // l'image), là où Agarica pose les pieds : Kainati, ses pierres et ses
+    // ondes flottaient sinon 16 px au-dessus de l'herbe.
+    floorY: GRAND_ARBRE_ARENE_SURFACE_Y + 16,
     lockX: 600,         // le combat démarre quand Agarica dépasse ce x
     startVine: 2,       // liane où Kainati attend
     calmX: 1390,        // position de Kainati apaisé (revisite)

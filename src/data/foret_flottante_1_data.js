@@ -55,9 +55,13 @@ const FORET_FLOTTANTE_1_DATA = {
   enemies: [
     // Corbeaux adoucis (playtest : trop agressifs sur P3-P5) : piqué moins
     // profond et plus lent, pause plus longue entre deux piqués ; le 2e ne
-    // survole plus l'entrée du belvédère (point de reprise x 3060).
-    { type: 'corbeau', x: 2620, y: 110, patrolMinX: 2480, patrolMaxX: 2720, diveDepth: 175, diveSpeed: 240, diveCooldown: 3400 },
-    { type: 'corbeau', x: 2880, y: 60, patrolMinX: 2780, patrolMaxX: 2960, diveDepth: 140, diveSpeed: 240, diveCooldown: 3400 },
+    // survole plus l'entrée du belvédère (point de reprise x 3060). Ils ne
+    // piquent que sur Agarica posée (diveGroundedOnly, cf. Corbeau.js) : un
+    // coup en plein saut au-dessus du vide coûtait 2 cœurs (coup + chute) ;
+    // patrouilles resserrées au-dessus de P3 et P4 : hors de l'arc des sauts
+    // P2->P3 et P4->P5 (un corbeau qui patrouille blesse aussi au contact).
+    { type: 'corbeau', x: 2620, y: 110, patrolMinX: 2600, patrolMaxX: 2720, diveDepth: 175, diveSpeed: 240, diveCooldown: 3400, diveGroundedOnly: true },
+    { type: 'corbeau', x: 2880, y: 60, patrolMinX: 2790, patrolMaxX: 2900, diveDepth: 140, diveSpeed: 240, diveCooldown: 3400, diveGroundedOnly: true },
     { type: 'mousse_creature', x: 3400, y: 100, patrolMinX: 3330, patrolMaxX: 3460 },
   ],
   // Visible mais inutilisable sans l'aigle (il n'agit que sur le plané) : on le

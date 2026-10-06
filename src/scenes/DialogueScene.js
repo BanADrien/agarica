@@ -29,7 +29,8 @@ class DialogueScene extends Phaser.Scene {
 
   create() {
     this.openedAt = this.time.now;
-    const B = DIALOGUE_BOX;
+    this.box = this.computeBox();
+    const B = this.box;
     this.root = this.add.container(0, 0).setAlpha(0);
     this.tweens.add({ targets: this.root, alpha: 1, duration: 140 });
 
@@ -62,6 +63,19 @@ class DialogueScene extends Phaser.Scene {
     this.showLine(0);
   }
 
+  // Boîte en HAUT de l'écran quand Agarica (et donc les PNJ à qui elle parle)
+  // se tient au sol, dans le bas de l'écran : en bas, la boîte cachait les
+  // personnages qui parlent (et leurs anims talk). Agent Histoire, 2026-10-06.
+  computeBox() {
+    const parent = this.parentKey && this.scene.get(this.parentKey);
+    const p = parent && parent.player;
+    const cam = parent && parent.cameras && parent.cameras.main;
+    if (!p || !cam || !p.active) return { ...DIALOGUE_BOX };
+    const feetScreenY = (p.y - cam.worldView.y) * cam.zoom;
+    const hidden = feetScreenY > DIALOGUE_BOX.y + 10 && feetScreenY - 90 < DIALOGUE_BOX.y + DIALOGUE_BOX.h;
+    return hidden ? { ...DIALOGUE_BOX, y: 34, top: true } : { ...DIALOGUE_BOX };
+  }
+
   onKey(event) {
     if (event.repeat || this.time.now - this.openedAt < DIALOGUE_OPEN_GUARD_MS) return;
     const k = event.key.toLowerCase();
@@ -81,7 +95,7 @@ class DialogueScene extends Phaser.Scene {
     const speaker = SPEAKERS[who] || { name: who, color: 0xa99bd6 };
     const name = line.name !== undefined ? line.name : speaker.name;
     const narrator = who === 'narrateur';
-    const B = DIALOGUE_BOX;
+    const B = this.box || DIALOGUE_BOX;
     storyDialogueLinePose(this.scene.get(this.parentKey), line);
 
     this.drawPortrait(narrator ? null : (line.portrait || who), speaker.initial || name, speaker.color);
@@ -114,7 +128,7 @@ class DialogueScene extends Phaser.Scene {
   drawPortrait(portraitId, name, color) {
     this.portraitLayer.removeAll(true);
     if (!portraitId) return;
-    const B = DIALOGUE_BOX;
+    const B = this.box || DIALOGUE_BOX;
     const size = DIALOGUE_PORTRAIT_SIZE;
     const cx = B.x + 28 + size / 2;
     const cy = B.y + B.h / 2;
@@ -151,7 +165,7 @@ class DialogueScene extends Phaser.Scene {
     this.namePlate.clear();
     this.nameText.setText(name);
     if (!name) return;
-    const B = DIALOGUE_BOX;
+    const B = this.box || DIALOGUE_BOX;
     const x = B.x + 24;
     const y = B.y - 12;
     const w = this.nameText.width + 28;
@@ -175,12 +189,12 @@ class DialogueScene extends Phaser.Scene {
   }
 
   showChoices(choices) {
-    const B = DIALOGUE_BOX;
+    const B = this.box || DIALOGUE_BOX;
     const w = 330;
     const rowH = 32;
     const h = choices.length * rowH + 18;
     const x = B.x + B.w - w - 10;
-    const y = B.y - h - 22;
+    const y = B.top ? B.y + B.h + 22 : B.y - h - 22;
     const g = this.add.graphics();
     drawStoryPanel(g, x, y, w, h, { vines: false });
     this.choiceLayer.add(g);

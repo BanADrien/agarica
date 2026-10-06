@@ -1,0 +1,24 @@
+[transfo_singe] découpe de 1 image(s)
+  rangée 0 transform: 4 frame(s) [OK]
+  canvas uniforme 352x431 -> assets/sprites/transfo_singe_frames
+[kainati] découpe de 2 image(s)
+  AVERTISSEMENT: kainati rangée 1 (throw_stone) : 3 silhouette(s) détectée(s) pour 4 frame(s) attendue(s) (frames qui se touchent ?)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 throw_stone: 3 frame(s) [ATTENDU 4]
+  rangée 2 swing_vine: 4 frame(s) [OK]
+  rangée 3 leap: 4 frame(s) [OK]
+  canvas uniforme 811x496 -> assets/sprites/kainati_frames
+
+================ RAPPORT ================
+Découpés maintenant (2) : transfo_singe, kainati
+Déjà présents (7) : agarica_extra, singe, xara_extra, pere_chef, amanite, galter, morgat
+Source manquante (à générer) (69) : habitant_druide, habitant_porteur, habitant_garde, clak, papillon, cochon_bebe, poisson, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_impact_pierre, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_galter, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_galter, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+
+Images partielles manquantes :
+  agarica_extra: assets/sprites/agarica_extra_p3.png, assets/sprites/agarica_extra_p4.png
+  kainati: assets/sprites/kainati_p3.png, assets/sprites/kainati_p4.png
+
+1 avertissement(s) :
+  - kainati rangée 1 (throw_stone) : 3 silhouette(s) détectée(s) pour 4 frame(s) attendue(s) (frames qui se touchent ?)
+
+asset_present.js : 152 fichier(s) présent(s).

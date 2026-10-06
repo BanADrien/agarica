@@ -88,6 +88,7 @@ function kainatiFlipFor(id, lookRight) {
 // Sprite manifest ; sans entrée au manifest, addManifestSprite donnerait un
 // carré générique 40 px : on le remplace par un placeholder à la bonne taille.
 function addKainatiSprite(scene, x, y, id, color, label) {
+  if (id === 'kainati') patchKainatiThrowAnim(scene);
   const sprite = addManifestSprite(scene, x, y, id, 'idle');
   if (!kainatiManifestDef(id)) {
     const key = ensurePlaceholderTexture(scene, `ph-local-${id}`,
@@ -95,6 +96,33 @@ function addKainatiSprite(scene, x, y, id, color, label) {
     sprite.setTexture(key).setScale(1);
   }
   return sprite;
+}
+
+// Planche Codex actuelle (avertissement d'import) : la rangée throw_stone n'a
+// que 3 frames au lieu de 4, et la frame du milieu contient DEUX silhouettes
+// collées (prise d'élan + lancer). Tant que la planche n'est pas refaite, on
+// ne garde que la 1re (pierre en main) et la dernière (bras tendu) : le geste
+// reste lisible. Dès que les 4 frames existent, rien n'est modifié.
+function patchKainatiThrowAnim(scene) {
+  const def = kainatiManifestDef('kainati');
+  const a = def && def.anims && def.anims.throw_stone;
+  if (!a || typeof manifestFrameKey !== 'function') return;
+  const present = [];
+  for (let i = 0; i < a.frames; i++) {
+    if (scene.textures.exists(manifestFrameKey('kainati', 'throw_stone', i))) present.push(i);
+  }
+  if (present.length !== a.frames - 1 || present.length < 3) return;
+  const key = 'kainati-throw_stone';
+  const wanted = [present[0], present[present.length - 1]];
+  const cur = scene.anims.get(key);
+  if (cur && cur.frames.length === wanted.length) return;
+  if (cur) scene.anims.remove(key);
+  scene.anims.create({
+    key,
+    frames: wanted.map((i) => ({ key: manifestFrameKey('kainati', 'throw_stone', i) })),
+    frameRate: Math.max(4, Math.round((a.fps || 10) / 2)),
+    repeat: a.repeat ?? 0,
+  });
 }
 
 function ensureKainatiStoneTexture(scene) {

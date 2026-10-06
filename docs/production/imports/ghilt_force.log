@@ -1,0 +1,18 @@
+[ghilt] découpe de 4 image(s)
+  rangée 0 idle: 3 frame(s) [OK]
+  rangée 1 walk: 3 frame(s) [OK]
+  rangée 2 charge: 3 frame(s) [OK]
+  rangée 3 toxic_breath: 3 frame(s) [OK]
+  rangée 4 spit: 3 frame(s) [OK]
+  rangée 5 roar: 3 frame(s) [OK]
+  rangée 6 hit: 3 frame(s) [OK]
+  rangée 7 weakened: 3 frame(s) [OK]
+  canvas uniforme 484x430 -> assets/sprites/ghilt_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : ghilt
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 212 fichier(s) présent(s).

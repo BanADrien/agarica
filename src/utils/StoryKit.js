@@ -107,17 +107,31 @@ function manifestInitialTexture(scene, id, anim) {
   return scene.textures.exists(key) ? key : manifestPlaceholderKey(scene, id);
 }
 
+// Frames présentes d'une anim du manifest (liste vide si la rangée manque).
+function manifestAnimFrames(scene, id, anim) {
+  const a = ((getAssetManifest()[id] || {}).anims || {})[anim];
+  const frames = [];
+  for (let i = 0; a && i < a.frames; i++) {
+    const key = manifestFrameKey(id, anim, i);
+    if (scene.textures.exists(key)) frames.push({ key });
+  }
+  return frames;
+}
+
 function ensureManifestAnims(scene, id) {
   const def = getAssetManifest()[id];
   if (!def) return;
+  // Art partiel (ex. Kainati : rangées 0-3 livrées, hit/defeated pas encore) :
+  // une rangée manquante rejoue l'idle (ou la 1re rangée livrée) plutôt que de
+  // faire clignoter le rectangle placeholder au milieu du vrai art.
+  const animNames = Object.keys(def.anims || {});
+  const fallbackAnim = ['idle', ...animNames].find((n) => manifestAnimFrames(scene, id, n).length > 0);
+  const fallbackFrames = fallbackAnim ? manifestAnimFrames(scene, id, fallbackAnim) : [];
   for (const [anim, a] of Object.entries(def.anims || {})) {
     const animKey = `${id}-${anim}`;
     if (scene.anims.exists(animKey)) continue;
-    const frames = [];
-    for (let i = 0; i < a.frames; i++) {
-      const key = manifestFrameKey(id, anim, i);
-      if (scene.textures.exists(key)) frames.push({ key });
-    }
+    let frames = manifestAnimFrames(scene, id, anim);
+    if (frames.length === 0) frames = fallbackFrames.slice();
     if (frames.length === 0) frames.push({ key: manifestPlaceholderKey(scene, id) });
     scene.anims.create({ key: animKey, frames, frameRate: a.fps || 8, repeat: a.repeat ?? -1 });
   }
@@ -129,6 +143,9 @@ function attachPlayManifest(sprite, id) {
     const key = `${id}-${anim}`;
     if (!this.scene || !this.scene.anims.exists(key)) return this;
     this.currentManifestAnim = anim;
+    // Sortie d'une pose de repos figée (cf. storyNpcRest).
+    this.__restPaused = false;
+    if (this.anims && this.anims.isPaused) this.anims.resume();
     return this.play(key, ignoreIfPlaying);
   };
   return sprite;
@@ -769,7 +786,7 @@ function hideBossBar(scene) {
 // ---------------------------------------------------------------------------
 // Gel du monde (dialogue, cinématique, menus)
 // ---------------------------------------------------------------------------
-const WORLD_FREEZING_SCENES = ['DialogueScene', 'InventoryScene', 'MapScene', 'CampfireMenuScene'];
+const WORLD_FREEZING_SCENES = ['DialogueScene', 'InventoryScene', 'MapScene', 'CampfireMenuScene', 'PauseScene'];
 
 function isWorldFrozen(scene) {
   if (!scene || !scene.scene) return false;
@@ -848,9 +865,76 @@ function setPlayerStoryPose(scene, anim) {
 function storyDialogueLinePose(scene, line) {
   const p = scene && scene.player;
   if (!p || !line) return;
+  storySpeakerTalkAnim(scene, line);
   if (line.pose !== undefined) setPlayerStoryPose(scene, line.pose);
   else if (line.who === 'agarica' && (!p.storyPose || p.storyPose === 'talk')) setPlayerStoryPose(scene, 'talk');
   else if (p.storyPose === 'talk') setPlayerStoryPose(scene, null);
+}
+
+// PNJ qui parle (agent Histoire, 2026-10-06) : pendant la réplique d'un PNJ
+// (`line.who` = clé de scene.npcs, ou id de manifest du PNJ, ou `line.npc`),
+// il passe de `idle` à son anim `talk` du manifest, puis revient à `idle` dès
+// qu'un autre parle. Une anim posée par la cinématique (brew, run_idol, talk
+// explicite…) n'est jamais écrasée : seul l'idle est remplacé. Xara compagnon
+// (scene.xara, monde gelé pendant le dialogue) joue `xara_extra.talk`.
+function storyFindSpeakerNpc(scene, line) {
+  const npcs = scene.npcs || {};
+  const key = line.npc || line.who;
+  if (!key) return null;
+  if (npcs[key] && npcs[key].active) return npcs[key];
+  return Object.values(npcs).find((n) => n && n.active && n.manifestId === key) || null;
+}
+
+// Pose de repos d'un PNJ : `idle` du manifest, sinon (Xara : talk/excited/
+// mysterious seulement) la 1re frame de `talk`, figée.
+function storyNpcRest(npc) {
+  if (!npc || !npc.active || !npc.playManifest) return;
+  const def = getAssetManifest()[npc.manifestId] || {};
+  npc.__restPaused = false;
+  if (def.anims && def.anims.idle) { npc.playManifest('idle'); return; }
+  if (def.anims && def.anims.talk && hasManifestArt(npc.scene, npc.manifestId, 'talk')) {
+    npc.playManifest('talk', false);
+    npc.anims.pause();
+    npc.__restPaused = true;
+  }
+}
+
+function storyStopSpeakerTalk(scene, except) {
+  for (const n of Object.values(scene.npcs || {})) {
+    if (n && n !== except && n.__autoTalk) {
+      n.__autoTalk = false;
+      if (n.active && n.currentManifestAnim === 'talk') storyNpcRest(n);
+    }
+  }
+  const x = scene.xara;
+  if (x && x !== except && x.__autoTalk) {
+    x.__autoTalk = false;
+    if (x.active) {
+      x.anims.stop();
+      x.setScale(x.__autoTalkScale || x.scaleX);
+      if (x.__autoTalkTexture && x.scene.textures.exists(x.__autoTalkTexture)) x.setTexture(x.__autoTalkTexture);
+    }
+  }
+}
+
+function storySpeakerTalkAnim(scene, line) {
+  if (!scene) return;
+  const npc = line && line.who !== 'agarica' && line.who !== 'narrateur' ? storyFindSpeakerNpc(scene, line) : null;
+  const companion = !npc && line && line.who === 'xara' && scene.xara && scene.xara.active ? scene.xara : null;
+  storyStopSpeakerTalk(scene, npc || companion);
+  if (npc && npc.playManifest && hasManifestArt(scene, npc.manifestId, 'talk')
+    && (!npc.currentManifestAnim || npc.currentManifestAnim === 'idle' || npc.__restPaused)) {
+    npc.__restPaused = false;
+    npc.playManifest('talk', false);
+    npc.__autoTalk = true;
+  } else if (companion && !companion.__autoTalk && hasManifestArt(scene, 'xara_extra', 'talk')) {
+    ensureManifestAnims(scene, 'xara_extra');
+    companion.__autoTalkScale = companion.scaleX;
+    companion.__autoTalkTexture = companion.texture && companion.texture.key;
+    companion.setScale((getAssetManifest().xara_extra || {}).scale || companion.scaleX);
+    companion.play('xara_extra-talk');
+    companion.__autoTalk = true;
+  }
 }
 
 let storyDialogueChain = Promise.resolve();
@@ -872,6 +956,7 @@ function showDialogue(scene, linesOrId) {
       parentKey: scene.scene.key,
       onDone: (result) => {
         if (scene.player && scene.player.storyPose === 'talk') setPlayerStoryPose(scene, null);
+        storyStopSpeakerTalk(scene, null);
         scene.__storyFreeze = Math.max(0, (scene.__storyFreeze || 0) - 1);
         releaseStoryInput(scene);
         resolve(result);
@@ -1193,6 +1278,33 @@ function storyGroundY(scene, x, fallbackY = 448) {
   return y == null ? fallbackY : y;
 }
 
+// Où POSER LES PIEDS d'un PNJ en x (agent Histoire, 2026-10-06) : haut du
+// CORPS physique de la tuile (les tuiles d'herbe ont une hitbox aux 3/4, son
+// haut est 16 px sous le haut de l'image — c'est là que se tient Agarica), et
+// seulement une tuile à découvert (pas une tuile de sol cachée sous une
+// marche/souche, que storyGroundY choisissait quand elle était plus proche de
+// `refY`). Parmi les surfaces à découvert, la plus proche de `refY`.
+function storyStandY(scene, x, refY = 448) {
+  const group = scene.ground;
+  if (!group) return storyGroundY(scene, x, refY);
+  const tiles = [];
+  group.children.iterate((t) => {
+    if (!t || !t.active) return;
+    const half = t.displayWidth / 2;
+    if (x >= t.x - half && x <= t.x + half) tiles.push(t);
+  });
+  if (!tiles.length) return refY;
+  const covered = (t) => tiles.some((o) => o !== t && Math.abs(o.y + o.displayHeight / 2 - (t.y - t.displayHeight / 2)) < 2);
+  const open = tiles.filter((t) => !covered(t));
+  const pool = open.length ? open : tiles;
+  let best = null;
+  for (const t of pool) {
+    const top = t.body ? t.body.top : t.y - t.displayHeight / 2;
+    if (best === null || Math.abs(top - refY) < Math.abs(best - refY)) best = top;
+  }
+  return best;
+}
+
 // Place `obj` juste sous le joueur dans la liste d'affichage (PNJ, objets).
 function storyPutBehindPlayer(scene, obj) {
   if (scene.player && scene.children.moveBelow) scene.children.moveBelow(obj, scene.player);
@@ -1212,7 +1324,7 @@ function ensureStoryPrompt(scene) {
 // Crée un PNJ (données `npcs` ou étape `npcAdd`) dans scene.npcs[key || id].
 function createStoryNpc(scene, n) {
   const key = n.key || n.id;
-  const y = n.y != null ? n.y : storyGroundY(scene, n.x);
+  const y = n.y != null ? n.y : storyStandY(scene, n.x);
   const npc = addManifestSprite(scene, n.x, y, n.sprite || n.id, n.anim || 'idle');
   npc.npcKey = key;
   npc.talk = n.talk || null;
@@ -1521,7 +1633,40 @@ function openMossWall(scene, wall) {
   showToast(scene, 'La mousse se dissout en sifflant…', 1800);
 }
 
+// Anti-traversée des murs/amas de mousse (agent Histoire, 2026-10-06) : en
+// passant humain → loup collé à un mur, le corps du loup (plus long, décalé
+// vers l'avant) apparaît DANS le mur ; Arcade ne sépare plus un corps déjà
+// enfoncé et le loup traversait le mur (poche secrète et hutte de Morgat
+// atteintes sans répulsif). On mémorise le côté du joueur tant qu'il ne
+// touche pas le mur, et on le ressort de ce côté-là s'il se retrouve dedans.
+function guardStoryMossOverlap(scene) {
+  const p = scene.player;
+  const pb = p && p.body;
+  if (!pb) return;
+  const solids = [
+    ...scene.__story.mossWalls.filter((w) => !w.open),
+    ...scene.__story.mossBlocks.filter((m) => !m.destroyed),
+  ];
+  for (const m of solids) {
+    const left = m.x - m.w / 2;
+    const right = m.x + m.w / 2;
+    const top = m.y - m.h / 2;
+    const bottom = m.y + m.h / 2;
+    const inside = pb.right > left + 1 && pb.left < right - 1 && pb.bottom > top + 1 && pb.top < bottom - 1;
+    if (!inside) {
+      if (pb.bottom > top + 1 && pb.top < bottom - 1) m.__playerSide = p.x < m.x ? -1 : 1;
+      continue;
+    }
+    const side = m.__playerSide || (p.x < m.x ? -1 : 1);
+    const dx = side < 0 ? left - pb.right - 1 : right - pb.left + 1;
+    p.x += dx;
+    pb.x += dx;
+    if (Math.sign(pb.velocity.x) === -side) pb.setVelocityX(0);
+  }
+}
+
 function updateStoryMossBlocks(scene) {
+  guardStoryMossOverlap(scene);
   const player = scene.player;
   const hitbox = player.getSkillHitbox && player.getSkillHitbox();
   if (!hitbox || player.activeSkillId !== 'ours') return;
@@ -1565,7 +1710,13 @@ function updateStoryFall(scene) {
   const st = scene.__story;
   const fall = st.fall;
   // Dernier appui sûr (pas le bas du monde, pas déjà sous la ligne de chute).
-  const onGround = player.body.blocked.down || player.body.touching.down;
+  // `blocked.down` SEUL (correctif FF1) : `touching.down` est aussi levé par
+  // un simple overlap (corbeau en piqué, ennemi...) -- le point sûr était
+  // alors pris en plein vide, et chaque chute y ramenait Agarica, qui
+  // retombait aussitôt (un cœur perdu par boucle jusqu'à la mort). Tous les
+  // appuis réels (sol, plateformes, murs de mousse) sont statiques et lèvent
+  // `blocked.down`.
+  const onGround = player.body.blocked.down;
   const atWorldBottom = player.body.bottom >= scene.physics.world.bounds.bottom - 1;
   if (onGround && !atWorldBottom && (!fall || player.y < fall.y - 40)) st.safePos = { x: player.x, y: player.y };
   // Le bas du monde physique vaut `levelHeight` (540) : posé dessus, le joueur

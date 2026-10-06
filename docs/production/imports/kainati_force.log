@@ -1,0 +1,17 @@
+[kainati] découpe de 4 image(s)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 throw_stone: 4 frame(s) [OK]
+  rangée 2 swing_vine: 4 frame(s) [OK]
+  rangée 3 leap: 4 frame(s) [OK]
+  rangée 4 land_stomp: 4 frame(s) [OK]
+  rangée 5 hit: 3 frame(s) [OK]
+  rangée 6 defeated_lucid: 4 frame(s) [OK]
+  canvas uniforme 388x396 -> assets/sprites/kainati_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : kainati
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 180 fichier(s) présent(s).

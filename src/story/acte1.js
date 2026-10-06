@@ -174,7 +174,6 @@ CUTSCENES.bosquet_aide_fin = [
 
 CUTSCENES.bosquet_talisman = [
   { npcFace: { npc: 'pere_chef', dir: 'player' } },
-  { npcAnim: { npc: 'pere_chef', anim: 'talk' } },
   { say: [
     { who: 'pere_chef', text: 'Agarica. Orme m\'a dit que tu l\'avais aidé. Et qu\'une bête est sortie de l\'amas.' },
     { who: 'agarica', text: 'Elle repousse partout, Père. On gratte, on brûle… et la nuit suivante, tout recommence.' },
@@ -360,7 +359,7 @@ function acte1BosquetAfterJudgement(scene) {
   };
   add('pere', 'bosquet_pere_adieu');
   add('orme_juge', 'bosquet_orme_adieu');
-  if (scene.npcs.garde_juge) scene.npcs.garde_juge.setX(3560).setY(storyGroundY(scene, 3560));
+  if (scene.npcs.garde_juge) scene.npcs.garde_juge.setX(3560).setY(storyStandY(scene, 3560));
 }
 
 ZONE_SCRIPTS.bosquet = {
@@ -469,7 +468,9 @@ CUTSCENES.fs1_rencontre = [
   { playerPose: null },
   { playerMove: { toX: FS1_XARA_X - 110 } },
   { npcFace: { npc: 'xara', dir: 'player' } },
-  { npcAnim: { npc: 'xara', anim: 'talk' } },
+  // Xara n'a pas d'idle : pose de repos (talk figée), la parole est jouée
+  // réplique par réplique par StoryKit (storySpeakerTalkAnim).
+  { call: (scene) => storyNpcRest(scene.npcs.xara) },
   { say: [
     { who: 'agarica', text: 'Qui… qui parle ?' },
     { who: 'xara', name: '???', text: 'Ici. Sur la souche. Non, un peu plus à droite… Voilà. Bonsoir.' },
@@ -638,6 +639,9 @@ ZONE_SCRIPTS.foret_sombre_1 = {
   create(scene) {
     const st = { amasDone: !!storyGet('moss_foret_sombre_1_amas_racines'), nextRefill: 0 };
     scene.__acte1 = st;
+    // Xara assise SUR la souche décorative : les props sont ajoutés après les
+    // PNJ, la souche la masquait.
+    if (scene.npcs && scene.npcs.xara) scene.npcs.xara.setDepth(1);
     acte1DrawMossDecor(scene, [
       [2690, 70, 22], [2810, 170, 20], [2730, 240, 16],
       [2980, 448, 30], [3150, 448, 24], [3420, 448, 34], [3700, 448, 22],

@@ -249,7 +249,6 @@ CUTSCENES.galter_rencontre = (scene) => {
   return [
     { npcMove: { npc: 'galter', toX: gx, speed: 260 } },
     { npcFace: { npc: 'galter', dir: 'player' } },
-    { npcAnim: { npc: 'galter', anim: 'talk' } },
     { playerFace: 'right' },
     { shake: { ms: 200, intensity: 0.004 } },
     { say: 'galter_rencontre' },
@@ -667,7 +666,6 @@ CUTSCENES.amanite_rencontre = (scene) => {
     // Coup de lance sur la bête corrompue : la méthode d'Amanite, sous nos yeux.
     { call: (sc) => a2AmaniteStrike(sc, st) },
     { npcFace: { npc: 'amanite', dir: 'player' } },
-    { npcAnim: { npc: 'amanite', anim: 'talk' } },
     { say: 'amanite_rencontre' },
     { call: (sc) => a2AmaniteLeaves(sc) },
     { say: 'amanite_apres' },
@@ -1056,7 +1054,6 @@ CUTSCENES.hutte_pas_encore = [{ say: 'hutte_pas_encore' }, { playerMove: { toX: 
 CUTSCENES.morgat_rencontre = (scene) => {
   const steps = [
     { npcFace: { npc: 'morgat', dir: 'player' } },
-    { npcAnim: { npc: 'morgat', anim: 'talk' } },
     { say: 'morgat_accueil' },
   ];
   if (!inventoryHas('fleur_resistante')) {
@@ -1067,7 +1064,8 @@ CUTSCENES.morgat_rencontre = (scene) => {
     { take: 'fleur_resistante' },
     { npcAnim: { npc: 'morgat', anim: 'brew' } },
     { call: (sc) => a2MorgatBrew(sc) },
-    { npcAnim: { npc: 'morgat', anim: 'talk' } },
+    // Retour à l'idle : la parole (talk) est jouée réplique par réplique par StoryKit.
+    { npcAnim: { npc: 'morgat', anim: 'idle' } },
     { say: 'morgat_repulsif' },
     { give: 'repulsif' },
     { say: 'morgat_antidote' },
@@ -1690,8 +1688,10 @@ Object.assign(DIALOGUES, {
 
 CUTSCENES.bosquet_retour = [
   { wait: 400 },
-  { npcAdd: { id: 'galter', x: 20 } },
-  { npcAdd: { id: 'clak', x: -30 } },
+  // y explicite : hors du sol (x < 64), le PNJ restait posé à 448 (16 px
+  // au-dessus de l'herbe, haut de la hitbox des tuiles = 464).
+  { npcAdd: { id: 'galter', x: 20, y: 464 } },
+  { npcAdd: { id: 'clak', x: -30, y: 464 } },
   { parallel: [
     { playerMove: { toX: 560, speed: 150 } },
     { npcMove: { npc: 'galter', toX: 470, speed: 150 } },
@@ -1699,7 +1699,6 @@ CUTSCENES.bosquet_retour = [
   ] },
   { playerFace: 'right' },
   { camera: { x: 1260, y: 270, ms: 1200 } },
-  { npcAnim: { npc: 'amanite', anim: 'talk' } },
   { say: 'br_acclamations' },
   { npcAnim: { npc: 'amanite', anim: 'idle' } },
   { cameraFollow: true },

@@ -1,0 +1,20 @@
+[agarica_extra] découpe de 4 image(s)
+  rangée 0 jump_rise: 3 frame(s) [OK]
+  rangée 1 jump_fall: 3 frame(s) [OK]
+  rangée 2 hurt: 3 frame(s) [OK]
+  rangée 3 death: 4 frame(s) [OK]
+  rangée 4 talk: 4 frame(s) [OK]
+  rangée 5 sad: 4 frame(s) [OK]
+  rangée 6 liane_hang: 3 frame(s) [OK]
+  rangée 7 liane_swing: 4 frame(s) [OK]
+  rangée 8 cast: 5 frame(s) [OK]
+  rangée 9 receive_item: 4 frame(s) [OK]
+  canvas uniforme 328x346 -> assets/sprites/agarica_extra_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : agarica_extra
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 168 fichier(s) présent(s).

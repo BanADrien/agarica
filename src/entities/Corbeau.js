@@ -40,6 +40,11 @@ class Corbeau extends Phaser.Physics.Arcade.Sprite {
     // du sol au lieu de s'enfoncer dedans.
     this.diveDepth = diveDepth;
     this.diveCooldown = 1500;
+    // Option de zone `diveGroundedOnly` : ne pique que sur une Agarica posée.
+    // Au-dessus du vide (forêt flottante 1), un coup reçu en plein saut
+    // annule l'élan (hitByEnemy) et fait tomber dans le vide : deux cœurs
+    // pour une seule erreur -- c'est ce qui rendait les corbeaux injustes.
+    this.diveGroundedOnly = false;
     this.lastDiveEndTime = -Infinity;
     // L'art fait face à droite par défaut (comme le Loup) : flip quand on
     // va vers la gauche.
@@ -80,7 +85,8 @@ class Corbeau extends Phaser.Physics.Arcade.Sprite {
       this.setFlipX(this.direction < 0);
 
       const underPlayer = Math.abs(player.x - this.x) < this.diveTriggerRangeX;
-      if (underPlayer && now - this.lastDiveEndTime > this.diveCooldown) {
+      const targetOk = !this.diveGroundedOnly || (player.body && player.body.blocked.down);
+      if (underPlayer && targetOk && now - this.lastDiveEndTime > this.diveCooldown) {
         this.isDiving = true;
         this.setVelocityX(0);
       }
@@ -111,6 +117,7 @@ if (typeof ENEMY_REGISTRY !== 'undefined') {
     // Réglages optionnels par zone (corbeaux plus doux, ex. forêt flottante 1).
     if (e.diveCooldown != null) c.diveCooldown = e.diveCooldown;
     if (e.diveSpeed != null) c.diveSpeed = e.diveSpeed;
+    if (e.diveGroundedOnly) c.diveGroundedOnly = true;
     return c;
   };
 }

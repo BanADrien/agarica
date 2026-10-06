@@ -1,0 +1,44 @@
+[
+  {
+    "source": "assets/sprites/kainati_esprit.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      89
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          328,
+          327,
+          329,
+          322
+        ],
+        "horizontal_gaps": [
+          58,
+          50,
+          60
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          368,
+          388,
+          360,
+          389
+        ],
+        "horizontal_gaps": [
+          150,
+          79,
+          49
+        ]
+      }
+    ]
+  }
+]

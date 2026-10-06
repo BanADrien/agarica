@@ -1,0 +1,12 @@
+[ghilt_gueri] découpe de 1 image(s)
+  rangée 0 idle: 3 frame(s) [OK]
+  rangée 1 collapse: 3 frame(s) [OK]
+  canvas uniforme 460x342 -> assets/sprites/ghilt_gueri_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : ghilt_gueri
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 218 fichier(s) présent(s).
