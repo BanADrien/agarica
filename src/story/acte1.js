@@ -182,9 +182,12 @@ CUTSCENES.bosquet_talisman = [
   ] },
   { npcAnim: { npc: 'pere_chef', anim: 'give_talisman' } },
   { wait: 500 },
+  // Pose `receive_item` (art Codex agarica_extra) le temps de recevoir l'objet.
+  { playerPose: 'receive_item' },
   { give: 'talisman_ours' },
   { set: { talismanOurs: true } },
   { wait: 1400 },
+  { playerPose: null },
   { npcAnim: { npc: 'pere_chef', anim: 'idle' } },
   { say: [
     { who: 'agarica', text: 'Le talisman de l\'ours ? Mais… il veille sur les chefs du bosquet depuis toujours !' },
@@ -208,11 +211,15 @@ DIALOGUES.bosquet_vol_supplier = [
 ];
 
 CUTSCENES.bosquet_vol = [
-  { call: (scene) => { if (!scene.npcs.amanite) createStoryNpc(scene, { id: 'amanite', x: BOSQUET_IDOLE.x - 40, y: 320, lookAtPlayer: false }); } },
+  { call: (scene) => { if (!scene.npcs.amanite) createStoryNpc(scene, { id: 'amanite', x: BOSQUET_IDOLE.x - 55, y: 336, lookAtPlayer: false }); } },
   { camera: { x: 3360, y: 300, ms: 900 } },
   { say: [
     'Au sanctuaire, une silhouette rouge se penche sur l\'autel.',
     { who: 'agarica', text: 'Amanite ?! Qu\'est-ce que tu fais là ?' },
+  ] },
+  // Surprise, elle se retourne vers Agarica (elle faisait face à l'autel).
+  { npcFace: { npc: 'amanite', dir: 'player' } },
+  { say: [
     { who: 'amanite', text: 'Agarica… Chut ! Ne crie pas, je t\'en prie.' },
   ] },
   { call: (scene) => acte1BosquetTakeIdol(scene) },
@@ -537,9 +544,11 @@ CUTSCENES.fs1_talisman = [
     { who: 'agarica', text: 'Tu en as déjà vu d\'autres ?' },
     { who: 'xara', text: '… Écoute-le plutôt. Il a quelque chose à te dire.' },
   ] },
+  { playerPose: 'cast' },
   { skill: 'ours' },
   { call: (scene) => acte1FillEnergy(scene) },
   { wait: 1200 },
+  { playerPose: null },
   { say: [
     { who: 'agarica', text: 'Je sens une force immense… comme si un ours se dressait derrière moi.' },
     { who: 'agarica', text: '« Il te le dira lui-même, le jour venu. » Père… tu savais.' },

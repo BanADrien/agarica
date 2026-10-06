@@ -289,9 +289,9 @@ const ASSET_MANIFEST = {
       hit: { row: 5, frames: 3, fps: 12, repeat: 0 },
       defeated_lucid: { row: 6, frames: 4, fps: 5, repeat: 0 },
     },
-    scale: 0.46,
+    scale: 0.6,
     facing: "right",
-    placeholder: { w: 175, h: 205, color: 0xe8e8e8, label: "Kainati" },
+    placeholder: { w: 195, h: 210, color: 0xe8e8e8, label: "Kainati" },
     sheets: [
       { file: "assets/sprites/kainati.png", rows: [0, 1] },
       { file: "assets/sprites/kainati_p2.png", rows: [2, 3] },
@@ -307,9 +307,9 @@ const ASSET_MANIFEST = {
       idle: { row: 0, frames: 4, fps: 6, repeat: -1 },
       swing: { row: 1, frames: 4, fps: 8, repeat: -1 },
     },
-    scale: 0.46,
+    scale: 0.6,
     facing: "right",
-    placeholder: { w: 175, h: 205, color: 0x9ff0e0, label: "Esprit Kainati" },
+    placeholder: { w: 195, h: 210, color: 0x9ff0e0, label: "Esprit Kainati" },
     sheets: [
       { file: "assets/sprites/kainati_esprit.png", rows: [0, 1] },
     ],

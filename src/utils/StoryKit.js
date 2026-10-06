@@ -909,11 +909,8 @@ function storyStopSpeakerTalk(scene, except) {
   const x = scene.xara;
   if (x && x !== except && x.__autoTalk) {
     x.__autoTalk = false;
-    if (x.active) {
-      x.anims.stop();
-      x.setScale(x.__autoTalkScale || x.scaleX);
-      if (x.__autoTalkTexture && x.scene.textures.exists(x.__autoTalkTexture)) x.setTexture(x.__autoTalkTexture);
-    }
+    if (x.__talkSprite) { x.__talkSprite.destroy(); x.__talkSprite = null; }
+    if (x.active) x.setVisible(true);
   }
 }
 
@@ -928,11 +925,14 @@ function storySpeakerTalkAnim(scene, line) {
     npc.playManifest('talk', false);
     npc.__autoTalk = true;
   } else if (companion && !companion.__autoTalk && hasManifestArt(scene, 'xara_extra', 'talk')) {
-    ensureManifestAnims(scene, 'xara_extra');
-    companion.__autoTalkScale = companion.scaleX;
-    companion.__autoTalkTexture = companion.texture && companion.texture.key;
-    companion.setScale((getAssetManifest().xara_extra || {}).scale || companion.scaleX);
-    companion.play('xara_extra-talk');
+    // Sprite de parole posé PAR-DESSUS le compagnon (caché le temps de la
+    // réplique) : changer la texture/l'échelle du compagnon lui-même modifiait
+    // son corps physique, qui s'enfonçait dans le sol et la faisait tomber.
+    const t = addManifestSprite(scene, companion.x, companion.y, 'xara_extra', 'talk');
+    t.setFlipX(companion.flipX).setDepth(companion.depth).setRotation(companion.rotation);
+    if (scene.children.moveAbove) scene.children.moveAbove(t, companion);
+    companion.__talkSprite = t;
+    companion.setVisible(false);
     companion.__autoTalk = true;
   }
 }

@@ -680,6 +680,12 @@ async function ghiltSoin(scene, st) {
   ghAnim(amanite, 'idle');
   // Elle se tourne vers Agarica pour lui parler ; enregistrée dans scene.npcs
   // pour que StoryKit joue son anim `talk` pendant ses répliques.
+  // Agarica se tenait souvent pile sur le point de frappe : Amanite recule d'un
+  // pas côté Ghil't pour ne pas se superposer à elle pendant la discussion.
+  if (Math.abs(amanite.x - player.x) < 80) {
+    const side = bx >= player.x ? 1 : -1;
+    await ghTween(scene, { targets: amanite, x: player.x + side * 90, duration: 300 });
+  }
   amanite.setFlipX(player.x < amanite.x);
   scene.npcs = scene.npcs || {};
   scene.npcs.amanite = amanite;
@@ -802,8 +808,11 @@ async function trouSequence(scene, exits) {
   jar.destroy();
   jarGlow.destroy();
   porters.forEach((p) => ghPapillonRemove(scene, p));
+  // Poses narratives d'Agarica (art Codex agarica_extra, sans effet sans art).
+  if (typeof setPlayerStoryPose === 'function') setPlayerStoryPose(scene, 'receive_item');
   await Promise.resolve(ghInvAdd(scene, 'bocal_antidote'));
   await ghWait(scene, 1600);
+  if (typeof setPlayerStoryPose === 'function') setPlayerStoryPose(scene, null);
 
   await ghSay(scene, 'trou_totem');
 
@@ -812,6 +821,7 @@ async function trouSequence(scene, exits) {
   const iy = player.y - 130;
   const totem = ghBigItem(scene, ix, iy, 'totem_poche_casse').setAlpha(0);
   const bottle = ghBigItem(scene, ix + 26, iy - 40, 'bocal_antidote').setAlpha(0).setAngle(-60);
+  if (typeof setPlayerStoryPose === 'function') setPlayerStoryPose(scene, 'cast');
   await ghTween(scene, { targets: [totem, bottle], alpha: 1, duration: 500 });
   for (let i = 0; i < 9; i++) {
     const d = scene.add.circle(ix + 10, iy - 30, 3, 0x9fffd6).setDepth(GH_GLOW_DEPTH + 3);
@@ -840,6 +850,7 @@ async function trouSequence(scene, exits) {
   await ghWait(scene, 1500);
   await Promise.resolve(ghUnlockSkill(scene, 'papillon'));
   await ghWait(scene, 1800);
+  if (typeof setPlayerStoryPose === 'function') setPlayerStoryPose(scene, null);
   ghSet(scene, 'trouSombreFait', true);
   await ghTween(scene, {
     targets: [active, activeGlow], x: player.x, y: player.y - 40, alpha: 0, duration: 600,

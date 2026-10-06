@@ -121,6 +121,74 @@ Toutes les scènes se chargent sans erreur JS : titre, anciennes zones, toutes l
 - Pour reprendre : `git switch wip/correctifs-moteur`, vérifier et tester, puis fusionner.
 - Les 8 points de la liste plus haut restent ouverts, sauf la mise à jour de CLAUDE.md, qui est faite.
 
+## Vérification de l'histoire (2026-10-06) — agent Histoire & art
+
+### Méthode
+- La démo a été jouée **du titre à l'écran de fin** par un robot (Edge sans fenêtre), en 10 tronçons enchaînés. Chaque tronçon repart de la sauvegarde du précédent via **« Continuer »** sur l'écran-titre : la reprise a donc été vérifiée à 10 endroits (bosquet → forêt sombre 1 → forêt sombre 2 → racines → arène → forêt flottante 1 → forêt flottante 2 → clairière → hutte → arène de Ghil't). Pilotes : `%TEMP%\histoire\` (`drive.py`, `lib.js`, `c1.js` … `c10.js`, `runall.sh`).
+- **Dégâts actifs** du début à la fin, combats de Ghil't (phases 1 et 2) compris : le dernier passage complet n'a utilisé aucune invincibilité. Seule exception : contre Kainati, le robot esquive mal, meurt (la remise à zéro du combat a fonctionné à chaque fois), puis l'invincibilité prend le relais.
+- Le robot ne sait pas tout faire. Les passages de plateforme déjà validés lors des vagues précédentes sont parfois franchis par téléportation : lianes du monde spirituel et de l'épreuve du singe, grimpe des racines. Certains ennemis sont aussi retirés quand le robot se battait mal (forêt sombre 2, forêts flottantes).
+- Les 18 scènes de l'histoire sortent en code 0 avec `tools/playtest.py`.
+
+### Événements de l'histoire
+
+| # | Événement | État |
+|---|---|---|
+| 1 | Bosquet : gratter la mousse, elle repousse, la créature sort de l'amas | OK |
+| 2 | Le père donne le talisman de l'ours | OK (+ pose `receive_item`) |
+| 3 | Vol de l'idole par Amanite (choix couvrir / supplier) | Corrigé : Amanite était à 30 px au-dessus de l'autel, à moitié cachée, et tournait le dos à Agarica |
+| 4 | Bannissement, départ par les portes de l'est | OK |
+| 5 | Désespoir, rencontre de Xara (petite araignée, Maexxna) | Corrigé : Xara était **invisible**, cachée dans la souche, et le compagnon créé à cet endroit traversait le sol |
+| 6 | Le talisman s'éveille : compétence de l'ours, l'amas est brisé | OK (+ pose `cast`) |
+| 7 | Totem du loup, ravin de 5 cases, pistes et plateformes cachées | OK (sprint et grand ravin franchis au clavier) |
+| 8 | Plante vue (`planteVue`), trois poissons, grand arbre au loin | OK |
+| 9 | Racines, pierres qui tombent, Kainati : combat, épargné, sorties ouvertes | OK (art réel, échelle refaite) |
+| 10 | Monde spirituel : forme singe, puis retour à l'arène par la porte du totem | OK |
+| 11 | Épreuve du singe : talisman du singe et compétence pierre | OK (+ pose `cast`) |
+| 12 | Galter : rencontre, duel (3 coups), carte (M) | OK (+ pose `receive_item`) |
+| 13 | Totem de poche cassé (forêt flottante 2) | OK |
+| 14 | Amanite retrouvée (dialogue selon le choix du bosquet) | OK |
+| 15 | Totem de l'aigle, plané jusqu'à la clairière | OK |
+| 16 | Fleur prélevée (une seule) | OK (+ pose) |
+| 17 | Morgat prend la fleur et donne le répulsif ; antidote annoncé | OK (+ pose) |
+| 18 | Mur de la forêt sombre ouvert au répulsif (aller-retour hutte ↔ poche, +1 cœur) | Corrigé : en passant de la forme humaine au loup contre le mur, **on le traversait sans répulsif** |
+| 19 | Crash, forêt corrompue (la mousse se referme, note de Galter, amas, papillons, spirale, mur vivant) | OK |
+| 20 | Ghil't phase 1, défaite imposée, chute dans le trou sombre | OK |
+| 21 | Trou sombre : papillons, bocal, totem de poche, compétence papillon | OK (+ poses ; le papillon est sur R quand A et F sont pris) |
+| 22 | Phase 2 : Ghil't soigné, Amanite l'achève, Galter arrive | Corrigé : Amanite et Galter n'avaient pas d'anim de parole ; Amanite tournait le dos à Agarica et se superposait à elle |
+| 23 | Retour au bosquet, vérité, départ d'Amanite, cochons, fin | Corrigé : Clak flottait à 16 px du sol ; puis `demoFinished` et EndScreen OK |
+
+**Rien ne manque** : tous les événements de HISTOIRE_DEMO.md et de PLAN_CARTE_DEMO.md existent et se déclenchent.
+
+### Transitions
+Tous les passages ont été testés dans les deux sens. L'arrivée se fait au sol, au bon point d'entrée.
+- Aller : bosquet → FS1 → FS2 → racines → arène → monde spirituel → arène → racines → épreuve → racines → arène → FF1 → FF2 → clairière → hutte → (sentier) FS2 → hutte → FC1 → arène de Ghil't → trou → arène → bosquet → fin.
+- Retour : FS2 → FS1, racines → FS2, FF1 → arène, FF2 → FF1, clairière → FF2, hutte → clairière, arène de Ghil't → FC1.
+- FS1 → bosquet est volontairement fermé (bannie).
+
+### Art Codex intégré (manifest, échelle et sens uniquement)
+- **Kainati** : nouvelle planche complète (7 rangées) → `scale` 0.6, placeholder 195×210 (~210 px à l'idle, ~2,5× Agarica). Même réglage pour `kainati_esprit`. Son poing est sur la liane quand il est suspendu.
+  - `floorY` de l'arène passe à 464 (haut de la hitbox du sol) : Kainati, ses pierres et ses ondes ne flottent plus.
+  - `Kainati.js` tolère encore l'ancienne rangée `throw_stone` à 3 frames (deux silhouettes collées dans une frame).
+- **Amanite** `scale` 0.31 (~104 px) ; **Galter** `scale` 0.30 (~70 px, halfelin) ; **Xara** (`xara_extra`) `scale` 0.12, à la taille du compagnon.
+- Le père, Morgat et Agarica sont inchangés (~107, ~104 et ~86 px).
+- Les PNJ regardent Agarica ; les pieds sont posés sur l'herbe partout où ils ont été vérifiés.
+- Les noms d'anims du code ont tous été vérifiés contre le manifest (script) : aucun nom inexistant.
+
+### Ce que j'ai touché hors de mes fichiers (minimal, à relire par l'agent Moteur)
+- `StoryKit.js` :
+  - **PNJ qui parle** : pendant sa réplique, un PNJ (ou Xara compagnon, via un sprite posé par-dessus elle) passe de `idle` à `talk`. `storyNpcRest` donne une pose de repos à Xara, qui n'a pas d'idle.
+  - Une rangée d'art manquante retombe sur l'idle, plutôt que sur le rectangle placeholder.
+  - `storyStandY` : les PNJ posés sur l'herbe (haut de la hitbox), plus sur une tuile cachée.
+  - Anti-traversée des murs et amas de mousse (`guardStoryMossOverlap`).
+- `DialogueScene.js` : la boîte se place **en haut de l'écran** quand Agarica est au sol. En bas, elle cachait les personnages qui parlent.
+
+### Reste à faire / pour l'agent Moteur
+- **Changement de forme près d'un mur** : le corps du loup, plus long, apparaît dans le décor, et Arcade ne le ressort pas. C'est corrigé pour la mousse, pas pour les tuiles. Le correctif général est à faire dans Player.
+- **Xara compagnon** : si elle tombe hors du monde, rien ne la ramène. Il faudrait la téléporter près d'Agarica si elle est trop loin ou trop bas.
+- Avertissements « Texture transfo-wolf-0/3 not found » à chaque transformation en loup (art de transformation absent).
+- Équilibrage, à voir lors du playtest humain : Kainati est punitif quand on reste immobile (une pierre toutes les ~4 s). La charge de Ghil't au début de la phase 1 touche Agarica au point d'entrée juste après l'intro.
+- Art encore placeholder : habitants, Clak, portraits, boîte de dialogue.
+
 ## RESTE À FAIRE
 
 1. Finir les correctifs moteur (en cours).

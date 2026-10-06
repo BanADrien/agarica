@@ -422,8 +422,10 @@ CUTSCENES.epreuve_talisman = [
     { who: 'kainati', name: 'Voix de Kainati', text: 'Tu n\'as pas touché le sol. Mon peuple te salue, Agarica.' },
     { who: 'kainati', name: 'Voix de Kainati', text: 'Ce talisman garde notre plus vieux savoir : la pierre lancée juste, de loin, sans se mettre en danger.' },
   ] },
+  { playerPose: 'cast' },
   { skill: 'pierre' },
   { wait: 1200 },
+  { playerPose: null },
   { say: [
     { who: 'xara', text: 'Une pierre bien lancée vaut mieux qu\'une lame trop près des crocs. Ce vieux singe est sage.' },
     { who: 'agarica', text: 'Merci, Kainati. Merci à ton peuple.' },
