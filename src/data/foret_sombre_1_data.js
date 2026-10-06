@@ -16,6 +16,7 @@ const FORET_SOMBRE_1_DATA = {
   levelWidth: 3840,
   levelHeight: 540,
   zoneName: 'La forêt sombre',
+  background: 'fond_foret_sombre',
   zoneSub: 'Au-delà de la lisière',
   // Pas encore de fond dédié au manifest : le ciel nocturne par défaut
   // (plan4) + un voile bleu nuit suffisent à l'ambiance.

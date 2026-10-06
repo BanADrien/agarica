@@ -53,7 +53,8 @@ const ASSET_MANIFEST = {
   singe: {
     dir: "assets/sprites/singe_frames", prefix: "singe",
     anims: {
-      jump: { row: 0, frames: 4, fps: 12, repeat: 0 },
+      // Double saut : salto en boule qui tourne (boucle).
+      jump: { row: 0, frames: 4, fps: 14, repeat: -1 },
       liane_hang: { row: 1, frames: 3, fps: 6, repeat: -1 },
       liane_swing: { row: 2, frames: 4, fps: 10, repeat: -1 },
       release_flip: { row: 3, frames: 5, fps: 14, repeat: 0 },
@@ -62,7 +63,7 @@ const ASSET_MANIFEST = {
     },
     scale: 0.34,
     facing: "right",
-    placeholder: { w: 40, h: 60, color: 0xc0602a, label: "Singe" },
+    placeholder: { w: 40, h: 60, color: 0x6b4226, label: "Singe" },
     sheets: [
       { file: "assets/sprites/singe.png", rows: [0, 1, 2] },
       { file: "assets/sprites/singe_p2.png", rows: [3, 4, 5] },
@@ -793,6 +794,13 @@ const ITEM_MANIFEST = {
     norm: { mode: "cover", w: 2079, h: 756 },
   },
   // [P2] inside and around a GIGANTIC TREE: an immense vertical trunk with huge bark ridges, enormo
+  // Fond de la forêt sombre (forêt sombre 1-2) : nuit, mousse toxique lumineuse.
+  fond_foret_sombre: {
+    path: "assets/decors/fonds/fond_foret_sombre.png", scale: 0.714,
+    placeholder: { w: 960, h: 540, color: 0x0e1424, label: "fond_foret_sombre" },
+    src: { file: "assets/_codex_src/fond_foret_sombre.png" },
+    norm: { mode: "cover", w: 2079, h: 756 },
+  },
   fond_grand_arbre: {
     path: "assets/decors/fonds/fond_grand_arbre.png", scale: 0.714,
     placeholder: { w: 960, h: 540, color: 0x101828, label: "fond_grand_arbre" },

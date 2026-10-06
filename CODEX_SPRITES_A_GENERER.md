@@ -61,7 +61,7 @@ AGARICA (the heroine): a petite teenage female druid, chibi proportions (about 2
 **Agarica — forme singe**
 
 ```text
-AGARICA'S MONKEY FORM: a small agile capuchin-like monkey that is clearly Agarica transformed: reddish-orange fur matching her bright red messy hair (a messy tuft on top of the head), cream-beige face, muzzle and chest, big green eyes, slightly pointed ears, a long curling prehensile tail, a short dark-green leafy mane of fur over the shoulders like a little hood, fastened by the same round silver clasp, a pink-red spiral marking on one upper arm. About the size of a cat. Clean anime cel-shaded chibi look, consistent with Agarica's other animal forms.
+AGARICA'S MONKEY FORM (match the reference image assets/_codex_ref/singe_reference.png exactly): a small agile monkey with shaggy warm-brown fur drawn in layered spiky tufts, a cream-beige face, muzzle, ears, hands, feet and chest, round cream ears, big glowing luminous-green eyes (Agarica's magic), a serious determined brow, a very long prehensile tail ending in a tight spiral curl. No clothes, no accessories. Clean cel-shaded look with thick dark outline, same rendering as the reference image.
 ```
 
 **Xara**
@@ -283,7 +283,7 @@ Output: one PNG image, 1536 x 1024 px, transparent background, exactly 1 row(s),
 
 | Rangée (manifest) | Image | Animation | Frames | fps | Poses (gauche → droite) |
 |---|---|---|---|---|---|
-| 0 | singe.png (rangée image 1) | `jump` (saut) | 4 | 12 | 1. crouched on all fours, ready to leap, tail curled / 2. pushing off, body stretched diagonally upward, arms reaching forward / 3. mid-air, body arched, arms and legs spread, tail curling behind / 4. starting to fall, limbs tucked under, tail up |
+| 0 | singe.png (rangée image 1) | `jump` (double saut : salto en boule, boucle) | 4 | 14 | 1. curled into a tight ball, back of the head and spine on top, tail wrapped around the ball / 2. same ball rotated 90° forward (head now on the right side) / 3. same ball rotated 180° (upside down) / 4. same ball rotated 270° — the 4 frames loop as a spinning somersault |
 | 1 | singe.png (rangée image 2) | `liane_hang` (suspendu à une liane (boucle)) | 3 | 6 boucle | 1. hanging from ONE raised hand gripping an INVISIBLE rope above (do not draw it), other arm loose, tail curled up / 2. same, body rotating slightly, legs swaying forward / 3. same, legs swaying backward, tail swinging |
 | 2 | singe.png (rangée image 3) | `liane_swing` (balancement (boucle)) | 4 | 10 boucle | 1. swing back: body angled with feet to the left, both hands up together / 2. bottom of arc: body vertical, legs tucked, tail streaming / 3. swing forward: body angled with feet to the right, legs extended forward / 4. returning: body vertical, legs trailing back |
 | 3 | singe_p2.png (rangée image 1) | `release_flip` (lâcher + salto) | 5 | 14 | 1. letting go: arms flung up, body launched forward / 2. beginning a forward somersault, body curled into a ball, head down / 3. upside down at the top of the flip, tucked / 4. coming out of the flip, legs extending forward / 5. landing-ready pose, arms out, tail up for balance |
@@ -295,12 +295,12 @@ Output: one PNG image, 1536 x 1024 px, transparent background, exactly 1 row(s),
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
 
-CHARACTER: AGARICA'S MONKEY FORM: a small agile capuchin-like monkey that is clearly Agarica transformed: reddish-orange fur matching her bright red messy hair (a messy tuft on top of the head), cream-beige face, muzzle and chest, big green eyes, slightly pointed ears, a long curling prehensile tail, a short dark-green leafy mane of fur over the shoulders like a little hood, fastened by the same round silver clasp, a pink-red spiral marking on one upper arm. About the size of a cat. Clean anime cel-shaded chibi look, consistent with Agarica's other animal forms.
+CHARACTER: AGARICA'S MONKEY FORM (match the reference image assets/_codex_ref/singe_reference.png exactly): a small agile monkey with shaggy warm-brown fur drawn in layered spiky tufts, a cream-beige face, muzzle, ears, hands, feet and chest, round cream ears, big glowing luminous-green eyes (Agarica's magic), a serious determined brow, a very long prehensile tail ending in a tight spiral curl. No clothes, no accessories. Clean cel-shaded look with thick dark outline, same rendering as the reference image.
 
 SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 3 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 341 px tall, each frame cell is about 384 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. The monkey is about 180 px tall when crouched on all fours (about 260 px when hanging with arms up). The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders. Rows with fewer frames use wider cells (row width divided by that row's frame count).
 
 ROWS:
-Row 1 (from top) - animation "jump", exactly 4 frame(s). Frame 1: crouched on all fours, ready to leap, tail curled. Frame 2: pushing off, body stretched diagonally upward, arms reaching forward. Frame 3: mid-air, body arched, arms and legs spread, tail curling behind. Frame 4: starting to fall, limbs tucked under, tail up.
+Row 1 (from top) - animation "jump" (the double jump: a spinning forward somersault, curled into a ball), exactly 4 frame(s), the SAME tucked ball pose rotated a quarter turn forward each frame so the 4 frames loop as a spin. Frame 1: tightly curled ball, spine on top, arms hugging the knees, tail wrapped around the ball. Frame 2: same ball rotated 90 degrees forward. Frame 3: same ball rotated 180 degrees (upside down). Frame 4: same ball rotated 270 degrees. Each frame is a compact round silhouette about 150 px wide.
 Row 2 (from top) - animation "liane_hang", exactly 3 frame(s). Frame 1: hanging from ONE raised hand gripping an INVISIBLE rope above (do not draw it), other arm loose, tail curled up. Frame 2: same, body rotating slightly, legs swaying forward. Frame 3: same, legs swaying backward, tail swinging.
 Row 3 (from top) - animation "liane_swing", exactly 4 frame(s). Frame 1: swing back: body angled with feet to the left, both hands up together. Frame 2: bottom of arc: body vertical, legs tucked, tail streaming. Frame 3: swing forward: body angled with feet to the right, legs extended forward. Frame 4: returning: body vertical, legs trailing back.
 
@@ -312,7 +312,7 @@ Output: one PNG image, 1536 x 1024 px, transparent background, exactly 3 row(s),
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
 
-CHARACTER: AGARICA'S MONKEY FORM: a small agile capuchin-like monkey that is clearly Agarica transformed: reddish-orange fur matching her bright red messy hair (a messy tuft on top of the head), cream-beige face, muzzle and chest, big green eyes, slightly pointed ears, a long curling prehensile tail, a short dark-green leafy mane of fur over the shoulders like a little hood, fastened by the same round silver clasp, a pink-red spiral marking on one upper arm. About the size of a cat. Clean anime cel-shaded chibi look, consistent with Agarica's other animal forms.
+CHARACTER: AGARICA'S MONKEY FORM (match the reference image assets/_codex_ref/singe_reference.png exactly): a small agile monkey with shaggy warm-brown fur drawn in layered spiky tufts, a cream-beige face, muzzle, ears, hands, feet and chest, round cream ears, big glowing luminous-green eyes (Agarica's magic), a serious determined brow, a very long prehensile tail ending in a tight spiral curl. No clothes, no accessories. Clean cel-shaded look with thick dark outline, same rendering as the reference image.
 
 SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 3 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 341 px tall, each frame cell is about 307 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. The monkey is about 180 px tall when crouched on all fours (about 260 px when hanging with arms up). The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders. Rows with fewer frames use wider cells (row width divided by that row's frame count).
 
@@ -1026,7 +1026,7 @@ A wide PARALLAX BACKGROUND painting for a 2D side-scrolling platformer, a DARK P
 
 | Rangée (manifest) | Image | Animation | Frames | fps | Poses (gauche → droite) |
 |---|---|---|---|---|---|
-| 0 | transfo_singe.png (rangée image 1) | `transform` (humaine -> singe) | 4 | 10 | 1. Agarica crouching, wrapped in a tight swirl of green leaves that touches her body, eyes glowing green / 2. half-transformed silhouette shrinking: red fur spreading, tail appearing, leaves wrapped around it / 3. small monkey shape still wrapped in a few leaves touching the body, eyes glowing / 4. the monkey form crouched on all fours, clean, ready (final pose) |
+| 0 | transfo_singe.png (rangée image 1) | `transform` (humaine -> singe) | 4 | 10 | 1. Agarica crouching, wrapped in a tight swirl of green leaves that touches her body, eyes glowing green / 2. half-transformed silhouette shrinking: brown fur spreading, tail appearing, leaves wrapped around it / 3. small monkey shape still wrapped in a few leaves touching the body, eyes glowing / 4. the monkey form crouched on all fours, clean, ready (final pose) |
 
 **Prompt → `assets/sprites/transfo_singe.png`**
 
@@ -1035,7 +1035,7 @@ Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platf
 
 CHARACTER: AGARICA (the heroine): a petite teenage female druid, chibi proportions (about 2.5 to 3 heads tall), pointed elf ears, big green eyes, short messy bright red hair, dark-green hooded cape embroidered with leaf and vine patterns and closed by a round silver clasp at the collar, sleeveless beige tunic, brown belt with a gold buckle, dark grey trousers, brown leather boots, black fingerless mittens, a pink-red spiral tattoo on her bare upper arm, a small silver dagger sheathed on her belt. Soft anime cel-shaded chibi look, same design as the existing game sprite.
 
-TARGET FORM (last frame): AGARICA'S MONKEY FORM: a small agile capuchin-like monkey that is clearly Agarica transformed: reddish-orange fur matching her bright red messy hair (a messy tuft on top of the head), cream-beige face, muzzle and chest, big green eyes, slightly pointed ears, a long curling prehensile tail, a short dark-green leafy mane of fur over the shoulders like a little hood, fastened by the same round silver clasp, a pink-red spiral marking on one upper arm. About the size of a cat. Clean anime cel-shaded chibi look, consistent with Agarica's other animal forms.
+TARGET FORM (last frame): AGARICA'S MONKEY FORM (match the reference image assets/_codex_ref/singe_reference.png exactly): a small agile monkey with shaggy warm-brown fur drawn in layered spiky tufts, a cream-beige face, muzzle, ears, hands, feet and chest, round cream ears, big glowing luminous-green eyes (Agarica's magic), a serious determined brow, a very long prehensile tail ending in a tight spiral curl. No clothes, no accessories. Clean cel-shaded look with thick dark outline, same rendering as the reference image.
 
 SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 1 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 1024 px tall, each frame cell is about 384 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. Agarica's standing height is about 250 px in frame 1; the monkey in the last frame is about 180 px tall crouched. The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders. The single row is vertically centered on the canvas.
 
@@ -1596,6 +1596,14 @@ Output: one PNG image, 1536 x 1024 px, transparent outside the parchment.
 A wide PARALLAX BACKGROUND painting for a 2D side-scrolling platformer, the Emerald Grove at night: a peaceful forest village with round moss-roofed huts, a tree house with warm lanterns, a stone tower overgrown with ivy, green banners with a white tree emblem, giant trees in the background, but patches of glowing toxic-green moss creeping on the trunks; deep violet-indigo night sky with a big moon. Painterly cel-shaded style matching the game (thick shapes, soft gradients, slightly darker and less saturated than the gameplay foreground so characters stay readable). NO characters, NO creatures, NO text. The image must TILE SEAMLESSLY HORIZONTALLY: the left edge and the right edge must match perfectly (same horizon height, same colors) because the game repeats it side by side. Keep the bottom quarter darker and simpler (ground will be drawn over it). Fully opaque, no transparency. Output: one PNG, 2172 x 724 px (wide 3:1).
 ```
 
+### [P2] `fond_foret_sombre` — fond parallax (forêt sombre 1-2)
+
+- **Image à produire** : `assets/_codex_src/fond_foret_sombre.png` (2172x724) → **final** `assets/decors/fonds/fond_foret_sombre.png` (2079x756, recadrage « cover » auto). Opaque. Répété horizontalement → bords gauche/droit raccord. Utilisé par `foret_sombre_1` et `foret_sombre_2`.
+
+```text
+A wide PARALLAX BACKGROUND painting for a 2D side-scrolling platformer, a DARK HAUNTED NIGHT FOREST just outside a druid village: tall dark trunks in layered silhouettes, a hunting trail fading into mist, deep ravines between rocky ledges, patches of glowing toxic-green moss crawling up the trunks and dripping from branches, a few glowing cyan mushrooms, thin moonlight beams through the canopy, and very far away on the horizon the silhouette of one GIGANTIC TREE rising above all the others. Deep violet, indigo and teal palette, cold and lonely mood. Painterly cel-shaded style matching the game (thick shapes, soft gradients, slightly darker and less saturated than the gameplay foreground so characters stay readable). NO characters, NO creatures, NO text. The image must TILE SEAMLESSLY HORIZONTALLY: the left edge and the right edge must match perfectly (same horizon height, same colors) because the game repeats it side by side. Keep the bottom quarter darker and simpler (ground will be drawn over it). Fully opaque, no transparency. Output: one PNG, 2172 x 724 px (wide 3:1).
+```
+
 ### [P2] `fond_grand_arbre` — fond parallax
 
 - **Image à produire** : `assets/_codex_src/fond_grand_arbre.png` (2172x724) → **final** `assets/decors/fonds/fond_grand_arbre.png` (2079x756, recadrage « cover » auto, comme `plan4_ciel.png`). Opaque. Répété horizontalement par `tileSprite` => bords gauche/droit raccord.
@@ -1973,6 +1981,32 @@ PROPS:
 Output: one PNG, 1536 x 1024 px.
 ```
 
+### [P2] Section `grand_arbre_tronc` — montée dans le tronc (racines du grand arbre, épreuve du singe)
+
+- **Image à produire** : `assets/decors/déco item/grand_arbre_tronc/grand_arbre_tronc_planche.png` (1536x1024)
+- **Noms finaux (ordre de lecture)** : `grand_arbre_tronc_paroi_ecorce`, `grand_arbre_tronc_paroi_noeud`, `grand_arbre_tronc_branche_courte`, `grand_arbre_tronc_branche_longue`, `grand_arbre_tronc_escalier_racines`, `grand_arbre_tronc_fenetre_lune`, `grand_arbre_tronc_lianes_hautes`, `grand_arbre_tronc_champignons_lumineux`, `grand_arbre_tronc_seve_corrompue`, `grand_arbre_tronc_corniche_mousse`
+- **Notes** : éléments VERTICAUX pour habiller la zone qui monte le long et à l'intérieur du tronc géant (posés devant/derrière les plateformes dans l'éditeur, section `grand_arbre_tronc`). Les plateformes jouables restent les tuiles `tuiles_ecorce`.
+
+```text
+Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green. Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view.
+
+DECOR PROPS SHEET: decoration for a VERTICAL climbing level INSIDE and along the trunk of a GIGANTIC ancient tree (brown-grey bark with deep ridges, warm wood inside, moss, lianas). Clearly pixel-art style like the existing village props sheet. Canvas 1536 x 1024 px, fully transparent background. Draw these 10 props on an invisible grid of 5 columns x 2 rows, in this exact reading order (left to right, top to bottom), each prop standing on a flat bottom edge, side view, with at least 50 px of EMPTY transparent space between props: no prop may touch another. Tall props may use the full row height (about 450 px). Each prop is one connected piece, no detached particles, no cast shadow, no text.
+
+PROPS:
+1. a tall vertical slab of trunk bark wall with deep vertical ridges (tileable top and bottom edges)
+2. a tall bark wall slab with a big round knot hole glowing faintly inside
+3. a short thick branch sticking out horizontally from a piece of bark, a few leaves
+4. a long gnarled branch sticking out horizontally, with moss on top and hanging leaves
+5. a staircase of twisted roots climbing diagonally up the inside of the trunk
+6. an opening in the trunk wall shaped like a window, with moonlight and night sky visible through it
+7. a bundle of long hanging lianas attached at the top (decorative, about 400 px tall)
+8. a cluster of glowing cyan shelf mushrooms on bark
+9. a trickle of corrupted sap: glowing toxic-green moss dripping down a bark slab
+10. a mossy wooden ledge with a small monkey-carved stone marker
+
+Output: one PNG, 1536 x 1024 px.
+```
+
 ### [P2] Section `foret_flottante`
 
 - **Image à produire** : `assets/decors/déco item/foret_flottante/foret_flottante_planche.png` (1536x1024)
@@ -2055,6 +2089,8 @@ Output: one PNG, 1536 x 1024 px.
 |---|---|---|---|---|
 | `agarica_extra` | `assets/sprites/agarica_extra.png`<br>`assets/sprites/agarica_extra_p2.png`<br>`assets/sprites/agarica_extra_p3.png`<br>`assets/sprites/agarica_extra_p4.png` | `assets/sprites/agarica_extra_frames/` | P1 | à générer |
 | `singe` | `assets/sprites/singe.png`<br>`assets/sprites/singe_p2.png` | `assets/sprites/singe_frames/` | P1 | à générer |
+| `fond_foret_sombre` | `assets/_codex_src/fond_foret_sombre.png` | `assets/decors/fonds/fond_foret_sombre.png` | P2 | à générer |
+| `grand_arbre_tronc` (planche décor) | `assets/decors/déco item/grand_arbre_tronc/grand_arbre_tronc_planche.png` | `assets/decors/deco_item_frames/grand_arbre_tronc/` | P2 | à générer |
 | `xara_extra` | `assets/sprites/xara_extra.png` | `assets/sprites/xara_extra_frames/` | P1 | à générer |
 | `pere_chef` | `assets/sprites/pere_chef.png` | `assets/sprites/pere_chef_frames/` | P1 | à générer |
 | `amanite` | `assets/sprites/amanite.png`<br>`assets/sprites/amanite_p2.png` | `assets/sprites/amanite_frames/` | P1 | à générer |

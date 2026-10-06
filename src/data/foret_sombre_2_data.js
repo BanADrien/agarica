@@ -25,6 +25,7 @@ const FORET_SOMBRE_2_DATA = {
   levelWidth: 5888,
   levelHeight: 720,
   zoneName: 'La forêt sombre',
+  background: 'fond_foret_sombre',
   zoneSub: 'Le sentier des ravins',
   ambient: { tint: 0x070b22, darkness: 0.28 },
   script: 'foret_sombre_2',
