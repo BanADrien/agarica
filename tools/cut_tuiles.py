@@ -263,6 +263,18 @@ def top_tile(clean, grass, sky=True):
     return out
 
 
+# Largeur (px) de la touffe d'herbe du coin interieur, cf. dirt_angle.
+ANGLE_TUFT_WIDTH = 7
+
+
+def angle_tile(clean, grass, dark):
+    """Inner corner (in-tl): solid dirt, a short grass tuft in the top-left."""
+    out = corner_band(clean.copy(), dark, radius=9)
+    tuft = grass.crop((0, 0, ANGLE_TUFT_WIDTH, TILE))
+    out.alpha_composite(tuft, (0, GRASS_TOP))
+    return out
+
+
 def pad_for_boost(img, name):
     """Add transparent rows on top so the engine's stretch cancels out."""
     boost = HEIGHT_BOOST.get(name)
@@ -318,22 +330,32 @@ def main():
 
     # --- tuiles du haut : herbe + ciel transparent au-dessus -------------
     save(top_tile(clean(0), grasses[0]), "dirt_t")
-    save(edge_band(top_tile(clean(1), grasses[1]), dark(2), "left"), "dirt_tl")
-    save(edge_band(top_tile(clean(2), grasses[2]), dark(3), "right"), "dirt_tr")
+    # Bande sombre posee sur la TERRE avant l'herbe : sinon elle assombrissait
+    # aussi la touffe d'herbe du bord, qui semblait manquer sur les coins.
+    save(top_tile(edge_band(clean(1), dark(2), "left"), grasses[1]), "dirt_tl")
+    save(top_tile(edge_band(clean(2), dark(3), "right"), grasses[2]), "dirt_tr")
 
     # --- plateformes : tuiles du haut qui ferment aussi leur dessous -----
     p0 = edge_band(top_tile(clean(3), grasses[0]), dark(0), "bottom")
     save(p0, "dirt_platform0")
-    p1 = edge_band(top_tile(clean(4), grasses[1]), dark(1), "bottom")
-    p1 = edge_band(edge_band(p1, dark(2), "left"), dark(3), "right")
+    p1 = edge_band(edge_band(clean(4), dark(2), "left"), dark(3), "right")
+    p1 = edge_band(top_tile(p1, grasses[1]), dark(1), "bottom")
     save(p1, "dirt_platform1")
-    p2 = edge_band(top_tile(clean(5), grasses[2]), dark(0), "bottom")
-    save(edge_band(p2, dark(1), "left"), "dirt_platform2")
+    p2 = edge_band(clean(5), dark(1), "left")
+    save(edge_band(top_tile(p2, grasses[2]), dark(0), "bottom"), "dirt_platform2")
 
     # --- coins interieurs -------------------------------------------------
     # dirt_angle : carre PLEIN (pas de ciel), herbe en haut, bande sombre a
     # gauche -- LevelKit le retourne horizontalement pour in-tr.
-    save(edge_band(top_tile(clean(1), grasses[0], sky=False), dark(2), "left"), "dirt_angle")
+    #
+    # in-tl = case dont le dessus est COUVERT (marche/mur au-dessus) mais dont
+    # le voisin de gauche est un sol a l'air libre : seul le coin haut-gauche
+    # est expose. Une herbe sur toute la largeur dessinait une bande d'herbe
+    # au milieu de la terre sous chaque marche (retour utilisateur : "les
+    # tuiles sont mal decoupees"). Donc : terre pleine, petite touffe qui
+    # prolonge l'herbe du voisin jusqu'au pied du mur, a la meme hauteur
+    # (GRASS_TOP), et ombre de coin.
+    save(angle_tile(clean(1), grasses[0], dark(2)), "dirt_angle")
     # coin : carre plein, accent sombre dans le coin HAUT-GAUCHE, jamais
     # d'herbe -- LevelKit le retourne verticalement (et horizontalement pour
     # in-br), donc l'accent doit etre dans ce coin-la et nulle part ailleurs.
