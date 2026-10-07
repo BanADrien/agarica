@@ -869,6 +869,28 @@ function groundSurfaceYAt(scene, x, referenceY) {
   return best;
 }
 
+// Comme groundSurfaceYAt, mais renvoie le haut de la HITBOX de la tuile (la
+// ligne où les pieds d'Agarica se posent) plutôt que le haut de son image.
+function groundStandYAt(scene, x, referenceY) {
+  const groundGroup = scene.ground;
+  if (!groundGroup) return null;
+  let best = null;
+  let bestDist = Infinity;
+  groundGroup.children.iterate((tile) => {
+    if (!tile || !tile.active) return;
+    const half = tile.displayWidth / 2;
+    if (x < tile.x - half || x > tile.x + half) return;
+    const visualTop = tile.y - tile.displayHeight / 2;
+    const standY = tile.body ? tile.body.top : visualTop;
+    const dist = Math.abs(visualTop - referenceY);
+    if (best === null || dist < bestDist) {
+      best = standY;
+      bestDist = dist;
+    }
+  });
+  return best;
+}
+
 // Totem sans art historique (singe) : image du manifest `totem_<type>_<état>`
 // (ou son placeholder) à la place de `totem-<type>-<état>`.
 function totemTextureKey(scene, totemType, state) {
@@ -1138,6 +1160,10 @@ const AUTOTILE_PLATFORM_VARIANT_COUNT = 3;
 // Part SOLIDE de la case (pas la part retirée) : 0.75 = les 3/4 du bas
 // restent solides, seul le dernier 1/4 du haut ne l'est plus.
 const AUTOTILE_GRASS_HITBOX_FRACTION = 0.75;
+// Écart entre le haut visuel d'une tuile d'herbe et la surface où l'on marche
+// (haut de sa hitbox) : les décors (props) sont posés sur cette surface, cf.
+// groundStandYAt ; l'éditeur décale son aperçu d'autant.
+const PROP_GROUND_SINK = GROUND_TILE_SIZE * (1 - AUTOTILE_GRASS_HITBOX_FRACTION);
 // Coin INTÉRIEUR (concave) : les 4 voisins orthogonaux sont pleins (donc
 // pas d'arête exposée, cf. autotilePositionKey) mais un voisin EN DIAGONALE
 // manque — cas d'un escalier en blocs carrés (ex: une marche qui monte en
@@ -1990,7 +2016,10 @@ function buildLevelFromData(scene, data, sceneData) {
   }
 
   for (const p of data.props || []) {
-    const y = groundSurfaceYAt(scene, p.x, p.y) ?? p.y;
+    // Surface où l'on MARCHE (haut de la hitbox, cf. AUTOTILE_GRASS_HITBOX_FRACTION :
+    // 16 px sous le haut visuel des tuiles d'herbe), pas le haut de l'image de
+    // tuile -- sinon les décors flottaient au-dessus de l'herbe.
+    const y = groundStandYAt(scene, p.x, p.y) ?? p.y;
     scene.add.image(p.x, y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
   }
 

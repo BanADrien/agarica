@@ -966,7 +966,7 @@ class EditorScene extends Phaser.Scene {
       const y = this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY;
       const entry = { type, x: worldX, y, scale: PROP_SCALE };
       this.data.props.push(entry);
-      const obj = this.add.image(worldX, y, `${PROP_PREFIX}${type}`).setOrigin(0.5, 1).setScale(PROP_SCALE);
+      const obj = this.add.image(worldX, y + PROP_GROUND_SINK, `${PROP_PREFIX}${type}`).setOrigin(0.5, 1).setScale(PROP_SCALE);
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
   }
@@ -1222,6 +1222,9 @@ class EditorScene extends Phaser.Scene {
       m.obj[0].setPosition(entry.x, entry.y + TOTEM_GROUND_SINK);
     } else if (m.kind === 'campfire') {
       m.obj[0].setPosition(entry.x, entry.y + CAMPFIRE_SINK);
+    } else if (m.kind === 'prop') {
+      // Même surface que dans le jeu (cf. groundStandYAt / PROP_GROUND_SINK).
+      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK);
     } else if (m.kind === 'enemy') {
       m.obj[0].setPosition(entry.x, entry.y);
       // obj[1] (s'il existe) : bande de patrouille, recentrée avec lui pour
@@ -1748,7 +1751,7 @@ class EditorScene extends Phaser.Scene {
       this.markers.push({ kind: 'enemy', entry, obj: extras, sourceArray: this.data.enemies });
     }
     for (const entry of this.data.props) {
-      const obj = this.add.image(entry.x, entry.y, `${PROP_PREFIX}${entry.type}`).setOrigin(0.5, 1).setScale(entry.scale || PROP_SCALE);
+      const obj = this.add.image(entry.x, entry.y + PROP_GROUND_SINK, `${PROP_PREFIX}${entry.type}`).setOrigin(0.5, 1).setScale(entry.scale || PROP_SCALE);
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
     for (const entry of this.data.campfires) {
