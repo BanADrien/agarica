@@ -171,6 +171,10 @@ function ensureTreeTexture(scene, width, height) {
 // premier plan devant le joueur — addProceduralGroundPlants/HangingPlants).
 const DECOR_SOURCE_HEIGHT = 724;
 const DECOR_FOREGROUND_DEPTH = 1000;
+// Profondeur commune des personnages (joueur, Xara, PNJ, ennemis, boss, animaux
+// terrestres) : devant les décors (props, totems, feux, 0 par défaut), derrière
+// les plantes de premier plan (DECOR_FOREGROUND_DEPTH).
+const CHARACTER_DEPTH = 10;
 
 // Forêt procédurale (plan3, assets/decors/arbres_frames/, découpés depuis
 // assets/decors/arbres.png par îlots de pixels connectés — voir
