@@ -1,6 +1,6 @@
 // Zone « arene_ghilt » (étapes 13 et 15 de PLAN_DEV.md) : arène du boss Ghil't,
 // le Fléau de la Forêt. Toute la logique (combat, défaite imposée phase 1,
-// soin phase 2, Amanite, Galter) est dans ZONE_SCRIPTS.ghilt_arene
+// soin phase 2, Amanite, Geralt) est dans ZONE_SCRIPTS.ghilt_arene
 // (src/story/boss_ghilt.js) ; ce fichier ne décrit que le terrain.
 // Arène plate et fermée (21 cases) : Ghil't fait ~330 px de large, il lui faut
 // de la place pour charger d'un bord à l'autre sans que l'écran défile trop.

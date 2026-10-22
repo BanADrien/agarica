@@ -86,7 +86,7 @@ const EDITOR_ENEMY_MARKER_LABELS = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t)
 // compagnon par l'étape {xaraJoin}).
 const EDITOR_NPC_IDS = [
   'xara_extra', 'pere_chef', 'amanite', 'habitant_druide', 'habitant_porteur', 'habitant_garde',
-  'galter', 'clak', 'morgat', 'kainati', 'kainati_esprit', 'ghilt', 'ghilt_gueri',
+  'geralt', 'clak', 'morgat', 'kainati', 'kainati_esprit', 'ghilt', 'ghilt_gueri',
 ];
 const EDITOR_NPC_DEFAULTS = { xara_extra: { id: 'xara', sprite: 'xara_extra' } };
 // Objets d'ITEM_MANIFEST qui ne sont pas des objets ramassables (UI, fonds...).

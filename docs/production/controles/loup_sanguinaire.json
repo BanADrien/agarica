@@ -1,0 +1,60 @@
+[
+  {
+    "source": "assets/sprites/loup_sanguinaire.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      132,
+      120
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          156,
+          157,
+          159,
+          159
+        ],
+        "horizontal_gaps": [
+          101,
+          86,
+          94
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          149,
+          157,
+          150,
+          135
+        ],
+        "horizontal_gaps": [
+          86,
+          76,
+          76
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          148,
+          159,
+          154,
+          162
+        ],
+        "horizontal_gaps": [
+          104,
+          79,
+          84
+        ]
+      }
+    ]
+  }
+]

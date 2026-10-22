@@ -182,9 +182,9 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
-  // [P1] Galter, ranger halfelin
-  galter: {
-    dir: "assets/sprites/galter_frames", prefix: "galter",
+  // [P1] Geralt, ranger halfelin
+  geralt: {
+    dir: "assets/sprites/geralt_frames", prefix: "geralt",
     anims: {
       idle: { row: 0, frames: 4, fps: 6, repeat: -1 },
       talk: { row: 1, frames: 4, fps: 8, repeat: -1 },
@@ -195,14 +195,14 @@ const ASSET_MANIFEST = {
     },
     scale: 0.30,
     facing: "right",
-    placeholder: { w: 34, h: 70, color: 0x7a5c3a, label: "Galter" },
+    placeholder: { w: 34, h: 70, color: 0x7a5c3a, label: "Geralt" },
     sheets: [
-      { file: "assets/sprites/galter.png", rows: [0, 1, 2] },
-      { file: "assets/sprites/galter_p2.png", rows: [3, 4, 5] },
+      { file: "assets/sprites/geralt.png", rows: [0, 1, 2] },
+      { file: "assets/sprites/geralt_p2.png", rows: [3, 4, 5] },
     ],
     cut: "blob", align: "bottom",
   },
-  // [P2] Clak, le crabe totem de Galter
+  // [P2] Clak, le crabe totem de Geralt
   clak: {
     dir: "assets/sprites/clak_frames", prefix: "clak",
     anims: {
@@ -596,10 +596,10 @@ const ITEM_MANIFEST = {
     src: { planche: "assets/_codex_src/objets_B.png", grid: [3, 2], cell: 3, cut: "grid" },
     norm: { mode: "fit", value: 256 },
   },
-  // [P1] Galter's map as an inventory item: a rolled-up parchment scroll tied with a cord, a corner
-  carte_galter: {
-    path: "assets/items/objets/carte_galter.png", scale: 0.16,
-    placeholder: { w: 36, h: 36, color: 0xd8c08a, label: "carte_galter" },
+  // [P1] Geralt's map as an inventory item: a rolled-up parchment scroll tied with a cord, a corner
+  carte_geralt: {
+    path: "assets/items/objets/carte_geralt.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0xd8c08a, label: "carte_geralt" },
     src: { planche: "assets/_codex_src/objets_B.png", grid: [3, 2], cell: 4, cut: "grid" },
     norm: { mode: "fit", value: 256 },
   },
@@ -723,7 +723,7 @@ const ITEM_MANIFEST = {
     src: { file: "assets/_codex_src/titre_logo.png" },
     norm: { mode: "fit", value: 1024 },
   },
-  // [P2] Carte de Galter (écran de carte)
+  // [P2] Carte de Geralt (écran de carte)
   carte_parchemin: {
     path: "assets/ui/carte_parchemin.png", scale: 0.52,
     placeholder: { w: 800, h: 530, color: 0xd8c08a, label: "Carte" },
@@ -758,11 +758,11 @@ const ITEM_MANIFEST = {
     src: { file: "assets/_codex_src/portrait_pere_chef.png" },
     norm: { mode: "square", value: 512 },
   },
-  // [P1] Portrait galter
-  portrait_galter: {
-    path: "assets/ui/portraits/galter.png", scale: 0.25,
-    placeholder: { w: 128, h: 128, color: 0x2a1e14, label: "galter" },
-    src: { file: "assets/_codex_src/portrait_galter.png" },
+  // [P1] Portrait geralt
+  portrait_geralt: {
+    path: "assets/ui/portraits/geralt.png", scale: 0.25,
+    placeholder: { w: 128, h: 128, color: 0x2a1e14, label: "geralt" },
+    src: { file: "assets/_codex_src/portrait_geralt.png" },
     norm: { mode: "square", value: 512 },
   },
   // [P1] Portrait morgat

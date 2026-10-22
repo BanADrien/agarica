@@ -20,7 +20,7 @@ parser.add_argument('--note', default='')
 args = parser.parse_args()
 state_path = HERE / 'suivi_codex.json'
 state = json.loads(state_path.read_text(encoding='utf-8')) if state_path.exists() else {}
-for aid in ['pere_chef', 'amanite', 'galter', 'morgat']:
+for aid in ['pere_chef', 'amanite', 'geralt', 'morgat']:
     state.setdefault(aid, {'status': 'fait', 'note': 'Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification.'})
 state.setdefault('agarica_extra', {'status': 'à refaire', 'note': 'p1/p2 conservées ; p3/p4 non faites.'})
 state.setdefault('xara_extra', {'status': 'à refaire', 'note': 'Bande entre rangées mesurée à 45 px ; minimum demandé 60 px.'})
@@ -49,7 +49,7 @@ if args.asset:
 state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
 guide = (ROOT / 'CODEX_SPRITES_A_GENERER.md').read_text(encoding='utf-8')
 anims, items, tilesets = importer.load_manifest()
-lines = ['# Rapport de production Codex — 6 octobre 2026', '',
+lines = ['# Rapport de production Codex', '',
     'Ordre : singe/transformation ; Agarica p3/p4 ; boss ; Xara ; habitants/animaux ; ennemis ; objets ; interface ; VFX ; fonds ; tuiles ; décors.', '',
     'Prompts anglais intégraux du guide mis à jour, génération avec image_gen intégré et références locales. Aucune modification manuelle de src/ ou du manifeste. asset_present.js est écrit uniquement par l’importeur demandé.', '',
     '« À refaire » inclut une production partielle ou une validation encore incomplète. Les décors seront livrés sans découpe.', '',

@@ -1,0 +1,734 @@
+{
+  "fonds": {
+    "fond_arene_ghilt_source": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.229,
+      "ecart_moyen_colonnes_voisines": 2.673,
+      "apercu": "fond_arene_ghilt_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_arene_ghilt_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.229,
+      "ecart_moyen_colonnes_voisines": 2.673,
+      "apercu": "fond_arene_ghilt_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_bosquet_source": {
+      "dimensions": [
+        2081,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 3.631,
+      "ecart_moyen_colonnes_voisines": 3.049,
+      "apercu": "fond_bosquet_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_bosquet_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 3.038,
+      "ecart_moyen_colonnes_voisines": 3.05,
+      "apercu": "fond_bosquet_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_foret_corrompue_source": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.12,
+      "ecart_moyen_colonnes_voisines": 2.422,
+      "apercu": "fond_foret_corrompue_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_foret_corrompue_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.12,
+      "ecart_moyen_colonnes_voisines": 2.422,
+      "apercu": "fond_foret_corrompue_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_foret_flottante_source": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 3.876,
+      "ecart_moyen_colonnes_voisines": 3.322,
+      "apercu": "fond_foret_flottante_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_foret_flottante_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 3.876,
+      "ecart_moyen_colonnes_voisines": 3.322,
+      "apercu": "fond_foret_flottante_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_foret_sombre_source": {
+      "dimensions": [
+        2080,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.605,
+      "ecart_moyen_colonnes_voisines": 2.852,
+      "apercu": "fond_foret_sombre_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_foret_sombre_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.58,
+      "ecart_moyen_colonnes_voisines": 2.852,
+      "apercu": "fond_foret_sombre_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_grand_arbre_source": {
+      "dimensions": [
+        2080,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.413,
+      "ecart_moyen_colonnes_voisines": 4.376,
+      "apercu": "fond_grand_arbre_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_grand_arbre_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.574,
+      "ecart_moyen_colonnes_voisines": 4.377,
+      "apercu": "fond_grand_arbre_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_monde_spirituel_source": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.211,
+      "ecart_moyen_colonnes_voisines": 3.116,
+      "apercu": "fond_monde_spirituel_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_monde_spirituel_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 2.211,
+      "ecart_moyen_colonnes_voisines": 3.116,
+      "apercu": "fond_monde_spirituel_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_trou_sombre_source": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 1.137,
+      "ecart_moyen_colonnes_voisines": 1.235,
+      "apercu": "fond_trou_sombre_source_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    },
+    "fond_trou_sombre_importe": {
+      "dimensions": [
+        2079,
+        756
+      ],
+      "ecart_moyen_bords_rgb_255": 1.137,
+      "ecart_moyen_colonnes_voisines": 1.235,
+      "apercu": "fond_trou_sombre_importe_raccord.jpg",
+      "note": "La mesure signale les ruptures ; validation visuelle requise."
+    }
+  },
+  "decors": {
+    "grand_arbre": {
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "grid": [
+        4,
+        3
+      ],
+      "cases": [
+        {
+          "row": 0,
+          "col": 0,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "vide": false,
+          "base_y": 998,
+          "ecart_bas_case": 25
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "vide": false,
+          "base_y": 998,
+          "ecart_bas_case": 25
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "vide": false,
+          "base_y": 998,
+          "ecart_bas_case": 25
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "vide": false,
+          "base_y": 691,
+          "ecart_bas_case": 332
+        }
+      ],
+      "note": "Planche conservée entière, aucune découpe."
+    },
+    "grand_arbre_tronc": {
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "grid": [
+        5,
+        2
+      ],
+      "cases": [
+        {
+          "row": 0,
+          "col": 0,
+          "vide": false,
+          "base_y": 505,
+          "ecart_bas_case": 6
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "vide": false,
+          "base_y": 505,
+          "ecart_bas_case": 6
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "vide": false,
+          "base_y": 504,
+          "ecart_bas_case": 7
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "vide": false,
+          "base_y": 503,
+          "ecart_bas_case": 8
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "vide": false,
+          "base_y": 505,
+          "ecart_bas_case": 6
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "vide": false,
+          "base_y": 994,
+          "ecart_bas_case": 29
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "vide": false,
+          "base_y": 994,
+          "ecart_bas_case": 29
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "vide": false,
+          "base_y": 994,
+          "ecart_bas_case": 29
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "vide": false,
+          "base_y": 995,
+          "ecart_bas_case": 28
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "vide": false,
+          "base_y": 994,
+          "ecart_bas_case": 29
+        }
+      ],
+      "note": "Planche conservée entière, aucune découpe."
+    },
+    "foret_sombre": {
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "grid": [
+        4,
+        3
+      ],
+      "cases": [
+        {
+          "row": 0,
+          "col": 0,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "vide": false,
+          "base_y": 1009,
+          "ecart_bas_case": 14
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "vide": false,
+          "base_y": 1009,
+          "ecart_bas_case": 14
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "vide": false,
+          "base_y": 1009,
+          "ecart_bas_case": 14
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "vide": false,
+          "base_y": 1009,
+          "ecart_bas_case": 14
+        }
+      ],
+      "note": "Planche conservée entière, aucune découpe."
+    },
+    "foret_flottante": {
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "grid": [
+        4,
+        3
+      ],
+      "cases": [
+        {
+          "row": 0,
+          "col": 0,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "vide": false,
+          "base_y": 1022,
+          "ecart_bas_case": 1
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "vide": false,
+          "base_y": 1013,
+          "ecart_bas_case": 10
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "vide": false,
+          "base_y": 1013,
+          "ecart_bas_case": 10
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "vide": false,
+          "base_y": 751,
+          "ecart_bas_case": 272
+        }
+      ],
+      "note": "Planche conservée entière, aucune découpe."
+    },
+    "foret_corrompue": {
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "grid": [
+        4,
+        3
+      ],
+      "cases": [
+        {
+          "row": 0,
+          "col": 0,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "vide": false,
+          "base_y": 1007,
+          "ecart_bas_case": 16
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "vide": false,
+          "base_y": 1007,
+          "ecart_bas_case": 16
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "vide": false,
+          "base_y": 1007,
+          "ecart_bas_case": 16
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "vide": false,
+          "base_y": 1007,
+          "ecart_bas_case": 16
+        }
+      ],
+      "note": "Planche conservée entière, aucune découpe."
+    },
+    "hutte_morgat": {
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "grid": [
+        4,
+        3
+      ],
+      "cases": [
+        {
+          "row": 0,
+          "col": 0,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 1,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 2,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 0,
+          "col": 3,
+          "vide": false,
+          "base_y": 340,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 0,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 2,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 1,
+          "col": 3,
+          "vide": false,
+          "base_y": 681,
+          "ecart_bas_case": 0
+        },
+        {
+          "row": 2,
+          "col": 0,
+          "vide": false,
+          "base_y": 1008,
+          "ecart_bas_case": 15
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "vide": false,
+          "base_y": 1008,
+          "ecart_bas_case": 15
+        },
+        {
+          "row": 2,
+          "col": 2,
+          "vide": false,
+          "base_y": 746,
+          "ecart_bas_case": 277
+        },
+        {
+          "row": 2,
+          "col": 3,
+          "vide": false,
+          "base_y": 764,
+          "ecart_bas_case": 259
+        }
+      ],
+      "note": "Planche conservée entière, aucune découpe."
+    }
+  }
+}

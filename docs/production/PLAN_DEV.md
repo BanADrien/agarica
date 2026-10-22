@@ -7,8 +7,8 @@ le modifier, fais-le de façon rétro-compatible et mets ce fichier à jour.
 Sources narratives : `histoire/HISTOIRE_DEMO.md` (résumé canonique),
 `histoire/PLAN_CARTE_DEMO.md` (zones + événements), `histoire/ZONES_ET_PROGRESSION.md`
 (mécaniques détaillées), `histoire/DEMO_CONCEPTION.md`. En cas de contradiction,
-HISTOIRE_DEMO.md + PLAN_CARTE_DEMO.md l'emportent. « Geralt » dans les docs = **Galter**
-(nom définitif, ne jamais afficher « Geralt »).
+HISTOIRE_DEMO.md + PLAN_CARTE_DEMO.md l'emportent. Le ranger s'appelle **Geralt** (nom définitif, demandé par l'utilisateur le 2026-10-22 ;
+l'ancien nom « Galter » a été remplacé partout, identifiants compris).
 
 Architecture existante : voir `docs/production/ARCHITECTURE.md`. Assets : voir
 `docs/production/INVENTAIRE_ASSETS.md` et `src/data/asset_manifest.js`.
@@ -72,14 +72,14 @@ Tu peux lire le screenshot avec l'outil Read pour vérifier visuellement.
 - Inventaire (objets-clés de l'histoire) : `inventoryAdd(scene, id, {silent})` (popup
   « Objet obtenu » avec `addItemImage`), `inventoryHas(id)`, `inventoryRemove(id)`,
   `inventoryList()`. Écran inventaire touche **I** (`InventoryScene`, overlay, monde gelé),
-  avec la carte de Galter (touche **M** → `MapScene`) si `inventoryHas('carte_galter')`.
+  avec la carte de Geralt (touche **M** → `MapScene`) si `inventoryHas('carte_geralt')`.
 - `unlockSkillFromStory(scene, skillId)` — ajoute à `unlockedSkills`, équipe dans le 1er
   slot libre, popup « Compétence débloquée ». (Implémentée par l'agent Formes dans
   Player.js / StoryKit ? → **Fondation** l'implémente dans StoryKit, en réutilisant la
   logique de Player.)
 
 ### Dialogues & cinématiques
-- `SPEAKERS` : `{ agarica, xara, amanite, pere_chef, galter, clak, morgat, kainati,
+- `SPEAKERS` : `{ agarica, xara, amanite, pere_chef, geralt, clak, morgat, kainati,
   kainati_esprit, ghilt, habitant, garde, narrateur }` → `{ name, color }`.
 - `DIALOGUES` (registre global, rempli par `src/story/*.js`) : `DIALOGUES[id] = [ {who, text}, … ]`.
   Une ligne peut avoir `choices: [{text, goto?}]` (optionnel, simple).
@@ -299,15 +299,15 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
 | 5 | `grand_arbre_arene` | Boss Kainati (script `kainati_arene`) → épargné, ouvre accès au totem du singe | `kainatiDefeated` |
 | 6 | `monde_spirituel` | Kainati esprit montre les lianes → forme singe | `hasMonkeyForm` |
 | 7 | `epreuve_singe` (optionnel) | course verticale lianes + checkpoints → talisman du singe | `talismanSinge`, skill `pierre` |
-| 8 | `foret_flottante_1` | Galter + Clak, duel comique, carte | `galterMet`, item `carte_galter` |
+| 8 | `foret_flottante_1` | Geralt + Clak, duel comique, carte | `geraltMet`, item `carte_geralt` |
 | 9 | `foret_flottante_2` | îles, totem de poche cassé, Amanite (1re rencontre), totem de l'aigle, courants d'air | item `totem_poche_casse`, `amaniteMet`, `hasEagleForm` |
 | 10 | `clairiere_plante` | plane jusqu'à la plante, prélève la fleur | item `fleur_resistante` |
 | 11 | `hutte_morgat` | Morgat + papillons, donne la fleur (obligatoire) → repulsif ; antidote en préparation ; rampe de lancement → cinématique crash | item `repulsif`, `crashDone` |
-| 12 | `foret_corrompue_1` | réveil après crash, mousse vivante, note de Galter, murs de mousse (repulsif) | — |
+| 12 | `foret_corrompue_1` | réveil après crash, mousse vivante, note de Geralt, murs de mousse (repulsif) | — |
 | 13 | `arene_ghilt` | Boss Ghil't phase 1 → défaite imposée (script `ghilt_arene`) | `ghiltPhase=1→2` |
 | 14 | `trou_sombre` | noir, papillons, bocal d'antidote, Xara : verser dans le totem de poche → compétence papillon | item `totem_poche_actif`, skill `papillon` |
 | 15 | `arene_ghilt` (phase 2) | soin de Ghil't, Amanite l'achève à la lance | `ghiltHealed` |
-| 16 | `bosquet_retour` | Galter explique au chef, Amanite part furieuse, Xara reconnaît un symbole, fin → EndScreen « à suivre » | `demoFinished` |
+| 16 | `bosquet_retour` | Geralt explique au chef, Amanite part furieuse, Xara reconnaît un symbole, fin → EndScreen « à suivre » | `demoFinished` |
 
 Le passage `mossWalls` de `foret_sombre_2` (ouvert avec le repulsif) mène à un secret
 (cœur bonus / raccourci). Les anciennes zones (Zone1…Zone5, zonetest, SousGrotte,

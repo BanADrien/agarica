@@ -1,7 +1,7 @@
 // Dialogues, cinématiques et scripts de zone de l'acte 2 — agent Acte 2.
 //
 // Zones (cf. docs/production/PLAN_DEV.md, progression 8 à 16) :
-//   foret_flottante_1 (Galter, duel comique, carte) → foret_flottante_2
+//   foret_flottante_1 (Geralt, duel comique, carte) → foret_flottante_2
 //   (totem de poche, Amanite, totem de l'aigle, plané) → clairiere_plante
 //   (fleur résistante) → hutte_morgat (répulsif, crash) → foret_corrompue_1
 //   → arene_ghilt / trou_sombre (boss_ghilt.js : on ne fait ici que réécrire
@@ -9,10 +9,10 @@
 // Les fichiers Scene restent le gabarit générique : tout passe par la donnée
 // de zone (`script: 'acte2_…'`, `triggers`, `npcs`…) et les registres.
 //
-// Flags posés ici : galterMet, amaniteMet, fleurPrelevee, morgatVue,
+// Flags posés ici : geraltMet, amaniteMet, fleurPrelevee, morgatVue,
 // crashDone, fc1Reveil, fc1MousseFermee, demoFinished (+ hasEagleForm par le
-// totem, objets carte_galter, totem_poche_casse, fleur_resistante, repulsif,
-// note_galter, et les flags automatiques trig_* / pickup_* / moss* de StoryKit).
+// totem, objets carte_geralt, totem_poche_casse, fleur_resistante, repulsif,
+// note_geralt, et les flags automatiques trig_* / pickup_* / moss* de StoryKit).
 
 // Le totem de poche est trouvé dans les ruines des îles flottantes (et non
 // dans la hutte, comme le disait la description par défaut de StoryKit).
@@ -39,7 +39,7 @@ function a2Tween(scene, cfg) {
   });
 }
 
-// Texte qui monte et s'efface au-dessus d'un personnage (annonces de Galter…).
+// Texte qui monte et s'efface au-dessus d'un personnage (annonces de Geralt…).
 function a2Float(scene, x, y, text, color = '#ffe9f5', { size = 16, ms = 1400 } = {}) {
   const t = scene.add.text(x, y, text, {
     fontFamily: STORY_UI.serif, fontSize: `${size}px`, fontStyle: 'bold', color,
@@ -165,7 +165,7 @@ function a2Npc(scene, key) {
 }
 
 // ===========================================================================
-// 8. FORÊT FLOTTANTE 1 — le chemin des hauteurs, Galter et Clak
+// 8. FORÊT FLOTTANTE 1 — le chemin des hauteurs, Geralt et Clak
 // ===========================================================================
 Object.assign(DIALOGUES, {
   ff1_intro: [
@@ -175,52 +175,52 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: 'Et tu sais où elle est, toi ?' },
     { who: 'xara', text: 'Je connais… un chemin. Par les hauteurs. Grimpe, et garde les yeux ouverts.' },
   ],
-  galter_rencontre: [
-    { who: 'galter', text: 'HALTE ! Pas un pas de plus, porteuse de mousse !' },
+  geralt_rencontre: [
+    { who: 'geralt', text: 'HALTE ! Pas un pas de plus, porteuse de mousse !' },
     { who: 'clak', text: 'Clac !' },
     { who: 'agarica', text: 'Porteuse de… quoi ? Je ne porte rien du tout !' },
-    { who: 'galter', text: 'C\'est exactement ce que dirait quelqu\'un qui porte de la mousse. Ou qui vient voler mes notes.' },
+    { who: 'geralt', text: 'C\'est exactement ce que dirait quelqu\'un qui porte de la mousse. Ou qui vient voler mes notes.' },
     { who: 'xara', text: 'Il a l\'air très sûr de lui. C\'est rarement bon signe.' },
-    { who: 'galter', text: 'Galter, ranger des marches boisées. Et voici Clak, mon totem. Tremble.' },
+    { who: 'geralt', text: 'Geralt, ranger des marches boisées. Et voici Clak, mon totem. Tremble.' },
     { who: 'clak', text: 'Clac clac.' },
-    { who: 'galter', text: 'En garde ! Un duel, et la vérité éclatera !' },
+    { who: 'geralt', text: 'En garde ! Un duel, et la vérité éclatera !' },
     { who: 'agarica', text: 'Je ne veux pas te faire de mal…' },
-    { who: 'galter', text: 'Ha ! Personne ne m\'a jamais fait de mal. Enfin… presque personne. Enfin, pas souvent.' },
+    { who: 'geralt', text: 'Ha ! Personne ne m\'a jamais fait de mal. Enfin… presque personne. Enfin, pas souvent.' },
   ],
-  galter_rendu_victoire: [
-    { who: 'galter', text: 'Ouille… D\'accord, d\'accord ! Je me rends. Stratégiquement.' },
+  geralt_rendu_victoire: [
+    { who: 'geralt', text: 'Ouille… D\'accord, d\'accord ! Je me rends. Stratégiquement.' },
     { who: 'agarica', text: 'Tu n\'as rien de cassé ?' },
-    { who: 'galter', text: 'Juste ma réputation. Clak la recollera.' },
+    { who: 'geralt', text: 'Juste ma réputation. Clak la recollera.' },
   ],
-  galter_rendu_temps: [
+  geralt_rendu_temps: [
     { who: 'xara', text: 'Ça suffit, vous deux. Vous allez finir par vous faire mal… lui, surtout.' },
-    { who: 'galter', text: 'Pff. Je la tenais. Clak, dis-lui que je la tenais.' },
+    { who: 'geralt', text: 'Pff. Je la tenais. Clak, dis-lui que je la tenais.' },
     { who: 'clak', text: '…' },
   ],
-  galter_paix: [
+  geralt_paix: [
     { who: 'xara', text: 'Ranger, vous cherchez l\'origine de la mousse. Elle aussi. Vous auriez pu commencer par là.' },
-    { who: 'galter', text: '… Tu cherches la source, toi aussi ?' },
+    { who: 'geralt', text: '… Tu cherches la source, toi aussi ?' },
     { who: 'agarica', text: 'Je veux sauver la forêt. Et… pouvoir rentrer chez moi, un jour.' },
-    { who: 'galter', text: 'Alors on est dans la même galère, petite. Tiens. Ma carte.' },
+    { who: 'geralt', text: 'Alors on est dans la même galère, petite. Tiens. Ma carte.' },
   ],
-  galter_carte: [
-    { who: 'galter', text: 'Elle est incomplète. Les flèches qui se contredisent, c\'est normal. Les traces de pinces, c\'est Clak.' },
-    { who: 'galter', text: 'Mais regarde ce que j\'ai noté : la mousse ne s\'étale pas au hasard. Elle monte. Vers les hauteurs.' },
-    { who: 'galter', text: 'Et elle pousse plus vite là où les bêtes sont malades. Comme si elle suivait la fièvre… ou l\'inverse.' },
+  geralt_carte: [
+    { who: 'geralt', text: 'Elle est incomplète. Les flèches qui se contredisent, c\'est normal. Les traces de pinces, c\'est Clak.' },
+    { who: 'geralt', text: 'Mais regarde ce que j\'ai noté : la mousse ne s\'étale pas au hasard. Elle monte. Vers les hauteurs.' },
+    { who: 'geralt', text: 'Et elle pousse plus vite là où les bêtes sont malades. Comme si elle suivait la fièvre… ou l\'inverse.' },
     { who: 'agarica', text: 'Alors il faut monter. On y va ensemble ?' },
-    { who: 'galter', text: '« Ensemble », oui. Regarde-moi bien faire.' },
+    { who: 'geralt', text: '« Ensemble », oui. Regarde-moi bien faire.' },
   ],
-  galter_essai: [
+  geralt_essai: [
     { who: 'clak', text: 'Clac. Clac clac.' },
-    { who: 'galter', text: 'Il dit que j\'aurais pu demander de l\'aide. Je ne lui ai pas demandé son avis.' },
-    { who: 'galter', text: 'J\'avais une corde, trois pièges et un discours héroïque. Rien de tout ça ne saute plus haut que moi.' },
-    { who: 'galter', text: 'Bon. Va, Agarica. Je garde le camp, et je mettrai la carte à jour avec ce que tu rapporteras.' },
-    { who: 'agarica', text: 'Merci, Galter ! Je reviendrai tout te raconter.' },
+    { who: 'geralt', text: 'Il dit que j\'aurais pu demander de l\'aide. Je ne lui ai pas demandé son avis.' },
+    { who: 'geralt', text: 'J\'avais une corde, trois pièges et un discours héroïque. Rien de tout ça ne saute plus haut que moi.' },
+    { who: 'geralt', text: 'Bon. Va, Agarica. Je garde le camp, et je mettrai la carte à jour avec ce que tu rapporteras.' },
+    { who: 'agarica', text: 'Merci, Geralt ! Je reviendrai tout te raconter.' },
     { who: 'xara', text: 'Il a raison sur un point : la mousse sait où elle va. Suivons-la vers le haut.' },
   ],
-  galter_camp: [
-    { who: 'galter', text: 'Toujours en un seul morceau ? Bien. Ça me fait une alliée de plus et un point d\'interrogation de moins.' },
-    { who: 'galter', text: 'La mousse monte, petite. Toujours. Moi, je reste en bas à prendre des notes.' },
+  geralt_camp: [
+    { who: 'geralt', text: 'Toujours en un seul morceau ? Bien. Ça me fait une alliée de plus et un point d\'interrogation de moins.' },
+    { who: 'geralt', text: 'La mousse monte, petite. Toujours. Moi, je reste en bas à prendre des notes.' },
   ],
   clak_camp: [
     { who: 'clak', text: 'Clac.' },
@@ -242,54 +242,54 @@ CUTSCENES.ff1_vue = [
   { cameraFollow: true },
 ];
 
-// Premier contact : Galter bondit hors de son camp.
-CUTSCENES.galter_rencontre = (scene) => {
+// Premier contact : Geralt bondit hors de son camp.
+CUTSCENES.geralt_rencontre = (scene) => {
   const p = scene.player;
   const gx = Phaser.Math.Clamp(p.x + 240, 900, 1400);
   return [
-    { npcMove: { npc: 'galter', toX: gx, speed: 260 } },
-    { npcFace: { npc: 'galter', dir: 'player' } },
+    { npcMove: { npc: 'geralt', toX: gx, speed: 260 } },
+    { npcFace: { npc: 'geralt', dir: 'player' } },
     { playerFace: 'right' },
     { shake: { ms: 200, intensity: 0.004 } },
-    { say: 'galter_rencontre' },
-    { npcAnim: { npc: 'galter', anim: 'idle' } },
-    { toast: 'Duel ! Touche Galter trois fois (K ou clic)… sans trop lui faire mal.' },
+    { say: 'geralt_rencontre' },
+    { npcAnim: { npc: 'geralt', anim: 'idle' } },
+    { toast: 'Duel ! Touche Geralt trois fois (K ou clic)… sans trop lui faire mal.' },
   ];
 };
 
-CUTSCENES.galter_fin_duel = (scene) => {
+CUTSCENES.geralt_fin_duel = (scene) => {
   const st = scene.__a2 || {};
   return [
-    { npcFace: { npc: 'galter', dir: 'player' } },
-    { say: st.duelEnd === 'temps' ? 'galter_rendu_temps' : 'galter_rendu_victoire' },
-    { say: 'galter_paix' },
-    { npcAnim: { npc: 'galter', anim: 'map_reading' } },
+    { npcFace: { npc: 'geralt', dir: 'player' } },
+    { say: st.duelEnd === 'temps' ? 'geralt_rendu_temps' : 'geralt_rendu_victoire' },
+    { say: 'geralt_paix' },
+    { npcAnim: { npc: 'geralt', anim: 'map_reading' } },
     { playerPose: 'receive_item' },
-    { give: 'carte_galter' },
+    { give: 'carte_geralt' },
     { wait: 700 },
     { playerPose: null },
-    { toast: 'Touche M : consulter la carte de Galter' },
-    { say: 'galter_carte' },
-    { npcAnim: { npc: 'galter', anim: 'walk' } },
+    { toast: 'Touche M : consulter la carte de Geralt' },
+    { say: 'geralt_carte' },
+    { npcAnim: { npc: 'geralt', anim: 'walk' } },
     { parallel: [
-      { npcMove: { npc: 'galter', toX: 1850, speed: 150 } },
+      { npcMove: { npc: 'geralt', toX: 1850, speed: 150 } },
       { npcMove: { npc: 'clak', toX: 1790, speed: 150 } },
       { playerMove: { toX: 1680 } },
     ] },
-    { npcAnim: { npc: 'galter', anim: 'idle' } },
+    { npcAnim: { npc: 'geralt', anim: 'idle' } },
     { camera: { x: 1820, y: 300, ms: 600 } },
-    { call: (sc) => a2GalterComicJump(sc) },
-    { say: 'galter_essai' },
-    { set: { galterMet: true } },
+    { call: (sc) => a2GeraltComicJump(sc) },
+    { say: 'geralt_essai' },
+    { set: { geraltMet: true } },
     { call: (sc) => a2Ff1EndDuel(sc) },
     { cameraFollow: true },
     { toast: 'Double saut pour atteindre la corniche' },
   ];
 };
 
-// Galter tente la corniche : petit bond raté, puis la corde qui lui retombe dessus.
-async function a2GalterComicJump(scene) {
-  const g = a2Npc(scene, 'galter');
+// Geralt tente la corniche : petit bond raté, puis la corde qui lui retombe dessus.
+async function a2GeraltComicJump(scene) {
+  const g = a2Npc(scene, 'geralt');
   const clak = a2Npc(scene, 'clak');
   if (!g) return;
   const gy = g.y;
@@ -336,27 +336,27 @@ function a2Ff1EndDuel(scene) {
   hideBossBar(scene);
 }
 
-// --- Duel comique : Galter enchaîne des « techniques » qui ratent toutes ---
-const GALTER_DUEL = { minX: 660, maxX: 1560, hits: 3, timeoutMs: 40000, pauseMs: 1500 };
-const GALTER_TECHNIQUES = ['fleche', 'bond', 'piege', 'charge'];
+// --- Duel comique : Geralt enchaîne des « techniques » qui ratent toutes ---
+const GERALT_DUEL = { minX: 660, maxX: 1560, hits: 3, timeoutMs: 40000, pauseMs: 1500 };
+const GERALT_TECHNIQUES = ['fleche', 'bond', 'piege', 'charge'];
 
 async function a2Ff1Encounter(scene) {
   const st = scene.__a2;
-  st.walls = a2Walls(scene, [GALTER_DUEL.minX, GALTER_DUEL.maxX]);
-  await runCutscene(scene, 'galter_rencontre');
+  st.walls = a2Walls(scene, [GERALT_DUEL.minX, GERALT_DUEL.maxX]);
+  await runCutscene(scene, 'geralt_rencontre');
   if (!scene.player || scene.__a2 !== st) return;
-  const g = a2Npc(scene, 'galter');
+  const g = a2Npc(scene, 'geralt');
   st.duel = {
     active: true, hits: 0, busy: false, tech: 0, startAt: scene.time.now,
     nextAt: scene.time.now + 900, invulUntil: 0, lastToken: null, gy: g.y,
   };
-  showBossBar(scene, 'Galter, ranger des marches boisées', () => 1 - (st.duel ? st.duel.hits : 0) / GALTER_DUEL.hits);
+  showBossBar(scene, 'Geralt, ranger des marches boisées', () => 1 - (st.duel ? st.duel.hits : 0) / GERALT_DUEL.hits);
 }
 
 function a2DuelUpdate(scene) {
   const st = scene.__a2;
   const d = st.duel;
-  const g = a2Npc(scene, 'galter');
+  const g = a2Npc(scene, 'geralt');
   const p = scene.player;
   if (!d || !d.active || !g) return;
   const now = scene.time.now;
@@ -366,29 +366,29 @@ function a2DuelUpdate(scene) {
     const token = p.isAttacking ? `m-${p.attackEndTime}` : `d-${Math.floor(now / 400)}`;
     if (token !== d.lastToken) {
       d.lastToken = token;
-      a2GalterHit(scene, d, g);
+      a2GeraltHit(scene, d, g);
     }
   }
-  if (d.hits >= GALTER_DUEL.hits) { a2DuelFinish(scene, 'victoire'); return; }
-  if (now - d.startAt > GALTER_DUEL.timeoutMs) { a2DuelFinish(scene, 'temps'); return; }
+  if (d.hits >= GERALT_DUEL.hits) { a2DuelFinish(scene, 'victoire'); return; }
+  if (now - d.startAt > GERALT_DUEL.timeoutMs) { a2DuelFinish(scene, 'temps'); return; }
   if (!d.busy && now >= d.nextAt) {
     d.busy = true;
-    const tech = GALTER_TECHNIQUES[d.tech % GALTER_TECHNIQUES.length];
+    const tech = GERALT_TECHNIQUES[d.tech % GERALT_TECHNIQUES.length];
     d.tech += 1;
-    a2GalterTechnique(scene, d, g, tech)
-      .catch((e) => console.error('duel Galter', e))
+    a2GeraltTechnique(scene, d, g, tech)
+      .catch((e) => console.error('duel Geralt', e))
       .finally(() => {
         d.busy = false;
-        d.nextAt = scene.time.now + GALTER_DUEL.pauseMs;
+        d.nextAt = scene.time.now + GERALT_DUEL.pauseMs;
         if (d.tech === 1) showToast(scene, 'Xara : « Il vise très bien… le crabe. »', 2400);
         if (d.tech === 3) showToast(scene, 'Xara : « Je crois que le crabe est de ton côté. »', 2400);
       });
   }
 }
 
-const GALTER_OUCH = ['Ouille !', 'Aïe, mon orgueil !', 'Pas le visage !'];
+const GERALT_OUCH = ['Ouille !', 'Aïe, mon orgueil !', 'Pas le visage !'];
 
-function a2GalterHit(scene, d, g) {
+function a2GeraltHit(scene, d, g) {
   d.hits += 1;
   d.invulUntil = scene.time.now + 700;
   if (scene.player.gainEnergy) scene.player.gainEnergy(ENERGY_PER_HIT);
@@ -396,18 +396,18 @@ function a2GalterHit(scene, d, g) {
   scene.time.delayedCall(140, () => g.active && g.setTint(0xffb0b0));
   scene.time.delayedCall(320, () => g.active && g.clearTint());
   scene.cameras.main.shake(90, 0.003);
-  a2Float(scene, g.x, g.y - 90, GALTER_OUCH[(d.hits - 1) % GALTER_OUCH.length], '#ffb0b0');
+  a2Float(scene, g.x, g.y - 90, GERALT_OUCH[(d.hits - 1) % GERALT_OUCH.length], '#ffb0b0');
 }
 
-function a2GalterDir(scene, g) {
+function a2GeraltDir(scene, g) {
   return scene.player.x >= g.x ? 1 : -1;
 }
 
-async function a2GalterTechnique(scene, d, g, tech) {
+async function a2GeraltTechnique(scene, d, g, tech) {
   const clak = a2Npc(scene, 'clak');
-  const dir = a2GalterDir(scene, g);
+  const dir = a2GeraltDir(scene, g);
   setNpcFacing(g, dir);
-  const clampX = (x) => Phaser.Math.Clamp(x, GALTER_DUEL.minX + 50, GALTER_DUEL.maxX - 50);
+  const clampX = (x) => Phaser.Math.Clamp(x, GERALT_DUEL.minX + 50, GERALT_DUEL.maxX - 50);
   if (tech === 'fleche') {
     a2Float(scene, g.x, g.y - 85, 'Flèche du Héron Silencieux !', '#ffd27a');
     g.playManifest('attack_miss', false);
@@ -453,7 +453,7 @@ async function a2GalterTechnique(scene, d, g, tech) {
     await a2Wait(scene, 700);
     setNpcFacing(g, dir);
     await a2Tween(scene, { targets: g, x: trapX, duration: 380 });
-    // Le collet se referme : Galter pend la tête en bas.
+    // Le collet se referme : Geralt pend la tête en bas.
     trap.destroy();
     // Origine du sprite aux pieds : retourné à 180°, il s'étend VERS LE BAS
     // depuis ses pieds. On remonte donc les pieds d'une hauteur de sprite
@@ -474,7 +474,7 @@ async function a2GalterTechnique(scene, d, g, tech) {
     a2Float(scene, g.x, g.y - 85, 'Charge du Sanglier Solitaire !', '#ffd27a');
     a2Float(scene, g.x, g.y - 115, '!', '#ff6b6b', { size: 24, ms: 700 });
     await a2Wait(scene, 600);
-    // Clak se met en travers, Galter trébuche dessus.
+    // Clak se met en travers, Geralt trébuche dessus.
     const cx = clampX(g.x + dir * 70);
     if (clak) {
       clak.playManifest('scuttle');
@@ -500,9 +500,9 @@ async function a2DuelFinish(scene, reason) {
   if (!d || !d.active) return;
   d.active = false;
   st.duelEnd = reason;
-  // Laisse finir la technique en cours (bornée), puis remet Galter d'aplomb.
+  // Laisse finir la technique en cours (bornée), puis remet Geralt d'aplomb.
   for (let i = 0; i < 40 && d.busy; i++) await a2Wait(scene, 100);
-  const g = a2Npc(scene, 'galter');
+  const g = a2Npc(scene, 'geralt');
   if (g) {
     scene.tweens.killTweensOf(g);
     g.setAngle(0).setY(d.gy).clearTint();
@@ -512,7 +512,7 @@ async function a2DuelFinish(scene, reason) {
   // Les murs du duel tombent AVANT la cinématique : elle fait marcher Agarica
   // jusqu'à x 1680, au-delà du mur droit (x 1560) — elle s'y bloquait.
   a2Ff1EndDuel(scene);
-  await runCutscene(scene, 'galter_fin_duel');
+  await runCutscene(scene, 'geralt_fin_duel');
 }
 
 // Brume du bas qui se déchire et lumière du jour qui grandit en montant.
@@ -565,9 +565,9 @@ ZONE_SCRIPTS.acte2_ff1 = {
     a2Ff1Atmosphere(scene);
     a2DrawTotemRuin(scene, 3120, 128 + 16, 56);
     a2DrawTotemRuin(scene, 3260, 128 + 16, 34, 0x8a7a66);
-    if (storyGet('galterMet')) {
-      // Revisite : Galter au pied de la corniche, plongé dans sa carte.
-      const g = a2Npc(scene, 'galter');
+    if (storyGet('geraltMet')) {
+      // Revisite : Geralt au pied de la corniche, plongé dans sa carte.
+      const g = a2Npc(scene, 'geralt');
       const c = a2Npc(scene, 'clak');
       if (g) { g.x = 1840; g.playManifest('map_reading'); }
       if (c) c.x = 1790;
@@ -577,9 +577,9 @@ ZONE_SCRIPTS.acte2_ff1 = {
     const st = scene.__a2;
     if (!st) return;
     a2Ff1AtmosphereUpdate(scene);
-    if (!storyGet('galterMet') && !st.encounterStarted && scene.player.x > 920 && scene.player.x < 1500) {
+    if (!storyGet('geraltMet') && !st.encounterStarted && scene.player.x > 920 && scene.player.x < 1500) {
       st.encounterStarted = true;
-      a2Ff1Encounter(scene).catch((e) => console.error('rencontre Galter', e));
+      a2Ff1Encounter(scene).catch((e) => console.error('rencontre Geralt', e));
     }
     a2DuelUpdate(scene);
   },
@@ -1322,8 +1322,8 @@ Object.assign(DIALOGUES, {
   fc1_reveil_2: [
     { who: 'agarica', text: 'Où sommes-nous ? Les arbres sont tout tordus… et la mousse respire.' },
     { who: 'xara', text: 'Le cœur de la corruption. Tu n\'as pas atterri où tu voulais… mais tu en es plus près que quiconque.' },
-    { who: 'agarica', text: 'Plus près que Galter ?' },
-    { who: 'xara', text: 'Galter n\'a jamais su voler.' },
+    { who: 'agarica', text: 'Plus près que Geralt ?' },
+    { who: 'xara', text: 'Geralt n\'a jamais su voler.' },
     { who: 'agarica', text: 'Moi non plus, apparemment.' },
   ],
   fc1_ferme: [
@@ -1334,12 +1334,12 @@ Object.assign(DIALOGUES, {
     { who: 'xara', text: 'Un amas de mousse, dur comme de l\'écorce. Il bouche toute la galerie.' },
     { who: 'agarica', text: 'Le talisman de mon père… La force de l\'ours devrait suffire.' },
   ],
-  fc1_note_galter: [
+  fc1_note_geralt: [
     'Un campement abandonné. Sous une pierre, une page arrachée, couverte d\'une écriture pressée.',
     '« Jour 23. La mousse est plus épaisse ici que partout ailleurs. Elle pousse en spirale, autour de quelque chose. »',
     '« Les bêtes malades tournent en rond près de l\'antre. Elles ne mangent plus. Elles gardent. »',
     '« Je n\'irai pas plus loin seul. Clak refuse aussi. Si tu lis ceci, c\'est que je suis passé par là. Ou que je l\'ai perdue. »',
-    { who: 'agarica', text: 'Galter est venu jusqu\'ici… à pied !' },
+    { who: 'agarica', text: 'Geralt est venu jusqu\'ici… à pied !' },
     { who: 'xara', text: 'Et il a vu juste. Les bêtes « gardent ». Reste à savoir quoi.' },
   ],
   fc1_papillons: [
@@ -1380,7 +1380,7 @@ CUTSCENES.fc1_amas = [
   { say: 'fc1_amas' },
   { toast: 'Compétence de l\'ours (touche A, F ou R) : brise l\'amas. Le feu de camp recharge ton énergie.' },
 ];
-CUTSCENES.fc1_note_galter = [{ wait: 300 }, { say: 'fc1_note_galter' }];
+CUTSCENES.fc1_note_geralt = [{ wait: 300 }, { say: 'fc1_note_geralt' }];
 CUTSCENES.fc1_papillons = (scene) => [
   { call: (sc) => a2Fc1Butterflies(sc, true) },
   { wait: 1200 },
@@ -1543,7 +1543,7 @@ Object.assign(DIALOGUES, {
     { who: 'xara', text: 'Agarica… le sol vibre. Quelque chose d\'énorme respire sous la mousse.' },
     { who: 'ghilt', text: 'GRRRROOOOAAAAH !' },
     { who: 'agarica', text: 'Un tapir… gigantesque. La mousse lui coule du museau comme de la bave.' },
-    { who: 'xara', text: 'Ghil\'t, le Fléau de la Forêt. Voilà ce que les bêtes de Galter « gardaient ».' },
+    { who: 'xara', text: 'Ghil\'t, le Fléau de la Forêt. Voilà ce que les bêtes de Geralt « gardaient ».' },
     { who: 'xara', text: 'Méfie-toi de ses charges, de son souffle… et ne marche pas dans ce qu\'il crache !' },
     { who: 'agarica', text: 'Il souffre, Xara. Je l\'entends dans sa voix.' },
     { who: 'agarica', text: 'Je ne fuirai pas. Mais je ne veux pas le tuer.' },
@@ -1600,13 +1600,13 @@ Object.assign(DIALOGUES, {
     { who: 'amanite', text: 'J\'ai sauvé le bosquet. Toi, tu jouais avec des papillons.' },
     { who: 'amanite', text: 'Je rentre leur annoncer la nouvelle. Eux, au moins, sauront qui remercier.' },
   ],
-  ghilt_galter: [
-    { who: 'galter', text: 'Par toutes les racines… j\'arrive trop tard, hein ?' },
+  ghilt_geralt: [
+    { who: 'geralt', text: 'Par toutes les racines… j\'arrive trop tard, hein ?' },
     { who: 'clak', text: 'Clac…' },
-    { who: 'agarica', text: 'Galter… je l\'avais soigné. Amanite l\'a achevé sous mes yeux.' },
-    { who: 'galter', text: 'J\'ai vu les papillons de loin. Et j\'ai vu la mousse reculer. Ça, petite, personne ne l\'avait jamais fait.' },
-    { who: 'galter', text: 'Regarde-le : la mousse le rongeait de l\'intérieur. Il était malade, pas la maladie. La source est ailleurs.' },
-    { who: 'galter', text: 'Viens. On rentre au bosquet. Ton père doit entendre la vérité… de ma bouche, s\'il le faut.' },
+    { who: 'agarica', text: 'Geralt… je l\'avais soigné. Amanite l\'a achevé sous mes yeux.' },
+    { who: 'geralt', text: 'J\'ai vu les papillons de loin. Et j\'ai vu la mousse reculer. Ça, petite, personne ne l\'avait jamais fait.' },
+    { who: 'geralt', text: 'Regarde-le : la mousse le rongeait de l\'intérieur. Il était malade, pas la maladie. La source est ailleurs.' },
+    { who: 'geralt', text: 'Viens. On rentre au bosquet. Ton père doit entendre la vérité… de ma bouche, s\'il le faut.' },
   ],
 });
 
@@ -1624,21 +1624,21 @@ Object.assign(DIALOGUES, {
   ],
   br_garde: [
     { who: 'garde', text: 'Halte ! Agarica ? Tu es bannie, tu n\'as rien à faire ici !' },
-    { who: 'galter', text: 'Elle est avec moi. Range ta lance, mon garçon, avant de te piquer avec.' },
+    { who: 'geralt', text: 'Elle est avec moi. Range ta lance, mon garçon, avant de te piquer avec.' },
     { who: 'garde', text: 'Et vous êtes qui, vous ?' },
-    { who: 'galter', text: 'Quelqu\'un que ton chef connaît depuis bien avant ta naissance.' },
+    { who: 'geralt', text: 'Quelqu\'un que ton chef connaît depuis bien avant ta naissance.' },
   ],
-  br_galter_chef: [
-    { who: 'pere_chef', text: '… Galter ? Vieille racine ! Ça fait dix hivers !' },
-    { who: 'galter', text: 'Onze. Et ta barbe a blanchi, ma vieille branche.' },
+  br_geralt_chef: [
+    { who: 'pere_chef', text: '… Geralt ? Vieille racine ! Ça fait dix hivers !' },
+    { who: 'geralt', text: 'Onze. Et ta barbe a blanchi, ma vieille branche.' },
     { who: 'clak', text: 'Clac !' },
     { who: 'pere_chef', text: 'Et Clak, toujours aussi bavard. Que fais-tu ici… avec ma fille ?' },
   ],
   br_verite: [
-    { who: 'galter', text: 'Je viens rétablir la vérité. J\'étais à l\'antre du Fléau. J\'ai tout vu.' },
-    { who: 'galter', text: 'Agarica a affaibli Ghil\'t sans jamais l\'achever. Puis, avec les papillons de la guérisseuse, elle l\'a guéri.' },
-    { who: 'galter', text: 'La mousse a quitté son corps. Il respirait en paix, comme une bête qui sort d\'une longue fièvre.' },
-    { who: 'galter', text: 'Et c\'est là qu\'Amanite est arrivée. Elle a achevé une créature guérie.' },
+    { who: 'geralt', text: 'Je viens rétablir la vérité. J\'étais à l\'antre du Fléau. J\'ai tout vu.' },
+    { who: 'geralt', text: 'Agarica a affaibli Ghil\'t sans jamais l\'achever. Puis, avec les papillons de la guérisseuse, elle l\'a guéri.' },
+    { who: 'geralt', text: 'La mousse a quitté son corps. Il respirait en paix, comme une bête qui sort d\'une longue fièvre.' },
+    { who: 'geralt', text: 'Et c\'est là qu\'Amanite est arrivée. Elle a achevé une créature guérie.' },
     'Un murmure parcourt le bosquet.',
   ],
   br_amanite_confrontation: [
@@ -1670,12 +1670,12 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: 'Père… je voulais seulement la protéger. Elle, et la forêt.' },
     { who: 'pere_chef', text: 'Je sais. Ce soir, ma fille, tu dormiras chez toi.', pose: null },
   ],
-  br_galter_source: [
-    { who: 'galter', text: 'Pas de fête trop longue, mes amis. Ghil\'t n\'était pas la source de la mousse.' },
-    { who: 'galter', text: 'C\'était une victime. Un relais, peut-être. La mousse vient de plus profond, et elle pousse encore.' },
-    { who: 'galter', text: 'J\'ai la carte pour le prouver… enfin, une partie de la carte.' },
+  br_geralt_source: [
+    { who: 'geralt', text: 'Pas de fête trop longue, mes amis. Ghil\'t n\'était pas la source de la mousse.' },
+    { who: 'geralt', text: 'C\'était une victime. Un relais, peut-être. La mousse vient de plus profond, et elle pousse encore.' },
+    { who: 'geralt', text: 'J\'ai la carte pour le prouver… enfin, une partie de la carte.' },
     { who: 'clak', text: 'Clac.' },
-    { who: 'galter', text: 'Oui. La partie que tu n\'as pas mangée.' },
+    { who: 'geralt', text: 'Oui. La partie que tu n\'as pas mangée.' },
   ],
   br_xara_symbole: [
     { who: 'agarica', text: 'Xara ? Tu es bien silencieuse.' },
@@ -1696,7 +1696,7 @@ Object.assign(DIALOGUES, {
   bosquet_retour_porteur: [{ who: 'habitant', text: 'Des papillons qui soignent… Si on m\'avait dit ça hier, j\'aurais ri.' }],
   bosquet_retour_druide: [{ who: 'habitant', name: ORME, text: 'Je te l\'avais dit : la forêt n\'est pas toujours cruelle. Elle t\'a ramenée, petite.' }],
   bosquet_retour_chef: [{ who: 'pere_chef', text: 'Repose-toi, ma fille. Demain, nous parlerons de la suite.' }],
-  bosquet_retour_galter: [{ who: 'galter', text: 'La carte est à jour. Enfin, presque : Clak a mangé le coin sud.' }],
+  bosquet_retour_geralt: [{ who: 'geralt', text: 'La carte est à jour. Enfin, presque : Clak a mangé le coin sud.' }],
   bosquet_retour_clak: [{ who: 'clak', text: 'Clac !' }],
 });
 
@@ -1704,11 +1704,11 @@ CUTSCENES.bosquet_retour = [
   { wait: 400 },
   // y explicite : hors du sol (x < 64), le PNJ restait posé à 448 (16 px
   // au-dessus de l'herbe, haut de la hitbox des tuiles = 464).
-  { npcAdd: { id: 'galter', x: 20, y: 464 } },
+  { npcAdd: { id: 'geralt', x: 20, y: 464 } },
   { npcAdd: { id: 'clak', x: -30, y: 464 } },
   { parallel: [
     { playerMove: { toX: 560, speed: 150 } },
-    { npcMove: { npc: 'galter', toX: 470, speed: 150 } },
+    { npcMove: { npc: 'geralt', toX: 470, speed: 150 } },
     { npcMove: { npc: 'clak', toX: 420, speed: 150 } },
   ] },
   { playerFace: 'right' },
@@ -1721,7 +1721,7 @@ CUTSCENES.bosquet_retour = [
   { say: 'br_garde' },
   { npcMove: { npc: 'pere_chef', toX: 760, speed: 140 } },
   { npcFace: { npc: 'pere_chef', dir: 'player' } },
-  { say: 'br_galter_chef' },
+  { say: 'br_geralt_chef' },
   { say: 'br_verite' },
   { npcMove: { npc: 'amanite', toX: 900, speed: 160 } },
   { npcFace: { npc: 'amanite', dir: 'player' } },
@@ -1739,7 +1739,7 @@ CUTSCENES.bosquet_retour = [
   { cameraFollow: true },
   { npcFace: { npc: 'pere_chef', dir: 'player' } },
   { say: 'br_apres' },
-  { say: 'br_galter_source' },
+  { say: 'br_geralt_source' },
   { say: 'br_xara_symbole' },
   { call: (scene) => a2PigletsGather(scene) },
   { say: 'br_cochons' },
@@ -1797,9 +1797,9 @@ ZONE_SCRIPTS.acte2_bosquet_retour = {
     a2InteractReset(scene);
     a2DrawIdol(scene);
     if (storyGet('demoFinished')) {
-      // Revisite après la fin : Galter et Clak sont restés au bosquet.
+      // Revisite après la fin : Geralt et Clak sont restés au bosquet.
       for (const n of [
-        { id: 'galter', x: 470, talk: 'bosquet_retour_galter' },
+        { id: 'geralt', x: 470, talk: 'bosquet_retour_geralt' },
         { id: 'clak', x: 420, talk: 'bosquet_retour_clak' },
       ]) {
         const npc = createStoryNpc(scene, n);

@@ -11,7 +11,7 @@ On continue la production des images de « Legend of Agarica ». Relis `CODEX_SP
 - après chaque asset : `python tools/import_codex_assets.py --only <id>` ;
 - ne modifie ni `src/` ni le manifeste.
 
-NE REFAIS PAS les personnages déjà importés (agarica_extra, singe, transfo_singe, xara_extra, pere_chef, amanite, habitants, galter, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_esprit, ghilt, ghilt_gueri) juste pour des écarts de taille entre poses ou entre planches : le jeu normalise les tailles par le code. Ne régénère un asset que si `import_codex_assets.py` affiche un AVERTISSEMENT (rangées ou frames manquantes / collées), ou si une frame est vide ou coupée. Dans ton rapport, marque ces assets « fait » avec une simple note.
+NE REFAIS PAS les personnages déjà importés (agarica_extra, singe, transfo_singe, xara_extra, pere_chef, amanite, habitants, geralt, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_esprit, ghilt, ghilt_gueri) juste pour des écarts de taille entre poses ou entre planches : le jeu normalise les tailles par le code. Ne régénère un asset que si `import_codex_assets.py` affiche un AVERTISSEMENT (rangées ou frames manquantes / collées), ou si une frame est vide ou coupée. Dans ton rapport, marque ces assets « fait » avec une simple note.
 
 À PRODUIRE, dans cet ordre :
 

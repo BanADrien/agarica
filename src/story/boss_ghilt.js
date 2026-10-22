@@ -6,7 +6,7 @@
 //     poche → totem_poche_actif + compétence papillon → trouSombreFait → arène ;
 //   arène phase 2 : combat (PV restants) → Ghil't affaibli (25 %) → compétence
 //     papillon → heal() → purification (ghiltHealed) → Amanite l'achève
-//     (amaniteKilledGhilt) → Galter → BosquetRetourScene.
+//     (amaniteKilledGhilt) → Geralt → BosquetRetourScene.
 // Tous les textes sont dans DIALOGUES (ids ghilt_* / trou_*) : l'agent Acte 2
 // peut les réécrire dans src/story/acte2.js (chargé après ce fichier).
 
@@ -67,11 +67,11 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: 'Tu viens de détruire la seule preuve qu\'on pouvait les sauver…' },
     { who: 'amanite', text: "J'ai sauvé le bosquet. Toi, tu jouais avec des papillons. Je rentre leur annoncer la nouvelle." },
   ],
-  ghilt_galter: [
-    { who: 'galter', text: "Par toutes les racines… j'arrive trop tard, hein ?" },
-    { who: 'agarica', text: "Galter… je l'avais soigné. Amanite l'a achevé sous mes yeux." },
-    { who: 'galter', text: "J'ai vu les papillons de loin. Et j'ai vu la mousse reculer. Ça, petite, personne ne l'avait jamais fait." },
-    { who: 'galter', text: 'Viens. On rentre au bosquet. Ton père doit entendre la vérité… de ma bouche, s\'il le faut.' },
+  ghilt_geralt: [
+    { who: 'geralt', text: "Par toutes les racines… j'arrive trop tard, hein ?" },
+    { who: 'agarica', text: "Geralt… je l'avais soigné. Amanite l'a achevé sous mes yeux." },
+    { who: 'geralt', text: "J'ai vu les papillons de loin. Et j'ai vu la mousse reculer. Ça, petite, personne ne l'avait jamais fait." },
+    { who: 'geralt', text: 'Viens. On rentre au bosquet. Ton père doit entendre la vérité… de ma bouche, s\'il le faut.' },
   ],
 });
 
@@ -237,7 +237,7 @@ function ghBlackout(scene, ms, from = 0, to = 1) {
 // Placeholders lisibles (taille ≈ finale) pour les PNJ/décors sans entrée de manifest.
 const GH_PLACEHOLDERS = {
   amanite: { w: 52, h: 96, color: 0xb3263a, label: 'Amanite' },
-  galter: { w: 44, h: 66, color: 0x5b7a3a, label: 'Galter' },
+  geralt: { w: 44, h: 66, color: 0x5b7a3a, label: 'Geralt' },
   papillon: { w: 18, h: 14, color: 0xffe680, label: '' },
   vfx_purification: { w: 160, h: 160, color: 0xe8ffd8, label: '' },
 };
@@ -593,7 +593,7 @@ function ghiltWeakenedHint(scene, st) {
   });
 }
 
-// Purification → Amanite → Galter → bosquet.
+// Purification → Amanite → Geralt → bosquet.
 async function ghiltSoin(scene, st) {
   if (st.busy) return;
   st.busy = true;
@@ -606,7 +606,7 @@ async function ghiltSoin(scene, st) {
   const bx = boss.x;
   const by = boss.y;
   const midY = by - boss.displayHeight * 0.5;
-  // Cadre fixe sur Agarica + Ghil't pour toute la fin (Amanite, Galter).
+  // Cadre fixe sur Agarica + Ghil't pour toute la fin (Amanite, Geralt).
   cam.stopFollow();
   cam.pan((player.x + bx) / 2, cam.midPoint.y, 700, 'Sine.easeInOut');
 
@@ -698,14 +698,14 @@ async function ghiltSoin(scene, st) {
   });
   amanite.destroy();
 
-  // Galter arrive (par la gauche, depuis la forêt corrompue).
-  const galter = ghSprite(scene, cam.scrollX - 50, ghArenaGroundY(scene, 100), 'galter', 'walk');
-  await ghTween(scene, { targets: galter, x: player.x - 90, duration: 1500, ease: 'Sine.easeOut' });
-  ghAnim(galter, 'idle');
+  // Geralt arrive (par la gauche, depuis la forêt corrompue).
+  const geralt = ghSprite(scene, cam.scrollX - 50, ghArenaGroundY(scene, 100), 'geralt', 'walk');
+  await ghTween(scene, { targets: geralt, x: player.x - 90, duration: 1500, ease: 'Sine.easeOut' });
+  ghAnim(geralt, 'idle');
   scene.npcs = scene.npcs || {};
-  scene.npcs.galter = galter;
-  await ghSay(scene, 'ghilt_galter');
-  delete scene.npcs.galter;
+  scene.npcs.geralt = geralt;
+  await ghSay(scene, 'ghilt_geralt');
+  delete scene.npcs.geralt;
   await ghBlackout(scene, 900);
   ghLock(scene, false);
   goToScene(scene, 'BosquetRetourScene', { enterId: 'from_arene' });

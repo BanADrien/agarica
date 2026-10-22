@@ -7,7 +7,7 @@
 //   x 0-832      lisière malade, cratère du crash ; la mousse se referme
 //                derrière Agarica (x ~420) une fois qu'elle avance
 //   x 832-1664   galerie de mousse (voûte basse), créature ; refuge : feu de
-//                camp (énergie pleine) + campement abandonné de Galter (note)
+//                camp (énergie pleine) + campement abandonné de Geralt (note)
 //   x 1728-1920  amas de mousse sous un tronc tombé : compétence de l'ours
 //   x 1920-3072  carrefour vivant : plateformes, créatures corrompues, arbre
 //                marqué d'une spirale
@@ -41,7 +41,7 @@ const FORET_CORROMPUE_1_DATA = {
     { type: 'bosquet_mossy_rock', x: 3500, y: 448, scale: 0.3 },
   ],
   pickups: [
-    { item: 'note_galter', x: 1600, cutscene: 'fc1_note_galter' },
+    { item: 'note_geralt', x: 1600, cutscene: 'fc1_note_geralt' },
   ],
   // Amas dense : fracas de l'ours. Monte jusqu'au tronc tombé (gy 3).
   mossBlocks: [{ id: 'amas_galerie', x: 1824, y: 320, w: 128, h: 256 }],

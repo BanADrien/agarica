@@ -1,0 +1,62 @@
+[
+  {
+    "source": "assets/sprites/singe_corrompu.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      124,
+      128
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          173,
+          165,
+          157,
+          173
+        ],
+        "horizontal_gaps": [
+          160,
+          147,
+          164
+        ]
+      },
+      {
+        "row": 1,
+        "count": 5,
+        "heights": [
+          160,
+          176,
+          170,
+          178,
+          167
+        ],
+        "horizontal_gaps": [
+          74,
+          68,
+          83,
+          86
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          188,
+          202,
+          190,
+          194
+        ],
+        "horizontal_gaps": [
+          109,
+          133,
+          119
+        ]
+      }
+    ]
+  }
+]

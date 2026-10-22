@@ -1,12 +1,12 @@
 // Zone « foret_flottante_1 » — le chemin des hauteurs (étape 8 de PLAN_DEV.md).
-// Logique (rencontre de Galter, duel comique, carte, brume qui se déchire) :
+// Logique (rencontre de Geralt, duel comique, carte, brume qui se déchire) :
 // ZONE_SCRIPTS.acte2_ff1 dans src/story/acte2.js.
 //
 // Plan (grille 64, surface d'une rangée gy = 64*gy, pieds d'Agarica +16) :
-//   x 0-1600     grosse branche d'arrivée depuis le grand arbre + camp de Galter
+//   x 0-1600     grosse branche d'arrivée depuis le grand arbre + camp de Geralt
 //                (feu de camp, duel entre x 640 et 1600)
 //   x 1600-2176  fin de la branche ; corniche P1 (gy 4, +3 rangées) : il faut
-//                le double saut — Galter, lui, n'y arrive pas
+//                le double saut — Geralt, lui, n'y arrive pas
 //   x 2240-3584  branches suspendues au-dessus du vide (chute = 1 cœur),
 //                corbeaux, courant d'air encore inutilisable, belvédère P5
 //                d'où l'on voit le jour, sortie vers les îles flottantes.
@@ -21,7 +21,7 @@ const FORET_FLOTTANTE_1_DATA = {
   groundCells: [
     // (groundRow : borne de fin exclue)
     ...groundRow(0, 34, [7, 8]),   // branche maîtresse (x 0-2176)
-    ...groundRow(30, 33, [4]),     // P1 : la corniche de Galter (x 1920-2112, surface 256)
+    ...groundRow(30, 33, [4]),     // P1 : la corniche de Geralt (x 1920-2112, surface 256)
     ...groundRow(35, 38, [3]),     // P2 (x 2240-2432, surface 192)
     ...groundRow(40, 42, [5]),     // P3 (x 2560-2688, surface 320)
     ...groundRow(43, 46, [3]),     // P4 (x 2752-2944, surface 192)
@@ -32,7 +32,7 @@ const FORET_FLOTTANTE_1_DATA = {
   fall: { y: 600, mode: 'hurt' },
   campfires: [{ x: 820, y: 448 }],
   // Points de reprise (mort = retour ici, pas au tout début de la zone) :
-  // sur la corniche de Galter et à l'entrée du belvédère, après les corbeaux.
+  // sur la corniche de Geralt et à l'entrée du belvédère, après les corbeaux.
   checkpoints: [{ x: 2050, y: 256 }, { x: 3060, y: 128 }],
   props: [
     { type: 'bosquet_signpost', x: 600, y: 448, scale: 0.35 },
@@ -42,9 +42,9 @@ const FORET_FLOTTANTE_1_DATA = {
     { type: 'bosquet_standing_stone', x: 3400, y: 128, scale: 0.3 },
   ],
   npcs: [
-    // Avant le duel, Galter n'a rien à dire (le script lance la rencontre).
-    { id: 'galter', x: 1180, facing: 'left', talk: [{ requires: { galterMet: true }, talk: 'galter_camp' }] },
-    { id: 'clak', x: 1240, facing: 'left', talk: [{ requires: { galterMet: true }, talk: 'clak_camp' }] },
+    // Avant le duel, Geralt n'a rien à dire (le script lance la rencontre).
+    { id: 'geralt', x: 1180, facing: 'left', talk: [{ requires: { geraltMet: true }, talk: 'geralt_camp' }] },
+    { id: 'clak', x: 1240, facing: 'left', talk: [{ requires: { geraltMet: true }, talk: 'clak_camp' }] },
   ],
   triggers: [
     { id: 'intro', x: 330, w: 64, cutscene: 'ff1_intro' },

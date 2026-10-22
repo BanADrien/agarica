@@ -2,7 +2,7 @@
 // StoryKit.js). Overlay au-dessus de la zone, qui reste gelée. Grille des
 // objets-clés (ITEM_INFO) à gauche, nom + description de l'objet choisi à
 // droite. Flèches / ZQSD pour naviguer, I / Échap / E pour fermer, M pour la
-// carte de Galter si Agarica l'a.
+// carte de Geralt si Agarica l'a.
 const INVENTORY_COLS = 4;
 const INVENTORY_ROWS = 3;
 const INVENTORY_CELL = 96;
@@ -31,7 +31,7 @@ class InventoryScene extends Phaser.Scene {
     this.add.text(px + 28, py + 18, "Sac d'Agarica", {
       fontFamily: STORY_UI.serif, fontSize: '24px', fontStyle: 'bold', color: STORY_UI.title,
     });
-    const hasMap = inventoryHas('carte_galter');
+    const hasMap = inventoryHas('carte_geralt');
     this.add.text(px + pw - 24, py + 26, `${hasMap ? 'M : carte   ·   ' : ''}I / Échap : fermer`, {
       fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.textSoft,
     }).setOrigin(1, 0);
@@ -113,7 +113,7 @@ class InventoryScene extends Phaser.Scene {
     if (event.repeat || this.time.now - this.openedAt < 120) return;
     const k = event.key.toLowerCase();
     if (k === 'i' || k === 'escape' || k === 'e') this.close();
-    else if (k === 'm' && inventoryHas('carte_galter')) this.close('MapScene');
+    else if (k === 'm' && inventoryHas('carte_geralt')) this.close('MapScene');
     else if (k === 'arrowleft' || k === 'q') this.select(this.selected - 1);
     else if (k === 'arrowright' || k === 'd') this.select(this.selected + 1);
     else if (k === 'arrowup' || k === 'z') this.select(this.selected - INVENTORY_COLS);

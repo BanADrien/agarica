@@ -14,7 +14,7 @@ const CREDITS_SECTIONS = [
   {
     title: 'Les personnages',
     lines: [
-      'Agarica, Xara, Amanite, Galter, Clak, Morgat, Kainati, Ghil\'t…',
+      'Agarica, Xara, Amanite, Geralt, Clak, Morgat, Kainati, Ghil\'t…',
       'sont nés autour d\'une table, pendant notre campagne de Donjons & Dragons.',
     ],
   },
@@ -47,7 +47,7 @@ const CONTROLS_GROUPS = [
     title: 'Menus',
     rows: [
       { keys: ['I'], text: 'Sac (inventaire)' },
-      { keys: ['M'], text: 'Carte de Galter (une fois trouvée)' },
+      { keys: ['M'], text: 'Carte de Geralt (une fois trouvée)' },
       { keys: ['Échap'], alt: ['P'], text: 'Pause' },
     ],
   },
@@ -102,10 +102,10 @@ const MENU_CHAPTERS = [
     gives: {
       flags: {
         visited_foret_flottante_1: true, visited_foret_flottante_2: true, visited_clairiere_plante: true, visited_hutte_morgat: true,
-        galterMet: true, amaniteMet: true, hasEagleForm: true, airForm: 'eagle', fleurPrelevee: true, clairiereArrivee: true,
+        geraltMet: true, amaniteMet: true, hasEagleForm: true, airForm: 'eagle', fleurPrelevee: true, clairiereArrivee: true,
         morgatVue: true, crashDone: true,
       },
-      items: ['carte_galter', 'totem_poche_casse', 'repulsif'],
+      items: ['carte_geralt', 'totem_poche_casse', 'repulsif'],
     },
   },
   {

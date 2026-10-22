@@ -1,0 +1,46 @@
+[
+  {
+    "source": "assets/sprites/habitant_porteur.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      166
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 5,
+        "heights": [
+          285,
+          289,
+          280,
+          289,
+          290
+        ],
+        "horizontal_gaps": [
+          51,
+          53,
+          54,
+          58
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          297,
+          301,
+          303,
+          302
+        ],
+        "horizontal_gaps": [
+          109,
+          112,
+          111
+        ]
+      }
+    ]
+  }
+]

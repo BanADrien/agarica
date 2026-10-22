@@ -24,7 +24,7 @@ Docs de travail : `docs/production/PLAN_DEV.md` (plan + contrat d'API, la réfé
 - Dialogues : portraits, effet machine à écrire, choix.
 - Cinématiques : environ 30 types d'étapes (déplacer un PNJ, caméra, donner un objet, débloquer une compétence…).
 - Sauvegarde automatique dans le navigateur (localStorage) et bouton Continuer.
-- Inventaire (touche I) et carte de Galter (touche M).
+- Inventaire (touche I) et carte de Geralt (touche M).
 - Écran-titre, prologue et écran de fin.
 - Barre de vie de boss et petits messages à l'écran.
 - Nouvelles clés de données de zone : PNJ, déclencheurs, objets à ramasser, amas et murs de mousse, chutes, scripts de zone, checkpoints, fonds et ambiance colorée.
@@ -49,7 +49,7 @@ Docs de travail : `docs/production/PLAN_DEV.md` (plan + contrat d'API, la réfé
   - phase 1 ;
   - défaite imposée ;
   - trou sombre : papillons, bocal d'antidote, totem de poche → compétence papillon ;
-  - phase 2 : soin de Ghil't, Amanite l'achève, Galter arrive.
+  - phase 2 : soin de Ghil't, Amanite l'achève, Geralt arrive.
 
 **Ennemis et animaux**
 - Ennemis : loup sanguinaire, araignée, corbeau, crapaud, Loup Alpha, plus 3 corrompus qu'on peut soigner (créature de mousse, singe corrompu, crapaud corrompu).
@@ -89,7 +89,7 @@ Toutes les scènes se chargent sans erreur JS : titre, anciennes zones, toutes l
 - **Épreuve du singe** (optionnelle) : course de lianes avec checkpoints → talisman du singe et compétence pierre.
 
 ### Acte 2 — FAIT, joué de bout en bout par script (8 bugs corrigés)
-- Galter et son duel, carte, îles, Amanite, totem de l'aigle, planés, clairière, Morgat, crash, forêt corrompue, Ghil't (chute, trou sombre, soin, Amanite), retour au bosquet, écran de fin.
+- Geralt et son duel, carte, îles, Amanite, totem de l'aigle, planés, clairière, Morgat, crash, forêt corrompue, Ghil't (chute, trou sombre, soin, Amanite), retour au bosquet, écran de fin.
 - Corrections principales :
   - blocage à la fin du duel ;
   - Agarica sortait par le haut de l'écran ;
@@ -101,7 +101,7 @@ Toutes les scènes se chargent sans erreur JS : titre, anciennes zones, toutes l
 ### Images Codex (en cours de production par l'utilisateur)
 - Importées et branchées :
   - `agarica_extra` p1-p2 (saut, blessure, mort, parole, tristesse, avec les poses automatiques en dialogue et cinématique) ;
-  - Xara (`xara_extra`, à refaire : marges trop justes), le père, Amanite, Galter, Morgat ;
+  - Xara (`xara_extra`, à refaire : marges trop justes), le père, Amanite, Geralt, Morgat ;
   - Kainati en cours.
 - Suivi de Codex : `docs/production/RAPPORT_CODEX.md`.
 
@@ -144,17 +144,17 @@ Toutes les scènes se chargent sans erreur JS : titre, anciennes zones, toutes l
 | 9 | Racines, pierres qui tombent, Kainati : combat, épargné, sorties ouvertes | OK (art réel, échelle refaite) |
 | 10 | Monde spirituel : forme singe, puis retour à l'arène par la porte du totem | OK |
 | 11 | Épreuve du singe : talisman du singe et compétence pierre | OK (+ pose `cast`) |
-| 12 | Galter : rencontre, duel (3 coups), carte (M) | OK (+ pose `receive_item`) |
+| 12 | Geralt : rencontre, duel (3 coups), carte (M) | OK (+ pose `receive_item`) |
 | 13 | Totem de poche cassé (forêt flottante 2) | OK |
 | 14 | Amanite retrouvée (dialogue selon le choix du bosquet) | OK |
 | 15 | Totem de l'aigle, plané jusqu'à la clairière | OK |
 | 16 | Fleur prélevée (une seule) | OK (+ pose) |
 | 17 | Morgat prend la fleur et donne le répulsif ; antidote annoncé | OK (+ pose) |
 | 18 | Mur de la forêt sombre ouvert au répulsif (aller-retour hutte ↔ poche, +1 cœur) | Corrigé : en passant de la forme humaine au loup contre le mur, **on le traversait sans répulsif** |
-| 19 | Crash, forêt corrompue (la mousse se referme, note de Galter, amas, papillons, spirale, mur vivant) | OK |
+| 19 | Crash, forêt corrompue (la mousse se referme, note de Geralt, amas, papillons, spirale, mur vivant) | OK |
 | 20 | Ghil't phase 1, défaite imposée, chute dans le trou sombre | OK |
 | 21 | Trou sombre : papillons, bocal, totem de poche, compétence papillon | OK (+ poses ; le papillon est sur R quand A et F sont pris) |
-| 22 | Phase 2 : Ghil't soigné, Amanite l'achève, Galter arrive | Corrigé : Amanite et Galter n'avaient pas d'anim de parole ; Amanite tournait le dos à Agarica et se superposait à elle |
+| 22 | Phase 2 : Ghil't soigné, Amanite l'achève, Geralt arrive | Corrigé : Amanite et Geralt n'avaient pas d'anim de parole ; Amanite tournait le dos à Agarica et se superposait à elle |
 | 23 | Retour au bosquet, vérité, départ d'Amanite, cochons, fin | Corrigé : Clak flottait à 16 px du sol ; puis `demoFinished` et EndScreen OK |
 
 **Rien ne manque** : tous les événements de HISTOIRE_DEMO.md et de PLAN_CARTE_DEMO.md existent et se déclenchent.
@@ -169,7 +169,7 @@ Tous les passages ont été testés dans les deux sens. L'arrivée se fait au so
 - **Kainati** : nouvelle planche complète (7 rangées) → `scale` 0.6, placeholder 195×210 (~210 px à l'idle, ~2,5× Agarica). Même réglage pour `kainati_esprit`. Son poing est sur la liane quand il est suspendu.
   - `floorY` de l'arène passe à 464 (haut de la hitbox du sol) : Kainati, ses pierres et ses ondes ne flottent plus.
   - `Kainati.js` tolère encore l'ancienne rangée `throw_stone` à 3 frames (deux silhouettes collées dans une frame).
-- **Amanite** `scale` 0.31 (~104 px) ; **Galter** `scale` 0.30 (~70 px, halfelin) ; **Xara** (`xara_extra`) `scale` 0.12, à la taille du compagnon.
+- **Amanite** `scale` 0.31 (~104 px) ; **Geralt** `scale` 0.30 (~70 px, halfelin) ; **Xara** (`xara_extra`) `scale` 0.12, à la taille du compagnon.
 - Le père, Morgat et Agarica sont inchangés (~107, ~104 et ~86 px).
 - Les PNJ regardent Agarica ; les pieds sont posés sur l'herbe partout où ils ont été vérifiés.
 - Les noms d'anims du code ont tous été vérifiés contre le manifest (script) : aucun nom inexistant.

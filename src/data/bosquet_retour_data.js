@@ -1,5 +1,5 @@
 // Zone « bosquet_retour » — retour au bosquet d'Émeraude, fin de la démo
-// (étape 16 de PLAN_DEV.md). Toute la scène (Galter et le chef, Amanite qui
+// (étape 16 de PLAN_DEV.md). Toute la scène (Geralt et le chef, Amanite qui
 // part avec un fragment de l'idole, le silence de Xara, les trois bébés
 // cochons) est la cinématique `bosquet_retour` de src/story/acte2.js
 // (ZONE_SCRIPTS.acte2_bosquet_retour), qui pose `demoFinished` → EndScreenScene.

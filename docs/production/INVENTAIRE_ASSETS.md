@@ -22,7 +22,7 @@ Référence interne utilisée pour produire `CODEX_SPRITES_A_GENERER.md`.
 - `transformation/` : humain→aigle, humain→loup, loup→aigle (flash), humain→ours, pieuvre.
 - `bosses_sprites/9a18...png` : Kainati corrompu, pose statique unique (1254x1254), non chargé.
 - `items/totem_frames` : totems loup/pieuvre/aigle dim/lit. `feu_de_camp_frames` (4). `firecamp_menu/interface.png` (non utilisé). `form_icone/{loup,aigle,pieuvre}.png`. `unlock_popup_animate/unlock1..5`.
-- `decors/` : `plan4_ciel.png` (fond nuit), `arbres_frames` (8), `sous_bois_frames` (14), `plantes_frames` (bplante/hplante), `autotile_frames` + `tuiles_frames` (21 tuiles), `surface_frames`, `deco_item_frames/bosquet` (18 props). Planche `bosquet componant.png` : cabane, huttes, cottage, tour, tente, murailles, cercle de feu NON découpés.
+- `decors/` : `plan4_ciel.png` (fond nuit), `arbres_frames` (8), `sous_bois_frames` (14), `plantes_frames` (bplante/hplante), `autotile_frames` (21 tuiles, jeu 'floor') + `tuiles_frames` (atlas `tuiles.png` découpé par `tools/cut_tuiles.py` : A1-A9, B, C1-C7, D1-D6 + 4 herbes, jeu 'tuiles'), `surface_frames`, `deco_item_frames/bosquet` (18 props). Planche `bosquet componant.png` : cabane, huttes, cottage, tour, tente, murailles, cercle de feu NON découpés.
 
 ## Placeholders dessinés par code
 

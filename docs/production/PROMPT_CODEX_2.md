@@ -10,7 +10,7 @@ On continue la production des images de « Legend of Agarica ». Relis `CODEX_SP
 - après chaque asset : `python tools/import_codex_assets.py`, et régénération si AVERTISSEMENT (`--only <id> --force`) ;
 - ne modifie ni `src/` ni le manifeste.
 
-Déjà fait, ne pas refaire : agarica_extra p1-p2, pere_chef, amanite, galter, morgat. Kainati p1-p2 existent.
+Déjà fait, ne pas refaire : agarica_extra p1-p2, pere_chef, amanite, geralt, morgat. Kainati p1-p2 existent.
 
 ORDRE DE PRODUCTION :
 
@@ -28,7 +28,7 @@ ORDRE DE PRODUCTION :
 4. Refaire `xara_extra` : la bande vide entre les rangées faisait 45 px, il en faut au moins 60.
 5. Nouveaux personnages des docs :
    - `habitant_druide`, `habitant_porteur`, `habitant_garde` ;
-   - `clak` (crabe totem de Galter) ;
+   - `clak` (crabe totem de Geralt) ;
    - `papillon` ;
    - `cochon_bebe`, `poisson`.
 6. Ennemis : `loup_sanguinaire`, `araignee`, `mousse_creature`, `crapaud_corrompu`, `singe_corrompu` (petit singe corrompu, même famille visuelle que le singe brun de référence, mais couvert de mousse vert toxique et yeux malades).

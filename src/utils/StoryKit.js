@@ -203,7 +203,7 @@ ENEMY_REGISTRY.corbeau = (scene, e) => {
 ENEMY_REGISTRY.crapaud = (scene, e) => new Crapaud(scene, e.x, e.y);
 
 // ---------------------------------------------------------------------------
-// Zones de la démo : ordre de l'histoire, région de la carte de Galter.
+// Zones de la démo : ordre de l'histoire, région de la carte de Geralt.
 // Sert à reconnaître une « scène d'histoire » (Xara conditionnelle,
 // sauvegarde auto, carte) par opposition aux anciennes zones de test.
 // ---------------------------------------------------------------------------
@@ -394,13 +394,13 @@ const ITEM_INFO = {
   talisman_ours: { name: "Talisman de l'ours", desc: "Confié par ton père avant ton départ. Il semble endormi… mais il pulse parfois d'une chaleur sourde." },
   idole: { name: 'Idole du bosquet', desc: "L'idole sacrée du bosquet d'Émeraude, sculptée dans une pierre verte. Elle n'aurait jamais dû quitter son autel." },
   talisman_singe: { name: 'Talisman du singe', desc: "Récompense de l'épreuve des lianes. Il renferme une compétence : lancer des pierres en cloche." },
-  carte_galter: { name: 'Carte de Galter', desc: 'Incomplète, couverte de flèches contradictoires et de traces de pinces. Touche M pour la consulter.' },
+  carte_geralt: { name: 'Carte de Geralt', desc: 'Incomplète, couverte de flèches contradictoires et de traces de pinces. Touche M pour la consulter.' },
   totem_poche_casse: { name: 'Totem de poche cassé', desc: 'Trouvé dans la hutte de Morgat. Fendu, éteint… À quoi peut-il bien servir ?' },
   totem_poche_actif: { name: 'Totem de poche', desc: "Ravivé par l'antidote. Il donne accès à la compétence du papillon : soigner au lieu de détruire." },
   fleur_resistante: { name: 'Fleur résistante', desc: 'Une fleur autour de laquelle la mousse refuse de pousser. Une guérisseuse saurait quoi en faire.' },
   repulsif: { name: 'Répulsif à mousse', desc: 'Préparé par Morgat. Quelques gouttes suffisent à dissoudre un mur de mousse (E devant le mur).' },
   bocal_antidote: { name: "Bocal d'antidote", desc: 'Apporté par les papillons dans le noir. Le liquide brille doucement.' },
-  note_galter: { name: 'Note de Galter', desc: "« Si tu lis ceci, c'est que je suis passé par là. Ou que je l'ai perdue. Clak, rends-moi ce crayon. »" },
+  note_geralt: { name: 'Note de Geralt', desc: "« Si tu lis ceci, c'est que je suis passé par là. Ou que je l'ai perdue. Clak, rends-moi ce crayon. »" },
 };
 
 function itemInfo(id) {
@@ -816,7 +816,7 @@ const SPEAKERS = {
   xara: { name: 'Xara', color: 0xc77dff },
   amanite: { name: 'Amanite', color: 0xe0464f },
   pere_chef: { name: 'Le Chef', color: 0x8fe3b8, initial: 'C' },
-  galter: { name: 'Galter', color: 0xd9a441 },
+  geralt: { name: 'Geralt', color: 0xd9a441 },
   clak: { name: 'Clak', color: 0xff7f50 },
   morgat: { name: 'Morgat', color: 0x9ad1ff },
   kainati: { name: 'Kainati', color: 0xc08a4a },
@@ -1826,7 +1826,7 @@ function updateStoryKeys(scene) {
   }
   // Ctrl+I reste la bascule de debug physique (cf. setupDebugToggle).
   if (Phaser.Input.Keyboard.JustDown(st.keys.inventory) && !st.keys.inventory.ctrlKey) openInventory(scene);
-  else if (Phaser.Input.Keyboard.JustDown(st.keys.map) && inventoryHas('carte_galter')) openMap(scene);
+  else if (Phaser.Input.Keyboard.JustDown(st.keys.map) && inventoryHas('carte_geralt')) openMap(scene);
 }
 
 function openStoryOverlay(scene, key) {

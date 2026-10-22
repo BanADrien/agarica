@@ -1,8 +1,8 @@
-// MapScene — carte de Galter (touche M en jeu si `carte_galter` est dans le
+// MapScene — carte de Geralt (touche M en jeu si `carte_geralt` est dans le
 // sac). Parchemin (art `item-carte_parchemin` si présent, sinon dessiné) avec
 // les 5 grandes régions de la démo : une région n'est révélée qu'une fois
 // une de ses zones visitée (flags `visited_<zone>`, cf. storyOnZoneEnter),
-// avec la note (pas toujours utile) de Galter. M / Échap / E ferme.
+// avec la note (pas toujours utile) de Geralt. M / Échap / E ferme.
 const MAP_REGION_LAYOUT = {
   bosquet: { x: 190, y: 400, note: 'Des druides. Accueillants,\nsauf avec les bannies.' },
   foret_sombre: { x: 330, y: 270, note: 'Sombre. (Vérifier si c\'est\npour ça le nom.)' },
@@ -31,7 +31,7 @@ class MapScene extends Phaser.Scene {
     this.add.text(width / 2, 62, 'Carte de la forêt', {
       fontFamily: STORY_UI.serif, fontSize: '26px', fontStyle: 'bold italic', color: MAP_INK_HEX,
     }).setOrigin(0.5);
-    this.add.text(width / 2, 90, 'par Galter, ranger (et Clak) — incomplète, mais pleine de bonne volonté', {
+    this.add.text(width / 2, 90, 'par Geralt, ranger (et Clak) — incomplète, mais pleine de bonne volonté', {
       fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#6b4a2a',
     }).setOrigin(0.5);
 
@@ -47,7 +47,7 @@ class MapScene extends Phaser.Scene {
     for (const r of STORY_REGIONS) this.drawRegion(r, revealed[r.id], here && here.region === r.id);
     this.drawCompass(width - 150, height - 140);
 
-    // Raccourci barré : la cartographie selon Galter.
+    // Raccourci barré : la cartographie selon Geralt.
     this.add.text(410, 440, 'raccourci ?', {
       fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#7a5a3a',
     }).setOrigin(0.5).setAngle(-6);
@@ -75,7 +75,7 @@ class MapScene extends Phaser.Scene {
     }
     const g = this.add.graphics();
     // Bords déchirés : polygone légèrement irrégulier.
-    const rnd = new Phaser.Math.RandomDataGenerator(['galter']);
+    const rnd = new Phaser.Math.RandomDataGenerator(['geralt']);
     const pts = [];
     const step = 28;
     for (let px = x; px <= x + w; px += step) pts.push({ x: px, y: y + rnd.realInRange(-4, 4) });

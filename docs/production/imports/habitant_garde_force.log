@@ -1,0 +1,13 @@
+[habitant_garde] découpe de 1 image(s)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 push: 4 frame(s) [OK]
+  rangée 2 walk: 5 frame(s) [OK]
+  canvas uniforme 334x298 -> assets/sprites/habitant_garde_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : habitant_garde
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 252 fichier(s) présent(s).

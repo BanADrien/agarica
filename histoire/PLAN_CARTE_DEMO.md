@@ -167,7 +167,7 @@ Apres avoir appris a courir et a suivre les pistes, Agarica suit les traces d'un
 
 ### Sortie vers la zone suivante
 
-Apres le boss, Agarica peut rejoindre un feu de camp et choisir sa forme active. Elle peut continuer l'histoire vers Galter ou revenir vers le totem du singe pour faire l'epreuve. Galter attend ensuite Agarica avec sa carte incomplete de la foret et explique que la mousse monte vers les hauteurs.
+Apres le boss, Agarica peut rejoindre un feu de camp et choisir sa forme active. Elle peut continuer l'histoire vers Geralt ou revenir vers le totem du singe pour faire l'epreuve. Geralt attend ensuite Agarica avec sa carte incomplete de la foret et explique que la mousse monte vers les hauteurs.
 
 ### Epreuve du singe
 
@@ -191,8 +191,8 @@ Apres le boss, Agarica peut rejoindre un feu de camp et choisir sa forme active.
 
 ### Evenements a retrouver
 
-- Galter rejoint Agarica ou la retrouve au debut de la zone.
-- Galter met sa carte a jour et explique qu'il n'a pas pu explorer les hauteurs.
+- Geralt rejoint Agarica ou la retrouve au debut de la zone.
+- Geralt met sa carte a jour et explique qu'il n'a pas pu explorer les hauteurs.
 - Il ne saute pas assez haut pour atteindre les plateformes superieures.
 - Son incapacité donne une scene comique avec son crabe totem.
 - Xara explique que le temps presse et que la foret est trop grande.

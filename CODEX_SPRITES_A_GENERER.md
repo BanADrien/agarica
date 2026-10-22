@@ -33,7 +33,7 @@ Données synchronisées : les tables de rangées ci-dessous et `src/data/asset_m
 ### Tailles et échelles
 
 - Feuilles personnages : 1536x1024, **3 rangées max** par image, **5 frames max** par rangée. Boss : 2 rangées par image (bandes de 512 px). Ghil't : 3 frames par rangée (cellules de 512 px).
-- Écran 960x540, tuile 64 px. Agarica ≈ 86 px de haut. Tous les humanoïdes sont dessinés à la même échelle source (Agarica ~250 px, adultes 270-300 px, Galter 215 px) et affichés à `0.34`.
+- Écran 960x540, tuile 64 px. Agarica ≈ 86 px de haut. Tous les humanoïdes sont dessinés à la même échelle source (Agarica ~250 px, adultes 270-300 px, Geralt 215 px) et affichés à `0.34`.
 - Boss ≈ 2,5-3x la hauteur d'Agarica : Kainati ~400 px source à `0.54` (~215 px), Ghil't ~330 px source à `0.72` (~238 px).
 - Objets ~24-48 px à l'écran : normalisés à 256 px de côté max par le script, échelle `0.16`.
 - Les échelles exactes de chaque asset sont dans `src/data/asset_manifest.js` (`scale`).
@@ -82,16 +82,16 @@ AMANITE (Agarica's best friend, a tiefling): young woman the same age as Agarica
 THE CHIEF OF THE EMERALD GROVE (Agarica's father): an elderly male druid, chibi but taller than Agarica (about 1.2x her height), long white beard braided with small wooden beads, greying red hair (family resemblance), pointed elf ears, kind but stern green eyes, long deep-green robe with gold leaf embroidery, brown fur mantle on the shoulders, a circlet of small antlers and leaves on his head, a gnarled wooden staff topped with a green crystal wrapped in leaves (the crystal glows softly but no detached light rays).
 ```
 
-**Galter**
+**Geralt**
 
 ```text
-GALTER (halfling ranger) - ORIGINAL design, must NOT resemble Geralt of Rivia (NO white hair, NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes): a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly chestnut-brown hair in a short stubby ponytail, short scruffy auburn beard, dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
+GERALT (halfling ranger, original design: NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes) with GREY-WHITE hair and GREY-WHITE beard: a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly GREY-WHITE hair in a short stubby ponytail, short scruffy GREY-WHITE beard (grey-white body hair on the feet too), dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
 ```
 
 **Clak**
 
 ```text
-CLAK (Galter's totem crab): a small crab with an orange-red shell carved with a pale tribal spiral rune that glows faint teal, one oversized right claw and one small left claw, stalk eyes with green pupils, comically expressive, sturdy little legs.
+CLAK (Geralt's totem crab): a small crab with an orange-red shell carved with a pale tribal spiral rune that glows faint teal, one oversized right claw and one small left claw, stalk eyes with green pupils, comically expressive, sturdy little legs.
 ```
 
 **Morgat**
@@ -434,31 +434,31 @@ Row 2 (from top) - animation "walk_angry", exactly 5 frame(s). Frame 1: stomping
 Output: one PNG image, 1536 x 1024 px, transparent background, exactly 2 row(s), 4 / 5 frames per row.
 ```
 
-### [P1] `galter` — Galter, ranger halfelin
+### [P1] `geralt` — Geralt, ranger halfelin
 
-- **Image(s) à produire** : `assets/sprites/galter.png` (1536x1024), `assets/sprites/galter_p2.png` (1536x1024)
-- **Découpe** : `assets/sprites/galter_frames/galter_row<r>_<c>.png` (auto, `tools/import_codex_assets.py`, mode `blob`)
+- **Image(s) à produire** : `assets/sprites/geralt.png` (1536x1024), `assets/sprites/geralt_p2.png` (1536x1024)
+- **Découpe** : `assets/sprites/geralt_frames/geralt_row<r>_<c>.png` (auto, `tools/import_codex_assets.py`, mode `blob`)
 - **Orientation** : regarde à DROITE — **hauteur source** : ~215 px — **échelle en jeu** : `0.34` (≈ 73 px à l'écran)
 - **Notes** : Design ORIGINAL : ne doit pas ressembler à Geralt de Riv (voir fiche).
 - **Anims (manifest)** : `idle` (row 0, 4 fr.), `talk` (row 1, 4 fr.), `attack_miss` (row 2, 5 fr.), `trip_fall` (row 3, 5 fr.), `map_reading` (row 4, 4 fr.), `walk` (row 5, 5 fr.)
 
 | Rangée (manifest) | Image | Animation | Frames | fps | Poses (gauche → droite) |
 |---|---|---|---|---|---|
-| 0 | galter.png (rangée image 1) | `idle` (repos (boucle)) | 4 | 6 boucle | 1. standing, slouched, yawning, hand on the satchel strap / 2. same, rubbing his eye / 3. same, scratching beard / 4. same, alert again |
-| 1 | galter.png (rangée image 2) | `talk` (parle (boucle)) | 4 | 8 boucle | 1. standing, finger raised like a know-it-all, mouth open / 2. mouth closed, hands on hips / 3. mouth open, pointing forward to the right / 4. mouth half open, shrugging |
-| 2 | galter.png (rangée image 3) | `attack_miss` (attaque ratée (comique)) | 5 | 10 | 1. dramatic pose drawing the short bow, overconfident grin / 2. bow drawn, aiming, one eye closed / 3. arrow loosed (no arrow drawn), the bowstring snapping, bow twisting in his hands / 4. losing balance, arms windmilling, bow flying up but still touching his fingertips / 5. embarrassed, catching the bow clumsily, sheepish face |
-| 3 | galter_p2.png (rangée image 1) | `trip_fall` (trébuche dans son propre piège) | 5 | 10 | 1. walking proudly, one foot catching a rope loop at his ankle (rope touches his foot) / 2. tripping forward, surprised face / 3. falling face first, arms out / 4. flat on his belly on the ground / 5. sitting up dazed, hair messed up |
-| 4 | galter_p2.png (rangée image 2) | `map_reading` (lit sa carte (boucle)) | 4 | 5 boucle | 1. holding a large unrolled parchment map in both hands (the map touches his hands, no readable text), frowning / 2. turning the map sideways, confused / 3. turning it upside down / 4. scratching his head with one hand, map in the other |
-| 5 | galter_p2.png (rangée image 3) | `walk` (marche (boucle)) | 5 | 9 boucle | 1. walking right, short bouncy halfling stride / 2. mid-stride / 3. passing pose / 4. opposite stride / 5. stride |
+| 0 | geralt.png (rangée image 1) | `idle` (repos (boucle)) | 4 | 6 boucle | 1. standing, slouched, yawning, hand on the satchel strap / 2. same, rubbing his eye / 3. same, scratching beard / 4. same, alert again |
+| 1 | geralt.png (rangée image 2) | `talk` (parle (boucle)) | 4 | 8 boucle | 1. standing, finger raised like a know-it-all, mouth open / 2. mouth closed, hands on hips / 3. mouth open, pointing forward to the right / 4. mouth half open, shrugging |
+| 2 | geralt.png (rangée image 3) | `attack_miss` (attaque ratée (comique)) | 5 | 10 | 1. dramatic pose drawing the short bow, overconfident grin / 2. bow drawn, aiming, one eye closed / 3. arrow loosed (no arrow drawn), the bowstring snapping, bow twisting in his hands / 4. losing balance, arms windmilling, bow flying up but still touching his fingertips / 5. embarrassed, catching the bow clumsily, sheepish face |
+| 3 | geralt_p2.png (rangée image 1) | `trip_fall` (trébuche dans son propre piège) | 5 | 10 | 1. walking proudly, one foot catching a rope loop at his ankle (rope touches his foot) / 2. tripping forward, surprised face / 3. falling face first, arms out / 4. flat on his belly on the ground / 5. sitting up dazed, hair messed up |
+| 4 | geralt_p2.png (rangée image 2) | `map_reading` (lit sa carte (boucle)) | 4 | 5 boucle | 1. holding a large unrolled parchment map in both hands (the map touches his hands, no readable text), frowning / 2. turning the map sideways, confused / 3. turning it upside down / 4. scratching his head with one hand, map in the other |
+| 5 | geralt_p2.png (rangée image 3) | `walk` (marche (boucle)) | 5 | 9 boucle | 1. walking right, short bouncy halfling stride / 2. mid-stride / 3. passing pose / 4. opposite stride / 5. stride |
 
-**Prompt → `assets/sprites/galter.png`**
+**Prompt → `assets/sprites/geralt.png`**
 
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
 
-CHARACTER: GALTER (halfling ranger) - ORIGINAL design, must NOT resemble Geralt of Rivia (NO white hair, NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes): a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly chestnut-brown hair in a short stubby ponytail, short scruffy auburn beard, dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
+CHARACTER: GERALT (halfling ranger, original design: NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes) with GREY-WHITE hair and GREY-WHITE beard: a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly GREY-WHITE hair in a short stubby ponytail, short scruffy GREY-WHITE beard (grey-white body hair on the feet too), dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
 
-SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 3 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 341 px tall, each frame cell is about 307 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. Galter is about 215 px tall (he is shorter than Agarica). The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders. Rows with fewer frames use wider cells (row width divided by that row's frame count).
+SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 3 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 341 px tall, each frame cell is about 307 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. Geralt is about 215 px tall (he is shorter than Agarica). The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders. Rows with fewer frames use wider cells (row width divided by that row's frame count).
 
 ROWS:
 Row 1 (from top) - animation "idle", exactly 4 frame(s). Frame 1: standing, slouched, yawning, hand on the satchel strap. Frame 2: same, rubbing his eye. Frame 3: same, scratching beard. Frame 4: same, alert again.
@@ -468,14 +468,14 @@ Row 3 (from top) - animation "attack_miss", exactly 5 frame(s). Frame 1: dramati
 Output: one PNG image, 1536 x 1024 px, transparent background, exactly 3 row(s), 4 / 4 / 5 frames per row.
 ```
 
-**Prompt → `assets/sprites/galter_p2.png`**
+**Prompt → `assets/sprites/geralt_p2.png`**
 
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
 
-CHARACTER: GALTER (halfling ranger) - ORIGINAL design, must NOT resemble Geralt of Rivia (NO white hair, NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes): a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly chestnut-brown hair in a short stubby ponytail, short scruffy auburn beard, dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
+CHARACTER: GERALT (halfling ranger, original design: NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes) with GREY-WHITE hair and GREY-WHITE beard: a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly GREY-WHITE hair in a short stubby ponytail, short scruffy GREY-WHITE beard (grey-white body hair on the feet too), dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
 
-SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 3 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 341 px tall, each frame cell is about 307 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. Galter is about 215 px tall (he is shorter than Agarica). The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders. Rows with fewer frames use wider cells (row width divided by that row's frame count).
+SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 3 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 341 px tall, each frame cell is about 307 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. Geralt is about 215 px tall (he is shorter than Agarica). The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders. Rows with fewer frames use wider cells (row width divided by that row's frame count).
 
 ROWS:
 Row 1 (from top) - animation "trip_fall", exactly 5 frame(s). Frame 1: walking proudly, one foot catching a rope loop at his ankle (rope touches his foot). Frame 2: tripping forward, surprised face. Frame 3: falling face first, arms out. Frame 4: flat on his belly on the ground. Frame 5: sitting up dazed, hair messed up.
@@ -803,7 +803,7 @@ Output: one PNG image, 1536 x 1024 px, transparent background, 6 objects.
 | 1 | `bocal_antidote` | `assets/items/objets/bocal_antidote.png` | fit 256 | 0.16 |
 | 2 | `repulsif` | `assets/items/objets/repulsif.png` | fit 256 | 0.16 |
 | 3 | `fleur_resistante` | `assets/items/objets/fleur_resistante.png` | fit 256 | 0.16 |
-| 4 | `carte_galter` | `assets/items/objets/carte_galter.png` | fit 256 | 0.16 |
+| 4 | `carte_geralt` | `assets/items/objets/carte_geralt.png` | fit 256 | 0.16 |
 | 5 | `lance_amanite` | `assets/items/objets/lance_amanite.png` | fit 256 | 0.16 |
 
 ```text
@@ -816,7 +816,7 @@ Cell row 1, column 1: the same POCKET TOTEM repaired and active: crack sealed wi
 Cell row 1, column 2: a small round glass jar with a cork and twine, filled with a glowing mint-green and cyan liquid with tiny light motes inside.
 Cell row 1, column 3: a small leather-wrapped gourd flask with a wooden stopper, a pale white-yellow flower tied on it, a few drops of golden liquid on the neck.
 Cell row 2, column 1: the RESISTANT FLOWER: a pure white flower with five large petals and a glowing golden-white heart, healthy bright-green stem and two leaves, roots in a small clump of clean earth; it radiates purity.
-Cell row 2, column 2: Galter's map as an inventory item: a rolled-up parchment scroll tied with a cord, a corner partly unrolled showing scribbles and arrows (no readable text).
+Cell row 2, column 2: Geralt's map as an inventory item: a rolled-up parchment scroll tied with a cord, a corner partly unrolled showing scribbles and arrows (no readable text).
 Cell row 2, column 3: Amanite's spear: a long wooden shaft wrapped with red cloth, a leaf-shaped black obsidian blade, a small tuft of black feathers; drawn horizontally, pointing to the right, filling the cell width.
 
 Output: one PNG image, 1536 x 1024 px, transparent background, 6 objects.
@@ -958,14 +958,14 @@ CHARACTER: THE CHIEF OF THE EMERALD GROVE (Agarica's father): an elderly male dr
 Output: one PNG image, 1024 x 1024 px, transparent background.
 ```
 
-**Prompt → `assets/_codex_src/portrait_galter.png`**
+**Prompt → `assets/_codex_src/portrait_geralt.png`**
 
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
 
 A square character PORTRAIT for a dialogue box (bust from the chest up), a tired half-smile, one eyebrow raised, head turned three-quarter toward the RIGHT, centered, the head filling about half of the canvas, shoulders cut at the bottom edge. Clean cel-shaded anime chibi style matching the in-game sprites, thick outlines. Fully transparent background (no frame, no backdrop), no text.
 
-CHARACTER: GALTER (halfling ranger) - ORIGINAL design, must NOT resemble Geralt of Rivia (NO white hair, NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes): a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly chestnut-brown hair in a short stubby ponytail, short scruffy auburn beard, dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
+CHARACTER: GERALT (halfling ranger, original design: NO witcher medallion, NO sword on the back, NO eye scar, NO yellow cat eyes) with GREY-WHITE hair and GREY-WHITE beard: a short stocky middle-aged halfling (about 0.85x Agarica's height), tired hunter look with heavy-lidded brown eyes and bags under them, round face, round nose, small round non-pointed ears, messy curly GREY-WHITE hair in a short stubby ponytail, short scruffy GREY-WHITE beard (grey-white body hair on the feet too), dark blue-black geometric tribal zigzag tattoos on both cheeks and forearms, patched moss-green hooded tunic, brown leather vest covered with pouches, a satchel stuffed with rolled map scrolls, a short wooden bow and a quiver on his back, bare big hairy halfling feet. Slightly comic, clumsy-but-proud attitude.
 
 Output: one PNG image, 1024 x 1024 px, transparent background.
 ```
@@ -1133,7 +1133,7 @@ Row 3 (from top) - animation "walk", exactly 5 frame(s). Frame 1: marching right
 Output: one PNG image, 1536 x 1024 px, transparent background, exactly 3 row(s), 4 / 4 / 5 frames per row.
 ```
 
-### [P2] `clak` — Clak, le crabe totem de Galter
+### [P2] `clak` — Clak, le crabe totem de Geralt
 
 - **Image(s) à produire** : `assets/sprites/clak.png` (1536x1024)
 - **Découpe** : `assets/sprites/clak_frames/clak_row<r>_<c>.png` (auto, `tools/import_codex_assets.py`, mode `blob`)
@@ -1151,7 +1151,7 @@ Output: one PNG image, 1536 x 1024 px, transparent background, exactly 3 row(s),
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
 
-CHARACTER: CLAK (Galter's totem crab): a small crab with an orange-red shell carved with a pale tribal spiral rune that glows faint teal, one oversized right claw and one small left claw, stalk eyes with green pupils, comically expressive, sturdy little legs.
+CHARACTER: CLAK (Geralt's totem crab): a small crab with an orange-red shell carved with a pale tribal spiral rune that glows faint teal, one oversized right claw and one small left claw, stalk eyes with green pupils, comically expressive, sturdy little legs.
 
 SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 3 horizontal row(s); each row is ONE animation, read left to right. Frames are laid out on an invisible regular grid: each row is a horizontal band about 341 px tall, each frame cell is about 384 px wide, and each pose is centered horizontally in its cell with the feet (or lowest point) on the same baseline within a row. Leave at least 40 px of empty transparent space between neighboring frames and at least 60 px of empty transparent space between rows: no part of a frame (hair, tail, cape, weapon, trunk, legs) may touch or overlap another frame or reach into another row. Every frame is ONE single connected silhouette: held objects must touch the hand; NO detached particles, sparkles, sweat drops, dust clouds, motion lines, speed lines, impact stars, sound effects or floating debris; NO cast shadow on the ground; NO ground line. Same character, same scale, same proportions and same colors in every frame and every row. Clak is about 160 px tall (eyes included) and about 220 px wide. The character faces RIGHT in every frame. No text, no numbers, no labels, no grid lines, no borders.
 
@@ -1576,14 +1576,14 @@ A round wooden MEDALLION icon for the game UI, exactly in the style of the game'
 Output: one PNG image, 1024 x 1024 px, transparent background.
 ```
 
-### [P2] `carte_parchemin` — Carte de Galter (écran de carte)
+### [P2] `carte_parchemin` — Carte de Geralt (écran de carte)
 
 - **Image à produire** : `assets/_codex_src/carte_parchemin.png` (1536x1024) → **fichier final** `assets/ui/carte_parchemin.png` (normalisation `fit` 1536) — échelle `0.52`
 
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
 
-Galter's INCOMPLETE hand-drawn FOREST MAP on an old torn parchment, seen from above, flat and unrolled, with ragged burnt edges and a coffee-ring stain: sketched in brown ink with a few watercolor washes: a small village with a big tree at the left (the Emerald Grove), a dark forest band in the middle, one gigantic tree, floating islands sketched at the top right, a corrupted area hatched in toxic green at the bottom right, dotted paths, contradictory arrows, crossed-out routes, question marks, little doodles of a crab and footprints, large blank unexplored areas. Scribbles that look like handwriting but are NOT readable words. Transparent background outside the parchment.
+Geralt's INCOMPLETE hand-drawn FOREST MAP on an old torn parchment, seen from above, flat and unrolled, with ragged burnt edges and a coffee-ring stain: sketched in brown ink with a few watercolor washes: a small village with a big tree at the left (the Emerald Grove), a dark forest band in the middle, one gigantic tree, floating islands sketched at the top right, a corrupted area hatched in toxic green at the bottom right, dotted paths, contradictory arrows, crossed-out routes, question marks, little doodles of a crab and footprints, large blank unexplored areas. Scribbles that look like handwriting but are NOT readable words. Transparent background outside the parchment.
 
 Output: one PNG image, 1536 x 1024 px, transparent outside the parchment.
 ```
@@ -2010,7 +2010,7 @@ Output: one PNG, 1536 x 1024 px.
 ### [P2] Section `foret_flottante`
 
 - **Image à produire** : `assets/decors/déco item/foret_flottante/foret_flottante_planche.png` (1536x1024)
-- **Noms finaux (ordre de lecture)** : `foret_flottante_ile_petite`, `foret_flottante_ile_moyenne`, `foret_flottante_rocher_flottant`, `foret_flottante_nuage`, `foret_flottante_arbre_jeune`, `foret_flottante_pont_corde`, `foret_flottante_tente_galter`, `foret_flottante_panneau_galter`, `foret_flottante_pissenlit_geant`, `foret_flottante_fleurs_hautes`
+- **Noms finaux (ordre de lecture)** : `foret_flottante_ile_petite`, `foret_flottante_ile_moyenne`, `foret_flottante_rocher_flottant`, `foret_flottante_nuage`, `foret_flottante_arbre_jeune`, `foret_flottante_pont_corde`, `foret_flottante_tente_geralt`, `foret_flottante_panneau_geralt`, `foret_flottante_pissenlit_geant`, `foret_flottante_fleurs_hautes`
 
 ```text
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces. World palette: night forest in deep violet, indigo and teal, glowing cyan mushrooms, magical accents in luminous green (eyes, runes). Corruption is glowing toxic-green moss that drips like slime with tiny sparkle highlights. Strict side view (profile).
@@ -2024,7 +2024,7 @@ PROPS:
 4. a fluffy white cloud
 5. a young sunlit tree with bright leaves
 6. a short rope-and-plank bridge section
-7. Galter's small patched ranger tent with a map pinned on it
+7. Geralt's small patched ranger tent with a map pinned on it
 8. a wooden signpost covered with scribbled notes and arrows (no readable text)
 9. a giant dandelion with seeds
 10. a clump of tall wildflowers
@@ -2094,7 +2094,7 @@ Output: one PNG, 1536 x 1024 px.
 | `xara_extra` | `assets/sprites/xara_extra.png` | `assets/sprites/xara_extra_frames/` | P1 | à générer |
 | `pere_chef` | `assets/sprites/pere_chef.png` | `assets/sprites/pere_chef_frames/` | P1 | à générer |
 | `amanite` | `assets/sprites/amanite.png`<br>`assets/sprites/amanite_p2.png` | `assets/sprites/amanite_frames/` | P1 | à générer |
-| `galter` | `assets/sprites/galter.png`<br>`assets/sprites/galter_p2.png` | `assets/sprites/galter_frames/` | P1 | à générer |
+| `geralt` | `assets/sprites/geralt.png`<br>`assets/sprites/geralt_p2.png` | `assets/sprites/geralt_frames/` | P1 | à générer |
 | `morgat` | `assets/sprites/morgat.png` | `assets/sprites/morgat_frames/` | P1 | à générer |
 | `papillon` | `assets/sprites/papillon.png` | `assets/sprites/papillon_frames/` | P1 | à générer |
 | `kainati` | `assets/sprites/kainati.png`<br>`assets/sprites/kainati_p2.png`<br>`assets/sprites/kainati_p3.png`<br>`assets/sprites/kainati_p4.png` | `assets/sprites/kainati_frames/` | P1 | à générer |
@@ -2111,7 +2111,7 @@ Output: one PNG, 1536 x 1024 px.
 | `bocal_antidote` | `assets/_codex_src/objets_B.png` | `assets/items/objets/bocal_antidote.png` | P1 | à générer |
 | `repulsif` | `assets/_codex_src/objets_B.png` | `assets/items/objets/repulsif.png` | P1 | à générer |
 | `fleur_resistante` | `assets/_codex_src/objets_B.png` | `assets/items/objets/fleur_resistante.png` | P1 | à générer |
-| `carte_galter` | `assets/_codex_src/objets_B.png` | `assets/items/objets/carte_galter.png` | P1 | à générer |
+| `carte_geralt` | `assets/_codex_src/objets_B.png` | `assets/items/objets/carte_geralt.png` | P1 | à générer |
 | `lance_amanite` | `assets/_codex_src/objets_B.png` | `assets/items/objets/lance_amanite.png` | P1 | à générer |
 | `mousse_amas_intact` | `assets/_codex_src/mousse_amas.png` | `assets/items/objets/mousse_amas_intact.png` | P1 | à générer |
 | `mousse_amas_fissure` | `assets/_codex_src/mousse_amas.png` | `assets/items/objets/mousse_amas_fissure.png` | P1 | à générer |
@@ -2124,7 +2124,7 @@ Output: one PNG, 1536 x 1024 px.
 | `portrait_xara` | `assets/_codex_src/portrait_xara.png` | `assets/ui/portraits/xara.png` | P1 | à générer |
 | `portrait_amanite` | `assets/_codex_src/portrait_amanite.png` | `assets/ui/portraits/amanite.png` | P1 | à générer |
 | `portrait_pere_chef` | `assets/_codex_src/portrait_pere_chef.png` | `assets/ui/portraits/pere_chef.png` | P1 | à générer |
-| `portrait_galter` | `assets/_codex_src/portrait_galter.png` | `assets/ui/portraits/galter.png` | P1 | à générer |
+| `portrait_geralt` | `assets/_codex_src/portrait_geralt.png` | `assets/ui/portraits/geralt.png` | P1 | à générer |
 | `portrait_morgat` | `assets/_codex_src/portrait_morgat.png` | `assets/ui/portraits/morgat.png` | P1 | à générer |
 | `portrait_kainati` | `assets/_codex_src/portrait_kainati.png` | `assets/ui/portraits/kainati.png` | P1 | à générer |
 | `portrait_ghilt` | `assets/_codex_src/portrait_ghilt.png` | `assets/ui/portraits/ghilt.png` | P1 | à générer |
