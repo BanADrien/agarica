@@ -41,10 +41,18 @@ class PisteTrack {
     const count = Math.max(1, Math.floor(w / PISTE_PRINT_SPACING));
     for (let i = 0; i < count; i++) {
       const px = cfg.x + i * PISTE_PRINT_SPACING + PISTE_PRINT_SPACING / 2;
-      const py = cfg.y - 4 + (i % 2 === 0 ? -3 : 3);
+      // Chaque empreinte sur la surface de marche sous elle (la piste suit le
+      // relief : butte, marches) ; `cfg.y` (haut de l'image des tuiles, comme
+      // les autres y de donnée) ne sert qu'à choisir la couche de sol, et de
+      // repli au-dessus d'une plateforme cachée pas encore révélée.
+      const groundY = groundStandYAt(scene, px, cfg.y) ?? cfg.y + PROP_GROUND_SINK;
+      const py = groundY - 4 + (i % 2 === 0 ? -3 : 3);
       let print;
       if (useVfx) {
-        print = addManifestSprite(scene, px, py, 'vfx_piste_loup', 'glow');
+        // Art Codex ancré par le bas (non tourné) : empreinte posée sur la
+        // surface, à peine décalée d'une patte à l'autre.
+        print = addManifestSprite(scene, px, groundY, 'vfx_piste_loup', 'glow');
+        setVisibleBottomY(print, groundY + (i % 2 === 0 ? -1 : 1));
       } else {
         print = scene.add.image(px, py, ensurePawTexture(scene)).setTint(PISTE_COLOR).setOrigin(0.5, 1);
         print.setAngle(90 + (i % 2 === 0 ? -8 : 8)); // orteils vers la droite (sens de la piste)

@@ -265,6 +265,29 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
   `<id>:<clé>`, case absente → jeu par défaut.
 - **Dev** : `index.html?zone=foret_sombre_1&flags=xaraMet,hearts=2[&load][&enter=id]`.
 
+### Placement au sol (2026-10-22, rétro-compatible)
+- **Surface de marche** = haut de la hitbox des tuiles (16 px sous le haut de l'image
+  des tuiles d'herbe) : pieds d'Agarica, des PNJ, des animaux, bas des props, feux de
+  camp, totems. `groundSurfaceYAt` / `groundStandYAt` / `storyStandY` n'utilisent plus
+  que les tuiles à découvert (`openGroundTilesAt(scene, x)`) : la case cachée sous une
+  marche n'est plus jamais choisie.
+- **Pixels visibles** (LevelKit) : `propTopYAt(scene, x, type?)` (haut visible du prop
+  sous x ; props gardés dans `scene.props`, `img.propType`), `visibleTopYAt(obj, x)`,
+  `visibleBottomY(obj)`, `setVisibleBottomY(obj, y)`. Lecture alpha mise en cache ;
+  en `file://` (canvas tainted) repli sur le cadre de l'image.
+- **PNJ** : `npcs[i].onProp: true | 'type_de_prop'` → pieds sur le haut visible du
+  décor sous lui (Xara sur sa souche) ; prioritaire sur `y`. L'éditeur en tient compte.
+  `storyPlaceOnProp(scene, obj, x, propType, fallbackY)` pose un objet sur un décor
+  (idole sur l'autel `bosquet_antler_totem`).
+- **Déplacements** : `npcMove` fait suivre le relief aux pieds du PNJ
+  (`storyFollowGround(scene, obj, dt, {dir, speed, footOffset, snap})` : marche montée
+  dès que l'avant des pieds la touche, descendue quand le centre la dépasse, ~0,1 s par
+  case ; marche > `STORY_MAX_STEP` = autre couche). `playerMove` saute les marches qui
+  le bloquent. Bébés cochons : posés sur la surface et suivent le relief.
+- **Props du bosquet** : `bosquet_grove` (3 arbres, les 2 petits flottaient) découpé par
+  `tools/split_grove.py` en `bosquet_grand_arbre`, `bosquet_arbre`, `bosquet_arbre_2`
+  (à utiliser) ; `bosquet_grove` reste déclaré pour les anciens brouillons.
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |

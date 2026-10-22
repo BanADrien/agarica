@@ -307,10 +307,13 @@ DIALOGUES.kainati_calme = [
 // ---------------------------------------------------------------------------
 // 6. MONDE SPIRITUEL — l'arbre d'avant
 // ---------------------------------------------------------------------------
-// Pieds de l'esprit à chaque étape du guide (lianes = celles de la donnée de zone).
-function mondeSpirituelGuidePath() {
+// Pieds de l'esprit à chaque étape du guide (lianes = celles de la donnée de
+// zone). Au sol : la surface de marche (haut de la hitbox des tuiles, là où se
+// tient Agarica), pas le haut de leur image -- il flottait 16 px trop haut.
+function mondeSpirituelGuidePath(scene) {
   const v = MONDE_SPIRITUEL_DATA.vines;
-  return [v[0], v[1], v[2], { x: 1470, y: 384 }, v[3], v[4], v[5], { x: 2480, y: 448 }];
+  const sol = (x, y) => ({ x, y: storyStandY(scene, x, y) });
+  return [v[0], v[1], v[2], sol(1470, 384), v[3], v[4], v[5], sol(2480, 448)];
 }
 
 CUTSCENES.esprit_arrivee = [
@@ -367,7 +370,8 @@ ZONE_SCRIPTS.monde_spirituel = {
     arbreMotes(scene, 0, 2880, 60, 460, 26, [0x9fe3ff, 0xbfe8a0, 0xffffff, 0xff9ad5]);
     arbreGlowPassage(scene, 2840, 390, 120, 0x9fe3ff);
 
-    const esprit = new KainatiEsprit(scene, done ? 2480 : 560, 448, { facing: done ? 'left' : 'right' });
+    const espritX = done ? 2480 : 560;
+    const esprit = new KainatiEsprit(scene, espritX, storyStandY(scene, espritX, 448), { facing: done ? 'left' : 'right' });
     scene.__esprit = esprit;
     // Parler à l'esprit (invite « E : parler » de StoryKit).
     const sprite = esprit.sprite;
@@ -382,7 +386,7 @@ ZONE_SCRIPTS.monde_spirituel = {
       if (!scene.sys.isActive() || scene.__esprit !== esprit) return;
       await runCutscene(scene, 'esprit_arrivee');
       if (scene.__esprit !== esprit) return;
-      await esprit.guide(mondeSpirituelGuidePath(), { radius: 230, pauseMs: 300 });
+      await esprit.guide(mondeSpirituelGuidePath(scene), { radius: 230, pauseMs: 300 });
       // Arrivé au pied de l'arbre : il se retourne vers Agarica.
       if (scene.__esprit === esprit && esprit.sprite.active) esprit.sprite.setFlipX(kainatiFlipFor('kainati_esprit', false));
     });
@@ -451,7 +455,9 @@ ZONE_SCRIPTS.epreuve_singe = {
   create(scene) {
     scene.__epreuveSommet = false;
     // Au sommet : un autel de pierre et un rai de lumière, visibles de loin.
-    const g = scene.add.graphics();
+    // Socle posé sur la surface de marche du sommet (dessiné pour un sol en
+    // y -192, haut de l'image des tuiles : il flottait de 16 px).
+    const g = scene.add.graphics({ y: storyStandY(scene, 110, -192) + 192 });
     g.fillStyle(0xffe9a8, 0.08).fillRect(50, -400, 120, 210);
     g.fillStyle(0x4a4058, 1).fillRoundedRect(82, -220, 56, 28, 6);
     g.fillStyle(0x6d6480, 1).fillRoundedRect(90, -228, 40, 10, 4);

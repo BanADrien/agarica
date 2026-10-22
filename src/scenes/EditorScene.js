@@ -115,6 +115,17 @@ const EDITOR_MIN_RECT = 16;
 // Conventions de coordonnées : cf. PLAN_DEV.md (centre pour triggers/
 // mousse, coin haut-gauche pour windCurrents/poissons, grille pour
 // hiddenPlatforms, y absent = posé au sol au runtime).
+// Pieds d'un PNJ dans l'aperçu : `onProp` -> haut visible du décor sous lui,
+// comme au runtime (cf. storyNpcFootY dans StoryKit.js) ; sinon y ou le sol.
+function editorNpcFootY(ed, e) {
+  if (e.onProp) {
+    const props = ed.markers.filter((m) => m.kind === 'prop').map((m) => Object.assign(m.obj[0], { propType: m.entry.type }));
+    const top = propTopYAt({ props }, e.x, e.onProp === true ? null : e.onProp);
+    if (top != null) return top;
+  }
+  return e.y != null ? e.y : ed.groundYOr(e.x, 400);
+}
+
 const EDITOR_STORY_KINDS = {
   npc: {
     key: 'npcs', shape: 'point', label: 'PNJ',
@@ -128,13 +139,13 @@ const EDITOR_STORY_KINDS = {
       return entry;
     },
     draw(ed, e) {
-      const y = e.y != null ? e.y : ed.groundYOr(e.x, 400);
+      const y = editorNpcFootY(ed, e);
       const sprite = addManifestSprite(ed, e.x, y, e.sprite || e.id, e.anim || 'idle');
       if (e.facing === 'left') sprite.setFlipX(true);
       const talk = typeof e.talk === 'string' ? e.talk : (e.talk ? '(conditionnel)' : '—');
       return [sprite, ed.markerLabel(e.x, y - sprite.displayHeight - 10, `PNJ ${e.key || e.id} : ${talk}`, '#ffe08a')];
     },
-    anchor: (ed, e) => ({ x: e.x, y: e.y != null ? e.y : ed.groundYOr(e.x, 400) }),
+    anchor: (ed, e) => ({ x: e.x, y: editorNpcFootY(ed, e) }),
     move(ed, e, x, y) { e.x = Math.round(x); e.y = ed.snapY(x, y); },
   },
   trigger: {
@@ -923,10 +934,10 @@ class EditorScene extends Phaser.Scene {
       // statique pour l'aperçu éditeur -- l'animation de flammes en
       // continu (ensureCampfireAnimation) n'est posée qu'au runtime par
       // addCampfire, pas ici (l'éditeur n'affiche jamais d'animation).
-      // + CAMPFIRE_SINK : même enfoncement que addCampfire (les bûches
-      // débordent sous le cadre découpé), pour que l'aperçu ne mente pas --
+      // + PROP_GROUND_SINK : addCampfire pose les bûches sur la surface de
+      // marche (haut de la hitbox), comme les props -- l'aperçu ne ment pas,
       // même raison que TOTEM_GROUND_SINK pour l'outil Totem juste au-dessus.
-      const obj = this.add.image(worldX, y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE);
+      const obj = this.add.image(worldX, y + PROP_GROUND_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE);
       this.markers.push({ kind: 'campfire', entry, obj: [obj], sourceArray: this.data.campfires });
       return;
     }
@@ -1221,7 +1232,7 @@ class EditorScene extends Phaser.Scene {
     if (m.kind === 'totem') {
       m.obj[0].setPosition(entry.x, entry.y + TOTEM_GROUND_SINK);
     } else if (m.kind === 'campfire') {
-      m.obj[0].setPosition(entry.x, entry.y + CAMPFIRE_SINK);
+      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK);
     } else if (m.kind === 'prop') {
       // Même surface que dans le jeu (cf. groundStandYAt / PROP_GROUND_SINK).
       m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK);
@@ -1756,7 +1767,7 @@ class EditorScene extends Phaser.Scene {
     }
     for (const entry of this.data.campfires) {
       // `entry.scale` : cf. le commentaire équivalent sur les totems ci-dessus.
-      const obj = this.add.image(entry.x, entry.y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(entry.scale || CAMPFIRE_SCALE);
+      const obj = this.add.image(entry.x, entry.y + PROP_GROUND_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(entry.scale || CAMPFIRE_SCALE);
       this.markers.push({ kind: 'campfire', entry, obj: [obj], sourceArray: this.data.campfires });
     }
     for (const entry of this.data.water) {

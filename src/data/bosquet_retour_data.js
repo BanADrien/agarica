@@ -21,7 +21,10 @@ const BOSQUET_RETOUR_DATA = {
     { type: 'bosquet_well', x: 760, y: 448, scale: 0.35 },
     { type: 'bosquet_banner_tree', x: 1010, y: 448, scale: 0.4 },
     { type: 'bosquet_bench', x: 1180, y: 448, scale: 0.3 },
-    { type: 'bosquet_standing_stone', x: 1560, y: 448, scale: 0.35 },
+    // L'autel de l'idole, le même qu'au sanctuaire du bosquet (l'idole est posée
+    // sur son haut par le script, cf. a2DrawIdol) ; la pierre levée pointue
+    // d'avant laissait l'idole flotter 50 px au-dessus de sa pointe.
+    { type: 'bosquet_antler_totem', x: 1560, y: 448, scale: 0.55 },
     { type: 'bosquet_lamp_post', x: 1760, y: 448, scale: 0.35 },
   ],
   npcs: [

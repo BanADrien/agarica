@@ -35,8 +35,12 @@ const BOSQUET_DATA = {
   ],
   playerSpawn: { x: 150, y: 412 },
   props: [
-    // Hutte d'Agarica
-    { type: 'bosquet_grove', x: 330, y: BOSQUET_SURFACE_Y, scale: 0.85 },
+    // Hutte d'Agarica : le grand arbre à lanternes + deux arbres (anciennement
+    // le prop unique `bosquet_grove`, dont les deux petits arbres flottaient,
+    // cf. tools/split_grove.py).
+    { type: 'bosquet_grand_arbre', x: 225, y: BOSQUET_SURFACE_Y, scale: 0.85 },
+    { type: 'bosquet_arbre', x: 370, y: BOSQUET_SURFACE_Y, scale: 0.85 },
+    { type: 'bosquet_arbre_2', x: 474, y: BOSQUET_SURFACE_Y, scale: 0.85 },
     { type: 'bosquet_lamp_post', x: 560, y: BOSQUET_SURFACE_Y, scale: 0.55 },
     { type: 'bosquet_bush_flowering', x: 60, y: BOSQUET_SURFACE_Y, scale: 0.5 },
     { type: 'bosquet_signpost', x: 760, y: BOSQUET_SURFACE_Y, scale: 0.5 },
@@ -53,15 +57,20 @@ const BOSQUET_DATA = {
     { type: 'bosquet_mossy_rock', x: 1760, y: BOSQUET_SURFACE_Y, scale: 0.5 },
     { type: 'bosquet_well', x: 2290, y: BOSQUET_SURFACE_Y, scale: 0.6 },
     { type: 'bosquet_cart', x: 2470, y: BOSQUET_SURFACE_Y, scale: 0.5 },
-    // Hutte du chef
-    { type: 'bosquet_grove', x: 2700, y: BOSQUET_SURFACE_Y, scale: 1.1 },
+    // Hutte du chef : le grand arbre au sol, les deux petits sur le seuil
+    // (x 2752-2944), chacun posé sur la surface sous lui.
+    { type: 'bosquet_grand_arbre', x: 2562, y: BOSQUET_SURFACE_Y, scale: 1.1 },
+    { type: 'bosquet_arbre', x: 2802, y: 384, scale: 1.1 },
+    { type: 'bosquet_arbre_2', x: 2906, y: 384, scale: 1.1 },
     { type: 'bosquet_banner_tree', x: 2980, y: BOSQUET_SURFACE_Y, scale: 0.6 },
     { type: 'bosquet_lamp_post', x: 3070, y: BOSQUET_SURFACE_Y, scale: 0.55 },
     // Sanctuaire de l'idole
     { type: 'bosquet_standing_stone', x: 3250, y: 384, scale: 0.55 },
-    { type: 'bosquet_statue_hooded', x: 3330, y: 320, scale: 0.6 },
-    { type: 'bosquet_antler_totem', x: 3424, y: 320, scale: 0.55 },
-    { type: 'bosquet_statue_hooded', x: 3515, y: 320, scale: 0.6 },
+    // Statues en retrait des bords de la marche de l'autel (x 3328-3520) :
+    // posées pile au bord, la moitié de leur socle débordait dans le vide.
+    { type: 'bosquet_statue_hooded', x: 3362, y: 320, scale: 0.6 },
+    { type: 'bosquet_antler_totem', x: 3424, y: 320, scale: 0.55 },   // l'autel de l'idole
+    { type: 'bosquet_statue_hooded', x: 3486, y: 320, scale: 0.6 },
     { type: 'bosquet_standing_stone', x: 3600, y: 384, scale: 0.55 },
     // Portes de l'est
     { type: 'bosquet_fence', x: 3790, y: BOSQUET_SURFACE_Y, scale: 0.55 },

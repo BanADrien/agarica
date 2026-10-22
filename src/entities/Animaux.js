@@ -97,15 +97,29 @@ function ensurePigletTextures(scene) {
   });
 }
 
+// Pieds posés sur la surface de MARCHE (haut de la hitbox des tuiles, comme
+// Agarica) et non sur le haut de l'image des tuiles : les cochons flottaient
+// de 16 px. Ils suivent ensuite le relief en trottinant (storyFollowGround).
+function pigletFootY(scene, x, y) {
+  if (typeof groundStandYAt !== 'function') return y;
+  return groundStandYAt(scene, x, y) ?? y;
+}
+
+// Un cochon ne trottine que là où il y a du sol à portée de pas (ni vide, ni
+// mur de plus d'une case).
+function pigletCanReach(scene, x, footY) {
+  return typeof storyWalkSurfaceY !== 'function' || storyWalkSurfaceY(scene, x, footY) != null;
+}
+
 function spawnPiglets(scene, x, y, { w = 180 } = {}) {
   const useArt = typeof hasManifestArt === 'function' && hasManifestArt(scene, 'cochon_bebe');
   if (!useArt) ensurePigletTextures(scene);
-  const groundY = (typeof groundSurfaceYAt === 'function' ? groundSurfaceYAt(scene, x, y) : null) ?? y;
   const minX = x - w / 2;
   const maxX = x + w / 2;
   const piglets = [];
   for (let i = 0; i < PIGLET_COUNT; i++) {
     const px = x + (i - 1) * 34;
+    const groundY = pigletFootY(scene, px, y);
     let s;
     if (useArt) {
       s = addManifestSprite(scene, px, groundY, 'cochon_bebe', 'idle');
@@ -116,8 +130,10 @@ function spawnPiglets(scene, x, y, { w = 180 } = {}) {
     }
     s.setDepth(ANIMAL_DEPTH);
     s.animalKind = 'cochon';
+    // `feet` : position des pieds suivie au sol ; le sprite y ajoute le petit
+    // saut de surprise (`hop`) et le dandinement.
     const st = s.pigState = {
-      groundY, minX, maxX, targetX: px, speed: 40,
+      feet: { x: px, y: groundY }, hop: 0, minX, maxX, targetX: px, speed: 40,
       pauseUntil: 400 * i, scareUntil: 0, hopping: false, phase: Math.random() * 10,
     };
     const setMoving = (moving) => {
@@ -132,14 +148,15 @@ function spawnPiglets(scene, x, y, { w = 180 } = {}) {
         && Math.abs(player.x - s.x) < 110 && Math.abs(player.y - s.y) < 100) {
         st.scareUntil = time + 1600;
         const away = s.x >= player.x ? 1 : -1;
-        st.targetX = Phaser.Math.Clamp(s.x + away * Phaser.Math.Between(60, 90), minX - 50, maxX + 50);
+        const fleeX = Phaser.Math.Clamp(s.x + away * Phaser.Math.Between(60, 90), minX - 50, maxX + 50);
+        if (pigletCanReach(scene, fleeX, st.feet.y)) st.targetX = fleeX;
         st.speed = 125;
         st.pauseUntil = 0;
         if (!st.hopping) {
           st.hopping = true;
           scene.tweens.add({
-            targets: s, y: groundY - 16, duration: 140, yoyo: true, ease: 'Quad.easeOut',
-            onComplete: () => { st.hopping = false; s.y = groundY; },
+            targets: st, hop: 16, duration: 140, yoyo: true, ease: 'Quad.easeOut',
+            onComplete: () => { st.hopping = false; st.hop = 0; },
           });
         }
       }
@@ -147,10 +164,12 @@ function spawnPiglets(scene, x, y, { w = 180 } = {}) {
       if (Math.abs(dx) < 2) {
         if (st.pauseUntil === 0) st.pauseUntil = time + Phaser.Math.Between(500, 1800);
         setMoving(false);
+        s.y = st.feet.y - st.hop;
         if (time >= st.pauseUntil) {
           // Évite de s'empiler sur un frère : les 3 doivent rester comptables.
           for (let k = 0; k < 6; k++) {
             st.targetX = Phaser.Math.Between(minX, maxX);
+            if (!pigletCanReach(scene, st.targetX, st.feet.y)) { st.targetX = s.x; continue; }
             if (piglets.every((o) => o === s || Math.abs((o.pigState ? o.pigState.targetX : o.x) - st.targetX) > 32)) break;
           }
           st.speed = Phaser.Math.Between(32, 50);
@@ -160,10 +179,14 @@ function spawnPiglets(scene, x, y, { w = 180 } = {}) {
       }
       const dir = Math.sign(dx);
       s.x += dir * Math.min(Math.abs(dx), (st.speed * delta) / 1000);
+      st.feet.x = s.x;
+      if (typeof storyFollowGround === 'function') storyFollowGround(scene, st.feet, delta / 1000, { dir, speed: st.speed });
       // L'art regarde à DROITE (convention des nouvelles feuilles).
       s.setFlipX(dir < 0);
       setMoving(true);
-      if (!st.hopping) s.y = groundY - Math.abs(Math.sin(time / 70 + st.phase)) * 1.5;
+      // Dandinement : les pieds décollent à peine (jamais sous la surface).
+      const waddle = st.hopping ? 0 : Math.abs(Math.sin(time / 70 + st.phase)) * 1.5;
+      s.y = st.feet.y - st.hop - waddle;
     };
     registerAnimal(scene, s);
     piglets.push(s);

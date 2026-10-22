@@ -836,6 +836,11 @@ CUTSCENES.plante_prelevement = [
   { toast: 'Suis les papillons vers l\'est →' },
 ];
 
+// Pied de la plante : sur la surface de marche, là où se tient Agarica.
+function a2PlanteBaseY(scene, x) {
+  return storyStandY(scene, x, 448);
+}
+
 // Plante dessinée : tige, feuilles, fleur blanche et rose, halo qui pulse.
 function a2DrawPlante(scene, x, y, picked) {
   const st = scene.__a2;
@@ -908,7 +913,7 @@ async function a2PlantePick(scene) {
   await a2Tween(scene, { targets: st.fleur, x: p.x, y: p.y - 60, scale: 0.6, duration: 700, ease: 'Sine.easeInOut' });
   await a2Tween(scene, { targets: st.fleur, alpha: 0, duration: 250 });
   st.fleur.destroy();
-  st.fleur = scene.add.graphics({ x: st.cfg.x + 2, y: storyGroundY(scene, st.cfg.x, 448) - 82 });
+  st.fleur = scene.add.graphics({ x: st.cfg.x + 2, y: a2PlanteBaseY(scene, st.cfg.x) - 82 });
   st.fleur.fillStyle(0xff9fc9, 1);
   st.fleur.fillEllipse(0, 0, 10, 14);
   storyPutBehindPlayer(scene, st.fleur);
@@ -935,7 +940,7 @@ ZONE_SCRIPTS.acte2_clairiere = {
     st.sky = a2SkyWash(scene, 0x9fd3ff, 0.5);
     a2DrawMossCarpet(scene, cfg.x, cfg.radius, scene.levelWidth);
     const picked = !!storyGet('fleurPrelevee');
-    a2DrawPlante(scene, cfg.x, storyGroundY(scene, cfg.x, 448) + 4, picked);
+    a2DrawPlante(scene, cfg.x, a2PlanteBaseY(scene, cfg.x), picked);
     // On arrive en planant : Agarica est déjà en aigle (2e saut consommé).
     const p = scene.player;
     if (a2EnterId(scene) === 'from_ff2' && p.hasEagleForm) {
@@ -952,7 +957,7 @@ ZONE_SCRIPTS.acte2_clairiere = {
       a2ClairiereOpenPath(scene, false);
     }
     a2AddInteract(scene, {
-      x: cfg.x, y: storyGroundY(scene, cfg.x, 448) + 16, h: 120,
+      x: cfg.x, y: a2PlanteBaseY(scene, cfg.x), h: 120,
       label: () => (storyGet('fleurPrelevee') ? 'E : regarder la plante' : 'E : examiner la plante'),
       onUse: (sc) => {
         if (storyGet('fleurPrelevee')) showDialogue(sc, 'plante_revue');
@@ -1217,7 +1222,8 @@ CUTSCENES.crash = [
 
 // Hutte, rampe et horizon malade (placeholders dessinés en attendant l'art).
 function a2DrawHutte(scene, x) {
-  const y = storyGroundY(scene, x, 448) + 6;
+  // Bas des murs sur la surface de marche (comme les props), pas 10 px au-dessus.
+  const y = storyStandY(scene, x, 448);
   const g = scene.add.graphics({ x, y });
   // Murs de rondins
   g.fillStyle(0x6b4a36, 1);
@@ -1746,12 +1752,14 @@ CUTSCENES.bosquet_retour = [
 
 CUTSCENES.bosquet_retour_revoir_fin = [{ fadeOut: 800 }, { goto: 'EndScreenScene' }];
 
-// L'idole sur son autel (pierre levée), et le fragment qu'Amanite emporte.
+// L'idole sur son autel (prop `bosquet_antler_totem`, posée sur son haut
+// visible), et le fragment qu'Amanite emporte.
+const A2_IDOLE = { x: 1560, y: 330, autel: 'bosquet_antler_totem' };
 function a2DrawIdol(scene) {
   const st = scene.__a2;
-  st.idol = addItemIcon(scene, 1560, 330, 'idole', 44);
+  st.idol = storyPlaceOnProp(scene, addItemIcon(scene, 0, 0, 'idole', 44), A2_IDOLE.x, A2_IDOLE.autel, A2_IDOLE.y);
   storyPutBehindPlayer(scene, st.idol);
-  st.idolGlow = a2Glow(scene, 1560, 330, 110, 0x8fe3b8, 0.35, 3);
+  st.idolGlow = a2Glow(scene, st.idol.x, st.idol.y, 110, 0x8fe3b8, 0.35, 3);
 }
 
 async function a2BreakIdol(scene) {
@@ -1765,7 +1773,7 @@ async function a2BreakIdol(scene) {
   scene.cameras.main.shake(250, 0.008);
   st.idol.setTint(0x9aa89a);
   if (st.idolGlow) st.idolGlow.setAlpha(0.1);
-  const frag = addItemIcon(scene, 1560, 318, 'idole_fragment', 26).setDepth(1040);
+  const frag = addItemIcon(scene, st.idol.x, st.idol.y - 12, 'idole_fragment', 26).setDepth(1040);
   await a2Tween(scene, { targets: frag, x: a.x, y: a.y - 50, duration: 500, ease: 'Quad.easeOut' });
   await a2Tween(scene, { targets: frag, alpha: 0, duration: 250 });
   frag.destroy();

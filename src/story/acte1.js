@@ -69,7 +69,10 @@ function acte1MossPatch(scene, x, y, w = 70) {
 // ---------------------------------------------------------------------------
 const BOSQUET_PATCH_XS = [1930, 2050, 2170];
 const BOSQUET_SOURCE_X = 2290;
-const BOSQUET_IDOLE = { x: 3424, y: 300 };
+// L'idole repose sur l'autel (le prop `bosquet_antler_totem`) : sa hauteur est
+// celle du haut visible de ce décor (cf. storyPlaceOnProp), `y` n'est
+// qu'un repli si le décor manque.
+const BOSQUET_IDOLE = { x: 3424, y: 300, autel: 'bosquet_antler_totem' };
 
 DIALOGUES.bosquet_porteur = [
   { who: 'habitant', name: 'Bran, le porteur', text: "Encore un seau, Agarica. L'eau de la source se trouble un peu plus chaque nuit." },
@@ -211,7 +214,9 @@ DIALOGUES.bosquet_vol_supplier = [
 ];
 
 CUTSCENES.bosquet_vol = [
-  { call: (scene) => { if (!scene.npcs.amanite) createStoryNpc(scene, { id: 'amanite', x: BOSQUET_IDOLE.x - 55, y: 336, lookAtPlayer: false }); } },
+  // Devant les décors (profondeur 1, comme Xara sur sa souche) : sur la marche
+  // de l'autel, la statue voisine la cachait.
+  { call: (scene) => { if (!scene.npcs.amanite) createStoryNpc(scene, { id: 'amanite', x: BOSQUET_IDOLE.x - 55, lookAtPlayer: false }).setDepth(1); } },
   { camera: { x: 3360, y: 300, ms: 900 } },
   { say: [
     'Au sanctuaire, une silhouette rouge se penche sur l\'autel.',
@@ -380,8 +385,8 @@ ZONE_SCRIPTS.bosquet = {
     }
     // L'idole sur son autel (lueur douce), tant qu'elle n'a pas été volée.
     if (!storyGet('idoleVolee')) {
-      st.idolGlow = scene.add.circle(BOSQUET_IDOLE.x, BOSQUET_IDOLE.y, 26, 0x8fe3b8, 0.25);
-      st.idol = addItemIcon(scene, BOSQUET_IDOLE.x, BOSQUET_IDOLE.y, 'idole', 40);
+      st.idol = storyPlaceOnProp(scene, addItemIcon(scene, 0, 0, 'idole', 40), BOSQUET_IDOLE.x, BOSQUET_IDOLE.autel, BOSQUET_IDOLE.y);
+      st.idolGlow = scene.add.circle(st.idol.x, st.idol.y, 26, 0x8fe3b8, 0.25);
       scene.tweens.add({ targets: st.idolGlow, alpha: 0.08, scale: 1.3, duration: 1400, yoyo: true, repeat: -1 });
       storyPutBehindPlayer(scene, st.idolGlow);
       storyPutBehindPlayer(scene, st.idol);
@@ -598,8 +603,19 @@ function acte1TalismanGlow(scene) {
 function acte1Fs1LittleSpider(scene) {
   const xara = scene.npcs && scene.npcs.xara;
   const x0 = (xara ? xara.x : FS1_XARA_X) - 50;
-  const y0 = storyGroundY(scene, x0);
-  const g = scene.add.graphics({ x: x0, y: y0 - 5 });
+  // Pattes (≈ 5 px sous le centre) sur la surface de marche, puis le relief
+  // suivi pendant la fuite (elle descend du bloc de la souche).
+  const FOOT = 5;
+  const y0 = storyStandY(scene, x0);
+  const g = scene.add.graphics({ x: x0, y: y0 - FOOT });
+  let lastX = x0;
+  const follow = () => {
+    if (!g.active) { scene.events.off('update', follow); return; }
+    const dir = Math.sign(g.x - lastX);
+    lastX = g.x;
+    storyFollowGround(scene, g, storyFrameDt(scene), { dir, speed: 160, footOffset: FOOT });
+  };
+  scene.events.on('update', follow);
   g.lineStyle(1.5, 0x1a1024, 1);
   for (const s of [-1, 1]) for (let k = 0; k < 4; k++) g.lineBetween(0, 0, s * (6 + k), 4 - k * 2);
   g.fillStyle(0x1a1024, 1).fillCircle(0, 0, 5).fillCircle(5, 1, 3);

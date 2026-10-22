@@ -29,7 +29,9 @@ const CLAIRIERE_PLANTE_DATA = {
   ],
   enemies: [
     // Les bêtes malades rôdent autour du cercle sans jamais y entrer.
-    { type: 'mousse_creature', x: 700, y: 400, patrolMinX: 520, patrolMaxX: 900 },
+    // x 660 : en 700, son corps chevauchait le coin de la butte (x 704) et
+    // elle restait perchée dessus, 64 px au-dessus du sol.
+    { type: 'mousse_creature', x: 660, y: 400, patrolMinX: 520, patrolMaxX: 900 },
     { type: 'crapaud_corrompu', x: 1720, y: 400 },
   ],
   windCurrents: [{ x: 0, y: 40, w: 112, h: 410, force: 330 }],

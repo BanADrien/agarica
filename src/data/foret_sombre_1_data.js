@@ -52,10 +52,10 @@ const FORET_SOMBRE_1_DATA = {
   campfires: [{ x: 1640, y: FORET_SOMBRE_1_SURFACE_Y }],
   npcs: [
     // Xara attend sur sa souche ; remplacée par le vrai compagnon ({xaraJoin}).
-    // y explicite (sur la souche décorative posée en y 384) : le sol « le plus proche
-    // de 448 » trouvé par défaut est celui CACHÉ sous la souche — Xara y était
-    // invisible et le compagnon, créé là, traversait le sol.
-    { id: 'xara', sprite: 'xara_extra', x: 1344, y: 342, anim: 'mysterious', facing: 'left', talk: 'fs1_rencontre', forbids: { xaraMet: true } },
+    // `onProp` : pieds sur le haut VISIBLE de l'image de la souche (cf.
+    // propTopYAt), recalculé à chaque visite -- un y écrit à la main ne suivait
+    // pas quand les décors ont été redescendus sur la surface de marche.
+    { id: 'xara', sprite: 'xara_extra', x: 1344, onProp: 'bosquet_tree_stump', anim: 'mysterious', facing: 'left', talk: 'fs1_rencontre', forbids: { xaraMet: true } },
   ],
   enemies: [
     // Première créature corrompue (2 PV) : elle rampe vers Agarica.

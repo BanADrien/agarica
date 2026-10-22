@@ -1043,7 +1043,14 @@ function storyCameraFollow(scene) {
   cam.startFollow(scene.player, true, 1, 1);
 }
 
+// Saut d'une marche par le joueur piloté (gravité 1300 : ~90 px de haut, de
+// quoi passer une case de 64 px avec la hitbox aux 3/4 des tuiles d'herbe).
+const STORY_PLAYER_HOP_VY = -480;
+
 // Déplace le joueur jusqu'à `toX` (joueur piloté : player.update() est gelé).
+// Corps physique : il suit déjà le sol (gravité + collisions) ; contre une
+// marche, il ne pourrait que pousser le mur jusqu'au délai de sécurité -- il
+// saute donc par-dessus, comme le ferait le joueur.
 function cutscenePlayerMove(scene, { toX, speed = 170 }) {
   const player = scene.player;
   if (!player || !player.body) return Promise.resolve();
@@ -1066,9 +1073,58 @@ function cutscenePlayerMove(scene, { toX, speed = 170 }) {
         return;
       }
       player.setVelocityX(dir * speed);
+      const body = player.body;
+      if (body.blocked.down && (dir > 0 ? body.blocked.right : body.blocked.left)) player.setVelocityY(STORY_PLAYER_HOP_VY);
     };
     scene.events.on('update', tick);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Suivi du sol des sprites SANS physique (PNJ en cinématique, animaux) : à
+// chaque frame d'un déplacement horizontal, les pieds (y, origine en bas)
+// reviennent sur la surface de marche sous eux, au lieu de garder le y de
+// départ (ils flottaient au-dessus des creux et s'enfonçaient dans les
+// marches). Une marche montante est gravie dès que l'avant des pieds la
+// touche, une descendante dès que le centre la dépasse, à vitesse bornée :
+// une case se franchit en ~0,1 s, en douceur plutôt que d'un coup.
+// ---------------------------------------------------------------------------
+const STORY_FOOT_REACH = 18; // px devant le centre des pieds, dans le sens de la marche
+const STORY_MAX_STEP = 72; // marche la plus haute qu'un marcheur gravit (~1 case)
+const STORY_STEP_SPEED_MIN = 480; // px/s
+
+// Surface où poser les pieds d'un marcheur en `x` dont les pieds sont à
+// `footY` : la plus haute à portée de pas (une plateforme bien plus haute est
+// une autre couche, ignorée), sous le centre et l'avant des pieds. Null
+// au-dessus du vide.
+function storyWalkSurfaceY(scene, x, footY, dir = 0) {
+  let best = null;
+  for (const sx of dir ? [x, x + dir * STORY_FOOT_REACH] : [x]) {
+    for (const t of openGroundTilesAt(scene, sx)) {
+      const top = t.body ? t.body.top : t.y - t.displayHeight / 2;
+      if (top < footY - STORY_MAX_STEP) continue;
+      if (best === null || top < best) best = top;
+    }
+  }
+  return best;
+}
+
+// Ramène les pieds de `obj` (y + footOffset) vers la surface, d'au plus une
+// vitesse de marche par frame. `dt` en secondes, `dir` = sens de la marche
+// (-1, 0, 1), `speed` = vitesse horizontale (px/s). Au-dessus du vide (hors
+// du niveau) : y inchangé.
+function storyFollowGround(scene, obj, dt, { dir = 0, speed = 120, footOffset = 0, snap = false } = {}) {
+  const feet = obj.y + footOffset;
+  const target = storyWalkSurfaceY(scene, obj.x, feet, dir);
+  if (target == null) return;
+  const step = snap ? Infinity : Math.max(STORY_STEP_SPEED_MIN, 4 * speed) * dt;
+  obj.y += Phaser.Math.Clamp(target - feet, -step, step);
+}
+
+// Durée de la dernière frame (s), bornée : un onglet en arrière-plan ne doit
+// pas téléporter un marcheur.
+function storyFrameDt(scene) {
+  return Math.min(scene.game.loop.delta || 16, 50) / 1000;
 }
 
 // Le sprite humain regarde à GAUCHE par défaut (cf. Player.update).
@@ -1103,9 +1159,13 @@ function cutsceneNpcMove(scene, { npc: key, toX, speed = 120 }) {
     const walkAnim = ['walk', 'run'].find((a) => def.anims && def.anims[a]);
     const before = npc.currentManifestAnim || 'idle';
     if (walkAnim) npc.playManifest(walkAnim);
+    const dir = dx > 0 ? 1 : -1;
     scene.tweens.add({
       targets: npc, x: toX, duration: (Math.abs(dx) / speed) * 1000,
+      // Les pieds suivent le relief (cf. storyFollowGround).
+      onUpdate: () => storyFollowGround(scene, npc, storyFrameDt(scene), { dir, speed }),
       onComplete: () => {
+        if (npc.active) storyFollowGround(scene, npc, 0, { snap: true });
         if (walkAnim && npc.active) npc.playManifest(before === walkAnim ? 'idle' : before);
         npc.__scripted = false;
         resolve();
@@ -1285,24 +1345,36 @@ function storyGroundY(scene, x, fallbackY = 448) {
 // marche/souche, que storyGroundY choisissait quand elle était plus proche de
 // `refY`). Parmi les surfaces à découvert, la plus proche de `refY`.
 function storyStandY(scene, x, refY = 448) {
-  const group = scene.ground;
-  if (!group) return storyGroundY(scene, x, refY);
-  const tiles = [];
-  group.children.iterate((t) => {
-    if (!t || !t.active) return;
-    const half = t.displayWidth / 2;
-    if (x >= t.x - half && x <= t.x + half) tiles.push(t);
-  });
-  if (!tiles.length) return refY;
-  const covered = (t) => tiles.some((o) => o !== t && Math.abs(o.y + o.displayHeight / 2 - (t.y - t.displayHeight / 2)) < 2);
-  const open = tiles.filter((t) => !covered(t));
-  const pool = open.length ? open : tiles;
+  if (!scene.ground) return storyGroundY(scene, x, refY);
+  const open = openGroundTilesAt(scene, x);
+  if (!open.length) return refY;
   let best = null;
-  for (const t of pool) {
+  for (const t of open) {
     const top = t.body ? t.body.top : t.y - t.displayHeight / 2;
     if (best === null || Math.abs(top - refY) < Math.abs(best - refY)) best = top;
   }
   return best;
+}
+
+// Où poser les pieds d'un PNJ : sur le haut VISIBLE d'un décor (`onProp: true`
+// ou le type du prop, ex. Xara sur sa souche, cf. propTopYAt), sinon `y`
+// explicite, sinon la surface de marche.
+function storyNpcFootY(scene, n) {
+  if (n.onProp) {
+    const top = propTopYAt(scene, n.x, n.onProp === true ? null : n.onProp);
+    if (top != null) return top;
+  }
+  return n.y != null ? n.y : storyStandY(scene, n.x);
+}
+
+// Pose un objet SUR le décor `propType` en x (le bas de ses pixels visibles
+// sur le haut visible du décor, cf. propTopYAt) ; repli si le décor manque :
+// `fallbackY` tel quel. Ex. l'idole sur son autel.
+function storyPlaceOnProp(scene, obj, x, propType, fallbackY) {
+  const top = propTopYAt(scene, x, propType);
+  obj.setPosition(x, top == null ? fallbackY : top);
+  if (top != null) setVisibleBottomY(obj, top);
+  return obj;
 }
 
 // Place `obj` juste sous le joueur dans la liste d'affichage (PNJ, objets).
@@ -1324,8 +1396,7 @@ function ensureStoryPrompt(scene) {
 // Crée un PNJ (données `npcs` ou étape `npcAdd`) dans scene.npcs[key || id].
 function createStoryNpc(scene, n) {
   const key = n.key || n.id;
-  const y = n.y != null ? n.y : storyStandY(scene, n.x);
-  const npc = addManifestSprite(scene, n.x, y, n.sprite || n.id, n.anim || 'idle');
+  const npc = addManifestSprite(scene, n.x, storyNpcFootY(scene, n), n.sprite || n.id, n.anim || 'idle');
   npc.npcKey = key;
   npc.talk = n.talk || null;
   npc.npcName = n.name || null;
@@ -1392,12 +1463,23 @@ function ensureMossGroup(scene) {
   return st.mossGroup;
 }
 
+// Bas du visuel d'un amas/mur : le rectangle s'arrête au haut de l'image des
+// tuiles (y de donnée) ; s'il repose sur le sol, son visuel descend jusqu'à
+// la surface de marche (16 px plus bas sur l'herbe) au lieu de flotter.
+const MOSS_GROUND_SNAP = 24;
+function mossVisualFootY(scene, x, bottom) {
+  const stand = storyStandY(scene, x, bottom);
+  return stand > bottom && stand - bottom <= MOSS_GROUND_SNAP ? stand : bottom;
+}
+
 // Visuel d'un amas/mur : art du manifest si présent, sinon mousse dessinée.
 function drawMossVisual(scene, x, y, w, h, artId, wall) {
+  const footY = mossVisualFootY(scene, x, y + h / 2);
   if (scene.textures.exists(`item-${artId}`)) {
-    return scene.add.image(x, y + h / 2, `item-${artId}`).setOrigin(0.5, 1).setDisplaySize(w * 1.15, h * 1.1);
+    const img = scene.add.image(x, y + h / 2, `item-${artId}`).setOrigin(0.5, 1).setDisplaySize(w * 1.15, h * 1.1);
+    return setVisibleBottomY(img, footY);
   }
-  const g = scene.add.graphics({ x, y });
+  const g = scene.add.graphics({ x, y: footY - h / 2 });
   const rnd = new Phaser.Math.RandomDataGenerator([`${x},${y}`]);
   const blobs = Math.max(5, Math.round((w * h) / 1800));
   g.fillStyle(0x10200f, 1);

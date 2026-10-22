@@ -850,36 +850,48 @@ function showFormUnlockPopup(scene, totemType) {
 // pour ELLE (un personnage qui marche dedans), mais pas pour un décor
 // statique qui doit rester posé sur le sommet visuel de l'herbe, ~16px plus
 // haut).
+//
+// Seules les tuiles À DÉCOUVERT comptent (cf. openGroundTilesAt) : la case
+// de sol cachée sous une marche ou un rocher en escalier pouvait être « la
+// plus proche » de `referenceY` -- le décor se retrouvait alors enfoncé de
+// toute la hauteur de la marche, dessiné sur sa face.
 function groundSurfaceYAt(scene, x, referenceY) {
-  const groundGroup = scene.ground;
-  if (!groundGroup) return null;
   let best = null;
   let bestDist = Infinity;
-  groundGroup.children.iterate((tile) => {
-    if (!tile || !tile.active) return;
-    const half = tile.displayWidth / 2;
-    if (x < tile.x - half || x > tile.x + half) return;
+  for (const tile of openGroundTilesAt(scene, x)) {
     const surfaceY = tile.y - tile.displayHeight / 2;
     const dist = Math.abs(surfaceY - referenceY);
     if (best === null || dist < bestDist) {
       best = surfaceY;
       bestDist = dist;
     }
-  });
+  }
   return best;
+}
+
+// Tuiles de sol sous `x` dont le dessus est à l'air libre (aucune autre tuile
+// posée directement dessus) : les seules surfaces sur lesquelles on peut
+// poser quelque chose.
+function openGroundTilesAt(scene, x) {
+  const groundGroup = scene.ground;
+  if (!groundGroup) return [];
+  const column = [];
+  groundGroup.children.iterate((tile) => {
+    if (!tile || !tile.active) return;
+    const half = tile.displayWidth / 2;
+    if (x >= tile.x - half && x <= tile.x + half) column.push(tile);
+  });
+  const covered = (t) => column.some((o) => o !== t
+    && Math.abs(o.y + o.displayHeight / 2 - (t.y - t.displayHeight / 2)) < 2);
+  return column.filter((t) => !covered(t));
 }
 
 // Comme groundSurfaceYAt, mais renvoie le haut de la HITBOX de la tuile (la
 // ligne où les pieds d'Agarica se posent) plutôt que le haut de son image.
 function groundStandYAt(scene, x, referenceY) {
-  const groundGroup = scene.ground;
-  if (!groundGroup) return null;
   let best = null;
   let bestDist = Infinity;
-  groundGroup.children.iterate((tile) => {
-    if (!tile || !tile.active) return;
-    const half = tile.displayWidth / 2;
-    if (x < tile.x - half || x > tile.x + half) return;
+  for (const tile of openGroundTilesAt(scene, x)) {
     const visualTop = tile.y - tile.displayHeight / 2;
     const standY = tile.body ? tile.body.top : visualTop;
     const dist = Math.abs(visualTop - referenceY);
@@ -887,7 +899,111 @@ function groundStandYAt(scene, x, referenceY) {
       best = standY;
       bestDist = dist;
     }
-  });
+  }
+  return best;
+}
+
+// Pixels VISIBLES d'une image (et non son cadre, qui a des marges
+// transparentes et un sommet irrégulier) : canal alpha de la frame, lu une
+// fois sur un canvas puis mis en cache. Null si la lecture est interdite
+// (page ouverte en file:// : canvas « tainted ») -- les appelants retombent
+// alors sur le cadre de l'image.
+const FRAME_ALPHA_CACHE = new Map();
+const VISIBLE_ALPHA_MIN = 40;
+
+function frameAlphaMap(frame) {
+  const key = `${frame.texture.key}#${frame.name}`;
+  if (FRAME_ALPHA_CACHE.has(key)) return FRAME_ALPHA_CACHE.get(key);
+  let map = null;
+  try {
+    const w = frame.cutWidth;
+    const h = frame.cutHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(frame.source.image, frame.cutX, frame.cutY, w, h, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    const alpha = new Uint8Array(w * h);
+    for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3];
+    map = { w, h, alpha };
+  } catch (e) {
+    map = null;
+  }
+  FRAME_ALPHA_CACHE.set(key, map);
+  return map;
+}
+
+// Coin haut-gauche monde d'une image/sprite non tourné (origine quelconque).
+function objectFrameTopLeft(obj) {
+  return {
+    left: obj.x - obj.displayOriginX * Math.abs(obj.scaleX),
+    top: obj.y - obj.displayOriginY * Math.abs(obj.scaleY),
+  };
+}
+
+// Haut visible (1er pixel opaque) de la colonne monde `x` d'un objet non
+// retourné verticalement (les décors ne le sont jamais), ou null si `x` est
+// hors de l'objet ou tombe sur une colonne vide.
+function visibleTopYAt(obj, x) {
+  const f = obj.frame;
+  const sx = Math.abs(obj.scaleX);
+  const sy = Math.abs(obj.scaleY);
+  const { left, top } = objectFrameTopLeft(obj);
+  let col = Math.floor((x - left) / sx);
+  if (col < 0 || col >= f.cutWidth) return null;
+  if (obj.flipX) col = f.cutWidth - 1 - col;
+  const map = frameAlphaMap(f);
+  if (!map) return top;
+  for (let row = 0; row < map.h; row++) {
+    if (map.alpha[row * map.w + col] > VISIBLE_ALPHA_MIN) return top + row * sy;
+  }
+  return null;
+}
+
+// 1re et dernière rangées contenant un pixel opaque (mises en cache sur la carte).
+function opaqueRowRange(map) {
+  if (map.rows) return map.rows;
+  const rowHas = (row) => {
+    for (let col = 0; col < map.w; col++) if (map.alpha[row * map.w + col] > VISIBLE_ALPHA_MIN) return true;
+    return false;
+  };
+  let first = 0;
+  while (first < map.h && !rowHas(first)) first++;
+  let last = map.h - 1;
+  while (last > first && !rowHas(last)) last--;
+  map.rows = first < map.h ? { first, last } : { first: 0, last: map.h - 1 };
+  return map.rows;
+}
+
+// Bas visible (sous la dernière rangée opaque) d'un objet, en coordonnées monde.
+function visibleBottomY(obj) {
+  const f = obj.frame;
+  const sy = Math.abs(obj.scaleY);
+  const { top } = objectFrameTopLeft(obj);
+  const map = frameAlphaMap(f);
+  if (!map) return top + f.cutHeight * sy;
+  const { first, last } = opaqueRowRange(map);
+  // Retourné verticalement : c'est la 1re rangée opaque qui se retrouve en bas.
+  return top + (obj.flipY ? map.h - first : last + 1) * sy;
+}
+
+// Déplace `obj` verticalement pour que le bas de ses pixels visibles soit en `y`.
+function setVisibleBottomY(obj, y) {
+  obj.y += y - visibleBottomY(obj);
+  return obj;
+}
+
+// Haut visible du décor (`scene.props`, cf. buildLevelFromData) sous `x` : le
+// plus haut si plusieurs se recouvrent ; `type` restreint à un type de prop.
+// Null si aucun décor n'est sous `x`.
+function propTopYAt(scene, x, type = null) {
+  let best = null;
+  for (const img of scene.props || []) {
+    if (!img.active || (type && img.propType !== type)) continue;
+    const y = visibleTopYAt(img, x);
+    if (y != null && (best === null || y < best)) best = y;
+  }
   return best;
 }
 
@@ -998,9 +1114,6 @@ const CAMPFIRE_FRAME_COUNT = 4;
 const CAMPFIRE_TEXTURE_PREFIX = 'decor-campfire-';
 const ANIM_CAMPFIRE_BURN_KEY = 'campfire-burn';
 const CAMPFIRE_SCALE = 0.15;
-// Les bûches débordent sous le cadre découpé (marge de crop) : sans ça, le
-// feu paraît posé juste au-dessus du sol plutôt que planté dedans.
-const CAMPFIRE_SINK = 14;
 
 function ensureCampfireAnimation(scene) {
   if (scene.anims.exists(ANIM_CAMPFIRE_BURN_KEY)) return;
@@ -1027,7 +1140,11 @@ const CAMPFIRE_INTERACT_RANGE = 70;
 // (retour utilisateur : "fais un vrai menu propre... glisser déposer").
 function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
   ensureCampfireAnimation(scene);
-  scene.add.sprite(x, y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`)
+  // Bûches posées sur la surface de marche (haut de la hitbox, comme les
+  // props et les pieds d'Agarica) ; l'ancien enfoncement fixe de 14 px sous
+  // le haut de l'image de tuile laissait le feu 3 px au-dessus d'elle.
+  const footY = groundStandYAt(scene, x, y) ?? y;
+  scene.add.sprite(x, footY, `${CAMPFIRE_TEXTURE_PREFIX}0`)
     .setOrigin(0.5, 1)
     .setScale(scale)
     .play(ANIM_CAMPFIRE_BURN_KEY);
@@ -1213,8 +1330,13 @@ const DIRT_CENTER_VARIANT_COUNT = 6;
 // `PROP_TYPES` (dérivé, `${section}_${item}`) est gardé tel quel pour ne
 // pas retoucher tout le reste du fichier qui boucle dessus (chargement
 // BootScene, sélection dans l'éditeur).
+// `grove` (3 arbres sur une image, les 2 petits flottaient : leur base est
+// dessinée plus haut que celle du grand) est découpé par tools/split_grove.py
+// en `grand_arbre` / `arbre` / `arbre_2`, à utiliser à sa place ; `grove`
+// reste déclaré pour ne pas casser d'anciens brouillons d'éditeur.
 const DECOR_SECTIONS = {
   bosquet: [
+    'grand_arbre', 'arbre', 'arbre_2',
     'grove', 'statue_hooded', 'standing_stone', 'lamp_post', 'banner_tree',
     'bush_round', 'bush_flowering', 'mossy_rock', 'signpost', 'fence',
     'cart', 'crates', 'well', 'antler_totem', 'tree_stump', 'log_pile',
@@ -2015,12 +2137,18 @@ function buildLevelFromData(scene, data, sceneData) {
     addAbilityShrine(scene, t.x, y, t.flag, t.message || '', t.scale || TOTEM_SCALE);
   }
 
+  // Gardés dans `scene.props` : un PNJ ou un objet posé SUR un décor (Xara sur
+  // sa souche, l'idole sur son autel) se cale sur le haut visible de l'image
+  // (cf. propTopYAt) plutôt que sur un y écrit à la main.
+  scene.props = [];
   for (const p of data.props || []) {
     // Surface où l'on MARCHE (haut de la hitbox, cf. AUTOTILE_GRASS_HITBOX_FRACTION :
     // 16 px sous le haut visuel des tuiles d'herbe), pas le haut de l'image de
     // tuile -- sinon les décors flottaient au-dessus de l'herbe.
     const y = groundStandYAt(scene, p.x, p.y) ?? p.y;
-    scene.add.image(p.x, y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
+    const img = scene.add.image(p.x, y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
+    img.propType = p.type;
+    scene.props.push(img);
   }
 
   // Retour utilisateur : "rajoute le feu de camp dans les element
