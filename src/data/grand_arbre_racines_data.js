@@ -73,7 +73,9 @@ const GRAND_ARBRE_RACINES_DATA = {
   // Pierres qui tombent des branches supérieures (lu par le script de zone) :
   // une ombre grandit sur la branche (télégraphe), puis la pierre tombe.
   // S'arrêtent une fois Kainati apaisé (ce sont ses guetteurs qui les lancent).
-  rockfall: { x1: 2260, x2: 2760, surfaceY: -192, every: 1700, telegraph: 1000 },
+  // surfaceY = là où l'on marche sur la grande branche (gy -3, haut de case
+  // -192 + GROUND_STAND_SINK, cf. LevelKit) : ombre et impact au ras des pieds.
+  rockfall: { x1: 2260, x2: 2760, surfaceY: -192 + GROUND_STAND_SINK, every: 1700, telegraph: 1000 },
   triggers: [
     { id: 'intro', x: 200, w: 160, cutscene: 'racines_intro' },
     { id: 'tunnel', x: 330, w: 40, y: 400, h: 140, cutscene: 'racines_tunnel' },

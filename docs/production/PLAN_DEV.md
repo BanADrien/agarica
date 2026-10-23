@@ -270,13 +270,26 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
   et les icônes `skill_icone_*` en images ; `drawHud` ne dessine plus que le repli.
   Objets sans art prévu (`note_geralt`) : icône dessinée par code (`STORY_DRAWN_ITEMS`).
 - **Clé de zone `tileset: 'tuiles_ecorce'`** (TILESET_MANIFEST) : cases chargées sous
-  `<id>:<clé>`, case absente → jeu par défaut.
+  `<id>:<clé>`. Jeu complet → rendu `'blob'` (images remontées de
+  `AUTOTILE_BLOB_VISUAL_LIFT` : même ligne de marche que le jeu par défaut) ; jeu
+  incomplet → jeu par défaut. Jeux proposés : racines / arène de Kainati / épreuve /
+  monde spirituel / forêt flottante 1 = `tuiles_ecorce` ; forêt flottante 2, clairière,
+  hutte = `tuiles_flottantes` ; forêt corrompue, Ghil't, trou sombre = `tuiles_corrompues`.
+- **Profondeurs** : `CHARACTER_DEPTH` (10) pour les personnages ; les ennemis du groupe
+  `scene.enemies` la reçoivent à l'ajout (même ajoutés par un script) ; props, totems et
+  feux restent à 0 ; plantes de premier plan à `DECOR_FOREGROUND_DEPTH`.
+- **Décors (props)** : `DECOR_SECTIONS` (LevelKit) = sections du menu de l'éditeur
+  (bosquet, foret_sombre, grand_arbre, grand_arbre_tronc, foret_flottante,
+  foret_corrompue, hutte_morgat) ; planches Codex découpées et nommées par
+  `python tools/crop_deco_items.py --named`, base de l'image au ras du bas.
 - **Dev** : `index.html?zone=foret_sombre_1&flags=xaraMet,hearts=2[&load][&enter=id]`.
 
 ### Placement au sol (2026-10-22, rétro-compatible)
-- **Surface de marche** = haut de la hitbox des tuiles (16 px sous le haut de l'image
-  des tuiles d'herbe) : pieds d'Agarica, des PNJ, des animaux, bas des props, feux de
-  camp, totems. `groundSurfaceYAt` / `groundStandYAt` / `storyStandY` n'utilisent plus
+- **Surface de marche** = haut de la hitbox des tuiles (`GROUND_STAND_SINK` sous le haut
+  de la case : 0 avec le jeu 'tuiles' actif, 16 avec l'ancien 'floor' ; ne jamais écrire
+  464 ou « + 16 » en dur) : pieds d'Agarica, des PNJ, des animaux, bas des props, feux de
+  camp, totems. Le dessous d'une case sans voisin au sud est raccourci de
+  `AUTOTILE_UNDERSIDE_TRIM` (16) : hauteurs libres sous plafonds/plateformes inchangées. `groundSurfaceYAt` / `groundStandYAt` / `storyStandY` n'utilisent plus
   que les tuiles à découvert (`openGroundTilesAt(scene, x)`) : la case cachée sous une
   marche n'est plus jamais choisie.
 - **Pixels visibles** (LevelKit) : `propTopYAt(scene, x, type?)` (haut visible du prop

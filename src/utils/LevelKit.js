@@ -1398,6 +1398,9 @@ const DIRT_CENTER_VARIANT_COUNT = 6;
 // dessinée plus haut que celle du grand) est découpé par tools/split_grove.py
 // en `grand_arbre` / `arbre` / `arbre_2`, à utiliser à sa place ; `grove`
 // reste déclaré pour ne pas casser d'anciens brouillons d'éditeur.
+// Planches Codex (une section par planche, ordre de la planche) : découpées
+// ET nommées par `python tools/crop_deco_items.py --named` (table PLANCHES,
+// à garder synchro avec ces listes), base de chaque image au ras du bas.
 const DECOR_SECTIONS = {
   bosquet: [
     'grand_arbre', 'arbre', 'arbre_2',
@@ -1405,6 +1408,38 @@ const DECOR_SECTIONS = {
     'bush_round', 'bush_flowering', 'mossy_rock', 'signpost', 'fence',
     'cart', 'crates', 'well', 'antler_totem', 'tree_stump', 'log_pile',
     'bench', 'barrels',
+    // bâtiments de la 1re rangée de la planche (crop_deco_items.py --named bosquet)
+    'cabane_arbre', 'hutte_mousse', 'hutte_paille', 'cottage', 'tour', 'tente',
+    'muraille_tour', 'muraille_pan', 'muraille_pan_2', 'muraille_tour_2', 'muraille_porte',
+  ],
+  foret_sombre: [
+    'arbre_moussu', 'souche_champignons', 'rocher_mousse', 'champignons_lumineux',
+    'racine_arche', 'buisson_epineux', 'tronc_couche', 'fougere_sombre',
+    'toile_araignee', 'mare_bord', 'pierre_runique', 'fleur_corniche',
+  ],
+  grand_arbre: [
+    'racine_tunnel', 'champignon_etagere', 'nid_singe', 'tas_pierres',
+    'morceaux_ecorce', 'lanterne_lucioles', 'statue_simien', 'rideau_lianes',
+    'trou_tronc', 'autel_singe',
+  ],
+  grand_arbre_tronc: [
+    'paroi_ecorce', 'paroi_noeud', 'branche_courte', 'branche_longue', 'escalier_racines',
+    'fenetre_lune', 'lianes_hautes', 'champignons_lumineux', 'seve_corrompue', 'corniche_mousse',
+  ],
+  foret_flottante: [
+    'ile_petite', 'ile_moyenne', 'rocher_flottant', 'nuage',
+    'arbre_jeune', 'pont_corde', 'tente_geralt', 'panneau_geralt',
+    'pissenlit_geant', 'fleurs_hautes',
+  ],
+  foret_corrompue: [
+    'arbre_malade', 'souche_corrompue', 'pustule_mousse', 'racine_tordue',
+    'os_creature', 'cocon_mousse', 'champignon_toxique', 'rocher_fissure',
+    'pilier_arene', 'arche_arene', 'pierre_symbole',
+  ],
+  hutte_morgat: [
+    'hutte_morgat', 'chaudron', 'etagere_bocaux', 'table_herbes',
+    'sechoir_plantes', 'lanterne_papillons', 'panier_plantes', 'tapis_rond',
+    'pot_fleurs', 'bocal_papillons',
   ],
 };
 const PROP_PREFIX = 'prop-';
@@ -1821,9 +1856,9 @@ function atlasTileFor(solid, gx, gy) {
 // touchent pile, et un débord de 0,5 px décalerait la grille de pixels d'une
 // case à l'autre), aucun boost de
 // hauteur, et l'herbe ajoutée en images séparées APRÈS toutes les cases (pour
-// passer devant les cases voisines qu'elle déborde). `options.tileset` (jeux
-// alternatifs du manifest, au format 'blob' à 21 noms) est ignoré : leurs
-// noms de cases ne correspondent pas à cette disposition.
+// passer devant les cases voisines qu'elle déborde). Un jeu de biome complet
+// (`options.tileset`, format 'blob') passe par renderAutotileGrid en 'blob'
+// (cf. autotileLayoutFor) ; incomplet, il est ignoré ici.
 function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
   const isBackLayer = !!options.back;
   const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));

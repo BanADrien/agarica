@@ -26,18 +26,24 @@ Jeu-cadeau d'anniversaire : metroidvania-lite 2D, inspiré du personnage DnD "Ag
 
 ### Tuiles de terrain : deux jeux interchangeables
 
-`AUTOTILE_TILESET` dans `src/utils/LevelKit.js` bascule entre les deux. Ils ont exactement
-les mêmes 21 noms de fichiers et les mêmes rôles, donc c'est le seul truc à changer :
+`AUTOTILE_TILESET` dans `src/utils/LevelKit.js` bascule entre les deux (seul mot à
+changer) ; chaque jeu décrit sa disposition dans `AUTOTILE_TILESETS` :
 
 - `'floor'` — le jeu d'origine (IA), `assets/decors/autotile_frames/`, découpé de
-  `floor.png` par `tools/crop_autotile.py`.
-- `'tuiles'` — le pixel art dessiné à la main, `assets/decors/tuiles_frames/`, généré par
-  `tools/cut_tuiles.py` depuis `assets/decors/tuiles.png` (grille de 24 px).
-  **Relancer le script après toute retouche de `tuiles.png`.**
+  `floor.png` par `tools/crop_autotile.py`. Disposition `'blob'` (21 fichiers `dirt_*`),
+  herbe dessinée dans la tuile, hitbox d'herbe aux 3/4 (on marche 16 px sous le haut).
+- `'tuiles'` (actif) — pixel art dessiné à la main : `assets/decors/tuiles.png` est un ATLAS
+  6x6 de cases de 24 px (repères : `docs/production/tuiles_reperes.png`), découpé en cases
+  nommées (A1..A9, B, C1..C7, D1..D6, herbes) dans `assets/decors/tuiles_frames/` par
+  `tools/cut_tuiles.py`. Disposition `'atlas'` (`atlasTileFor` = règles de l'utilisateur) :
+  cases pleines, on marche sur le haut de la case, herbe en image séparée sans hitbox qui
+  dépasse du bord. **Relancer le script après toute retouche de `tuiles.png`.**
+  Contrôle visuel : `docs/production/tuiles_rendu.png`.
 
-Aucune logique de rendu ne dépend du jeu actif : les compensations que l'art doit respecter
-(étirement `AUTOTILE_CORNER_HEIGHT_BOOST`, hitbox aux 3/4, miroirs de `dirt_angle`/`coin`)
-sont expliquées dans l'en-tête de `tools/cut_tuiles.py`.
+Jeux des biomes (clé de zone `tileset`, `TILESET_MANIFEST`, importés par
+`tools/import_codex_assets.py`) : toujours en `'blob'`, images remontées pour garder la
+ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK` (0 avec
+`'tuiles'`, 16 avec `'floor'`), jamais `464` ni `+ 16` en dur.
 
 ## Gameplay et histoire (démo, voir docs/production/PLAN_DEV.md)
 
