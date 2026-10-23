@@ -48,8 +48,13 @@ class BootScene extends Phaser.Scene {
       }
     }
     // Plume tirée en forme Aigle (voir Feather.js), animée (léger scintillement
-    // en vol) : 4 frames découpées depuis assets/sprites/piaf_frames/plume_animation.png.
-    for (let i = 0; i < FEATHER_FRAME_COUNT; i++) {
+    // en vol), découpée depuis assets/sprites/piaf_frames/plume_animation.png.
+    // La découpe n'a produit que 3 frames (plumeanim_row0_0..2) alors que
+    // FEATHER_FRAME_COUNT en annonce 4 : on ne demande que les fichiers qui
+    // existent (la 4e donnait un 404 à chaque lancement). Rendu identique :
+    // Phaser ignore déjà une frame d'anim dont la texture manque.
+    const FEATHER_FRAME_FILES = 3;
+    for (let i = 0; i < Math.min(FEATHER_FRAME_COUNT, FEATHER_FRAME_FILES); i++) {
       this.load.image(`${FEATHER_ANIM_PREFIX}${i}`, `assets/sprites/piaf_frames/plume_animation_frames/plumeanim_row0_${i}.png`);
     }
     // Toutes les feuilles de TRANSFORMATION (humain <-> Loup/Aigle/Pieuvre/
@@ -67,8 +72,15 @@ class BootScene extends Phaser.Scene {
     this.load.image(TRANSFO_FALL_START_KEY, 'assets/sprites/transformation/transfo_frames/transfo_row1_1.png');
     this.load.image(TRANSFO_STEP2_KEY, 'assets/sprites/transformation/transfo_frames/transfo_row0_2.png');
     // Transformation humaine <-> Loup (voir ANIM_TRANSFO_TO_WOLF_KEY dans
-    // Player.js), généré depuis assets/sprites/transfo_loup.png.
-    for (let i = 0; i < TRANSFO_WOLF_FRAME_COUNT_LOADED; i++) {
+    // Player.js), généré depuis assets/sprites/transfo_loup.png. Seules les
+    // poses 1 et 2 existent sur disque (transfoloup_0 et _3 n'ont jamais été
+    // gardées) : on ne charge qu'elles, au lieu des TRANSFO_WOLF_FRAME_COUNT_LOADED
+    // (4) qui donnaient deux 404 à chaque lancement. Rendu identique : les
+    // anims de Player.js citent 0..3, et Phaser saute déjà les frames sans
+    // texture (l'anim jouée est donc 1 -> 2, comme avant).
+    const TRANSFO_WOLF_FILE_INDICES = [1, 2];
+    for (const i of TRANSFO_WOLF_FILE_INDICES) {
+      if (i >= TRANSFO_WOLF_FRAME_COUNT_LOADED) continue;
       this.load.image(`transfo-wolf-${i}`, `assets/sprites/transformation/transfo_loup_frames/transfoloup_${i}.png`);
     }
     // Flash Loup -> Aigle (voir TRANSFO_WOLF_EAGLE_* dans Player.js), généré
