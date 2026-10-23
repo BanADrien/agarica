@@ -322,9 +322,14 @@ ZONE_SCRIPTS.kainati_arene = {
     // pendant le gel) ne voyait jamais `hearts <= 0`. On écoute le registre.
     st.onHearts = (parent, value) => { if (!st.disposed && value <= 0) st.dying = true; };
     scene.registry.events.on('changedata-hearts', st.onHearts);
+    // Signal direct de Player.hitByEnemy (couvre aussi le 1er `set` du
+    // registre, qui n'émet pas 'changedata-hearts').
+    st.onDepleted = () => { if (!st.disposed) st.dying = true; };
+    scene.events.on('player-depleted', st.onDepleted);
     scene.events.once('shutdown', () => {
       st.disposed = true;
       scene.registry.events.off('changedata-hearts', st.onHearts);
+      scene.events.off('player-depleted', st.onDepleted);
       scene.input.keyboard.off('keydown-E', st.onKeyE);
       kainatiHideBar(scene, st);
     });

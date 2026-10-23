@@ -154,17 +154,31 @@ Clés gérées par l'agent **Formes** (fichier `src/entities/Liane.js`, `src/ent
   (pas en piqué). `scene.windCurrents`.
 
 Formes (Player.js) — état & API :
-- Registre : `hasWolfForm`, `hasEagleForm`, `hasMonkeyForm`, `hasOctopusForm`,
-  `airForm` ('monkey' | 'eagle' | null — **à inclure dans la sauvegarde**), `equippedForms`
+- Registre : `hasWolfForm`, `hasEagleForm`, `hasMonkeyForm`, `hasButterflyForm`, `hasOctopusForm`,
+  `airForm` ('monkey' | 'eagle' | 'butterfly' | null — **à inclure dans la sauvegarde**), `equippedForms`
   (toujours un tableau de 3, normalisé en `[sol, aérien, eau]`, ex. `['wolf','eagle',null]`).
 - Débloquer une forme aérienne en cours de jeu (flag posé au registre OU sur `player`) la rend
   automatiquement active (`airForm`). Totems LevelKit et triche Ctrl+Shift+D restent
   compatibles (la triche Player ajoute `hasMonkeyForm` sans changer l'aigle).
   `storySet('airForm', 'monkey')` est aussi suivi en direct.
 - `player.getActiveAirForm()`, `player.equipForm(id)`, `player.unequipForm(id)`,
-  `player.vine` (liane tenue ou null), `player.form` ∈ agarica/wolf/eagle/monkey/octopus.
-- Double saut : sans forme aérienne = saut simple -450 (pas de transfo) ; singe = -500 +
-  forme singe + accroche aux lianes ; aigle = -550 + plané (inchangé).
+  `player.vine` (liane tenue ou null), `player.form` ∈ agarica/wolf/eagle/monkey/butterfly/octopus.
+- Saut = **Espace seul** (-680, ~172 px ; tolérance de bord 110 ms). **Sans forme aérienne :
+  UN SEUL saut** (plus de double saut de base). 2e appui en l'air : singe = -500 + forme singe +
+  accroche aux lianes ; aigle = -550 + plané (inchangé) ; papillon = battement sur place
+  (130 ms) puis dash rectiligne à 45° avant-haut sans gravité (~290 px, 380 ms), puis chute
+  humaine — un par saut. Forme papillon débloquée avec la compétence `papillon`
+  (`unlockSkillFromStory(scene, 'papillon')` débloque aussi `hasButterflyForm`).
+- Lianes : seule la forme singe s'y accroche ; en forme humaine/aigle/loup elles sont
+  ignorées partout (plus de lianes-tremplins, arène de Kainati comprise).
+- Combat (humaine + singe) : Z/↑ = viser haut, S/↓ = viser bas (en l'air seulement),
+  K/clic = coup dans la direction visée (sinon devant). `player.getAttackHitbox()` renvoie le
+  rectangle de l'ARC AFFICHÉ (art `vfx_slash`) pendant ses images actives seulement, null
+  sinon ; jeton d'un coup = `attackEndTime`. Coup vers le bas qui touche (ennemi, amas de
+  mousse, Kainati/ses pierres, ou objet de `scene.pogoTargets` : getBounds()/Rectangle)
+  = rebond -600 (événement scène `'player-pogo'`). Loup : morsure-ruée inchangée.
+- Événement scène `'player-depleted'` (player) au dernier cœur perdu (fiable même au tout
+  premier `set('hearts')`, qui n'émet pas `changedata-hearts`).
 
 Ennemis : `ENEMY_REGISTRY[type] = (scene, e) => instance` (Fondation migre les types
 existants : araignee, loup, loupAlpha, corbeau, crapaud). Chaque fichier d'entité s'enregistre
@@ -362,9 +376,9 @@ ZoneAquatique) restent intactes, accessibles depuis le menu titre « Zones de te
   (le joueur peut rester coincé contre, à cause de la hitbox 3/4 des tuiles
   d'herbe) — préférer des marches d'une case.
 
-Formes : emplacement **sol** = loup ; emplacement **aérien** = singe OU aigle (exclusifs,
-choix au feu de camp) ; sans forme aérienne, double saut de base simple (sans
-transformation). Singe : saut moins haut + accroche auto aux lianes + balancement ;
+Formes : emplacement **sol** = loup ; emplacement **aérien** = singe OU aigle OU papillon
+(exclusifs, choix au feu de camp) ; sans forme aérienne, un seul saut (le double saut de
+base a été retiré). Singe : saut moins haut + accroche auto aux lianes + balancement ;
 Aigle : double saut plus haut + plané (+ courants d'air). Pieuvre : conservée (emplacement
 eau) mais hors histoire.
 

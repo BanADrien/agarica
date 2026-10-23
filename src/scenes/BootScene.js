@@ -296,6 +296,8 @@ class BootScene extends Phaser.Scene {
     if (typeof assetPresent === 'function' && assetPresent(logoPath)) {
       this.load.image('item-titre_logo', logoPath);
       this.load.once('filecomplete-image-item-titre_logo', () => {
+        // Logo en pixel art (refait le 2026-10-23) : pixels nets, pas de lissage.
+        this.textures.get('item-titre_logo').setFilter(Phaser.Textures.FilterMode.NEAREST);
         const logo = this.add.image(width / 2, 186, 'item-titre_logo').setAlpha(0);
         logo.setScale(Math.min(450 / logo.width, 290 / logo.height));
         objs.push(logo);

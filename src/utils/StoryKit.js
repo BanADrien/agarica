@@ -330,7 +330,7 @@ const SAVE_STORAGE_KEY = 'agarica-save-v1';
 // est sauvegardée, ces clés-là comprises, ainsi que les flags d'histoire et
 // l'inventaire `inventory`).
 const SAVE_PLAYER_KEYS = [
-  'hasWolfForm', 'hasEagleForm', 'hasOctopusForm', 'hasMonkeyForm', 'equippedForms', 'airForm',
+  'hasWolfForm', 'hasEagleForm', 'hasOctopusForm', 'hasMonkeyForm', 'hasButterflyForm', 'equippedForms', 'airForm',
   'hearts', 'energy', 'unlockedSkills', 'skillSlots', 'equippedTotem',
 ];
 
@@ -525,6 +525,11 @@ function unlockSkillFromStory(scene, skillId, { silent = false } = {}) {
       itemId: STORY_SKILL_ICON[skillId] || `skill_icone_${skillId}`, color: 0x8fe3b8,
     });
   }
+  // Le totem de poche (trou sombre) donne EN MÊME TEMPS la forme du papillon
+  // (3e forme aérienne) : sa bannière suit celle de la compétence.
+  if (skillId === 'papillon' && typeof unlockFormFromStory === 'function') {
+    unlockFormFromStory(scene, 'hasButterflyForm', { silent });
+  }
   return !already;
 }
 
@@ -533,6 +538,8 @@ const STORY_FORM_INFO = {
   // Sans forme aérienne, Agarica n'a qu'un saut : c'est la forme qui donne le double saut.
   hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: 'Donne le double saut (plus haut) et le plané.' },
   hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: 'Donne le double saut ; accroche aux lianes et balancement.' },
+  // Débloquée avec la compétence papillon (cf. unlockSkillFromStory).
+  hasButterflyForm: { type: 'butterfly', name: 'Forme du papillon', desc: "2e appui sur Espace en l'air : un battement d'ailes, puis un élan en diagonale vers l'avant et le haut." },
   hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Nage automatique.' },
 };
 
@@ -558,7 +565,8 @@ function unlockFormFromStory(scene, flag, { silent = false } = {}) {
   if (scene.textures.exists('unlock-anim-0') && scene.textures.exists(`form-icon-${info.type}`)) {
     showFormUnlockPopup(scene, info.type);
   } else {
-    showStoryBanner(scene, { kicker: 'Nouvelle forme', title: info.name, desc: info.desc, itemId: `form_icone_${info.type === 'monkey' ? 'singe' : info.type}`, color: 0xc77dff });
+    const iconId = { monkey: 'singe', butterfly: 'papillon' }[info.type] || info.type;
+    showStoryBanner(scene, { kicker: 'Nouvelle forme', title: info.name, desc: info.desc, itemId: `form_icone_${iconId}`, color: 0xc77dff });
   }
   return true;
 }

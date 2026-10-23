@@ -53,11 +53,13 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   arène de Ghil't (défaite imposée) → trou sombre → Ghil't phase 2 (soin) → retour au
   bosquet → écran de fin. Anciennes zones de test (Zone1-5, SousGrotte, ZoneAquatique,
   Zonetest) intactes, via le titre « Zones de test ».
-- Contrôles : flèches / QD, saut Z/↑/Espace (double saut de base), Shift sprint, S piqué /
-  lâcher, K ou clic attaque, E interagir, A/F/R compétences, I inventaire, M carte.
+- Contrôles : flèches / QD, saut **Espace seul** (un seul saut sans forme aérienne), Z/↑ viser en
+  haut, S/↓ viser en bas en l'air (coup vers le bas = rebond), Shift sprint (loup), K ou clic
+  attaque en arc dans la direction visée, E interagir, A/F/R compétences, I inventaire, M carte,
+  Échap/P pause.
 - **Formes** débloquées par l'histoire, automatiques (jamais un bouton) : sol = **Loup**
   (sprint, pistes, plateformes cachées), aérien = **Singe** (lianes) OU **Aigle** (plané,
-  courants d'air) au choix, eau = **Pieuvre**. **Compétences** (énergie) : ours, pierre,
+  courants d'air) OU **Papillon** (battement + dash en diagonale) au choix, eau = **Pieuvre**. **Compétences** (énergie) : ours, pierre,
   papillon (soigne les corrompus). **Feux de camp** : soin, sauvegarde, menu formes /
   compétences / totems (monde gelé).
 - **Compagnon Xara** (araignée) : suit Agarica, parle, pas de combat.

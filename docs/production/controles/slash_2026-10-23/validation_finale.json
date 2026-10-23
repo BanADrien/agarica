@@ -1,0 +1,18 @@
+{
+  "inventaire.json": {
+    "checked": 50,
+    "dimensions_alpha_errors": []
+  },
+  "inventaire_imports.json": {
+    "checked": 70,
+    "dimensions_alpha_errors": []
+  },
+  "logo": {
+    "colors": 10,
+    "pixel_grid": 4,
+    "alpha": [
+      0,
+      255
+    ]
+  }
+}

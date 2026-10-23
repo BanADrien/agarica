@@ -1,0 +1,19 @@
+{
+  "mode": "image_gen intégré",
+  "references": [
+    "assets/ui/portraits/agarica.png",
+    "assets/sprites/papillon_frames/papillon_row0_0.png",
+    "assets/sprites/singe_frames/singe_row0_0.png",
+    "assets/sprites/transfo_singe.png",
+    "assets/items/form_icone/loup.png",
+    "assets/items/form_icone/singe.png"
+  ],
+  "outputs": [
+    "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-aeeac023-eee2-4423-a5b8-c37e6bd876ce.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+    "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-42cd9eef-544e-48ac-aeb1-fd034706cf10.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+    "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-7fa4cffa-1e1f-4e44-9e7e-665c3953007d.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+    "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-120856f6-be3c-47ba-85e7-e2a3480040a4.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+  ],
+  "correction": "Première rangée, troisième frame : ailes abaissées sous le corps ; autres poses conservées.",
+  "prompts": "prompts.json"
+}

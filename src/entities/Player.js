@@ -302,17 +302,9 @@ const AGARICA_ATTACK_FRAME_HEIGHT = 366;
 // (personnage + effet) proportionnellement plutôt que de les traiter
 // séparément.
 const AGARICA_ATTACK_SCALE = HUMAN_SCALE * 0.85;
-// Portée de la hitbox de DÉGÂTS (cf. getAttackHitbox plus bas), pas la
-// hitbox de collision passive ci-dessous -- retour utilisateur : "la hitbox
-// de l'attaque d'agarica devrait être beaucoup plus longue devant". Mesurée
-// directement sur agarica_attack_2.png (le contenu -- lame d'énergie
-// comprise -- déborde jusqu'à x=8 côté gauche du canvas, alors que le
-// personnage lui-même reste centré sur x=712, cf. AGARICA_ATTACK_BODY) :
-// 712-8=704px BRUTS de portée réelle depuis le centre du corps dans le sens
-// où elle attaque nativement, bien au-delà de sa propre largeur de
-// silhouette (utilisée avant ce changement, beaucoup trop courte pour une
-// lame qui déborde largement du corps).
-const AGARICA_ATTACK_REACH_RAW = 704;
+// (L'ancienne portée « estoc » AGARICA_ATTACK_REACH_RAW = 704 px bruts, mesurée
+// sur la lame de lumière de la frame 2, a été remplacée par les arcs
+// directionnels SLASH_ARCS : la zone qui touche est désormais celle affichée.)
 // Même gabarit affiché que FORMS.agarica (cf. PLAYER_BODY_FRACTION/
 // AGARICA_BODY_BBOX plus bas), recalculé pour CE canvas précis (échelle
 // différente, AGARICA_ATTACK_SCALE) -- sans ce recalcul, la hitbox
@@ -335,6 +327,105 @@ const AGARICA_ATTACK_BODY = {
   offsetX: 624.0,
   offsetY: 30.5,
 };
+
+// --- Attaques directionnelles (forme humaine ET singe), façon Hollow Knight ---
+// Retour utilisateur : l'ancien estoc (lame d'énergie de 144 px dessinée sur
+// UNE seule frame, hitbox active pendant toute l'anim) tuait des ennemis
+// qu'on ne voyait pas touchés. Règle : LA ZONE QUI TOUCHE = L'ARC AFFICHÉ,
+// et seulement pendant ses images actives (SLASH_ACTIVE_MS) ; un coup par
+// ennemi et par coup (jeton `attackEndTime`, cf. damageEnemy dans LevelKit).
+// Direction choisie à l'appui : Z/↑ tenu = haut, S/↓ tenu EN L'AIR = bas,
+// sinon de côté (devant). Art Codex : `agarica_slash` (poses du corps) et
+// `vfx_slash` (l'arc lumineux, origine au centre), tous deux face à DROITE.
+// Placement de l'arc par direction (À RECALER ICI si l'art change) : centre
+// du sprite d'arc relatif aux pieds (this.x, this.y), `cx` vers l'avant, `cy`
+// vertical. La zone qui touche est calculée sur les pixels VISIBLES de l'arc
+// (cf. slashArtBounds, union des images affichées pendant la phase active) ;
+// `w`/`h` ne servent qu'au croissant dessiné par code quand l'art manque.
+const SLASH_ARCS = {
+  side: { cx: 62, cy: -40, w: 104, h: 80 },
+  up: { cx: 8, cy: -92, w: 108, h: 72 },
+  down: { cx: 0, cy: 12, w: 100, h: 80 },
+};
+// Phases d'un coup, calées sur les 4 frames du corps (`agarica_slash`, une
+// frame par SLASH_WINDUP_MS) : frame 0 = élan (rien ne touche), frames 1-2 =
+// images actives (l'arc est affiché ET touche), frame 3 = retour (l'arc
+// s'efface, ne touche plus).
+const SLASH_WINDUP_MS = 56;
+const SLASH_ACTIVE_MS = 112;
+const SLASH_RECOVERY_MS = 112;
+const SLASH_FADE_MS = 70;
+// Images de l'arc `vfx_slash` montrées pendant la phase active (la 3e,
+// plus pâle, pendant l'effacement) : la zone qui touche = leur union.
+const SLASH_VFX_ACTIVE_FRAMES = [0, 1];
+const SLASH_TOTAL_MS = SLASH_WINDUP_MS + SLASH_ACTIVE_MS + SLASH_RECOVERY_MS;
+// Rebond (« pogo ») : un coup vers le bas qui touche un ennemi, un amas de
+// mousse ou un danger relance Agarica vers le haut (~140 px).
+const POGO_VELOCITY = -600;
+// Croissant dessiné par code tant que l'art `vfx_slash` n'existe pas (palette
+// du jeu : vert lunaire, cœur blanc, liseré rose).
+const SLASH_COLORS = { glow: 0x5fd88f, body: 0x9fffd0, core: 0xe8fff2, edge: 0xffb3e0 };
+// Poses du corps sans l'art `agarica_slash` : [élan, actif, retour]. Côté :
+// planche d'attaque historique SANS la frame 2 (son estoc de lumière
+// débordait de la zone de coup) ; haut : bras levés (`cast`) ; bas : genoux
+// repliés, dague vers le bas (`jump_rise`).
+const SLASH_FALLBACK_POSES = {
+  side: [{ attack: 0 }, { attack: 1 }, { attack: 3 }],
+  up: [{ extra: 'cast', frame: 1 }, { extra: 'cast', frame: 2 }, { extra: 'cast', frame: 3 }],
+  down: [{ extra: 'jump_rise', frame: 1 }, { extra: 'jump_rise', frame: 2 }, { extra: 'jump_rise', frame: 2 }],
+};
+// Lancer de pierre : pose fixe bras tendu (frame 1 de la planche d'attaque) --
+// l'anim d'attaque complète montrait l'estoc de lumière pendant un lancer.
+const THROW_POSE_TEXTURE = 'agarica-attack-1';
+
+// Croissant lumineux inscrit dans le rectangle `r` du coup (= hitbox) : arc
+// extérieur = demi-ellipse qui touche les bords du rectangle côté coup, arc
+// intérieur plus court sur la même base (pointes fines, ventre épais).
+function drawSlashCrescent(g, r, dir, facing, alpha) {
+  let cx; let cy; let rx; let ry; let a0; let a1;
+  if (dir === 'up') {
+    cx = r.centerX; cy = r.bottom; rx = r.width / 2; ry = r.height; a0 = Math.PI; a1 = Math.PI * 2;
+  } else if (dir === 'down') {
+    cx = r.centerX; cy = r.y; rx = r.width / 2; ry = r.height; a0 = 0; a1 = Math.PI;
+  } else {
+    cx = facing > 0 ? r.x : r.right; cy = r.centerY; rx = r.width; ry = r.height / 2;
+    a0 = facing > 0 ? -Math.PI / 2 : Math.PI / 2; a1 = a0 + Math.PI;
+  }
+  const N = 20;
+  const band = (outer, inner) => {
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const a = a0 + ((a1 - a0) * i) / N;
+      pts.push({ x: cx + Math.cos(a) * rx * outer, y: cy + Math.sin(a) * ry * outer });
+    }
+    for (let i = N; i >= 0; i--) {
+      const a = a0 + ((a1 - a0) * i) / N;
+      // Côté ventre : rayon intérieur réduit surtout au milieu de l'arc.
+      const mid = Math.sin(((a - a0) / (a1 - a0)) * Math.PI);
+      const k = 1 - (1 - inner) * mid;
+      const rr = dir === 'side' ? { x: rx * outer * k, y: ry * outer * (0.94 + 0.06 * (1 - mid)) }
+        : { x: rx * outer * (0.94 + 0.06 * (1 - mid)), y: ry * outer * k };
+      pts.push({ x: cx + Math.cos(a) * rr.x, y: cy + Math.sin(a) * rr.y });
+    }
+    return pts;
+  };
+  g.fillStyle(SLASH_COLORS.glow, 0.32 * alpha);
+  g.fillPoints(band(1, 0.42), true);
+  g.fillStyle(SLASH_COLORS.body, 0.75 * alpha);
+  g.fillPoints(band(0.96, 0.6), true);
+  g.fillStyle(SLASH_COLORS.core, 0.95 * alpha);
+  g.fillPoints(band(0.92, 0.8), true);
+  // Liseré rose sur le bord extérieur (clin d'œil au tatouage d'Agarica).
+  g.lineStyle(2, SLASH_COLORS.edge, 0.8 * alpha);
+  g.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const a = a0 + ((a1 - a0) * i) / N;
+    const x = cx + Math.cos(a) * rx;
+    const y = cy + Math.sin(a) * ry;
+    if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.strokePath();
+}
 
 function agaricaAnimFrames(name, indices) {
   return indices.map((i) => ({ key: `agarica-${name}-${i}` }));
@@ -613,10 +704,72 @@ const TRANSFO_WOLF_EAGLE_BODY = transfoBodyConfig(TRANSFO_WOLF_EAGLE_FRAME_WIDTH
 // EAU = pieuvre. `equippedForms` garde son format historique (tableau de 3,
 // lu par LevelKit : sanctuaires, triche Ctrl+Shift+D) mais est normalisé en
 // [sol, aérien, eau] ; `airForm` (registre) mémorise le choix aérien.
-const AIR_FORM_IDS = ['eagle', 'monkey'];
+// Papillon : 3e forme aérienne (trou sombre, avec la compétence papillon).
+const AIR_FORM_IDS = ['eagle', 'monkey', 'butterfly'];
 const FORM_FLAG_BY_ID = {
   wolf: 'hasWolfForm', eagle: 'hasEagleForm', monkey: 'hasMonkeyForm', octopus: 'hasOctopusForm',
+  butterfly: 'hasButterflyForm',
 };
+// --- Forme PAPILLON (décisions utilisateur) -----------------------------------
+// 2e appui sur Espace en l'air : PAS un saut -- battement d'ailes sur place
+// (transformation brève), puis DASH en ligne droite, diagonale FIXE
+// avant-haut (sens où elle regarde), sans gravité ; puis chute normale en
+// forme humaine. Un seul dash par saut (rechargé au sol, ou par un rebond).
+const BUTTERFLY_FLAP_MS = 130;
+const BUTTERFLY_DASH_MS = 380;
+// 760 px/s pendant 0,38 s = ~290 px le long de la diagonale (≈ 4,5 cases ;
+// ~205 px vers l'avant ET vers le haut).
+const BUTTERFLY_DASH_SPEED = 760;
+const BUTTERFLY_DASH_ANGLE = Math.PI / 4;
+// Vitesse horizontale gardée à la sortie du dash (chute humaine normale).
+const BUTTERFLY_EXIT_SPEED_X = 190;
+// Le papillon (art centré) est dessiné centré sur le buste, pas aux pieds.
+const BUTTERFLY_CENTER_ABOVE_FEET = 38;
+const BUTTERFLY_TRAIL_EVERY_MS = 22;
+const BUTTERFLY_DUST_COLORS = [0x9ff3ff, 0x6fd8ff, 0xffb3f0, 0xfff6a0];
+const BUTTERFLY_PH_KEY = 'butterfly-ph';
+const ANIM_BUTTERFLY_PH_KEY = 'butterfly-ph-flap';
+const BUTTERFLY_PH_SIZE = { w: 60, h: 52 };
+
+// Placeholder du papillon (tant que `forme_papillon` n'existe pas) : 4
+// textures dessinées par code, ailes plus ou moins ouvertes (battement).
+function ensureButterflyPlaceholder(scene) {
+  if (scene.anims.exists(ANIM_BUTTERFLY_PH_KEY)) return;
+  const { w, h } = BUTTERFLY_PH_SIZE;
+  const opens = [1, 0.7, 0.35, 0.7];
+  opens.forEach((open, i) => {
+    const key = `${BUTTERFLY_PH_KEY}-${i}`;
+    if (scene.textures.exists(key)) return;
+    const g = scene.make.graphics({ x: 0, y: 0, add: false });
+    const cx = w / 2;
+    const cy = h / 2;
+    for (const side of [-1, 1]) {
+      // Aile haute (cyan, liseré bleu) et aile basse (rose), vues de profil :
+      // largeur = ouverture du battement.
+      g.fillStyle(0x2a6fd8, 1);
+      g.fillEllipse(cx + side * 13 * open, cy - 8, 26 * open + 4, 30);
+      g.fillStyle(0x9ff3ff, 1);
+      g.fillEllipse(cx + side * 13 * open, cy - 8, 22 * open + 2, 25);
+      g.fillStyle(0xffb3f0, 1);
+      g.fillEllipse(cx + side * 10 * open, cy + 10, 17 * open + 3, 17);
+      g.fillStyle(0xffffff, 0.9);
+      g.fillCircle(cx + side * 15 * open, cy - 14, 2.5);
+    }
+    g.fillStyle(0x3a1d5a, 1);
+    g.fillEllipse(cx, cy + 2, 6, 26);
+    g.lineStyle(1.5, 0x3a1d5a, 1);
+    g.lineBetween(cx, cy - 10, cx + 7, cy - 22);
+    g.lineBetween(cx, cy - 10, cx - 2, cy - 23);
+    g.generateTexture(key, w, h);
+    g.destroy();
+  });
+  scene.anims.create({
+    key: ANIM_BUTTERFLY_PH_KEY,
+    frames: opens.map((_, i) => ({ key: `${BUTTERFLY_PH_KEY}-${i}` })),
+    frameRate: 18,
+    repeat: -1,
+  });
+}
 // Retour utilisateur : SANS forme aérienne (ni singe ni aigle dans
 // l'emplacement aérien), Agarica ne fait qu'UN saut -- l'ancien « double saut
 // de base » (-450, petit nuage) est retiré. Le 2e saut n'existe qu'avec le
@@ -729,6 +882,39 @@ function textureAlphaInfo(scene, key) {
   }
   TEXTURE_ALPHA_CACHE.set(key, info);
   return info;
+}
+
+// Boîte des pixels visibles (alpha > seuil) d'une texture, en px du canvas
+// (mise en cache). Sert à caler la zone de coup sur l'arc réellement dessiné.
+const TEXTURE_BOX_CACHE = new Map();
+function textureOpaqueBox(scene, key, alphaMin = 48) {
+  const ck = `${key}|${alphaMin}`;
+  if (TEXTURE_BOX_CACHE.has(ck)) return TEXTURE_BOX_CACHE.get(ck);
+  let box = null;
+  try {
+    if (scene.textures.exists(key)) {
+      const img = scene.textures.get(key).getSourceImage();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, img.width, img.height).data;
+      let x0 = Infinity; let y0 = Infinity; let x1 = -1; let y1 = -1;
+      for (let y = 0; y < img.height; y++) {
+        for (let x = 0; x < img.width; x++) {
+          if (d[(y * img.width + x) * 4 + 3] > alphaMin) {
+            if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+          }
+        }
+      }
+      if (x1 >= 0) box = { x0, y0, x1: x1 + 1, y1: y1 + 1, w: img.width, h: img.height };
+    }
+  } catch (e) {
+    box = null;
+  }
+  TEXTURE_BOX_CACHE.set(ck, box);
+  return box;
 }
 
 // Échelle à laquelle la silhouette de la texture `key` a la même hauteur
@@ -1107,7 +1293,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Formes aériennes déjà connues à la création : seule une forme débloquée
     // EN COURS de jeu (totem, cinématique, triche) devient automatiquement
     // la forme aérienne active, cf. syncFormSlots().
-    this.airFormsSeen = { eagle: this.hasEagleForm, monkey: this.hasMonkeyForm };
+    this.hasButterflyForm = scene.registry.get('hasButterflyForm') || false;
+    this.airFormsSeen = { eagle: this.hasEagleForm, monkey: this.hasMonkeyForm, butterfly: this.hasButterflyForm };
     this.airForm = this.resolveInitialAirForm(scene.registry.get('airForm'));
     this.applyAirForm(this.airForm);
 
@@ -1226,6 +1413,22 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.isAttacking = false;
     this.attackEndTime = 0;
     this.attackCooldownEndTime = 0;
+    // Coup directionnel en cours (cf. SLASH_ARCS) : 'side' | 'up' | 'down' |
+    // null (Loup : morsure-ruée, Aigle : plume). Sens figé à l'appui.
+    this.slashDir = null;
+    this.slashFacing = 1;
+    this.slashStart = 0;
+    this.pogoDone = false;
+    // Arc dessiné APRÈS la synchro physique (événement 'postupdate') pour
+    // coller au sprite, devant les personnages.
+    this.slashGfx = scene.add.graphics().setDepth(CHARACTER_DEPTH + 1);
+    this.slashSprite = null;
+    // Mesure des arcs dès maintenant (lecture de pixels) : évite un à-coup
+    // au tout premier coup de la zone.
+    for (const d of Object.keys(SLASH_ARCS)) this.slashArtBounds(d);
+    this.onSlashPostUpdate = () => this.drawSlashArc();
+    scene.events.on('postupdate', this.onSlashPostUpdate);
+    scene.events.once('shutdown', () => scene.events.off('postupdate', this.onSlashPostUpdate));
     // Tir de plume (forme Aigle, cf. plus bas) : force la pose de battement
     // d'ailes (ANIM_PIAF_FLY_KEY) pendant cette fenêtre, même en plein
     // plané (vitesse verticale positive, qui montrerait sinon la pose de
@@ -1304,6 +1507,33 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.skillHitboxId = null;
     this.lastSkillId = null;
     FORMS.monkey = manifestFormConfig(scene, 'singe', 'jump');
+    // Papillon : art `forme_papillon` (centré, face à DROITE) s'il existe,
+    // sinon placeholder dessiné par code ; hitbox au gabarit humain (comme
+    // le singe) pour que les collisions ne changent pas pendant le dash.
+    ensureManifestAnims(scene, 'forme_papillon');
+    ensureManifestAnims(scene, 'transfo_papillon');
+    ensureButterflyPlaceholder(scene);
+    this.butterflyArt = hasManifestArt(scene, 'forme_papillon');
+    if (this.butterflyArt) {
+      FORMS.butterfly = manifestFormConfig(scene, 'forme_papillon', 'dash');
+    } else {
+      const { w, h } = BUTTERFLY_PH_SIZE;
+      FORMS.butterfly = { texture: `${BUTTERFLY_PH_KEY}-0`, scale: 1, frameWidth: w, frameHeight: h, body: transfoBodyConfig(w, h, 1) };
+    }
+    // Transfo humaine -> papillon (art à venir) : recréée à la durée du battement.
+    this.butterflyTransfoKey = null;
+    if (hasManifestArt(scene, 'transfo_papillon') && scene.anims.exists('transfo_papillon-transform')) {
+      this.butterflyTransfoKey = 'transfo_papillon-transform-timed';
+      if (!scene.anims.exists(this.butterflyTransfoKey)) {
+        const frames = scene.anims.get('transfo_papillon-transform').frames.map((f) => ({ key: f.textureKey }));
+        scene.anims.create({ key: this.butterflyTransfoKey, frames, frameRate: frames.length / (BUTTERFLY_FLAP_MS / 1000), repeat: 0 });
+      }
+    }
+    // 'flap' (battement sur place) | 'dash' | null ; cf. updateButterflyDash.
+    this.butterflyPhase = null;
+    this.butterflyPhaseEnd = 0;
+    this.butterflyDir = 1;
+    this.butterflyTrailAt = 0;
     ensureManifestAnims(scene, 'singe');
     ensureManifestAnims(scene, 'transfo_singe');
     ensureManifestAnims(scene, 'agarica_extra');
@@ -1345,6 +1575,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.hasMonkeyForm = true;
       this.airFormsSeen.monkey = true;
       playerStateSet(scene, 'hasMonkeyForm', true);
+      // Idem pour le papillon (débloqué, pas activé).
+      this.hasButterflyForm = true;
+      this.airFormsSeen.butterfly = true;
+      playerStateSet(scene, 'hasButterflyForm', true);
     });
     this.jumpsUsed = 0;
     this.justJumped = false;
@@ -1416,9 +1650,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       || Phaser.Input.Keyboard.JustDown(this.keys.left);
     const rightJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.right)
       || Phaser.Input.Keyboard.JustDown(this.keys.right);
-    const jumpJustPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up)
-      || Phaser.Input.Keyboard.JustDown(this.keys.up)
-      || Phaser.Input.Keyboard.JustDown(this.keys.jump);
+    // Décision utilisateur : SAUT = ESPACE SEUL. Z/↑ et S/↓ servent à viser
+    // (attaque vers le haut / vers le bas en l'air) ; S/↓ garde ses rôles de
+    // piqué (Aigle), de lâcher de liane (singe) et de nage (pieuvre).
+    const jumpJustPressed = Phaser.Input.Keyboard.JustDown(this.keys.jump);
+    const upHeld = this.cursors.up.isDown || this.keys.up.isDown;
     const downHeld = this.cursors.down.isDown || this.keys.down.isDown;
 
     const now = this.scene.time.now;
@@ -1499,17 +1735,30 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.scene.physics.world.timeScale = 1;
         this.scene.anims.globalTimeScale = 1;
       });
-    } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && now >= this.attackCooldownEndTime) {
+    } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.butterflyPhase && now >= this.attackCooldownEndTime) {
       // Retour utilisateur : "retire l'attaque de la pieuvre" -- forme
       // 100% nage, jamais de combat (elle n'avait de toute façon aucune
       // pose d'attaque dédiée, cf. le cycle de nage rejoué tel quel plus
       // bas dans update() -- juste le flash de teinte générique et la
       // hitbox qui restaient actifs malgré l'absence de vraie animation).
       this.isAttacking = true;
-      // Forme humaine : sa propre durée plus courte (cf.
-      // AGARICA_ATTACK_DURATION) -- Loup/Pieuvre gardent `attackDuration`
-      // (calé sur la morsure du Loup, cf. sa définition).
-      this.attackEndTime = now + (this.form === 'agarica' ? AGARICA_ATTACK_DURATION : this.attackDuration);
+      if (this.form === 'wolf') {
+        // Loup : morsure-ruée (inchangée), durée calée sur ses 8 frames.
+        this.slashDir = null;
+        this.attackEndTime = now + this.attackDuration;
+      } else {
+        // Humaine / singe : coup directionnel (cf. SLASH_ARCS). `this.onGround`
+        // = état de l'image précédente (le sol n'est relu que plus bas).
+        this.slashDir = upHeld ? 'up' : (downHeld && !this.onGround ? 'down' : 'side');
+        // Sens : la direction tenue à cet instant (sinon le sens courant) --
+        // `facingDir` n'est mis à jour que plus bas dans update().
+        const heldDir = left && !right ? -1 : right && !left ? 1 : 0;
+        this.slashFacing = heldDir || (this.facingDir >= 0 ? 1 : -1);
+        this.slashStart = now;
+        this.pogoDone = false;
+        this.attackEndTime = now + SLASH_TOTAL_MS;
+        this.startSlashVfx();
+      }
       this.attackCooldownEndTime = now + this.attackCooldown;
       this.attackDashActive = this.form === 'wolf';
       this.attackDashDir = this.facingDir;
@@ -1517,6 +1766,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.isAttacking && now >= this.attackEndTime) {
       this.isAttacking = false;
       this.attackDashActive = false;
+      this.slashDir = null;
     }
 
     if (leftJustDown) {
@@ -1661,6 +1911,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         } else {
           this.setVelocityY(this.jumpVelocity);
         }
+      } else if (!swimming && airForm === 'butterfly' && this.jumpsUsed < 2 && !this.butterflyPhase) {
+        // Papillon : le 2e appui n'est pas un saut mais le dash (cf.
+        // startButterflyDash) ; un 1er appui en l'air (chute d'un bord) reste
+        // un saut normal, comme pour le singe et l'aigle.
+        this.jumpsUsed += 1;
+        if (this.jumpsUsed === 2) this.startButterflyDash(now);
+        else this.setVelocityY(this.jumpVelocity);
       } else if (!swimming && airForm === 'eagle' && this.jumpsUsed < 2) {
         // Pose actuelle (montée ou descente du 1er saut) au moment précis
         // du double-saut : décide quelle des deux séquences de
@@ -1688,7 +1945,24 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine;
+    // Papillon : battement puis dash (écrase vitesse et gravité, cf. plus bas).
+    if (this.butterflyPhase) this.updateButterflyDash(now, swimming || onGround);
+
+    // Rebond (pogo) : coup vers le bas qui touche quelque chose de frappable,
+    // une fois par coup. Testé AVANT LevelKit (qui applique les dégâts juste
+    // après Player.update) : l'ennemi touché est donc encore vivant ici.
+    if (this.isAttacking && this.slashDir === 'down' && !this.pogoDone && !onGround && !this.vine
+      && this.isSlashActive(now) && this.pogoTargetHit(this.getSlashRect())) {
+      this.pogoDone = true;
+      this.setVelocityY(POGO_VELOCITY);
+      // Rend l'éventuel saut aérien (singe/aigle), comme dans Hollow Knight ;
+      // sans forme aérienne, jumpsUsed >= 1 : toujours aucun saut en l'air.
+      this.jumpsUsed = 1;
+      this.wolfJumpCarry = false;
+      this.scene.events.emit('player-pogo', this);
+    }
+
+    const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine && !this.butterflyPhase;
     this.body.gravity.y = falling ? this.fallGravityBonus : 0;
 
     // Descente en piqué : S maintenu remplace le plané par une accélération
@@ -1716,9 +1990,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.inWater && !(this.hasOctopusForm && this.formEquipped('octopus'))) {
       this.hitByEnemy();
     }
-    this.body.setAllowGravity(!swimming && !this.vine);
+    this.body.setAllowGravity(!swimming && !this.vine && !this.butterflyPhase);
     if (swimming) {
-      const swimUp = this.cursors.up.isDown || this.keys.up.isDown;
+      const swimUp = upHeld || this.keys.jump.isDown;
       const vy = swimUp ? -this.swimSpeed : downHeld ? this.swimSpeed : 0;
       this.setAcceleration(0, 0);
       this.setVelocity(dir * this.swimSpeed, vy);
@@ -1727,6 +2001,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (swimming) {
       this.setForm('octopus');
+    } else if (this.butterflyPhase) {
+      this.setForm('butterfly');
     } else if (this.vine) {
       this.setForm('monkey');
     } else if (!onGround && this.jumpsUsed >= 2 && this.airJumpForm === 'eagle') {
@@ -1764,9 +2040,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // sens avec `facesRight=false` (miroir par rapport au sens de
       // déplacement) — même convention dans les deux sens (entrée/sortie).
       this.beginFormTransition(now, ANIM_TRANSFO_TO_WOLF_KEY, this.wolfTransformDuration, TRANSFO_WOLF_SCALE, TRANSFO_WOLF_BODY, true);
-    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming && leavingWolf && this.form !== 'monkey') {
+    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming && leavingWolf
+      && this.form !== 'monkey' && this.form !== 'butterfly') {
       // (Loup -> singe : c'est la transfo singe, plus bas, qui prend le relais
-      // -- l'anim Loup -> humaine aurait montré Agarica entre les deux.)
+      // -- l'anim Loup -> humaine aurait montré Agarica entre les deux ; Loup
+      // -> papillon : le battement d'ailes sert de transformation.)
       // `!this.formTransitionActive` (retour utilisateur, reformulé une 2e
       // fois avec plus de détail : "au moment de la transfo la hitbox se
       // desactive ou s'actualise donc je passe à travers les murs pendant
@@ -1935,8 +2213,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           this.applyAgaricaExtraPose(this.storyPose);
         } else if (now < this.hurtPoseUntil && !this.isAttacking && extra('hurt')) {
           this.applyAgaricaExtraPose('hurt');
+        } else if (this.isAttacking && this.slashDir) {
+          this.applySlashPose(now);
         } else if (this.isAttacking || now < this.throwPoseUntil) {
-          this.anims.play(ANIM_AGARICA_ATTACK_KEY, true);
+          // Lancer de pierre : pose fixe bras tendu (cf. THROW_POSE_TEXTURE).
+          this.anims.stop();
+          this.setTexture(THROW_POSE_TEXTURE);
           // Canvas différent de celui d'idle/marche (cf. AGARICA_ATTACK_BODY)
           // : hitbox dédiée pour rester correctement centrée/calée au sol
           // pendant les 4 frames de l'animation. Échelle légèrement réduite
@@ -2008,12 +2290,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         } else {
           playManifestOn(this, 'singe', now < this.monkeyReleasePoseUntil ? 'release_flip' : 'jump');
         }
+      } else if (this.form === 'butterfly') {
+        this.applyButterflyPose(now);
       } else if (this.form === 'octopus') {
         // Pas d'attaque du tout pour cette forme (cf. le garde-fou
         // `this.form !== 'octopus'` sur le déclenchement plus haut) --
         // juste un cycle de nage, vue de face. Pas d'idle séparé non plus :
         // figée sur la 1re frame du cycle au repos.
-        const swimUp = this.cursors.up.isDown || this.keys.up.isDown;
+        const swimUp = upHeld || this.keys.jump.isDown;
         const moving = dir !== 0 || swimUp || downHeld;
         if (moving) {
           this.anims.play(ANIM_PIEUVRE_WALK_KEY, true);
@@ -2097,39 +2381,25 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.formTransitionFacesRight = facesRight;
   }
 
-  // Rectangle (espace monde) de la dague active pendant la fenêtre
-  // d'attaque, devant Agarica selon le sens où elle regarde. Retourne null
-  // hors attaque.
-  //
-  // Retour utilisateur : "les hitbox d'attaque devraient prendre toute
-  // l'image, réduite en hauteur (garder le centre)" -- l'ancien
-  // attackRange/attackHeight (34x60) était un chiffre fixe unique, partagé
-  // par les 4 formes malgré des silhouettes réelles très différentes (même
-  // défaut que FORMS.body avant PLAYER_BODY_FRACTION, cf. plus haut) : la
-  // dague d'Agarica et la morsure du Loup, bien plus large, frappaient
-  // toutes les deux sur exactement la même largeur. Hauteur ramenée à
-  // ATTACK_HITBOX_HEIGHT_FRACTION de la silhouette PLEINE (pas réduite comme
-  // la hitbox de collision passive) et centrée sur le milieu du corps
-  // plutôt qu'ancrée près de la tête ("garder le centre"), pour toutes les
-  // formes. Largeur : reprise à playerFullDisplaySize ("toute l'image") pour
-  // les formes SANS mesure dédiée -- mais retour utilisateur suivant : "la
-  // hitbox de l'attaque d'agarica devrait être beaucoup plus longue devant"
-  // -- sa propre silhouette (~45px) ne rendait pas justice à la vraie
-  // portée de la lame d'énergie du swing, bien plus longue (cf.
-  // AGARICA_ATTACK_REACH_RAW, mesurée directement sur la planche
-  // d'attaque) : cas spécial pour sa forme uniquement, les autres formes
-  // (Loup...) gardent leur propre largeur de silhouette, jamais mesurée
-  // comme "trop courte".
+  // Rectangle (espace monde) de la zone qui touche, ou null : arc du coup
+  // directionnel en cours (humaine/singe, images actives seulement, cf.
+  // SLASH_ARCS), piqué de l'Aigle (tout le corps), morsure du Loup (toute la
+  // silhouette, réduite en hauteur et centrée sur le corps, cf.
+  // ATTACK_HITBOX_HEIGHT_FRACTION). API utilisée par LevelKit, Kainati,
+  // Ghil't, les scripts d'actes (jeton anti-double-coup : `attackEndTime`).
   getAttackHitbox() {
     // Piqué Aigle (S maintenu en forme Aigle) : le contact seul inflige des
     // dégâts, pas de fenêtre d'attaque dédiée — clin d'œil au piqué du
     // Corbeau, qui touche aussi au simple contact.
     if (this.eagleDiving) return this.getBounds();
     if (!this.isAttacking) return null;
+    // Coup directionnel (humaine, singe) : l'arc affiché, et seulement
+    // pendant ses images actives (cf. SLASH_ARCS) -- null pendant l'élan et
+    // le retour. Même rectangle que celui que dessine drawSlashArc().
+    if (this.slashDir) return this.isSlashActive(this.scene.time.now) ? this.getSlashRect() : null;
+    // Loup : morsure sur toute la silhouette (inchangé).
     const fullSize = playerFullDisplaySize(this.form);
-    const attackWidth = this.form === 'agarica'
-      ? AGARICA_ATTACK_REACH_RAW * AGARICA_ATTACK_SCALE
-      : fullSize.width;
+    const attackWidth = fullSize.width;
     const attackHeight = fullSize.height * ATTACK_HITBOX_HEIGHT_FRACTION;
     // `facingDir` plutôt que `flipX` : ce dernier a un sens inversé selon la
     // forme (le loup/l'aigle font face à droite par défaut, cf. setFlipX
@@ -2159,7 +2429,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // table, sans toucher à cette méthode.
   tryActivateSkill(slotIndex, now) {
     const skillId = this.skillSlots[slotIndex];
-    if (!skillId || now < this.skillCooldownEndTime) return;
+    if (!skillId || now < this.skillCooldownEndTime || this.butterflyPhase) return;
     const def = SKILL_DEFS[skillId];
     if (this.energy < def.cost) return; // pas de retour visuel dédié pour l'instant (TODO UI : flash de la barre ?)
     this.energy -= def.cost;
@@ -2286,6 +2556,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (regAir === undefined && this.equippedForms.every((f) => !f)) {
       if (this.hasEagleForm) return 'eagle';
       if (this.hasMonkeyForm) return 'monkey';
+      if (this.hasButterflyForm) return 'butterfly';
     }
     return null;
   }
@@ -2437,6 +2708,118 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.events.emit('vine-release', vine);
   }
 
+  // --- Forme papillon : battement + dash (cf. BUTTERFLY_*) ------------------
+
+  startButterflyDash(now) {
+    this.butterflyPhase = 'flap';
+    this.butterflyPhaseEnd = now + BUTTERFLY_FLAP_MS;
+    this.butterflyDir = this.facingDir >= 0 ? 1 : -1;
+    this.airJumpForm = 'butterfly';
+    this.wolfJumpCarry = false;
+    this.formTransitionActive = false;
+    this.setAcceleration(0, 0);
+    this.setVelocity(0, 0);
+    this.spawnButterflySparkles(18);
+  }
+
+  // `abort` : sol touché, eau... Le dash s'arrête aussi contre un mur/plafond.
+  updateButterflyDash(now, abort) {
+    if (abort) { this.endButterflyDash(); return; }
+    const b = this.body;
+    this.setAcceleration(0, 0);
+    this.setDrag(0, 0);
+    if (this.butterflyPhase === 'flap') {
+      this.setVelocity(0, 0);
+      if (now >= this.butterflyPhaseEnd) {
+        this.butterflyPhase = 'dash';
+        this.butterflyPhaseEnd = now + BUTTERFLY_DASH_MS;
+      }
+    }
+    if (this.butterflyPhase === 'dash') {
+      const blocked = b.blocked.up || (this.butterflyDir > 0 ? b.blocked.right : b.blocked.left);
+      if (now >= this.butterflyPhaseEnd || (blocked && now > this.butterflyPhaseEnd - BUTTERFLY_DASH_MS + 40)) {
+        this.endButterflyDash();
+        return;
+      }
+      b.maxVelocity.set(BUTTERFLY_DASH_SPEED, BUTTERFLY_DASH_SPEED);
+      this.setVelocity(
+        this.butterflyDir * Math.cos(BUTTERFLY_DASH_ANGLE) * BUTTERFLY_DASH_SPEED,
+        -Math.sin(BUTTERFLY_DASH_ANGLE) * BUTTERFLY_DASH_SPEED,
+      );
+      if (now >= this.butterflyTrailAt) {
+        this.butterflyTrailAt = now + BUTTERFLY_TRAIL_EVERY_MS;
+        this.spawnButterflyTrail();
+      }
+    }
+  }
+
+  endButterflyDash() {
+    if (!this.butterflyPhase) return;
+    const wasDash = this.butterflyPhase === 'dash';
+    this.butterflyPhase = null;
+    this.body.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
+    // Chute humaine normale : un peu d'élan vers l'avant, plus de montée.
+    this.setVelocity(wasDash ? this.butterflyDir * BUTTERFLY_EXIT_SPEED_X : this.body.velocity.x, 0);
+    this.jumpsUsed = 2;
+    this.spawnButterflySparkles(10);
+  }
+
+  // Pose du papillon : art `forme_papillon` (flap / dash) ou placeholder,
+  // centré sur le buste (BUTTERFLY_CENTER_ABOVE_FEET) ; hitbox inchangée.
+  applyButterflyPose(now) {
+    const sc = this.scene;
+    if (this.butterflyPhase === 'flap' && this.butterflyTransfoKey) {
+      this.anims.play(this.butterflyTransfoKey, true);
+    } else if (this.butterflyArt) {
+      const want = this.butterflyPhase === 'flap' ? 'forme_papillon-flap' : 'forme_papillon-dash';
+      if (sc.anims.exists(want)) this.anims.play(want, true);
+    } else {
+      this.anims.play(ANIM_BUTTERFLY_PH_KEY, true);
+    }
+    this.setFlipX(this.butterflyDir < 0);
+    // Penché dans le sens du dash (diagonale), droit pendant le battement.
+    this.setRotation(this.butterflyPhase === 'dash' ? -this.butterflyDir * 0.35 : 0);
+    const W = this.frame.realWidth;
+    const H = this.frame.realHeight;
+    this.setOrigin(0.5, 0.5 + BUTTERFLY_CENTER_ABOVE_FEET / (H * this.scaleY));
+    const b = FORMS.butterfly.body;
+    this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
+    // Remis à (0.5, 1) / rotation 0 en tête de l'image suivante (cf. resetVineArtAnchor).
+    this.vineArtAnchored = true;
+  }
+
+  // Poussière lumineuse (transformation, fin du dash).
+  spawnButterflySparkles(count) {
+    const sc = this.scene;
+    const cx = this.x;
+    const cy = this.y - BUTTERFLY_CENTER_ABOVE_FEET;
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const dot = sc.add.circle(cx, cy, Phaser.Math.Between(2, 4), BUTTERFLY_DUST_COLORS[i % BUTTERFLY_DUST_COLORS.length], 1)
+        .setDepth(this.depth + 1).setBlendMode(Phaser.BlendModes.ADD);
+      sc.tweens.add({
+        targets: dot, x: cx + Math.cos(a) * Phaser.Math.Between(18, 42), y: cy + Math.sin(a) * Phaser.Math.Between(14, 34),
+        alpha: 0, scale: 0.3, duration: Phaser.Math.Between(260, 420), ease: 'Quad.easeOut', onComplete: () => dot.destroy(),
+      });
+    }
+  }
+
+  // Traînée du dash : grains lumineux laissés derrière, qui retombent en s'éteignant.
+  spawnButterflyTrail() {
+    const sc = this.scene;
+    const cx = this.x;
+    const cy = this.y - BUTTERFLY_CENTER_ABOVE_FEET;
+    for (let i = 0; i < 2; i++) {
+      const dot = sc.add.circle(cx + Phaser.Math.Between(-6, 6), cy + Phaser.Math.Between(-8, 8), Phaser.Math.Between(2, 4),
+        BUTTERFLY_DUST_COLORS[Phaser.Math.Between(0, BUTTERFLY_DUST_COLORS.length - 1)], 0.95)
+        .setDepth(this.depth - 1).setBlendMode(Phaser.BlendModes.ADD);
+      sc.tweens.add({
+        targets: dot, y: dot.y + Phaser.Math.Between(10, 26), alpha: 0, scale: 0.2,
+        duration: Phaser.Math.Between(380, 560), onComplete: () => dot.destroy(),
+      });
+    }
+  }
+
   // Gerbe de feuilles autour des mains à la prise d'une liane depuis la forme
   // humaine (cf. update() : pas de transfo dessinée suspendue).
   spawnVineGrabPuff() {
@@ -2538,7 +2921,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.setRotation(0);
   }
 
-  applyAgaricaExtraPose(anim) {
+  // Échelle + hitbox d'une rangée `agarica_extra` (mise en cache).
+  extraPoseConfig(anim) {
     this.extraPoseCfg = this.extraPoseCfg || {};
     let cfg = this.extraPoseCfg[anim];
     if (!cfg) {
@@ -2549,9 +2933,187 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       }
       this.extraPoseCfg[anim] = cfg;
     }
+    return cfg;
+  }
+
+  applyAgaricaExtraPose(anim) {
+    const cfg = this.extraPoseConfig(anim);
     playManifestOn(this, 'agarica_extra', anim);
     this.applyBodyForScale(cfg.scale, cfg.body);
     this.setFlipX(AGARICA_EXTRA_FACES_RIGHT ? this.facingDir < 0 : this.facingDir > 0);
+  }
+
+  // --- Coups directionnels (cf. SLASH_ARCS) ---------------------------------
+
+  isSlashActive(now) {
+    const t = now - this.slashStart;
+    return t >= SLASH_WINDUP_MS && t < SLASH_WINDUP_MS + SLASH_ACTIVE_MS;
+  }
+
+  // Échelle commune du corps ET de l'arc (art Codex) : la pose debout de
+  // côté (frame 0) ramenée à la hauteur de l'idle (~85 px), jamais plus que
+  // l'échelle du manifest -- l'arc, dessiné à la même échelle que le corps
+  // sur la planche, suit le même rapport.
+  slashArtScale() {
+    if (this.slashScaleCache) return this.slashScaleCache;
+    const sc = this.scene;
+    const def = getAssetManifest().agarica_slash || {};
+    const ref = manifestFrameKey('agarica_slash', 'side', 0);
+    const scale = sc.textures.exists(ref) ? scaleMatchingHumanHeight(sc, ref, def.scale || 0.34) : (def.scale || 0.34);
+    this.slashScaleCache = scale;
+    return scale;
+  }
+
+  // Pixels visibles de l'arc `vfx_slash` d'une direction (union des images
+  // montrées pendant la phase active), relatifs au CENTRE du sprite, en px
+  // affichés, art non retourné. null si l'art manque.
+  slashArtBounds(dir) {
+    this.slashBoundsCache = this.slashBoundsCache || {};
+    if (dir in this.slashBoundsCache) return this.slashBoundsCache[dir];
+    const sc = this.scene;
+    let res = null;
+    if (hasManifestArt(sc, 'vfx_slash', dir)) {
+      const scale = this.slashArtScale();
+      let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+      for (const i of SLASH_VFX_ACTIVE_FRAMES) {
+        const b = textureOpaqueBox(sc, manifestFrameKey('vfx_slash', dir, i));
+        if (!b) continue;
+        x0 = Math.min(x0, b.x0 - b.w / 2); x1 = Math.max(x1, b.x1 - b.w / 2);
+        y0 = Math.min(y0, b.y0 - b.h / 2); y1 = Math.max(y1, b.y1 - b.h / 2);
+      }
+      if (x1 > x0) res = { x0: x0 * scale, y0: y0 * scale, x1: x1 * scale, y1: y1 * scale };
+    }
+    this.slashBoundsCache[dir] = res;
+    return res;
+  }
+
+  // Rectangle de l'arc du coup en cours (espace monde), à la position
+  // actuelle = la zone qui touche (pixels visibles de l'arc s'il y a l'art,
+  // sinon le rectangle du croissant dessiné).
+  getSlashRect(dir = this.slashDir, facing = this.slashFacing) {
+    const a = SLASH_ARCS[dir] || SLASH_ARCS.side;
+    const cx = this.x + facing * a.cx;
+    const cy = this.y + a.cy;
+    const art = this.slashArtBounds(dir);
+    if (art) {
+      const x0 = facing > 0 ? art.x0 : -art.x1;
+      const x1 = facing > 0 ? art.x1 : -art.x0;
+      return new Phaser.Geom.Rectangle(cx + x0, cy + art.y0, x1 - x0, art.y1 - art.y0);
+    }
+    return new Phaser.Geom.Rectangle(cx - a.w / 2, cy - a.h / 2, a.w, a.h);
+  }
+
+  // Pose du corps pendant un coup (forme humaine) : art `agarica_slash` s'il
+  // existe (face à DROITE, une frame par SLASH_WINDUP_MS : élan / 2 actives /
+  // retour), sinon poses existantes (SLASH_FALLBACK_POSES).
+  applySlashPose(now) {
+    const sc = this.scene;
+    const dir = this.slashDir;
+    if (hasManifestArt(sc, 'agarica_slash', dir)) {
+      const scale = this.slashArtScale();
+      this.slashBodyCfg = this.slashBodyCfg || {};
+      let body = this.slashBodyCfg[dir];
+      if (!body) {
+        const cfg = manifestFormConfig(sc, 'agarica_slash', dir);
+        body = transfoBodyConfig(cfg.frameWidth, cfg.frameHeight, scale);
+        this.slashBodyCfg[dir] = body;
+      }
+      const t = now - this.slashStart;
+      const frame = Math.min(3, Math.max(0, Math.floor(t / SLASH_WINDUP_MS)));
+      const key = manifestFrameKey('agarica_slash', dir, frame);
+      this.anims.stop();
+      if (sc.textures.exists(key)) this.setTexture(key);
+      this.applyBodyForScale(scale, body);
+      this.setFlipX(this.slashFacing < 0);
+      return;
+    }
+    const t = now - this.slashStart;
+    const phase = t < SLASH_WINDUP_MS ? 0 : t < SLASH_WINDUP_MS + SLASH_ACTIVE_MS ? 1 : 2;
+    const pose = SLASH_FALLBACK_POSES[dir][phase];
+    const extraKey = pose.extra ? manifestFrameKey('agarica_extra', pose.extra, pose.frame) : null;
+    this.anims.stop();
+    if (extraKey && sc.textures.exists(extraKey)) {
+      const cfg = this.extraPoseConfig(pose.extra);
+      this.setTexture(extraKey);
+      this.applyBodyForScale(cfg.scale, cfg.body);
+      this.setFlipX(AGARICA_EXTRA_FACES_RIGHT ? this.slashFacing < 0 : this.slashFacing > 0);
+    } else {
+      // Planche d'attaque historique (face à GAUCHE).
+      this.setTexture(`agarica-attack-${pose.attack ?? 1}`);
+      this.applyBodyForScale(AGARICA_ATTACK_SCALE, AGARICA_ATTACK_BODY);
+      this.setFlipX(this.slashFacing > 0);
+    }
+  }
+
+  // Prépare le sprite d'arc `vfx_slash` (sinon : croissant dessiné par code).
+  startSlashVfx() {
+    const sc = this.scene;
+    if (!hasManifestArt(sc, 'vfx_slash', this.slashDir)) return;
+    if (!this.slashSprite || !this.slashSprite.active) {
+      this.slashSprite = sc.add.sprite(this.x, this.y, manifestFrameKey('vfx_slash', this.slashDir, 0))
+        .setOrigin(0.5, 0.5).setDepth(CHARACTER_DEPTH + 1).setVisible(false);
+    }
+  }
+
+  // Arc du coup en cours, redessiné après la synchro physique : affiché
+  // pendant les images actives (= zone qui touche), puis bref effacement
+  // (SLASH_FADE_MS, ne touche plus). Art : 3 images, les deux premières sur
+  // la phase active (SLASH_VFX_ACTIVE_FRAMES), la 3e pendant l'effacement.
+  drawSlashArc() {
+    const g = this.slashGfx;
+    if (!g || !g.active || !this.active) return;
+    g.clear();
+    const spr = this.slashSprite && this.slashSprite.active ? this.slashSprite : null;
+    const now = this.scene.time.now;
+    const t = now - this.slashStart;
+    const after = t - SLASH_WINDUP_MS - SLASH_ACTIVE_MS;
+    if (!this.isAttacking || !this.slashDir || t < SLASH_WINDUP_MS || after >= SLASH_FADE_MS) {
+      if (spr) spr.setVisible(false);
+      return;
+    }
+    const alpha = after < 0 ? 1 : 0.6 * (1 - after / SLASH_FADE_MS);
+    const dir = this.slashDir;
+    if (spr && hasManifestArt(this.scene, 'vfx_slash', dir)) {
+      const a = SLASH_ARCS[dir];
+      const frame = after >= 0 ? 2 : (t - SLASH_WINDUP_MS < SLASH_ACTIVE_MS / 2 ? 0 : 1);
+      const key = manifestFrameKey('vfx_slash', dir, frame);
+      if (this.scene.textures.exists(key)) spr.setTexture(key);
+      spr.setVisible(true).setScale(this.slashArtScale())
+        .setPosition(this.x + this.slashFacing * a.cx, this.y + a.cy)
+        .setFlipX(this.slashFacing < 0).setAlpha(alpha);
+      return;
+    }
+    drawSlashCrescent(g, this.getSlashRect(), dir, this.slashFacing, alpha);
+  }
+
+  // Quelque chose de frappable sous un coup vers le bas ? (cf. POGO_VELOCITY)
+  // Ennemis (dont Ghil't), amas de mousse, Kainati et ses projectiles, et
+  // `scene.pogoTargets` : liste libre pour les scripts de zone (objets avec
+  // getBounds() et `active`, ou Phaser.Geom.Rectangle).
+  pogoTargetHit(rect) {
+    const sc = this.scene;
+    const hit = (r) => !!r && Phaser.Geom.Intersects.RectangleToRectangle(rect, r);
+    if (sc.enemies && sc.enemies.getChildren) {
+      for (const e of sc.enemies.getChildren()) {
+        if (e && e.active && !e.defeated && !e.healed && typeof e.getBounds === 'function' && hit(e.getBounds())) return true;
+      }
+    }
+    for (const m of (sc.__story && sc.__story.mossBlocks) || []) {
+      if (!m.destroyed && m.body && m.body.active && hit(m.body.getBounds())) return true;
+    }
+    const k = sc.kainati;
+    if (k && k.active && !k.defeated && !k.calm && hit(k.getHitRect())) return true;
+    if (k && k.hazards) {
+      for (const h of k.hazards.list) {
+        if (h.dead || !h.img || !h.img.active || (h.kind !== 'stone' && h.kind !== 'wave')) continue;
+        if (hit(h.img.getBounds())) return true;
+      }
+    }
+    for (const o of sc.pogoTargets || []) {
+      if (!o || o.active === false) continue;
+      if (hit(typeof o.getBounds === 'function' ? o.getBounds() : o)) return true;
+    }
+    return false;
   }
 
   // Rectangle de la nuée de papillons (soin) en cours, ou null -- PAS
@@ -2591,12 +3153,17 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.isInvulnerable) return;
     this.isInvulnerable = true;
     if (this.vine) this.releaseVine(false, this.scene.time.now);
+    if (this.butterflyPhase) this.endButterflyDash();
     this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;
     this.hearts -= 1;
     this.scene.registry.set('hearts', this.hearts);
     this.setTint(0xff4d6d);
     this.setVelocity(0, 0);
     const depleted = this.hearts <= 0;
+    // Dernier cœur perdu : signalé aux scripts de zone (boss : remise à zéro
+    // du combat). Le registre seul ne suffit pas : son 1er `set('hearts')`
+    // émet 'setdata' et non 'changedata-hearts'.
+    if (depleted) this.scene.events.emit('player-depleted', this);
     // Dernier cœur perdu : pose `death` (art Codex agarica_extra) tenue un
     // instant avant la réapparition, monde gelé via __cutsceneLock pour que
     // ni les ennemis ni les touches n'interfèrent. Sans art : comme avant.

@@ -23,12 +23,13 @@
 // (glisser OU clic) : si l'état du joueur n'a pas changé, rebuildUI()
 // replace chaque carte exactement là où elle était avant.
 // Emplacements de formes (démo histoire) : SOL = loup, AÉRIEN = singe OU
-// aigle (exclusifs), EAU = pieuvre. L'équipement passe par
+// aigle OU papillon (exclusifs), EAU = pieuvre. L'équipement passe par
 // Player.equipForm/unequipForm (qui tiennent `equippedForms` + `airForm`).
 const FORM_INFO = {
   wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), perçoit les pistes cachées.' },
-  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court), s\'accroche aux lianes (gauche/droite pour se balancer, Saut pour lâcher).' },
+  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court), s\'accroche aux lianes (gauche/droite pour se balancer, Espace pour lâcher, S pour tomber).' },
   eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : donne le double saut (plus haut) puis le plané, porté par les courants d\'air (S = piqué).' },
+  butterfly: { flag: 'hasButterflyForm', label: 'Papillon', slot: 'air', icon: ['form-icon-butterfly', 'item-form_icone_papillon'], desc: "Papillon (aérien) : 2e appui sur Espace en l'air = battement d'ailes puis élan en diagonale vers l'avant et le haut (un par saut)." },
   octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
 };
 const FORM_IDS = Object.keys(FORM_INFO);
@@ -120,7 +121,7 @@ class CampfireMenuScene extends Phaser.Scene {
     this.formSlotBoxes = {};
     for (const fs of FORM_SLOTS) {
       this.formSlotBoxes[fs.slot] = drawSlotBox(fs.x, 104, 130, 50, 'form', fs.slot);
-      const sub = fs.slot === 'air' ? 'Aérien (Singe OU Aigle)' : fs.label;
+      const sub = fs.slot === 'air' ? 'Aérien (une seule forme)' : fs.label;
       this.add.text(fs.x, 72, sub, small).setOrigin(0.5);
     }
     this.formPoolZone = drawSlotBox(480, 158, 900, 40, 'form', 'pool');

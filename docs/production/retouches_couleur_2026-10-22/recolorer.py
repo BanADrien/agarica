@@ -17,8 +17,11 @@ import import_codex_assets as imp
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--apply', action='store_true')
+parser.add_argument('--only-geralt', action='store_true')
 args = parser.parse_args()
 entries = json.loads((HERE / 'inventaire.json').read_text())
+if args.only_geralt:
+    entries = [e for e in entries if 'geralt' in e['path']]
 MASKS = HERE / 'masques'
 PREVIEW = HERE / 'comparaisons'
 MASKS.mkdir(exist_ok=True)
@@ -107,7 +110,7 @@ def agarica_mask(a, path):
 def geralt_mask(a, path):
     h, w = a.shape[:2]
     r, g, b = a[:, :, :3].astype(float).transpose(2, 0, 1)
-    eligible = (a[:, :, 3] > 0) & (r > 40) & (r > g*1.7) & (g > b*1.27) & (r < 200)
+    eligible = (a[:, :, 3] >= 128) & (r > 55) & (r > g*1.7) & (g > b*1.27) & (r < 200)
     if 'portrait_' in path:
         bs = [[0, 0, w, h]]
     else:
@@ -118,12 +121,14 @@ def geralt_mask(a, path):
         'geralt.png': [[185,85,340,205],[530,85,700,205],[885,85,1045,205],[1220,85,1395,205],[180,405,345,545],[540,405,710,545],[880,405,1055,545],[1215,405,1395,545],[75,730,230,890],[385,730,555,890],[685,730,860,905],[990,730,1165,905],[1305,730,1480,905]],
         'geralt_p2.png': [[110,45,300,198],[430,55,610,215],[715,100,905,280],[1075,185,1245,325],[1310,65,1500,240],[215,375,405,540],[485,370,685,525],[835,370,1030,545],[1145,375,1330,550],[70,720,255,875],[390,720,585,875],[700,720,890,875],[990,720,1175,880],[1310,720,1490,885]],
     }
+    head_bottoms = {'geralt.png': [197,199,194,196,522,523,526,533,851,862,854,858,864], 'geralt_p2.png': [179,195,270,318,214,523,510,518,527,847,857,850,852,859]}
     for index, (x0, y0, x1, y1) in enumerate(bs):
         bh, bw = y1-y0, x1-x0
         if 'portrait_' in path:
             head = (0, 0, w, int(h*.65))
         else:
             head = tuple(custom_heads[Path(path).name][index])
+            head = (*head[:3], head_bottoms[Path(path).name][index])
         rx0, ry0, rx1, ry1 = head
         candidate = eligible[ry0:ry1, rx0:rx1]
         labs, n = ndimage.label(candidate, np.ones((3, 3)))
@@ -142,7 +147,7 @@ def geralt_mask(a, path):
                 continue
             cx = (sl[1].start + sl[1].stop)/2
             cy = (sl[0].start + sl[0].stop)/2
-            beard = sizes[k] >= max(12, biggest*.022) and cx > hx0+(hx1-hx0)*.36 and hy0+(hy1-hy0)*.72 < cy < hy1+(hy1-hy0)*.2
+            beard = sizes[k] >= max(10, biggest*.007) and cx > hx0+(hx1-hx0)*.36 and hy0+(hy1-hy0)*.72 < cy < hy1+(hy1-hy0)*.2
             pony = sizes[k] >= biggest*.035 and cy < hy1-(hy1-hy0)*.15 and cx < hx0+(hx1-hx0)*.55
             if k == main_id or beard or pony:
                 selected |= labs == k
@@ -213,6 +218,8 @@ for e, a, mask, rois, family in all_data:
     proposal.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(after).save(proposal)
     if args.apply and changed.any():
+        if hashlib.sha256((ROOT/path).read_bytes()).hexdigest() != e['sha256']:
+            raise RuntimeError('Source changed since backup, refusing overwrite: ' + path)
         shutil.copy2(proposal, ROOT / path)
     orig, edited = Image.fromarray(a), Image.fromarray(after)
     overlay = a.copy()
@@ -244,5 +251,5 @@ for group in ['geralt', 'agarica_sources', 'agarica_frames']:
             draw.text((5, i*360+4), path, fill='white')
         contact.save(HERE / (group + '_' + str(page) + '.jpg'), quality=96)
 
-(HERE / 'validation_pixels.json').write_text(json.dumps({'applique': args.apply, 'palette_source': params, 'fichiers': report}, ensure_ascii=False, indent=2), encoding='utf-8')
+(HERE / ('validation_geralt.json' if args.only_geralt else 'validation_pixels.json')).write_text(json.dumps({'applique': args.apply, 'palette_source': params, 'fichiers': report}, ensure_ascii=False, indent=2), encoding='utf-8')
 print(json.dumps({'files': len(report), 'changed': sum(r['pixels_changed'] > 0 for r in report), 'mode': 'apply' if args.apply else 'preview', 'palette_source': params}))

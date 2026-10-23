@@ -1,0 +1,27 @@
+[
+  {
+    "source": "assets/sprites/transfo_papillon.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          248,
+          208,
+          172,
+          155
+        ],
+        "horizontal_gaps": [
+          182,
+          215,
+          212
+        ]
+      }
+    ]
+  }
+]

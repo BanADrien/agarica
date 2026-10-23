@@ -1,0 +1,60 @@
+[
+  {
+    "source": "assets/sprites/forme_papillon.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      158,
+      185
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          208,
+          167,
+          167,
+          164
+        ],
+        "horizontal_gaps": [
+          208,
+          204,
+          202
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          132,
+          158,
+          133,
+          153
+        ],
+        "horizontal_gaps": [
+          192,
+          201,
+          208
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          156,
+          150,
+          156,
+          143
+        ],
+        "horizontal_gaps": [
+          182,
+          183,
+          179
+        ]
+      }
+    ]
+  }
+]

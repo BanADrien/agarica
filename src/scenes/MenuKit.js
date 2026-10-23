@@ -30,15 +30,16 @@ const CONTROLS_GROUPS = [
     title: 'Se déplacer',
     rows: [
       { keys: ['←', '→'], alt: ['Q', 'D'], text: 'Marcher' },
-      { keys: ['Z', '↑', 'Espace'], text: 'Sauter (double saut : seulement en Singe ou en Aigle)' },
+      { keys: ['Espace'], text: 'Sauter (2e saut : Singe, Aigle ou Papillon)' },
       { keys: ['Shift'], text: 'Courir — forme du Loup (ou double appui ← / →)' },
-      { keys: ['S', '↓'], text: 'Piqué de l\'Aigle · lâcher une liane' },
+      { keys: ['Z', '↑'], text: 'Viser vers le haut' },
+      { keys: ['S', '↓'], text: "Viser en bas (en l'air, rebond) · piqué de l'Aigle · lâcher une liane" },
     ],
   },
   {
     title: 'Agir',
     rows: [
-      { keys: ['K'], alt: ['Clic'], text: 'Attaquer (dague)' },
+      { keys: ['K'], alt: ['Clic'], text: "Attaquer là où l'on vise (sinon devant)" },
       { keys: ['E'], text: 'Parler, examiner, interagir' },
       { keys: ['A', 'F', 'R'], text: 'Compétences (coûtent de l\'énergie)' },
     ],
@@ -52,10 +53,10 @@ const CONTROLS_GROUPS = [
     ],
   },
 ];
-const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, double saut = Singe ou Aigle '
+const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e saut = Singe, Aigle ou Papillon '
   + '(sans forme aérienne, un seul saut), eau = Pieuvre. Au feu de camp : soin, sauvegarde, formes et compétences.';
 // Rappel discret affiché en jeu si l'option est activée.
-const CONTROLS_HINT_LINE = '←→/QD bouger · Z/↑/Espace sauter · Shift courir · K attaquer · E agir · A F R compétences · I sac · Échap pause';
+const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Shift courir · E agir · A F R compétences · I sac · Échap pause';
 
 // ---------------------------------------------------------------------------
 // Chapitres : point de départ de chaque grande région, avec l'état cohérent

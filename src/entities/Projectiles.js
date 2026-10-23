@@ -99,15 +99,39 @@ SKILL_DEFS.pierre = {
 // ---------------------------------------------------------------------------
 // Papillon (soin) : nuée lumineuse devant Agarica. Sur un ennemi
 // `corrupted` → enemy.heal() (une fois par lancer) ; sinon aucun effet.
+// Retour utilisateur (« la compétence n'a pas de forme ») : art Codex
+// branché et LISIBLE -- anneau `vfx_soin_papillon` (swirl) étiré pour que ses
+// pixels visibles couvrent EXACTEMENT la zone de soin, papillons `papillon`
+// (idle) qui tournent SUR cet anneau ; la zone de soin = ce cercle affiché.
+// Sans art : papillons dessinés par code dans le même rectangle.
 // ---------------------------------------------------------------------------
 const PAPILLON_DURATION_MS = 1000;
 const PAPILLON_SPEED = 170;
-const PAPILLON_RECT_W = 130;
-const PAPILLON_RECT_H = 100;
+// Zone de soin (quasi ronde, comme l'anneau de l'art), centrée devant elle.
+const PAPILLON_RECT_W = 136;
+const PAPILLON_RECT_H = 128;
+const PAPILLON_FRONT = 64;
+const PAPILLON_CENTER_ABOVE_FEET = 56;
 const PAPILLON_COUNT = 14;
+// Avec l'art : quelques grands papillons en orbite sur l'anneau.
+const PAPILLON_ART_COUNT = 6;
+const PAPILLON_ART_SIZE = 30;
+const PAPILLON_ORBIT_SPEED = 3.2; // rad/s
 const PAPILLON_COLORS = [0x9ff3ff, 0xffb3f0, 0xfff6a0, 0xc8ffb0];
 const PAPILLON_TEXTURE_KEY = 'fx-papillon';
 const PAPILLON_GLOW_KEY = 'fx-papillon-glow';
+
+// Pixels visibles de l'anneau `vfx_soin_papillon` (union des frames de swirl).
+function papillonSwirlBox(scene) {
+  if (typeof textureOpaqueBox !== 'function' || typeof manifestFrameKey !== 'function') return null;
+  let res = null;
+  for (let i = 0; i < 4; i++) {
+    const b = textureOpaqueBox(scene, manifestFrameKey('vfx_soin_papillon', 'swirl', i));
+    if (!b) continue;
+    res = res ? { x0: Math.min(res.x0, b.x0), y0: Math.min(res.y0, b.y0), x1: Math.max(res.x1, b.x1), y1: Math.max(res.y1, b.y1), w: b.w, h: b.h } : { ...b };
+  }
+  return res;
+}
 
 function ensurePapillonTextures(scene) {
   if (!scene.textures.exists(PAPILLON_TEXTURE_KEY)) {
@@ -142,31 +166,48 @@ class PapillonSwarm {
     this.scene = scene;
     this.player = player;
     this.dir = player.facingDir >= 0 ? 1 : -1;
-    this.cx = player.x + this.dir * 60;
-    this.cy = player.y - 48;
+    this.cx = player.x + this.dir * PAPILLON_FRONT;
+    this.cy = player.y - PAPILLON_CENTER_ABOVE_FEET;
     this.rect = new Phaser.Geom.Rectangle(0, 0, PAPILLON_RECT_W, PAPILLON_RECT_H);
     this.elapsed = 0;
     this.active = true;
     this.healed = new Set();
     this.glow = scene.add.image(this.cx, this.cy, PAPILLON_GLOW_KEY)
-      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff8ff).setScale(2.6).setAlpha(0).setDepth(CHARACTER_DEPTH + 1);
-    // Art Codex si présent : tourbillon `vfx_soin_papillon` + papillons
-    // `papillon` animés ; sinon papillons procéduraux teintés.
-    this.swirl = hasManifestArt(scene, 'vfx_soin_papillon', 'swirl')
-      ? addManifestSprite(scene, this.cx, this.cy, 'vfx_soin_papillon', 'swirl', { origin: [0.5, 0.5] }).setAlpha(0).setDepth(CHARACTER_DEPTH + 1)
-      : null;
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff8ff).setAlpha(0).setDepth(CHARACTER_DEPTH + 1);
+    this.glow.setDisplaySize(PAPILLON_RECT_W * 1.25, PAPILLON_RECT_H * 1.25);
+    // Anneau : affiché à la taille où ses pixels VISIBLES (union des frames
+    // de `swirl`) remplissent le rectangle de soin.
+    this.swirl = null;
+    if (hasManifestArt(scene, 'vfx_soin_papillon', 'swirl')) {
+      ensureManifestAnims(scene, 'vfx_soin_papillon');
+      this.swirl = addManifestSprite(scene, this.cx, this.cy, 'vfx_soin_papillon', 'swirl', { origin: [0.5, 0.5] })
+        .setAlpha(0).setDepth(CHARACTER_DEPTH + 1);
+      const box = papillonSwirlBox(scene);
+      const kx = box ? box.w / (box.x1 - box.x0) : 1.12;
+      const ky = box ? box.h / (box.y1 - box.y0) : 1.12;
+      this.swirl.setDisplaySize(PAPILLON_RECT_W * kx, PAPILLON_RECT_H * ky);
+    }
     const flyArt = hasManifestArt(scene, 'papillon');
     this.flyArt = flyArt;
-    this.flies = Array.from({ length: PAPILLON_COUNT }, (_, i) => ({
-      sprite: (flyArt
-        ? addManifestSprite(scene, this.cx, this.cy, 'papillon', 'idle', { origin: [0.5, 0.5] }).setAlpha(0)
-        : scene.add.image(this.cx, this.cy, PAPILLON_TEXTURE_KEY)
+    const count = flyArt ? PAPILLON_ART_COUNT : PAPILLON_COUNT;
+    this.flies = Array.from({ length: count }, (_, i) => {
+      let sprite;
+      if (flyArt) {
+        sprite = addManifestSprite(scene, this.cx, this.cy, 'papillon', 'idle', { origin: [0.5, 0.5] }).setAlpha(0);
+        sprite.setScale(PAPILLON_ART_SIZE / Math.max(sprite.width, sprite.height));
+      } else {
+        sprite = scene.add.image(this.cx, this.cy, PAPILLON_TEXTURE_KEY)
           .setTint(PAPILLON_COLORS[i % PAPILLON_COLORS.length])
           .setBlendMode(Phaser.BlendModes.ADD)
-          .setAlpha(0)).setDepth(CHARACTER_DEPTH + 2),
-      ax: 20 + Math.random() * 45, ay: 12 + Math.random() * 32,
-      fx: 1.5 + Math.random() * 2, fy: 2 + Math.random() * 2.5, ph: Math.random() * Math.PI * 2,
-    }));
+          .setAlpha(0);
+      }
+      sprite.setDepth(CHARACTER_DEPTH + 2);
+      return {
+        sprite, a0: (i / count) * Math.PI * 2,
+        ax: 20 + Math.random() * 40, ay: 12 + Math.random() * 40,
+        fx: 1.5 + Math.random() * 2, fy: 2 + Math.random() * 2.5, ph: Math.random() * Math.PI * 2,
+      };
+    });
     this.updateRect();
     scene.events.on('update', this.update, this);
     scene.events.once('shutdown', () => this.destroy());
@@ -186,12 +227,22 @@ class PapillonSwarm {
     this.updateRect();
     const k = this.elapsed / PAPILLON_DURATION_MS;
     const fade = k < 0.15 ? k / 0.15 : k > 0.75 ? Math.max(0, (1 - k) / 0.25) : 1;
-    this.glow.setPosition(this.cx, this.cy).setAlpha(0.45 * fade);
+    this.glow.setPosition(this.cx, this.cy).setAlpha(0.35 * fade);
+    // Rayons de l'orbite = bord visible de l'anneau (un peu en dedans).
+    const rx = PAPILLON_RECT_W / 2 - PAPILLON_ART_SIZE * 0.35;
+    const ry = PAPILLON_RECT_H / 2 - PAPILLON_ART_SIZE * 0.35;
     for (const f of this.flies) {
-      const x = this.cx + Math.sin(t * f.fx + f.ph) * f.ax;
-      const y = this.cy + Math.cos(t * f.fy + f.ph) * f.ay;
-      f.sprite.setPosition(x, y).setAlpha(fade);
-      if (!this.flyArt) f.sprite.setScale(1, 0.4 + 0.6 * Math.abs(Math.sin(t * 14 + f.ph))); // battement d'ailes
+      if (this.flyArt) {
+        const a = f.a0 + t * PAPILLON_ORBIT_SPEED * this.dir;
+        f.sprite.setPosition(this.cx + Math.cos(a) * rx, this.cy + Math.sin(a) * ry).setAlpha(fade);
+        // Regarde dans le sens de sa course sur l'orbite (art face à droite).
+        f.sprite.setFlipX(-Math.sin(a) * this.dir < 0);
+      } else {
+        const x = this.cx + Math.sin(t * f.fx + f.ph) * Math.min(f.ax, rx);
+        const y = this.cy + Math.cos(t * f.fy + f.ph) * Math.min(f.ay, ry);
+        f.sprite.setPosition(x, y).setAlpha(fade);
+        f.sprite.setScale(1, 0.4 + 0.6 * Math.abs(Math.sin(t * 14 + f.ph))); // battement d'ailes
+      }
     }
     if (this.swirl) this.swirl.setPosition(this.cx, this.cy).setAlpha(fade);
     this.checkTargets();

@@ -106,7 +106,23 @@ Prompts anglais intégraux du guide mis à jour, génération avec image_gen int
 | `poisson` | à refaire | 4 frames importées sans avertissement et sans vide/coupe. Écarts >=67 px. Échelle encore supérieure aux 260x120 px : largeur proche de 310 px, hauteur avec nageoires 170-199 px. | [journal](imports/poisson_force.log) |
 | `titre_logo` | fait | Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche. | [journal](imports/lot_2026-10-22_validation.log) |
 
-## Dernière exécution
+## Retouches couleur 2026-10-22
+
+Édition par masques Pillow/NumPy autorisée par l’utilisateur après rejet du test génératif, qui ne conservait pas les dimensions. Les trois sources de Geralt (`geralt.png`, `geralt_p2.png`, `portrait_geralt.png`) ont été recolorées en gris-blanc pour les cheveux, la barbe et les poils des pieds. Les pixels hors masque et l’alpha sont identiques aux originaux ; les 27 frames et le portrait ont été réimportés sans avertissement. Voir [validation Geralt](retouches_couleur_2026-10-22/validation_geralt.json) et les comparaisons dans `retouches_couleur_2026-10-22/comparaisons/`.
+
+Les fichiers d’Agarica avaient déjà reçu de nouvelles retouches externes au 23 octobre : ces versions ont été conservées, sans application des anciennes propositions. Les sources `agarica_extra`, `transfo_singe` et `portrait_agarica` ont été réimportées avec `--force`. Le contrôle final des 50 sources/frames hors ancien logo et des 70 sorties existantes confirme la conservation des dimensions et de l’alpha. La recoloration de l’ancien logo est remplacée par la refonte demandée le 23 octobre. Originaux archivés dans `retouches_couleur_2026-10-22/originaux/`.
+
+## Planches slash et logo — 2026-10-23
+
+Trois sources transparentes de 1536 × 1024 pixels livrées :
+
+- `assets/sprites/agarica_slash.png` : 12 poses, lignes side/up/down de 4 frames. Références : `agarica_extra_row4_0.png` et `assets/ui/portraits/agarica.png`. Cheveux châtain roux, base #A85C34 ; dague solidaire de la main, sans effet. Espacements verticaux de 60 pixels et horizontaux d’au moins 79 pixels. [Aperçu](controles/slash_2026-10-23/agarica_slash_final.jpg).
+- `assets/vfx/vfx_slash.png` : 9 arcs, lignes de 3 frames, ouvertures gauche/bas/haut ; cellules avec marges d’au moins 30 pixels, dimensions maximales 300 × 200 puis 220 × 280. [Aperçu](controles/slash_2026-10-23/vfx_slash_final.jpg).
+- `assets/_codex_src/titre_logo.png` : nouveau logo sobre, 10 couleurs, grille de 4 pixels, alpha strictement 0/255, sans halo. Ancien logo archivé dans `assets/_codex_src/titre_logo_ancien.png`. [Aperçu](controles/slash_2026-10-23/titre_logo_final.jpg).
+
+Génération par image_gen intégré, puis nettoyage et placement déterministes avec [le script de normalisation](normaliser_slash_logo_2026_10_23.py). [Prompts et références](generation_slash_logo_2026-10-23.json), [mesures](controles/slash_2026-10-23/normalisation.json) et [validation finale](controles/slash_2026-10-23/validation_finale.json). Les imports ciblés ont produit 12 frames de personnage et 9 frames d’effet sans avertissement. Aucun changement manuel de `src/` ni du manifeste ; `asset_present.js` est actualisé par l’importeur.
+
+## Dernière exécution historique du 22 octobre
 
 Commande : `tools/import_codex_assets.py`
 
@@ -120,4 +136,57 @@ Source manquante (à générer) (0) : -
 Aucun avertissement.
 
 asset_present.js : 487 fichier(s) présent(s).
+```
+
+
+## Import final du 23 octobre 2026
+
+Commande : `python tools/import_codex_assets.py`
+
+[Journal complet](imports/final_2026-10-23.log).
+
+```text
+
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (80) : agarica_extra, agarica_slash, singe, transfo_singe, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_impact_pierre, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (3) : forme_papillon, transfo_papillon, form_icone_papillon
+
+Aucun avertissement.
+
+asset_present.js : 511 fichier(s) présent(s).
+
+```
+
+
+## Forme papillon ? 2026-10-23
+
+Trois images g?n?r?es avec image_gen int?gr?, en joignant les r?f?rences demand?es (portrait d?Agarica, papillon lumineux, singe et transformation singe ; m?daillons loup/singe pour l?ic?ne). La forme termin?e sert ?galement de r?f?rence ? la transformation.
+
+- `assets/sprites/forme_papillon.png` : 1536 ? 1024, 12 frames en lignes flap/dash/glide de 4. Battement descendant corrig? lors d?une passe cibl?e. Envergure maximale proche de 220 pixels ; espacements horizontaux ?179 pixels, verticaux 158 et 185 pixels. [Aper?u](controles/papillon_2026-10-23/forme_papillon_final.jpg).
+- `assets/sprites/transfo_papillon.png` : 1536 ? 1024, une ligne de 4 ?tapes, humaine vers papillon ; feuilles/p?tales attach?s ? la silhouette. Espacements horizontaux ?182 pixels. [Aper?u](controles/papillon_2026-10-23/transfo_papillon_final.jpg).
+- `assets/_codex_src/form_icone_papillon.png` : 1024 ? 1024, m?daillon bois/lierre et papillon sculpt? ? spirales ; sortie import?e `assets/items/form_icone/papillon.png`, 724 ? 724. [Aper?u](controles/papillon_2026-10-23/form_icone_papillon_final.jpg).
+
+Fond transparent, orientation droite et absence de texte contr?l?s visuellement. Une composante connexe par frame v?rifi?e sur l?alpha non nul. Les dessins bruts sont conserv?s dans `controles/papillon_2026-10-23/` ; [script de finition](normaliser_papillon_2026_10_23.py) : retrait des halos et pixels isol?s, redimensionnement uniforme des planches et placement dans les cellules, sans redessin. [Prompts initiaux](controles/papillon_2026-10-23/prompts.json), [mesures](controles/papillon_2026-10-23/normalisation.json), [validation](controles/papillon_2026-10-23/validation.json).
+
+Imports cibl?s : 12 + 4 frames et une ic?ne, sans avertissement. Aucun changement manuel de `src/` ni du manifeste ; seul `asset_present.js` change automatiquement ? l?import.
+
+
+### Import final du lot papillon
+
+Commande : `python tools/import_codex_assets.py`
+
+[Journal](imports/final_papillon_2026-10-23.log).
+
+```text
+
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (83) : agarica_extra, agarica_slash, singe, transfo_singe, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_impact_pierre, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 528 fichier(s) présent(s).
+
 ```
