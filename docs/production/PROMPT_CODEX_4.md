@@ -3,7 +3,9 @@
 ```
 Retouches de couleur sur des images DÉJÀ existantes de « Legend of Agarica ». Il s'agit d'ÉDITIONS d'image, pas de nouvelles créations : pour chaque fichier, garde EXACTEMENT la même image (même taille de toile, même transparence, mêmes poses, même cadrage, même visage, mêmes vêtements, mêmes contours) et ne change QUE la couleur indiquée. Ne déplace rien, ne redessine rien, n'ajoute rien. Ne modifie ni `src/` ni le manifeste. Lis aussi `CODEX_SPRITES_A_GENERER.md` (les fiches d'identité ont été mises à jour).
 
-A) AGARICA : ses cheveux ne sont pas rouges mais BRUN CLAIR ORANGÉ (cuivre clair chaleureux / châtain roux clair). Repères : teinte de base #C9773F, ombres #8E4F2A, reflets #E3A066. Ne change QUE les cheveux. Le tatouage rose/rouge sur le bras, les yeux verts, la cape verte, la peau et tout le reste restent identiques.
+A) AGARICA — DÉJÀ FAIT par script le 2026-10-23 (tools/recolor_agarica_hair.py) : NE PAS retoucher ces images. Pour toute NOUVELLE image d'Agarica, utiliser directement cette couleur :
+
+Ancienne consigne, pour mémoire : ses cheveux ne sont pas rouges mais BRUN CLAIR ORANGÉ (cuivre clair chaleureux / châtain roux clair). Repères : teinte de base #C9773F, ombres #8E4F2A, reflets #E3A066. Ne change QUE les cheveux. Le tatouage rose/rouge sur le bras, les yeux verts, la cape verte, la peau et tout le reste restent identiques.
 
 Fichiers à retoucher :
 1. Feuilles sources (puis relancer l'import) :

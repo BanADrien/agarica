@@ -81,7 +81,12 @@ class DialogueScene extends Phaser.Scene {
 
     this.input.keyboard.on('keydown', this.onKey, this);
     this.input.on('pointerdown', () => this.confirm());
-    this.events.once('shutdown', () => this.clearPortraitMask());
+    this.events.once('shutdown', () => {
+      this.clearPortraitMask();
+      // Arrêtée de l'extérieur (changement de zone…) : résout quand même la
+      // promesse, sinon la file de showDialogue resterait bloquée.
+      if (!this.finished) this.finish({ interrupted: true });
+    });
     this.showLine(0);
   }
 
@@ -334,13 +339,13 @@ class DialogueScene extends Phaser.Scene {
     this.showLine(this.index + 1);
   }
 
-  finish() {
+  finish({ interrupted = false } = {}) {
     if (this.finished) return;
     this.finished = true;
     const cb = this.onDone;
     this.onDone = null;
     this.input.keyboard.off('keydown', this.onKey, this);
-    this.scene.stop();
+    if (!interrupted) this.scene.stop();
     if (cb) cb({ lastChoice: this.lastChoice, choices: this.choicesMade });
   }
 }
