@@ -287,6 +287,13 @@ CUTSCENES.geralt_fin_duel = (scene) => {
   ];
 };
 
+// Chute de Geralt : l'art Codex `trip_fall` dessine déjà la chute jusqu'au sol
+// (puis assis). Tourner en plus le sprite autour de ses pieds l'enfonçait à
+// moitié dans le sol : on ne tourne plus que le placeholder sans art.
+function a2GeraltFallAngle(scene, angle) {
+  return hasManifestArt(scene, 'geralt', 'trip_fall') ? 0 : angle;
+}
+
 // Geralt tente la corniche : petit bond raté, puis la corde qui lui retombe dessus.
 async function a2GeraltComicJump(scene) {
   const g = a2Npc(scene, 'geralt');
@@ -298,7 +305,7 @@ async function a2GeraltComicJump(scene) {
   await a2Tween(scene, { targets: g, y: gy - 46, duration: 260, ease: 'Quad.easeOut' });
   await a2Tween(scene, { targets: g, y: gy, duration: 240, ease: 'Quad.easeIn' });
   g.playManifest('trip_fall', false);
-  await a2Tween(scene, { targets: g, angle: -80, duration: 220 });
+  await a2Tween(scene, { targets: g, angle: a2GeraltFallAngle(scene, -80), duration: 220 });
   a2Float(scene, g.x, g.y - 50, 'Ouf…', '#ffd27a');
   await a2Wait(scene, 700);
   await a2Tween(scene, { targets: g, angle: 0, duration: 260 });
@@ -436,7 +443,7 @@ async function a2GeraltTechnique(scene, d, g, tech) {
     await a2Tween(scene, { targets: g, y: d.gy - 70, duration: 260, ease: 'Quad.easeOut' });
     await a2Tween(scene, { targets: g, y: d.gy, duration: 260, ease: 'Quad.easeIn' });
     g.playManifest('trip_fall', false);
-    await a2Tween(scene, { targets: g, angle: dir * 85, duration: 200 });
+    await a2Tween(scene, { targets: g, angle: a2GeraltFallAngle(scene, dir * 85), duration: 200 });
     a2Float(scene, g.x, g.y - 50, 'Le sol… a bougé.', '#ffd27a');
     await a2Wait(scene, 1100);
     await a2Tween(scene, { targets: g, angle: 0, duration: 250 });
@@ -485,7 +492,7 @@ async function a2GeraltTechnique(scene, d, g, tech) {
     await a2Tween(scene, { targets: g, x: clampX(cx - dir * 20), duration: 260, ease: 'Quad.easeIn' });
     g.playManifest('trip_fall', false);
     if (clak) a2Float(scene, clak.x, clak.y - 30, 'Clac.', '#ff9f70', { size: 14 });
-    await a2Tween(scene, { targets: g, x: clampX(g.x + dir * 90), angle: dir * 95, duration: 380, ease: 'Quad.easeOut' });
+    await a2Tween(scene, { targets: g, x: clampX(g.x + dir * 90), angle: a2GeraltFallAngle(scene, dir * 95), duration: 380, ease: 'Quad.easeOut' });
     a2Float(scene, g.x, g.y - 50, 'CLAK !', '#ffd27a');
     await a2Wait(scene, 1000);
     await a2Tween(scene, { targets: g, angle: 0, duration: 250 });
@@ -1470,7 +1477,8 @@ function a2DrawSpiralTree(scene, x) {
 // Touffes de mousse vivante qui se tendent vers Agarica.
 function a2MakeMossTufts(scene, xs) {
   return xs.map((x, i) => {
-    const y = storyGroundY(scene, x, 448) + 14;
+    // Pied 2 px sous la ligne de marche (cf. GROUND_STAND_SINK), planté dans l'herbe.
+    const y = storyGroundY(scene, x, 448) + GROUND_STAND_SINK + 2;
     const g = scene.add.graphics({ x, y });
     const h = 26 + (i % 3) * 12;
     g.fillStyle(0x2f5a2a, 1);
