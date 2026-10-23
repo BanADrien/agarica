@@ -90,9 +90,17 @@ SKILL_DEFS.pierre = {
   cost: 20,
   cooldownMs: 350,
   onActivate(player, now) {
+    // Depuis la forme humaine : Agarica devient brièvement le singe qui lance
+    // la pierre (Player.startSkillFormPose) -- la pierre part de sa main au
+    // moment du geste. Autres formes : lancer immédiat, pose bras tendu.
+    const throwStone = () => {
+      if (!player.active || !player.scene || !player.body) return;
+      const dir = player.facingDir >= 0 ? 1 : -1;
+      new PierreProjectile(player.scene, player.x + dir * 18, player.y - 52, dir, player.body.velocity.x);
+    };
+    if (typeof player.startSkillFormPose === 'function' && player.startSkillFormPose('pierre', now, { onRelease: throwStone })) return;
     player.throwPoseUntil = now + THROW_POSE_MS;
-    const dir = player.facingDir >= 0 ? 1 : -1;
-    new PierreProjectile(player.scene, player.x + dir * 18, player.y - 52, dir, player.body.velocity.x);
+    throwStone();
   },
 };
 
@@ -112,6 +120,12 @@ const PAPILLON_RECT_W = 136;
 const PAPILLON_RECT_H = 128;
 const PAPILLON_FRONT = 64;
 const PAPILLON_CENTER_ABOVE_FEET = 56;
+// Soin lancé en forme humaine (Agarica devient la forme papillon, cf.
+// Player.startSkillFormPose) : la nuée tourne autour d'elle pendant
+// PAPILLON_HOLD_MS, centrée sur le papillon (même hauteur que
+// SKILL_BUTTERFLY_CENTER_ABOVE_FEET, Player.js), puis s'envole.
+const PAPILLON_HOLD_MS = 420;
+const PAPILLON_HOLD_CENTER_ABOVE_FEET = 48;
 const PAPILLON_COUNT = 14;
 // Avec l'art : quelques grands papillons en orbite sur l'anneau.
 const PAPILLON_ART_COUNT = 6;
@@ -160,14 +174,26 @@ function ensurePapillonTextures(scene) {
 
 // Nuée : objet logique + sprites, mis à jour via scene.events 'update'
 // (pas de groupe à câbler dans les scènes). `rect` = zone de soin courante.
+// `holdMs` : la nuée naît autour d'Agarica transformée en papillon (centre =
+// celui du papillon, cf. SKILL_BUTTERFLY_CENTER_ABOVE_FEET dans Player.js) et
+// la suit, puis file devant elle et finit au même endroit que sans attente
+// (PAPILLON_FRONT + PAPILLON_SPEED × durée) : portée du soin inchangée.
 class PapillonSwarm {
-  constructor(scene, player) {
+  constructor(scene, player, { holdMs = 0 } = {}) {
     ensurePapillonTextures(scene);
     this.scene = scene;
     this.player = player;
     this.dir = player.facingDir >= 0 ? 1 : -1;
-    this.cx = player.x + this.dir * PAPILLON_FRONT;
-    this.cy = player.y - PAPILLON_CENTER_ABOVE_FEET;
+    this.holdMs = holdMs;
+    this.speed = PAPILLON_SPEED;
+    if (holdMs > 0) {
+      this.speed = (PAPILLON_FRONT + PAPILLON_SPEED * (PAPILLON_DURATION_MS / 1000)) / ((PAPILLON_DURATION_MS - holdMs) / 1000);
+      this.cx = player.x;
+      this.cy = player.y - PAPILLON_HOLD_CENTER_ABOVE_FEET;
+    } else {
+      this.cx = player.x + this.dir * PAPILLON_FRONT;
+      this.cy = player.y - PAPILLON_CENTER_ABOVE_FEET;
+    }
     this.rect = new Phaser.Geom.Rectangle(0, 0, PAPILLON_RECT_W, PAPILLON_RECT_H);
     this.elapsed = 0;
     this.active = true;
@@ -223,7 +249,13 @@ class PapillonSwarm {
     const dt = Math.min(delta, 50) / 1000;
     this.elapsed += delta;
     const t = this.elapsed / 1000;
-    this.cx += this.dir * PAPILLON_SPEED * dt;
+    if (this.elapsed < this.holdMs && this.player && this.player.active) {
+      // Autour du papillon (Agarica transformée), qu'elle bouge ou non.
+      this.cx = this.player.x;
+      this.cy = this.player.y - PAPILLON_HOLD_CENTER_ABOVE_FEET;
+    } else {
+      this.cx += this.dir * this.speed * dt;
+    }
     this.updateRect();
     const k = this.elapsed / PAPILLON_DURATION_MS;
     const fade = k < 0.15 ? k / 0.15 : k > 0.75 ? Math.max(0, (1 - k) / 0.25) : 1;
@@ -286,9 +318,13 @@ SKILL_DEFS.papillon = {
   hudColor: 0x7fe0f0,
   cost: 40,
   cooldownMs: PAPILLON_DURATION_MS,
-  onActivate(player) {
+  onActivate(player, now) {
     if (player.papillonSwarm) player.papillonSwarm.destroy();
-    player.papillonSwarm = new PapillonSwarm(player.scene, player);
+    // Depuis la forme humaine : Agarica devient la forme papillon AU CENTRE de
+    // la nuée, qui tourbillonne autour d'elle puis s'envole devant (même
+    // point d'arrivée qu'avant) ; autres formes : nuée devant elle, comme avant.
+    const transformed = typeof player.startSkillFormPose === 'function' && player.startSkillFormPose('papillon', now);
+    player.papillonSwarm = new PapillonSwarm(player.scene, player, transformed ? { holdMs: PAPILLON_HOLD_MS } : {});
   },
   // Soigne un ennemi corrompu (renvoie true), ignore les autres (false).
   onHitEnemy(player, enemy) {

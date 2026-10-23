@@ -165,8 +165,9 @@ const EDITOR_STORY_KINDS = {
     draw(ed, e) {
       const full = e.y == null || e.h == null;
       const w = e.w || 64;
-      const h = full ? EDITOR_WORLD_BOTTOM - EDITOR_WORLD_TOP : e.h;
-      const cy = full ? (EDITOR_WORLD_TOP + EDITOR_WORLD_BOTTOM) / 2 : e.y;
+      const top = ed.worldTop ? ed.worldTop() : EDITOR_WORLD_TOP;
+      const h = full ? EDITOR_WORLD_BOTTOM - top : e.h;
+      const cy = full ? (top + EDITOR_WORLD_BOTTOM) / 2 : e.y;
       const rect = ed.add.rectangle(e.x, cy, w, h, 0xff9933, 0.18).setStrokeStyle(2, 0xffb366, 0.9);
       const label = `Déclencheur ${e.id != null ? e.id : ''} → ${e.cutscene || '?'}${e.once === false ? ' (rejouable)' : ''}`;
       return [rect, ed.markerLabel(e.x, (full ? 60 : cy - h / 2) - 10, label, '#ffb366')];
@@ -554,10 +555,17 @@ class EditorScene extends Phaser.Scene {
     this.redrawGround();
   }
 
+  // Haut du monde éditable : la marge par défaut, ou plus haut pour une zone
+  // qu'on gravit (`levelTop`, cf. camera.vertical dans LevelKit).
+  worldTop() {
+    const lt = this.data && this.data.levelTop;
+    return typeof lt === 'number' ? Math.min(EDITOR_WORLD_TOP, lt - 128) : EDITOR_WORLD_TOP;
+  }
+
   refreshWorldBounds() {
     const w = this.data.levelWidth + EDITOR_WORLD_PAD_X * 2;
-    const h = EDITOR_WORLD_BOTTOM - EDITOR_WORLD_TOP;
-    this.cameras.main.setBounds(-EDITOR_WORLD_PAD_X, EDITOR_WORLD_TOP, w, h);
+    const h = EDITOR_WORLD_BOTTOM - this.worldTop();
+    this.cameras.main.setBounds(-EDITOR_WORLD_PAD_X, this.worldTop(), w, h);
     this.drawGrid();
   }
 
@@ -567,15 +575,16 @@ class EditorScene extends Phaser.Scene {
     g.lineStyle(1, 0x4a3f6b, 0.35);
     const x0 = -EDITOR_WORLD_PAD_X;
     const x1 = this.data.levelWidth + EDITOR_WORLD_PAD_X;
+    const top = this.worldTop();
     for (let x = Math.ceil(x0 / GROUND_TILE_SIZE) * GROUND_TILE_SIZE; x <= x1; x += GROUND_TILE_SIZE) {
-      g.lineBetween(x, EDITOR_WORLD_TOP, x, EDITOR_WORLD_BOTTOM);
+      g.lineBetween(x, top, x, EDITOR_WORLD_BOTTOM);
     }
-    for (let y = Math.ceil(EDITOR_WORLD_TOP / GROUND_TILE_SIZE) * GROUND_TILE_SIZE; y <= EDITOR_WORLD_BOTTOM; y += GROUND_TILE_SIZE) {
+    for (let y = Math.ceil(top / GROUND_TILE_SIZE) * GROUND_TILE_SIZE; y <= EDITOR_WORLD_BOTTOM; y += GROUND_TILE_SIZE) {
       g.lineBetween(x0, y, x1, y);
     }
     // Ligne de largeur de niveau (limite droite jouable) en surbrillance.
     g.lineStyle(2, 0xff6666, 0.6);
-    g.lineBetween(this.data.levelWidth, EDITOR_WORLD_TOP, this.data.levelWidth, EDITOR_WORLD_BOTTOM);
+    g.lineBetween(this.data.levelWidth, top, this.data.levelWidth, EDITOR_WORLD_BOTTOM);
   }
 
   worldPointFromPointer(pointer) {
@@ -2022,14 +2031,17 @@ class EditorScene extends Phaser.Scene {
     for (const [id, key] of [['zone-background-select', 'background'], ['zone-tileset-select', 'tileset']]) {
       const el = document.getElementById(id);
       if (!el) continue;
+      // `background: {id, baseline, …}` (ligne de base, cf. zoneBackdropSpec) :
+      // la liste n'affiche/ne change que l'id, le reste est conservé.
+      const v = key === 'background' && typeof zoneBackgroundId === 'function' ? zoneBackgroundId(d) : d[key];
       // Valeur inconnue de la liste (écrite à la main) : ajoutée pour ne pas l'écraser.
-      if (d[key] && ![...el.options].some((o) => o.value === d[key])) {
+      if (v && ![...el.options].some((o) => o.value === v)) {
         const o = document.createElement('option');
-        o.value = d[key];
-        o.textContent = `${d[key]} (?)`;
+        o.value = v;
+        o.textContent = `${v} (?)`;
         el.appendChild(o);
       }
-      el.value = d[key] || '';
+      el.value = v || '';
     }
     const tall = document.getElementById('zone-tall-input');
     if (tall) tall.checked = !!d.tallLevel;
@@ -2187,7 +2199,14 @@ class EditorScene extends Phaser.Scene {
     if (bg) {
       const items = typeof ITEM_MANIFEST !== 'undefined' ? Object.keys(ITEM_MANIFEST).filter((k) => k.startsWith('fond_')) : [];
       bg.innerHTML = '<option value="">(ciel par défaut)</option>' + items.map((k) => `<option value="${k}">${k}</option>`).join('');
-      bg.addEventListener('change', (e) => { EditorScene.setZoneProp('background', e.target.value || undefined); e.target.blur(); });
+      bg.addEventListener('change', (e) => {
+        const ed = EditorScene.getEditor();
+        const cur = ed && ed.data ? ed.data.background : null;
+        const id = e.target.value || undefined;
+        // Forme objet (ligne de base…) : on ne change que l'id.
+        EditorScene.setZoneProp('background', cur && typeof cur === 'object' && id ? { ...cur, id } : id);
+        e.target.blur();
+      });
     }
     const ts = document.getElementById('zone-tileset-select');
     if (ts) {

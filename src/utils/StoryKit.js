@@ -1062,10 +1062,11 @@ function buildSpeechBubble(scene, text) {
 }
 
 // Fond sombre, liseré vert lunaire, pointe vers le personnage (`tipX` relatif
-// au centre de la bulle). Origine du conteneur = bout de la pointe.
-function drawSpeechBubble(b, tipX) {
+// au centre de la bulle). Origine du conteneur = bout de la pointe. `lift` :
+// bulle remontée au-dessus d'une autre (pointe allongée d'autant).
+function drawSpeechBubble(b, tipX, lift = 0) {
   const { g, w, h } = b;
-  const top = -SPEECH_BUBBLE_TAIL - h;
+  const top = -SPEECH_BUBBLE_TAIL - lift - h;
   const left = -w / 2 - tipX;
   const tx = Phaser.Math.Clamp(0, left + 12, left + w - 12);
   g.clear();
@@ -1079,10 +1080,13 @@ function drawSpeechBubble(b, tipX) {
   // Recouvre le liseré sous la base de la pointe (la pointe sort de la bulle).
   g.lineStyle(3, STORY_UI.night, 1);
   g.lineBetween(tx - 5.5, top + h - 1, tx + 5.5, top + h - 1);
-  b.label.setPosition(left + w / 2, -SPEECH_BUBBLE_TAIL - SPEECH_BUBBLE_PAD.y);
+  b.label.setPosition(left + w / 2, -SPEECH_BUBBLE_TAIL - lift - SPEECH_BUBBLE_PAD.y);
 }
 
-function positionSpeechBubble(scene, b) {
+// `placed` : rectangles (monde) des bulles déjà posées cette image. Deux
+// personnages côte à côte (Xara et Agarica) : la bulle suivante remonte
+// au-dessus de la première au lieu de la recouvrir (remontée lissée).
+function positionSpeechBubble(scene, b, placed = []) {
   const a = speechBubbleAnchor(b.target);
   const tipY = a.top - SPEECH_BUBBLE_GAP;
   // Haut visible lissé : les frames d'une anim n'ont pas toutes la même tête.
@@ -1092,18 +1096,30 @@ function positionSpeechBubble(scene, b) {
   const half = b.w / 2;
   const cx = Phaser.Math.Clamp(a.x, view.x + half + 4, view.right - half - 4);
   const y = Math.max(b.tipY, view.y + b.h + SPEECH_BUBBLE_TAIL + 4);
+  let lift = 0;
+  for (let k = 0; k < placed.length; k++) {
+    const bottom = y - SPEECH_BUBBLE_TAIL - lift;
+    const hit = placed.find((r) => cx - half < r.right + 4 && cx + half > r.left - 4
+      && bottom > r.top - 4 && bottom - b.h < r.bottom + 4);
+    if (!hit) break;
+    lift = y - SPEECH_BUBBLE_TAIL - (hit.top - 4);
+  }
+  b.lift = b.lift == null || Math.abs(lift - b.lift) > 60 ? lift : b.lift + (lift - b.lift) * 0.3;
   b.container.setPosition(a.x, y);
-  drawSpeechBubble(b, a.x - cx);
+  drawSpeechBubble(b, a.x - cx, b.lift);
+  const bottom = y - SPEECH_BUBBLE_TAIL - b.lift;
+  placed.push({ left: cx - half, right: cx + half, top: bottom - b.h, bottom });
 }
 
 function updateSpeechBubbles(scene) {
   const st = scene.__speechBubbles;
   if (!st) return;
+  const placed = [];
   for (const [target, slot] of st.byTarget) {
     const b = slot.current;
     if (!b) continue;
     if (!target.active || !b.container.active) { finishSpeechBubble(scene, target, slot, true); continue; }
-    positionSpeechBubble(scene, b);
+    positionSpeechBubble(scene, b, placed);
   }
 }
 
@@ -1129,9 +1145,11 @@ function finishSpeechBubble(scene, target, slot, instant = false) {
 
 function startSpeechBubble(scene, target, slot, req) {
   const b = buildSpeechBubble(scene, req.text);
-  Object.assign(b, { target, resolve: req.resolve, tipY: null });
+  Object.assign(b, { target, resolve: req.resolve, tipY: null, lift: null });
   slot.current = b;
-  positionSpeechBubble(scene, b);
+  // Toutes les bulles repositionnées : la nouvelle se range d'emblée au-dessus
+  // de ses voisines (cf. positionSpeechBubble).
+  updateSpeechBubbles(scene);
   b.container.setScale(0.85);
   scene.tweens.add({ targets: b.container, alpha: 1, scale: 1, duration: 140, ease: 'Back.Out' });
   b.timer = scene.time.delayedCall(req.ms, () => finishSpeechBubble(scene, target, slot));
@@ -1551,7 +1569,9 @@ function storyNpc(scene, key) {
 function storyCameraFollow(scene) {
   const cam = scene.cameras.main;
   scene.__cameraDetached = false;
-  cam.startFollow(scene.player, true, 1, 1);
+  // Caméra de la zone (zone morte verticale, cf. cameraFollowPlayer, LevelKit).
+  if (typeof cameraFollowPlayer === 'function') cameraFollowPlayer(scene);
+  else cam.startFollow(scene.player, true, 1, 1);
 }
 
 // Saut d'une marche par le joueur piloté (gravité 1300 : ~90 px de haut, de

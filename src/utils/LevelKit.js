@@ -230,26 +230,41 @@ const ARBRE_SINK = 6;
 // puis redescendus ("un peu trop haut" à 100, "encore trop haut, un peu" à 85).
 const ARBRE_GROUND_CLEARANCE = 75;
 
-function addProceduralForest(scene, height, levelWidth, avoidRanges = [], canopyView = false, screenBottom = false) {
+// `base` (optionnel, cf. zoneBackdropSpec) : { y, scrollY, camLow } -- BAS
+// VISIBLE de chaque arbre posé sur la ligne de base `y` (monde) quand la
+// caméra est au plus bas, défilement vertical `scrollY` (1 = collé au monde,
+// < 1 = plan plus lointain qui descend moins vite quand on monte).
+function addProceduralForest(scene, height, levelWidth, avoidRanges = [], canopyView = false, screenBottom = false, base = null) {
+  // Ligne de base / ciel qui se révèle : prioritaires sur l'ancien ancrage au
+  // bas de l'ÉCRAN (`treesAtScreenBottom`, incompatible avec une caméra qui monte).
+  if (base) screenBottom = false;
   // En altitude, la forêt reste plantée loin sous les plateformes : seules
   // les cimes dépassent dans le cadre. Tous les troncs gardent le même sol.
-  const tallestTree = canopyView ? Math.max(...Array.from({ length: ARBRE_COUNT }, (_, i) =>
+  const tallestTree = canopyView && !base ? Math.max(...Array.from({ length: ARBRE_COUNT }, (_, i) =>
     scene.textures.get(`${ARBRE_TEXTURE_PREFIX}${i}`).getSourceImage().height,
   )) * ARBRE_BASE_SCALE * 1.15 : 0;
   const groundY = screenBottom ? height + ARBRE_SINK
-    : canopyView ? height + tallestTree * 0.72
+    : canopyView && !base ? height + tallestTree * 0.72
       : height - ARBRE_GROUND_CLEARANCE + ARBRE_SINK;
+  const trees = [];
   scatterAlongLevel(scene, levelWidth, avoidRanges, ARBRE_SPACING_MIN, ARBRE_SPACING_MAX, (x) => {
     const variant = Phaser.Math.Between(0, ARBRE_COUNT - 1);
     const scale = ARBRE_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.15);
-    scene.add.image(x, groundY, `${ARBRE_TEXTURE_PREFIX}${variant}`)
+    const img = scene.add.image(x, groundY, `${ARBRE_TEXTURE_PREFIX}${variant}`)
       .setOrigin(0.5, 1)
       .setScale(scale)
       .setFlipX(Math.random() < 0.5)
       // Au camp de Geralt, le pied du décor reste au bas du cadre.
       // Les autres forêts gardent leur ancrage vertical dans le monde.
-      .setScrollFactor(0.35, screenBottom ? 0 : 1);
+      .setScrollFactor(0.35, screenBottom ? 0 : (base ? base.scrollY : 1));
+    if (base) {
+      // Le plan défile à `scrollY` : il est posé là où sa base coïncide avec
+      // la ligne de base quand la caméra est au plus bas (camLow).
+      setVisibleBottomY(img, base.y - base.camLow * (1 - base.scrollY) + BACKDROP_TREE_SINK);
+    }
+    trees.push(img);
   });
+  return trees;
 }
 
 // Plantes de premier plan (plan1, assets/decors/plantes_frames/, découpées
@@ -318,21 +333,481 @@ function addProceduralHangingPlants(scene, levelWidth) {
 // `background` (optionnel, clé de zone `background`) : id d'un fond de
 // ITEM_MANIFEST (texture `item-<id>`) qui remplace le ciel plan4 ; plan4 reste
 // le repli tant que l'image n'existe pas.
-function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null, largeTrees = true, treesAtScreenBottom = false) {
+// `backdrop` (cf. zoneBackdropSpec, tout optionnel) : { baseline, groundLine,
+// camLow, camHigh, sky, treesScrollY } -- ligne de base des fonds, plage de
+// défilement vertical de la caméra, ciel qui se révèle (skyReveal). Sans
+// aucune de ces options : rendu historique à l'identique.
+function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null, largeTrees = true, treesAtScreenBottom = false, backdrop = {}) {
   const coverWidth = Math.ceil(levelWidth * 1.4);
   const bgKey = background && scene.textures.exists(`item-${background}`) ? `item-${background}` : 'decor-plan4';
   const sourceHeight = bgKey === 'decor-plan4' ? DECOR_SOURCE_HEIGHT : scene.textures.get(bgKey).getSourceImage().height;
   const scale = height / sourceHeight;
+  const { baseline = null, groundLine = 1, camLow = 0, camHigh = 0, sky = null } = backdrop;
+  const farScroll = sky && sky.farScrollY != null ? sky.farScrollY : FAR_BG_SCROLL;
 
-  scene.add.tileSprite(-100, 0, coverWidth, height, bgKey)
+  // Ligne de base : la ligne de sol de l'image (`groundLine`, fraction de sa
+  // hauteur, 1 = bord bas) tombe sur `baseline` quand la caméra est au plus bas.
+  const top = baseline == null ? 0 : baseline - camLow * (1 - farScroll) - height * groundLine;
+  if (sky) addSkyGradient(scene, sky);
+  const far = scene.add.tileSprite(-100, top, coverWidth, height, bgKey)
     .setOrigin(0, 0)
     .setTileScale(scale, scale)
-    .setScrollFactor(0.08);
+    .setScrollFactor(FAR_BG_SCROLL, farScroll);
+  scene.__farBackground = far;
+  // Caméra qui défile verticalement (tallLevel, camera.vertical) ou fond
+  // décalé : bords haut/bas prolongés dans la couleur de l'image (plus de
+  // bande vide en haut de l'écran quand on monte).
+  if (camHigh < camLow || baseline != null) addFarBackgroundCaps(scene, far, bgKey, { top, height, coverWidth, camLow, camHigh, farScroll, skyFade: !!sky });
+  if (sky) addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh });
 
   const floatingBackground = background === 'fond_foret_flottante';
   const canopyView = floatingBackground && !treesAtScreenBottom;
-  if (largeTrees) addProceduralForest(scene, height, levelWidth, canopyView ? [] : avoidRanges, canopyView, treesAtScreenBottom);
+  // Ligne de base (ou ciel qui se révèle) : la forêt du fond est POSÉE dessus
+  // (bas visible des arbres), plus plantée sous l'écran façon « canopée ».
+  const treeBase = baseline != null || sky ? {
+    y: baseline != null ? baseline : height - ARBRE_GROUND_CLEARANCE + ARBRE_SINK,
+    scrollY: sky && sky.treesScrollY != null ? sky.treesScrollY : (sky ? SKY_TREES_SCROLL_Y : 1),
+    camLow,
+  } : null;
+  if (largeTrees) addProceduralForest(scene, height, levelWidth, canopyView && !treeBase ? [] : avoidRanges, canopyView, treesAtScreenBottom, treeBase);
   if (!floatingBackground) addProceduralGroundPlants(scene, height, levelWidth, avoidRanges);
+}
+
+// ===========================================================================
+// FONDS « AU SOL », LIQUIDE, CAMÉRA VERTICALE, CIEL (2026-10-23, cf.
+// PLAN_DEV.md « Fonds, liquide et caméra verticale »). Tout est optionnel :
+// une zone sans ces clés garde son rendu et sa caméra historiques.
+// ===========================================================================
+// Défilement du fond lointain (TileSprite du ciel/fond de zone).
+const FAR_BG_SCROLL = 0.08;
+// Bas visible des arbres du fond posé 2 px SOUS la ligne de base (le liquide
+// ou le sol devant recouvre ce dernier rang à demi transparent).
+const BACKDROP_TREE_SINK = 2;
+// Ciel qui se révèle : la forêt du fond défile à 0,6 en vertical (plus
+// lointaine que le sol) -- en montant, elle descend et découvre le ciel.
+const SKY_TREES_SCROLL_Y = 0.6;
+
+// Normalise les clés de fond d'une zone : `background: 'id'` (historique) ou
+// `background: { id, baseline, groundLine }`, `backgroundBaseline: y`.
+function zoneBackgroundId(data) {
+  const bg = data && data.background;
+  return bg && typeof bg === 'object' ? bg.id || null : bg || null;
+}
+function zoneBackdropSpec(data, { camLow = 0, camHigh = 0 } = {}) {
+  const bg = data.background && typeof data.background === 'object' ? data.background : {};
+  const baseline = bg.baseline ?? data.backgroundBaseline ?? null;
+  const id = zoneBackgroundId(data);
+  const def = id && typeof getItemManifest === 'function' ? getItemManifest()[id] : null;
+  const groundLine = bg.groundLine ?? data.backgroundGroundLine ?? (def && def.groundLine) ?? 1;
+  const sky = data.skyReveal ? { ...(data.skyReveal === true ? {} : data.skyReveal) } : null;
+  return { baseline, groundLine, camLow, camHigh, sky };
+}
+
+// Couleur moyenne des rangées du haut ou du bas d'une texture (mise en
+// cache) : prolongement des bords du fond lointain. Repli sombre si les
+// pixels sont illisibles (file://).
+const TEXTURE_EDGE_COLOR_CACHE = new Map();
+function textureEdgeColor(scene, key, edge, fallback = 0x0d0b1a) {
+  const ck = `${key}|${edge}`;
+  if (TEXTURE_EDGE_COLOR_CACHE.has(ck)) return TEXTURE_EDGE_COLOR_CACHE.get(ck);
+  let color = fallback;
+  try {
+    const img = scene.textures.get(key).getSourceImage();
+    const rows = Math.max(2, Math.round(img.height * 0.01));
+    const c = document.createElement('canvas');
+    c.width = Math.min(256, img.width);
+    c.height = rows;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, edge === 'top' ? 0 : img.height - rows, img.width, rows, 0, 0, c.width, rows);
+    const d = ctx.getImageData(0, 0, c.width, rows).data;
+    let r = 0; let g = 0; let b = 0; const n = d.length / 4;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    color = Phaser.Display.Color.GetColor(Math.round(r / n), Math.round(g / n), Math.round(b / n));
+  } catch (e) {
+    color = fallback;
+  }
+  TEXTURE_EDGE_COLOR_CACHE.set(ck, color);
+  return color;
+}
+
+// Bords du fond lointain prolongés : sans eux, quand la caméra monte, le fond
+// (qui ne défile qu'à 0,08) découvrait une bande vide en haut de l'écran
+// (épreuve du singe, racines), et une ligne de base remontée laissait un vide
+// dessous. Prolongement = l'image retournée verticalement (raccord sans
+// couture : même rangée de pixels de part et d'autre), puis sa couleur de
+// bord. `skyFade` (ciel qui se révèle) : le haut se fond en transparence
+// pour laisser voir le dégradé de ciel derrière.
+function addFarBackgroundCaps(scene, far, key, { top, height, coverWidth, camLow, camHigh, farScroll, skyFade }) {
+  const topColor = textureEdgeColor(scene, key, 'top', 0x101828);
+  const bottomColor = textureEdgeColor(scene, key, 'bottom');
+  const reach = Math.max(0, camLow - camHigh) * farScroll + Math.abs(Math.min(0, camHigh)) * farScroll;
+  const g = scene.add.graphics().setScrollFactor(FAR_BG_SCROLL, farScroll);
+  const mirror = (y) => scene.add.tileSprite(far.x, y, far.width, height, key)
+    .setOrigin(0, 0).setTileScale(far.tileScaleX, far.tileScaleY).setFlipY(true)
+    .setScrollFactor(FAR_BG_SCROLL, farScroll);
+  const parts = [g];
+  if (skyFade) {
+    const fade = 160;
+    g.fillGradientStyle(topColor, topColor, topColor, topColor, 0, 0, 1, 1);
+    g.fillRect(-100, top - fade, coverWidth, fade);
+  } else {
+    parts.push(mirror(top - height));
+    const extra = Math.max(60, top + reach + 60 - height);
+    g.fillStyle(topColor, 1).fillRect(-100, top - height - extra, coverWidth, extra + 1);
+  }
+  parts.push(mirror(top + height));
+  g.fillStyle(bottomColor, 1).fillRect(-100, top + 2 * height - 1, coverWidth, Math.max(600, reach + 600));
+  // Derrière le fond lointain dans la liste d'affichage.
+  for (const o of parts) scene.children.moveBelow(o, far);
+  // Ciel qui se révèle : filet de raccord DEVANT l'image (son 1er rang, filtré
+  // en boucle, mélange le bas de l'image -> trait sombre sur le ciel).
+  if (skyFade) {
+    const seam = scene.add.graphics().setScrollFactor(FAR_BG_SCROLL, farScroll);
+    seam.fillStyle(topColor, 1).fillRect(-100, top - 1, coverWidth, 3);
+    scene.children.moveAbove(seam, far);
+  }
+  return g;
+}
+
+// ---------------------------------------------------------------------------
+// Bande de liquide / brume au premier plan du fond (clé `liquidFloor`) :
+// { y, style: 'mousse' | 'eau' | 'brume', color?, x1?, x2?, image?, height?,
+// front? }. Dessinée DEVANT les fonds (forêt du fond, sous-bois), derrière le
+// sol et les personnages (`front: true` : devant eux, ils « s'y enfoncent »).
+// Image du manifest (`image`, sinon celle du style, cf. LIQUID_STYLES.images :
+// bande TUILABLE en largeur, crête en haut, corps opaque) répétée en
+// tileSprite à l'échelle du manifest (`height` : hauteur affichée imposée),
+// la crête calée sur `y`, sa couleur du bas prolongée dessous ; sinon rendu
+// par code (nappe sombre, surface bosselée, points lumineux). Bulles : VFX
+// `vfx_mousse_toxique` (anim `bulle`) si l'art existe, sinon cercles.
+// Purement visuelle : y tomber reste géré par la clé `fall`.
+// ---------------------------------------------------------------------------
+const LIQUID_STYLES = {
+  mousse: { deep: 0x16280f, blobs: [0x2f5a2a, 0x3e7a2c], glow: 0x9bff5a, images: ['liquide_mousse_toxique', 'liquide_mousse'] },
+  eau: { deep: 0x0b1f33, blobs: [0x1d4a6e, 0x245a85], glow: 0x9fe3ff, images: ['liquide_mare_fond', 'liquide_eau'] },
+  brume: { deep: 0x2a3550, blobs: [0x46557a, 0x5a6a90], glow: 0xd6e2ff, images: ['liquide_brume'] },
+};
+
+function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
+  if (!cfg || cfg.y == null) return null;
+  const style = LIQUID_STYLES[cfg.style] ? cfg.style : 'mousse';
+  const pal = { ...LIQUID_STYLES[style] };
+  if (cfg.color != null) pal.deep = cfg.color;
+  const x1 = cfg.x1 ?? -200;
+  const x2 = cfg.x2 ?? levelWidth + 200;
+  const y = cfg.y;
+  const bottom = Math.max(levelHeight, y) + 400;
+  const objs = [];
+  const rnd = new Phaser.Math.RandomDataGenerator([`liquide-${style}-${Math.round(y)}`]);
+  const imgId = [cfg.image, ...pal.images].find((id) => id && scene.textures.exists(`item-${id}`));
+  if (imgId) {
+    const key = `item-${imgId}`;
+    const src = scene.textures.get(key).getSourceImage();
+    const def = typeof getItemManifest === 'function' ? getItemManifest()[imgId] || {} : {};
+    const k = cfg.height ? cfg.height / src.height : (def.scale || 96 / src.height);
+    const band = src.height * k;
+    // Crête (1er rang visible de l'image) quelques px au-dessus de `y`.
+    const vb = visibleBounds(scene, key);
+    const surfTop = y - (vb && !vb.empty ? vb.y0 * k : 0) - 6;
+    const deep = scene.add.rectangle(x1, surfTop + band - 1, x2 - x1, Math.max(0, bottom - surfTop - band), textureEdgeColor(scene, key, 'bottom', pal.deep)).setOrigin(0, 0);
+    const surf = scene.add.tileSprite(x1, surfTop, x2 - x1, band, key).setOrigin(0, 0).setTileScale(k, k);
+    objs.push(deep, surf);
+    // Lente dérive de la surface.
+    scene.tweens.add({ targets: surf, tilePositionX: { from: 0, to: src.width }, duration: 60000, repeat: -1 });
+  } else {
+    const g = scene.add.graphics();
+    g.fillStyle(pal.deep, 1).fillRect(x1, y, x2 - x1, bottom - y);
+    if (style === 'eau') {
+      g.fillStyle(pal.blobs[1], 0.9).fillRect(x1, y - 2, x2 - x1, 6);
+      for (let x = x1; x < x2; x += 34) g.fillStyle(pal.glow, 0.35).fillRect(x + rnd.between(0, 20), y + rnd.between(6, 40), rnd.between(8, 22), 2);
+    } else {
+      for (let x = x1; x < x2; x += 46) {
+        g.fillStyle(pal.blobs[rnd.frac() < 0.5 ? 0 : 1], 1);
+        g.fillEllipse(x + rnd.between(0, 20), y + 2 + rnd.between(-4, 6), rnd.between(50, 80), rnd.between(20, 34));
+      }
+      for (let x = x1; x < x2; x += 37) g.fillStyle(pal.glow, 0.65).fillCircle(x + rnd.between(0, 30), y + rnd.between(-6, 14), rnd.realInRange(1.5, 3.5));
+    }
+    objs.push(g);
+  }
+  // Bulles (mousse) / reflets (eau) qui montent et crèvent.
+  const bubbleArt = style === 'mousse' && typeof hasManifestArt === 'function' && hasManifestArt(scene, 'vfx_mousse_toxique', 'bulle');
+  for (let x = x1 + 120; x < x2; x += 260 + rnd.between(0, 160)) {
+    if (bubbleArt) {
+      const b = addManifestSprite(scene, x, y + 4, 'vfx_mousse_toxique', 'bulle', { origin: [0.5, 1] }).setVisible(false);
+      objs.push(b);
+      const pop = () => {
+        if (!b.active) return;
+        b.setPosition(x + rnd.between(-40, 40), y + 4).setVisible(true);
+        b.play('vfx_mousse_toxique-bulle');
+        b.once('animationcomplete', () => { if (b.active) b.setVisible(false); });
+        scene.time.delayedCall(rnd.between(1600, 3600), pop);
+      };
+      scene.time.delayedCall(rnd.between(0, 2500), pop);
+    } else {
+      const b = scene.add.circle(x, y + 6, rnd.between(3, 7), pal.glow, style === 'eau' ? 0.35 : 0.55);
+      objs.push(b);
+      scene.tweens.add({
+        targets: b, y: y - 16, alpha: 0, scale: 1.6, duration: rnd.between(1300, 2200),
+        delay: rnd.between(0, 2000), repeat: -1, repeatDelay: rnd.between(300, 1500),
+      });
+    }
+  }
+  if (cfg.front) {
+    for (const o of objs) o.setDepth(DECOR_FOREGROUND_DEPTH - 2);
+  } else if (scene.__frontGroundFirstImage) {
+    // Derrière le sol principal (donc les personnages) : juste avant sa 1re image.
+    for (const o of objs) scene.children.moveBelow(o, scene.__frontGroundFirstImage);
+  }
+  scene.liquidFloor = { y, style, objects: objs };
+  return scene.liquidFloor;
+}
+
+// ---------------------------------------------------------------------------
+// Ciel qui se révèle en montant (clé `skyReveal`, avec `camera.vertical`) :
+// dégradé de ciel fixé à l'écran DERRIÈRE le fond lointain (forêt/nuit en bas
+// -> jour lumineux en haut, fondu selon la hauteur de la caméra), voile de
+// sous-bois sur le fond lointain, nuages en parallaxe lente, rayons de
+// soleil, feuilles qui tombent dans la canopée, éclat de lumière à la sortie
+// de la canopée. Images du manifest utilisées si elles existent
+// (`ciel_jour`, `nuages`, `rayons_soleil`), sinon rendu par code.
+//   skyReveal: { start: 0.1, end: 0.85 (fractions de la course verticale de
+//   la caméra), low: [haut, bas], high: [haut, bas] (couleurs du dégradé),
+//   shade: 0.55 (voile du fond en bas), clouds: 7, rays: true, leaves: true,
+//   flashAt: 0.55, treesScrollY: 0.6, farScrollY: 0.08 }
+// ---------------------------------------------------------------------------
+const SKY_DEFAULTS = {
+  start: 0.1, end: 0.85,
+  low: [0x0f2230, 0x1d3b33], high: [0x3d8fe0, 0xbfe5ff],
+  shade: 0.55, shadeColor: 0x0b1a17, clouds: 7, rays: true, leaves: true, flashAt: 0.55,
+};
+
+function addSkyGradient(scene, sky) {
+  const cfg = { ...SKY_DEFAULTS, ...(sky || {}) };
+  const { width, height } = scene.scale;
+  const st = { cfg, progress: 0, flashArmed: true, leafAt: 0, raySway: 0, flashBoost: 0 };
+  scene.__sky = st;
+  const grad = (top, bottom) => {
+    const g = scene.add.graphics().setScrollFactor(0).setDepth(-20);
+    g.fillGradientStyle(top, top, bottom, bottom, 1);
+    g.fillRect(0, 0, width, height);
+    return g;
+  };
+  st.low = grad(cfg.low[0], cfg.low[1]);
+  if (scene.textures.exists('item-ciel_jour')) {
+    st.high = scene.add.image(0, 0, 'item-ciel_jour').setOrigin(0, 0).setScrollFactor(0).setDepth(-19)
+      .setDisplaySize(width, height);
+  } else {
+    st.high = grad(cfg.high[0], cfg.high[1]).setDepth(-19);
+  }
+  st.high.setAlpha(0);
+}
+
+// Voile, nuages et rayons : entre le fond lointain et la forêt du fond.
+function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
+  const st = scene.__sky;
+  if (!st) return;
+  const cfg = st.cfg;
+  const { width, height } = scene.scale;
+  st.shade = scene.add.rectangle(0, 0, width, height, cfg.shadeColor, cfg.shade).setOrigin(0, 0).setScrollFactor(0);
+  // Nuages : dans le haut de la course de la caméra, parallaxe lente.
+  st.clouds = [];
+  const n = cfg.clouds || 0;
+  const cloudScroll = 0.25;
+  const rnd = new Phaser.Math.RandomDataGenerator(['ciel-nuages']);
+  for (let i = 0; i < n; i++) {
+    const s = camHigh + (camLow - camHigh) * rnd.realInRange(0, 0.45);
+    const cy = s * cloudScroll + rnd.between(40, Math.round(height * 0.45));
+    const cx = ((levelWidth * 0.35 + width) * i) / Math.max(1, n) + rnd.between(0, 200);
+    let c;
+    if (scene.textures.exists('item-nuages')) {
+      c = scene.add.image(cx, cy, 'item-nuages').setScale(rnd.realInRange(0.5, 0.9));
+    } else {
+      // Nuage doux : base ombrée, puis boules de plus en plus claires.
+      c = scene.add.graphics({ x: cx, y: cy });
+      const w = rnd.between(150, 280);
+      c.fillStyle(0xc9dcef, 0.55).fillEllipse(0, 12, w * 0.95, 30);
+      for (let k = 0; k < 7; k++) {
+        c.fillStyle(k < 3 ? 0xe4eef8 : 0xffffff, 0.5 + k * 0.05);
+        c.fillEllipse(rnd.between(-w * 0.42, w * 0.42), rnd.between(-14, 6), rnd.between(56, 104), rnd.between(30, 50));
+      }
+    }
+    c.setScrollFactor(0.12, cloudScroll).setAlpha(0);
+    scene.tweens.add({ targets: c, x: cx + rnd.between(120, 260), duration: rnd.between(40000, 70000), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    st.clouds.push(c);
+  }
+  // Rayons de soleil (coin haut droit), additifs, fixés à l'écran.
+  st.rays = null;
+  if (cfg.rays) {
+    if (scene.textures.exists('item-rayons_soleil')) {
+      st.rays = scene.add.image(width, 0, 'item-rayons_soleil').setOrigin(1, 0).setScrollFactor(0);
+    } else {
+      st.rays = scene.add.graphics().setScrollFactor(0);
+      const ox = width * 0.88;
+      for (let i = 0; i < 5; i++) {
+        const a = Math.PI * (0.58 + i * 0.07);
+        const len = height * 1.3;
+        const spread = 0.025 + (i % 2) * 0.015;
+        st.rays.fillStyle(0xfff4c8, 0.09 + (i % 2) * 0.04);
+        st.rays.fillTriangle(ox, -20, ox + Math.cos(a - spread) * len, -20 + Math.sin(a - spread) * len,
+          ox + Math.cos(a + spread) * len, -20 + Math.sin(a + spread) * len);
+      }
+    }
+    st.rays.setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    scene.tweens.add({ targets: st, raySway: { from: -1, to: 1 }, duration: 5200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  // Éclat de lumière à la sortie de la canopée (au-dessus de tout le décor).
+  st.flash = scene.add.rectangle(0, 0, width, height, 0xfff3c4, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(950);
+}
+
+// Progression 0 (bas de la course de la caméra) -> 1 (haut) et rendu.
+function updateSkyReveal(scene, dt) {
+  const st = scene.__sky;
+  if (!st || !st.low || !st.low.active) return;
+  const cam = scene.cameras.main;
+  const zc = scene.__zoneCamera;
+  const low = zc ? zc.camLow : 0;
+  const high = zc ? zc.camHigh : 0;
+  const raw = low > high ? (low - cam.scrollY) / (low - high) : 0;
+  const cfg = st.cfg;
+  const p = Phaser.Math.Clamp((raw - cfg.start) / Math.max(0.01, cfg.end - cfg.start), 0, 1);
+  // Lissé : pas de saut de lumière quand la caméra rattrape un grand saut.
+  st.progress += (p - st.progress) * (1 - Math.exp(-dt * 4));
+  const e = st.progress * st.progress * (3 - 2 * st.progress); // smoothstep
+  st.high.setAlpha(e);
+  if (st.shade) st.shade.setAlpha(cfg.shade * (1 - e));
+  for (const c of st.clouds || []) c.setAlpha(Phaser.Math.Clamp((e - 0.2) / 0.5, 0, 1) * 0.9);
+  if (st.rays) {
+    const base = Phaser.Math.Clamp((e - 0.3) / 0.5, 0, 1) * (0.75 + 0.25 * st.raySway);
+    st.rays.setAlpha(Phaser.Math.Clamp(base + st.flashBoost, 0, 1));
+  }
+  // Sortie de la canopée : éclat doux une fois (réarmé quand on redescend).
+  if (cfg.flashAt != null && st.flash) {
+    if (st.flashArmed && st.progress >= cfg.flashAt) {
+      st.flashArmed = false;
+      scene.tweens.killTweensOf(st.flash);
+      st.flash.setAlpha(0);
+      scene.tweens.add({ targets: st.flash, alpha: { from: 0, to: 0.3 }, duration: 160, yoyo: true, hold: 120, ease: 'Sine.easeOut' });
+      st.flashBoost = 0.35;
+      scene.tweens.add({ targets: st, flashBoost: 0, duration: 1400, ease: 'Quad.easeOut' });
+    } else if (!st.flashArmed && st.progress < cfg.flashAt - 0.2) {
+      st.flashArmed = true;
+    }
+  }
+  // Feuilles qui tombent tant qu'on traverse la canopée.
+  if (cfg.leaves && st.progress > 0.08 && st.progress < 0.8 && scene.time.now >= st.leafAt) {
+    st.leafAt = scene.time.now + Phaser.Math.Between(260, 520);
+    spawnSkyLeaf(scene);
+  }
+}
+
+function spawnSkyLeaf(scene) {
+  const view = scene.cameras.main.worldView;
+  const x = view.x + Phaser.Math.Between(0, Math.round(view.width));
+  const y = view.y - 10;
+  const leaf = scene.add.ellipse(x, y, 10, 5, Phaser.Utils.Array.GetRandom([0x6fbf5a, 0xa8e07a, 0x4f9a48]), 0.9)
+    .setDepth(DECOR_FOREGROUND_DEPTH - 1).setRotation(Math.random() * Math.PI);
+  const fall = Phaser.Math.Between(260, 420);
+  scene.tweens.add({ targets: leaf, y: y + fall, duration: Phaser.Math.Between(2600, 3800), ease: 'Sine.easeIn', onComplete: () => leaf.destroy() });
+  scene.tweens.add({ targets: leaf, x: x + Phaser.Math.Between(-60, 60), rotation: leaf.rotation + Phaser.Math.FloatBetween(-3, 3), duration: 900, yoyo: true, repeat: 2, ease: 'Sine.easeInOut' });
+  scene.tweens.add({ targets: leaf, alpha: 0, delay: 2000, duration: 900 });
+}
+
+// ---------------------------------------------------------------------------
+// Caméra de zone (clé `camera`) : { vertical: true, deadzoneTop: 0.35,
+// deadzoneBottom: 0.7, lerp | smoothTime, lookAhead: 60, lookAheadX: 0 }.
+// Horizontal : suivi historique (centré, immédiat). Vertical : zone morte --
+// la caméra ne monte que quand Agarica (buste) dépasse `deadzoneTop` du cadre
+// et ne redescend que sous `deadzoneBottom` --, rattrapage par ressort amorti
+// (accélère puis décélère, sans dépassement : « smooth damp »), léger regard
+// dans le sens de la montée/de la chute, bornes = monde de la zone.
+// ---------------------------------------------------------------------------
+const ZONE_CAMERA_DEFAULTS = { deadzoneTop: 0.35, deadzoneBottom: 0.7, smoothTime: 0.24, lookAhead: 60, lookAheadX: 0 };
+const ZONE_CAMERA_FOCUS_ABOVE_FEET = 40;
+
+function setupZoneCamera(scene, data, { camLow = 0, camHigh = 0 } = {}) {
+  const c = data.camera && data.camera.vertical ? { ...ZONE_CAMERA_DEFAULTS, ...data.camera } : null;
+  // `lerp` (par image à 60 i/s, façon Phaser) -> temps de lissage équivalent.
+  if (c && data.camera.smoothTime == null && data.camera.lerp) c.smoothTime = Phaser.Math.Clamp(1 / (data.camera.lerp * 60), 0.05, 1.5);
+  scene.__zoneCamera = c || scene.__sky ? { cfg: c, vel: 0, target: null, look: 0, lookX: 0, camLow, camHigh } : null;
+  cameraFollowPlayer(scene, { snap: true });
+  if (scene.__zoneCamera && !scene.__zoneCameraHook) {
+    scene.__zoneCameraHook = true;
+    // Après la physique (POST_UPDATE, après Arcade) : position finale du joueur.
+    scene.events.on('postupdate', (time, delta) => {
+      if (!scene.__zoneCamera || !scene.player) return;
+      const dt = Math.min(delta || 16, 50) / 1000;
+      updateZoneCamera(scene, dt);
+      updateSkyReveal(scene, dt);
+    });
+  }
+}
+
+// (Re)met la caméra sur Agarica selon la caméra de la zone (cinématiques :
+// cf. storyCameraFollow). `snap` : directement à la bonne hauteur.
+function cameraFollowPlayer(scene, { snap = false } = {}) {
+  const cam = scene.cameras.main;
+  const p = scene.player;
+  if (!p) return;
+  const zc = scene.__zoneCamera && scene.__zoneCamera.cfg ? scene.__zoneCamera : null;
+  const keepY = cam.scrollY;
+  cam.startFollow(p, true, 1, zc ? 0 : 1);
+  if (!zc) return;
+  zc.vel = 0;
+  zc.look = 0;
+  zc.target = null;
+  if (snap) {
+    const focus = p.y - ZONE_CAMERA_FOCUS_ABOVE_FEET;
+    cam.scrollY = cam.clampY(focus - ((zc.cfg.deadzoneTop + zc.cfg.deadzoneBottom) / 2) * cam.height);
+  } else {
+    cam.scrollY = keepY;
+  }
+}
+
+// Ressort amorti critique (« SmoothDamp ») : rejoint `target` en ~smoothTime
+// sans le dépasser, vitesse continue (accélération puis freinage en douceur).
+function cameraSmoothDamp(current, target, state, smoothTime, dt) {
+  const omega = 2 / Math.max(0.0001, smoothTime);
+  const x = omega * dt;
+  const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const change = current - target;
+  const temp = (state.vel + omega * change) * dt;
+  state.vel = (state.vel - omega * temp) * exp;
+  let out = target + (change + temp) * exp;
+  // Pas de dépassement (anti-oscillation).
+  if ((target - current > 0) === (out > target)) { out = target; state.vel = 0; }
+  return out;
+}
+
+function updateZoneCamera(scene, dt) {
+  const zc = scene.__zoneCamera;
+  if (!zc || !zc.cfg) return;
+  const cam = scene.cameras.main;
+  const p = scene.player;
+  // Cinématique qui a pris la caméra (pan, caméra détachée) : on n'y touche pas.
+  if (!p || !p.active || !p.body || scene.__cameraDetached || cam._follow !== p || (cam.panEffect && cam.panEffect.isRunning)) {
+    zc.vel = 0;
+    zc.target = null;
+    return;
+  }
+  const c = zc.cfg;
+  const h = cam.height;
+  const focus = p.y - ZONE_CAMERA_FOCUS_ABOVE_FEET;
+  let target = zc.target == null ? cam.scrollY : zc.target;
+  if (focus < target + c.deadzoneTop * h) target = focus - c.deadzoneTop * h;
+  else if (focus > target + c.deadzoneBottom * h) target = focus - c.deadzoneBottom * h;
+  zc.target = cam.clampY(target);
+  // Regard : un peu plus haut en pleine montée, plus bas en chute rapide.
+  const vy = p.body.velocity.y;
+  const want = vy < -150 ? -c.lookAhead * Phaser.Math.Clamp((-vy - 150) / 450, 0, 1)
+    : vy > 300 ? c.lookAhead * Phaser.Math.Clamp((vy - 300) / 500, 0, 1) : 0;
+  zc.look += (want - zc.look) * (1 - Math.exp(-dt * 3));
+  const goal = cam.clampY(zc.target + zc.look);
+  cam.scrollY = cameraSmoothDamp(cam.scrollY, goal, zc, c.smoothTime, dt);
+  if (c.lookAheadX) {
+    const wantX = -(p.facingDir >= 0 ? 1 : -1) * c.lookAheadX;
+    zc.lookX += (wantX - zc.lookX) * (1 - Math.exp(-dt * 2));
+    cam.followOffset.x = zc.lookX;
+  }
 }
 
 // Plafond (lianes suspendues, assets/decors/plantes_frames/ — voir
@@ -2513,7 +2988,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // ce plafond invisible/inaccessible en jeu (la caméra ne peut jamais
   // scroller au-dessus de Y=0). N'affecte pas un niveau plat classique : le
   // joueur n'a simplement jamais de raison d'aller dans cette marge.
-  const levelTop = -400;
+  // `levelTop` (optionnel, négatif) : monde plus haut que la marge par défaut
+  // (zone qu'on gravit, cf. `camera.vertical`).
+  const levelTop = Math.min(-400, data.levelTop ?? -400);
   // Marge à DROITE du monde PHYSIQUE (jamais la caméra, cf. plus bas) --
   // retour utilisateur : "la hitbox du loup ne permet pas de changer de
   // zone de par sa taille... corrige la logique pour toutes les formes à
@@ -2532,9 +3009,19 @@ function buildLevelFromData(scene, data, sceneData) {
   // forme future, plus large encore, en profite pareil sans y retoucher.
   const levelRightPad = 200;
 
+  // Course verticale de la caméra (cf. plus bas : tallLevel / camera.vertical) :
+  // calculée dès ici pour caler les fonds (ligne de base, ciel, bords).
+  const verticalCamera = !!(data.tallLevel || (data.camera && data.camera.vertical));
+  const cameraTop = verticalCamera ? levelTop : 0;
+  const cameraHeight = verticalCamera ? (levelHeight - levelTop) : height;
+  const camLow = cameraTop + cameraHeight - height;
+  const camHigh = cameraTop;
+  scene.__sky = null;
+  scene.liquidFloor = null;
   if (data.decor !== false) {
-    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], data.background, data.largeTrees !== false, data.treesAtScreenBottom === true);
-    if (data.background !== 'fond_foret_flottante') addCaveCeiling(scene, levelWidth);
+    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], zoneBackgroundId(data), data.largeTrees !== false,
+      data.treesAtScreenBottom === true, zoneBackdropSpec(data, { camLow, camHigh }));
+    if (zoneBackgroundId(data) !== 'fond_foret_flottante') addCaveCeiling(scene, levelWidth);
   }
   setupDebugToggle(scene);
 
@@ -2555,6 +3042,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // des objets créés plus tard (totems et leurs plantes, cf.
   // sendBehindFrontGround).
   scene.__frontGroundFirstImage = renderAutotileGrid(scene, scene.ground, data.groundCells || [], { tileset: data.tileset })[0];
+  // Bande de liquide/brume devant les fonds (cf. addLiquidFloor) : masque le
+  // bas des arbres du fond au-dessus d'un vide (épreuve du singe…).
+  if (data.liquidFloor) addLiquidFloor(scene, data.liquidFloor, levelWidth, levelHeight);
 
   // `scene.water` gardé (comme scene.ground/scene.enemies) : l'overlap qui
   // arme `player.inWater` (cf. Player.js, forme Pieuvre automatique) doit
@@ -2580,8 +3070,8 @@ function buildLevelFromData(scene, data, sceneData) {
   // Zone4, qui tombent dedans avant un changement de scène/dégâts) --
   // seule la caméra arrête de suivre une fois sortie de l'écran, au lieu
   // de continuer à descendre avec le joueur.
-  const cameraTop = data.tallLevel ? levelTop : 0;
-  const cameraHeight = data.tallLevel ? (levelHeight - levelTop) : height;
+  // (cameraTop/cameraHeight calculés plus haut, avec les fonds ; `camera.
+  // vertical` ouvre la même course que tallLevel, cf. setupZoneCamera.)
   scene.cameras.main.setBounds(0, cameraTop, levelWidth, cameraHeight);
   scene.levelWidth = levelWidth;
 
@@ -2647,7 +3137,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // rencontre) : cf. shouldSpawnXara dans StoryKit.js pour la règle.
   scene.xara = shouldSpawnXara(scene, data) ? new Xara(scene, scene.player) : null;
   scene.physics.add.collider(scene.player, scene.ground);
-  scene.cameras.main.startFollow(scene.player, true, 1, 1);
+  // Suivi historique (centré, immédiat), ou caméra de zone (`camera.vertical` :
+  // zone morte + ressort, ciel qui se révèle), cf. setupZoneCamera.
+  setupZoneCamera(scene, data, { camLow, camHigh });
 
   if (scene.water.length) {
     scene.physics.add.overlap(scene.player, scene.water, () => { scene.player.inWater = true; });

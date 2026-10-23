@@ -800,6 +800,10 @@ const PLAYER_MAX_FALL_SPEED = 900;
 // elle s'annule) ; inclinaison du dessin = fraction de l'angle de la liane.
 const VINE_LOOK_OMEGA = 0.35;
 const VINE_ART_TILT = 0.55;
+// Grimpe le long de la liane : une prise de main tous les 18 px parcourus,
+// le dessin remontant de 3 px au plus fort de la traction (repli sans art `climb`).
+const VINE_CLIMB_STEP_PX = 18;
+const VINE_CLIMB_BOB_PX = 3;
 // Passage pose suspendue (1 bras, anim lente) <-> poses de balancement (2 bras,
 // choisies selon la phase) : seuils d'entrée et de sortie distincts, sinon la
 // pose clignote quand le balancement s'éteint.
@@ -820,6 +824,17 @@ const HIT_INVULN_MS = 950;
 const HIT_BLINK_MS = 90;
 const HIT_BLINK_ALPHA = 0.35;
 const THROW_POSE_MS = 220;
+// Compétences « avec la forme » (cf. startSkillFormPose) : durées des phases
+// transfo -> geste -> transfo inverse (ms) ; `releaseAt` = fraction du geste
+// où la pierre quitte la main. Pierre ~0,56 s, papillon ~0,74 s (sous son
+// délai de 1 s) : courtes mais lisibles.
+const SKILL_FORM_POSE_MS = {
+  pierre: { in: 150, act: 260, out: 150, releaseAt: 0.45 },
+  papillon: { in: 130, act: 480, out: 130, releaseAt: 0 },
+};
+// Papillon du soin : centre du dessin au-dessus des pieds = centre de la nuée
+// pendant le battement (cf. PapillonSwarm, Projectiles.js).
+const SKILL_BUTTERFLY_CENTER_ABOVE_FEET = 48;
 
 // Écrit une clé persistante : storySet (sauvegarde auto, Fondation) si
 // disponible, sinon le registre Phaser brut.
@@ -1471,9 +1486,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.lastVine = null;
     this.vineReleasedAt = -Infinity;
     this.vineMomentumSpeed = 0;
+    // Vol après un lâcher avec Espace (cf. releaseVine) : jusqu'au sol/liane.
+    this.vineFlight = false;
+    this.vineClimbLastR = null;
+    this.vineClimbDist = 0;
     this.monkeyReleasePoseUntil = 0;
     this.hurtPoseUntil = 0;
     this.throwPoseUntil = 0;
+    // Compétence « avec la forme » en cours (cf. startSkillFormPose) ou null.
+    this.skillFormPose = null;
     // Compétence dont la hitbox (getSkillHitbox) est active, ex. 'ours' --
     // la Fondation s'en sert pour réserver la destruction des mossBlocks à
     // l'Ours. `lastSkillId` : dernière compétence lancée (y compris
@@ -1650,6 +1671,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (Phaser.Input.Keyboard.JustDown(this.skillKeys.slot1)) this.tryActivateSkill(0, now);
     else if (Phaser.Input.Keyboard.JustDown(this.skillKeys.slot2)) this.tryActivateSkill(1, now);
     else if (Phaser.Input.Keyboard.JustDown(this.skillKeys.slot3)) this.tryActivateSkill(2, now);
+    // Pose « compétence avec la forme » : horloge (lâcher de la pierre, fin).
+    this.tickSkillFormPose(now);
     // Fenêtre de dégâts de la compétence active (cf. tryActivateSkill) :
     // se referme toute seule, jamais consommée/effacée ailleurs — un seul
     // rectangle par activation, jamais recalculé frame après frame comme
@@ -1709,7 +1732,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.scene.physics.world.timeScale = 1;
         this.scene.anims.globalTimeScale = 1;
       });
-    } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.butterflyPhase && now >= this.attackCooldownEndTime) {
+    } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.butterflyPhase && !this.vine
+      && now >= this.attackCooldownEndTime) {
+      // (Sur une liane : aucune attaque -- les deux mains tiennent la liane,
+      // demande utilisateur ; K/clic y est simplement ignoré.)
       // Retour utilisateur : "retire l'attaque de la pieuvre" -- forme
       // 100% nage, jamais de combat (elle n'avait de toute façon aucune
       // pose d'attaque dédiée, cf. le cycle de nage rejoué tel quel plus
@@ -1821,6 +1847,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.wolfJumpCarry = false;
       this.airJumpForm = null;
       this.vineMomentumSpeed = 0;
+      this.vineFlight = false;
       this.lastGroundedAt = now;
     }
 
@@ -1859,7 +1886,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // aérien réduit jusqu'à l'atterrissage (ou la prochaine liane).
     if (!this.vine && this.vineMomentumSpeed > 0 && !onGround) {
       this.body.maxVelocity.x = Math.max(maxSpeed, this.vineMomentumSpeed);
-      this.setDragX(150);
+      this.setDragX(this.vineFlight ? VINE_FLIGHT_DRAG : 150);
     }
 
     // Saut « comme au sol » : posée, ou à peine sortie d'un bord sans avoir
@@ -1940,7 +1967,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.scene.events.emit('player-pogo', this);
     }
 
-    const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine && !this.butterflyPhase;
+    // Vol de liane en liane (lâcher avec Espace, cf. releaseVine) : chute à la
+    // gravité normale, sans le surplus de chute -- un vrai vol plané.
+    const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine && !this.butterflyPhase && !this.vineFlight;
     this.body.gravity.y = falling ? this.fallGravityBonus : 0;
 
     // Descente en piqué : S maintenu remplace le plané par une accélération
@@ -2186,7 +2215,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // Poses Codex optionnelles (manifest `agarica_extra`, face à DROITE) :
         // utilisées seulement si l'art existe, sinon comportement historique.
         const extra = (anim) => hasManifestArt(this.scene, 'agarica_extra', anim);
-        if (this.storyPose && extra(this.storyPose)) {
+        if (this.skillFormPose && this.drawSkillFormPose(now)) {
+          // Compétence avec la forme : singe qui lance la pierre, papillon du
+          // soin (cf. startSkillFormPose).
+        } else if (this.storyPose && extra(this.storyPose)) {
           // Pose narrative tenue (cf. setPlayerStoryPose dans StoryKit, chute de mort).
           this.applyAgaricaExtraPose(this.storyPose);
         } else if (now < this.hurtPoseUntil && !this.isAttacking && extra('hurt')) {
@@ -2619,10 +2651,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.jumpsUsed = 1;
     this.airJumpForm = 'monkey';
     this.vineMomentumSpeed = 0;
+    this.vineFlight = false;
     this.wolfJumpCarry = false;
     this.vineDir = 0;
     this.vineLook = 0;
     this.vineSwingPose = false;
+    // Montée/descente : distance parcourue le long de la liane (rythme des
+    // mains, cf. applyVinePose).
+    this.vineClimbLastR = null;
+    this.vineClimbDist = 0;
     // Une transfo en cours (saut du singe juste avant la prise) s'afficherait
     // ancrée aux pieds, sous la liane : la pose suspendue prend la main tout de suite.
     this.formTransitionActive = false;
@@ -2680,10 +2717,17 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.airJumpForm = 'monkey';
     let vx = v.vx;
     let vy = v.vy;
+    this.vineFlight = false;
     if (withJump) {
-      vx *= VINE_RELEASE_SPEED_MULT;
+      // Sens du vol : celui du balancement ; presque à l'arrêt, la direction
+      // tenue, sinon le regard (cf. VINE_RELEASE_MIN_VX dans Liane.js).
+      const sign = Math.abs(vx) > 40 ? Math.sign(vx)
+        : (this.vineDir || (this.vineLook || (this.facingDir >= 0 ? 1 : -1)));
+      vx = sign * Phaser.Math.Clamp(Math.abs(vx) * VINE_RELEASE_SPEED_MULT, VINE_RELEASE_MIN_VX, VINE_MAX_CARRY_SPEED);
       vy = Math.min(vy, 0) + VINE_RELEASE_BOOST_Y;
       this.monkeyReleasePoseUntil = now + MONKEY_RELEASE_POSE_MS;
+      // Vol plané jusqu'au sol ou à la prochaine liane (cf. update()).
+      this.vineFlight = true;
     }
     this.setVelocity(vx, vy);
     this.body.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
@@ -2857,6 +2901,17 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     } else if (Math.abs(om) > VINE_SWING_POSE_ENTER.omega || Math.abs(theta) > VINE_SWING_POSE_ENTER.angle) {
       this.vineSwingPose = true;
     }
+    // Montée / descente (Z/↑, S/↓) : mains l'une après l'autre au rythme de
+    // la distance parcourue le long de la liane (une prise tous les
+    // VINE_CLIMB_STEP_PX) -- anim `climb` du manifest `singe` si l'art existe,
+    // sinon les poses suspendues `liane_hang` + un léger mouvement de traction.
+    const dr = this.vineClimbLastR == null ? 0 : vine.swingR - this.vineClimbLastR;
+    this.vineClimbLastR = vine.swingR;
+    this.vineClimbDist += Math.abs(dr);
+    if (this.vineClimb && Math.abs(dr) > 0.05) {
+      this.applyVineClimbPose(theta);
+      return;
+    }
     const swingFrames = sc.anims.exists('singe-liane_swing') ? sc.anims.get('singe-liane_swing').frames : null;
     if (this.vineSwingPose && swingFrames && swingFrames.length >= 4) {
       // Phase : s > 0 = côté vers lequel elle file. Frames de la planche :
@@ -2880,6 +2935,38 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.applyVineArtAnchor(-theta * VINE_ART_TILT);
   }
 
+  // Pose de grimpe (cf. applyVinePose) : frame choisie d'après la distance
+  // parcourue (descendre rejoue les mêmes prises), dessin incliné avec la
+  // liane comme la pose suspendue.
+  applyVineClimbPose(theta) {
+    const sc = this.scene;
+    const step = Math.floor(this.vineClimbDist / VINE_CLIMB_STEP_PX);
+    let body = FORMS.monkey.body;
+    let bob = 0;
+    if (hasManifestArt(sc, 'singe', 'climb') && sc.anims.exists('singe-climb')) {
+      const frames = sc.anims.get('singe-climb').frames;
+      this.anims.stop();
+      this.setTexture(frames[step % frames.length].textureKey);
+      // Feuille de l'art de grimpe (peut-être une autre image source) : son échelle.
+      const cfg = agaricaSheetPoseConfig(sc, 'singe', 'climb', { method: 'area' });
+      this.applyBodyForScale(cfg.scale, cfg.body);
+      body = cfg.body;
+    } else {
+      const hang = sc.anims.exists('singe-liane_hang') ? sc.anims.get('singe-liane_hang').frames : null;
+      if (hang && hang.length && hasManifestArt(sc, 'singe', 'liane_hang')) {
+        this.anims.stop();
+        this.setTexture(hang[step % hang.length].textureKey);
+      } else {
+        playManifestOn(this, 'singe', 'liane_hang');
+      }
+      // Traction : le corps remonte d'un cran à chaque prise puis se relâche.
+      const k = (this.vineClimbDist / VINE_CLIMB_STEP_PX) % 1;
+      bob = Math.sin(k * Math.PI) * VINE_CLIMB_BOB_PX;
+    }
+    this.setFlipX(MONKEY_FACES_RIGHT ? this.vineLook < 0 : this.vineLook > 0);
+    this.applyVineArtAnchor(-theta * VINE_ART_TILT, bob, body);
+  }
+
   // Art singe suspendu : le poing levé est dessiné 64-96 px au-dessus des
   // pieds, alors que la physique tient les mains à VINE_HANG_OFFSET (58 px,
   // cf. Liane.js -- portée de prise calibrée sur les niveaux). Plutôt que de
@@ -2890,18 +2977,21 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // Repère : texture (u, v) -> monde = pieds + R(rot)·(sx·(u − u0), s·(v − v0)),
   // sx = −s quand flipX (Phaser miroite autour de l'origine : u0 = W − originX·W).
   // Poing -> prise impose u0 = poingX + 58·sin(rot)/sx, v0 = poingY + 58·cos(rot)/s.
-  applyVineArtAnchor(rotation = 0) {
+  // `lift` : px dont le dessin remonte le long de la liane (traction de la
+  // grimpe) ; `body` : hitbox de la feuille affichée (gabarit fixe).
+  applyVineArtAnchor(rotation = 0, lift = 0, body = FORMS.monkey.body) {
     const info = textureAlphaInfo(this.scene, this.texture.key);
     if (!info || typeof VINE_HANG_OFFSET === 'undefined') return;
     const W = this.frame.realWidth;
     const H = this.frame.realHeight;
     const s = this.scaleY;
     const sx = this.flipX ? -this.scaleX : this.scaleX;
-    const u0 = info.fistX + (VINE_HANG_OFFSET * Math.sin(rotation)) / sx;
-    const v0 = info.fistY + (VINE_HANG_OFFSET * Math.cos(rotation)) / s;
+    const hang = VINE_HANG_OFFSET + lift;
+    const u0 = info.fistX + (hang * Math.sin(rotation)) / sx;
+    const v0 = info.fistY + (hang * Math.cos(rotation)) / s;
     this.setRotation(rotation);
     this.setOrigin((this.flipX ? W - u0 : u0) / W, v0 / H);
-    const b = FORMS.monkey.body;
+    const b = body;
     this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
     this.vineArtAnchored = true;
   }
@@ -2926,6 +3016,151 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     playManifestOn(this, 'agarica_extra', anim);
     this.applyBodyForScale(cfg.scale, cfg.body);
     this.setFlipX(AGARICA_EXTRA_FACES_RIGHT ? this.facingDir < 0 : this.facingDir > 0);
+  }
+
+  // --- Compétences « avec la forme » (2026-10-23, demande utilisateur) -----
+  // Pierre : Agarica devient brièvement le SINGE qui lance la pierre ;
+  // papillon (soin) : elle devient la FORME PAPILLON au centre de la nuée.
+  // Purement visuel (corps physique, énergie et délais inchangés) : phases
+  // 'in' (transfo dessinée, saut net + gerbe de feuilles sans l'art), 'act'
+  // (lancer / battement), 'out' (transfo à l'envers). Seulement depuis la
+  // forme humaine ; sinon la compétence part comme avant (cf. Projectiles.js).
+  // `onRelease` : appelé au moment du lâcher (pierre), une seule fois, même
+  // si la pose est interrompue (coup reçu, changement de forme).
+  // Renvoie false si la pose ne peut pas être jouée.
+  startSkillFormPose(kind, now, { onRelease = null } = {}) {
+    if (this.form !== 'agarica' || this.vine || this.butterflyPhase || this.storyPose) return false;
+    const prev = this.skillFormPose;
+    // Relance pendant la pose (pierre en rafale) : déjà singe, on enchaîne le lancer.
+    const chained = prev && prev.kind === kind && prev.phase !== 'out';
+    if (prev) this.endSkillFormPose(true);
+    const t = SKILL_FORM_POSE_MS[kind];
+    const hasIn = kind === 'pierre' ? !!this.monkeyTransfoAnimKey : !!this.butterflyTransfoKey;
+    const inMs = chained ? 0 : (hasIn ? t.in : 0);
+    const outMs = hasIn ? t.out : 0;
+    this.skillFormPose = {
+      kind, start: now, phase: inMs ? 'in' : 'act', inEnd: now + inMs, actEnd: now + inMs + t.act,
+      end: now + inMs + t.act + outMs, releaseAt: now + inMs + t.act * t.releaseAt, released: false, onRelease,
+      puffOut: !hasIn,
+    };
+    // Cassure d'un coup en cours : c'est la compétence qui prend la main.
+    this.isAttacking = false;
+    this.slashDir = null;
+    if (!hasIn && !chained) this.spawnSkillFormPuff(kind);
+    return true;
+  }
+
+  endSkillFormPose(releaseNow = false) {
+    const p = this.skillFormPose;
+    if (!p) return;
+    if (!p.released && p.onRelease && releaseNow) { p.released = true; p.onRelease(); }
+    this.skillFormPose = null;
+  }
+
+  // Horloge de la pose (début d'update, quel que soit l'affichage : la pierre
+  // part à l'heure même si un autre rendu a la main cette image).
+  tickSkillFormPose(now) {
+    const p = this.skillFormPose;
+    if (!p) return;
+    if (!p.released && p.onRelease && now >= p.releaseAt) { p.released = true; p.onRelease(); }
+    // Coup reçu, pose narrative, liane, papillon : la pose s'efface.
+    if (now < this.hurtPoseUntil || this.storyPose || this.vine || this.butterflyPhase) { this.endSkillFormPose(true); return; }
+    if (now >= p.end) {
+      if (p.puffOut) this.spawnSkillFormPuff(p.kind);
+      this.endSkillFormPose(true);
+      return;
+    }
+    p.phase = now < p.inEnd ? 'in' : now < p.actEnd ? 'act' : 'out';
+  }
+
+  // Affichage (branche forme humaine d'update) ; true si la pose a été dessinée.
+  drawSkillFormPose(now) {
+    const p = this.skillFormPose;
+    if (!p) return false;
+    const sc = this.scene;
+    const progress = (a, b) => Phaser.Math.Clamp((now - a) / Math.max(1, b - a), 0, 0.999);
+    const frameAt = (animKey, k, reverse = false) => {
+      const frames = sc.anims.exists(animKey) ? sc.anims.get(animKey).frames : null;
+      if (!frames || !frames.length) return false;
+      const i = Math.floor(k * frames.length);
+      this.anims.stop();
+      this.setTexture(frames[reverse ? frames.length - 1 - i : i].textureKey);
+      return true;
+    };
+    if (p.kind === 'pierre') {
+      // Singe : art dessiné face à DROITE (cf. MONKEY_FACES_RIGHT).
+      this.setFlipX(MONKEY_FACES_RIGHT ? this.facingDir < 0 : this.facingDir > 0);
+      if (p.phase === 'in' || p.phase === 'out') {
+        const k = p.phase === 'in' ? progress(p.start, p.inEnd) : progress(p.actEnd, p.end);
+        const base = this.monkeyTransfoAnimKey && sc.anims.exists(this.monkeyTransfoAnimKey) ? this.monkeyTransfoAnimKey : null;
+        if (!base || !frameAt(base, k, p.phase === 'out')) return false;
+        this.applyBodyForScale(this.monkeyTransfoCfg.scale, this.monkeyTransfoCfg.body);
+        return true;
+      }
+      const k = progress(p.inEnd, p.actEnd);
+      if (hasManifestArt(sc, 'singe', 'throw') && frameAt('singe-throw', k)) {
+        const cfg = agaricaSheetPoseConfig(sc, 'singe', 'throw', { method: 'area' });
+        this.applyBodyForScale(cfg.scale, cfg.body);
+        return true;
+      }
+      // Sans art de lancer : singe debout + geste du corps (élan en arrière,
+      // détente vers l'avant au lâcher, retour), pivot aux pieds.
+      if (!(hasManifestArt(sc, 'singe', 'idle') && frameAt('singe-idle', 0))) playManifestOn(this, 'singe', 'idle');
+      const cfg = agaricaSheetPoseConfig(sc, 'singe', 'idle', { method: 'area' });
+      this.applyBodyForScale(cfg.scale, cfg.body);
+      const rel = SKILL_FORM_POSE_MS.pierre.releaseAt;
+      const lean = k < rel ? -0.3 * Math.sin((k / rel) * Math.PI / 2)
+        : k < rel + 0.2 ? -0.3 + 0.55 * ((k - rel) / 0.2)
+          : 0.25 * (1 - (k - rel - 0.2) / (0.8 - rel));
+      this.setRotation(lean * this.facingDir);
+      this.vineArtAnchored = true; // origine/rotation remises à zéro à l'image suivante
+      return true;
+    }
+    // Papillon : forme papillon centrée sur le buste (au centre de la nuée).
+    let cfg = FORMS.butterfly;
+    if (p.phase === 'in' || p.phase === 'out') {
+      const k = p.phase === 'in' ? progress(p.start, p.inEnd) : progress(p.actEnd, p.end);
+      if (!this.butterflyTransfoKey || !frameAt(this.butterflyTransfoKey, k, p.phase === 'out')) return false;
+      cfg = agaricaSheetPoseConfig(sc, 'transfo_papillon', 'transform');
+    } else if (this.butterflyArt) {
+      const anim = ['cast', 'glide', 'flap'].find((a) => hasManifestArt(sc, 'forme_papillon', a));
+      if (anim) {
+        playManifestOn(this, 'forme_papillon', anim);
+        cfg = agaricaSheetPoseConfig(sc, 'forme_papillon', anim, { method: 'area' });
+      }
+    } else {
+      this.anims.play(ANIM_BUTTERFLY_PH_KEY, true);
+    }
+    this.applyBodyForScale(cfg.scale, cfg.body);
+    this.setFlipX(this.facingDir < 0);
+    this.setRotation(0);
+    // Léger flottement pendant le soin.
+    const hover = p.phase === 'act' ? Math.sin((now - p.inEnd) / 90) * 2.5 : 0;
+    const W = this.frame.realWidth;
+    const H = this.frame.realHeight;
+    this.setOrigin(0.5, 0.5 + (SKILL_BUTTERFLY_CENTER_ABOVE_FEET + hover) / (H * this.scaleY));
+    const b = cfg.body;
+    this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
+    this.vineArtAnchored = true;
+    return true;
+  }
+
+  // Bascule sans art de transformation : gerbe de feuilles (singe) ou de
+  // poussière lumineuse (papillon) qui masque le changement de silhouette.
+  spawnSkillFormPuff(kind) {
+    if (kind === 'papillon') { this.spawnButterflySparkles(14); return; }
+    const sc = this.scene;
+    const cx = this.x;
+    const cy = this.y - 40;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.random() * 0.5;
+      const leaf = sc.add.ellipse(cx, cy, 9, 5, i % 2 ? 0x6fbf5a : 0xa8e07a, 0.95)
+        .setDepth(this.depth + 1).setRotation(a);
+      sc.tweens.add({
+        targets: leaf, x: cx + Math.cos(a) * Phaser.Math.Between(20, 36), y: cy + Math.sin(a) * Phaser.Math.Between(18, 34),
+        rotation: a + 2, alpha: 0, duration: 300, ease: 'Quad.easeOut', onComplete: () => leaf.destroy(),
+      });
+    }
   }
 
   // --- Coups directionnels (cf. SLASH_ARCS) ---------------------------------

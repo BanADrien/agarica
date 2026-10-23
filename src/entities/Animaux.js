@@ -116,18 +116,30 @@ function pigletCanReach(scene, x, footY) {
   return typeof storyWalkSurfaceY !== 'function' || storyWalkSurfaceY(scene, x, footY) != null;
 }
 
+// Une couleur par bébé (art Codex : rose, gris, orange, mêmes anims et échelle
+// que `cochon_bebe`) ; variante absente : repli sur `cochon_bebe`.
+const PIGLET_ART_IDS = ['cochon_bebe_rose', 'cochon_bebe_gris', 'cochon_bebe_orange'];
+
+function pigletArtId(scene, i) {
+  if (typeof hasManifestArt !== 'function') return null;
+  const id = PIGLET_ART_IDS[i % PIGLET_ART_IDS.length];
+  if (hasManifestArt(scene, id)) return id;
+  return hasManifestArt(scene, 'cochon_bebe') ? 'cochon_bebe' : null;
+}
+
 function spawnPiglets(scene, x, y, { w = 180 } = {}) {
-  const useArt = typeof hasManifestArt === 'function' && hasManifestArt(scene, 'cochon_bebe');
-  if (!useArt) ensurePigletTextures(scene);
   const minX = x - w / 2;
   const maxX = x + w / 2;
   const piglets = [];
   for (let i = 0; i < PIGLET_COUNT; i++) {
     const px = x + (i - 1) * 34;
     const groundY = pigletFootY(scene, px, y);
+    const artId = pigletArtId(scene, i);
+    const useArt = !!artId;
+    if (!useArt) ensurePigletTextures(scene);
     let s;
     if (useArt) {
-      s = addManifestSprite(scene, px, groundY, 'cochon_bebe', 'idle');
+      s = addManifestSprite(scene, px, groundY, artId, 'idle');
       s.setScale(s.scaleX * PIGLET_SCALES[i]);
     } else {
       s = scene.add.sprite(px, groundY, 'bebe-cochon-0').setOrigin(0.5, 1).setScale(PIGLET_SCALES[i]);

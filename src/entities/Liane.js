@@ -26,9 +26,18 @@ const VINE_MAX_ANGLE = 0.96; // ~55°
 const VINE_GRAB_MAX_ANGLE = 1.35; // ~77°
 const VINE_MAX_OMEGA = 4.2;
 const VINE_REGRAB_COOLDOWN_MS = 350; // même liane, juste après l'avoir lâchée
-const VINE_RELEASE_SPEED_MULT = 1.1;
-const VINE_RELEASE_BOOST_Y = -260;
-const VINE_MAX_CARRY_SPEED = 560;
+// Lâcher avec Espace = LE saut du singe (retour utilisateur : « le singe ne
+// part pas assez loin ») : vitesse horizontale du balancement × 1,45, jamais
+// moins de VINE_RELEASE_MIN_VX (lâcher presque à l'arrêt : petit bond quand
+// même), + impulsion vers le haut ; puis vol « plané » jusqu'à la prochaine
+// liane ou le sol (Player : sans le surplus de gravité de chute, frein
+// aérien réduit, cf. vineFlight). Mesuré : ~430-520 px d'un balancement
+// franc (avant ~250 px), assez pour enchaîner des lianes espacées de 320 px.
+const VINE_RELEASE_SPEED_MULT = 1.45;
+const VINE_RELEASE_MIN_VX = 300;
+const VINE_RELEASE_BOOST_Y = -330;
+const VINE_MAX_CARRY_SPEED = 760;
+const VINE_FLIGHT_DRAG = 60;
 // Prise en pleine montée : l'élan vertical restant fait « grimper » les mains
 // le long de la liane (fraction de la hauteur balistique restante).
 const VINE_CLIMB_FRACTION = 0.6;

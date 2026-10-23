@@ -115,7 +115,9 @@ Tu peux lire le screenshot avec l'outil Read pour vérifier visuellement.
   n'attend pas ; une cinématique faite UNIQUEMENT de bulles ne pose pas `__cutsceneLock`
   (monde non gelé). Réplique de dialogue `{who, text, bubble: true}` : part en bulle au lieu
   de la boîte (sauf dialogue à choix, entièrement dans la boîte). Usage côté histoire :
-  `if (typeof showSpeechBubble === 'function') …`.
+  `if (typeof showSpeechBubble === 'function') …`. Deux personnages côte à côte : la bulle
+  suivante se range au-dessus de l'autre (pointe allongée), jamais l'une sur l'autre ;
+  personnage hors champ : bulle collée au bord de l'écran.
 
 ### Nouvelles clés de données de zone (gérées via `LEVEL_DATA_HANDLERS`)
 `buildLevelFromData` appelle, pour chaque clé `k` de la donnée présente dans
@@ -191,7 +193,16 @@ Formes (Player.js) — état & API :
   140 px/s, de `VINE_CLIMB_TOP_R` = 28 px sous l'attache jusqu'au bout) ; S tout en bas
   = se laisser tomber ; Espace = lâcher avec l'élan = LE saut du singe : compte comme le
   double saut (`jumpsUsed = 2`), plus aucun saut avant le sol ou la prochaine liane
-  (l'accroche recharge). Pose de grimpe : `liane_hang` en attendant un art dédié.
+  (l'accroche recharge). Aucune attaque sur une liane (K/clic ignorés).
+  Lâcher plus puissant : vitesse horizontale du balancement × 1,45 (`VINE_RELEASE_SPEED_MULT`),
+  au moins 300 px/s (`VINE_RELEASE_MIN_VX`, sens = balancement, sinon touche tenue, sinon
+  regard), plafond 760 (`VINE_MAX_CARRY_SPEED`), + -330 vers le haut ; puis vol « plané »
+  (`player.vineFlight`) jusqu'au sol/à la liane suivante : gravité normale sans le surplus
+  de chute, frein aérien 60 (`VINE_FLIGHT_DRAG`). Mesuré (liane de 240 px, balancement
+  plein) : ~460 px parcourus en revenant à la hauteur du lâcher, ~590 px 100 px plus bas
+  (avant ≈ 250 / 330 px). Grimpe : anim `climb` du manifest `singe` si l'art existe
+  (frame choisie selon la distance parcourue, une prise tous les 18 px, descente = mêmes
+  prises), sinon frames de `liane_hang` au même rythme + traction de 3 px.
 - Combat (humaine + singe) : Z/↑ = viser haut, S/↓ = viser bas (en l'air seulement),
   K/clic = coup dans la direction visée (sinon devant). `player.getAttackHitbox()` renvoie le
   rectangle de l'ARC AFFICHÉ (art `vfx_slash`) pendant ses images actives seulement, null
@@ -233,7 +244,8 @@ tant que l'art du manifest manque (`applyEnemyManifestArt` garde la hitbox du pl
 Clé `animals` (agent **Ennemis**, `src/entities/Animaux.js`) — décor sans physique ni dégâts :
 `animals: [{type: 'cochons', x, y, w?: 180}, {type: 'poissons', x, y, w?: 200, h?: 60},
 {type: 'papillons', x, y, count?: 6, w?: 80}]`. Cochons : TOUJOURS 3 bébés (x, y = point au
-sol), trottinent dans ±w/2, sautent et s'écartent quand Agarica approche. Poissons : TOUJOURS 3,
+sol), trottinent dans ±w/2, sautent et s'écartent quand Agarica approche ; un de chaque
+couleur (art `cochon_bebe_rose`, `cochon_bebe_gris`, `cochon_bebe_orange`, repli `cochon_bebe`). Poissons : TOUJOURS 3,
 dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
 `scene.animals = {cochons, poissons, papillons}`. Art optionnel `cochon_bebe` (idle/walk),
 `poisson` (idle), `papillon` (idle). API papillons pour cinématiques :
@@ -390,6 +402,60 @@ Pixels illisibles (`file://`) : repli sur le cadre (`exact: false`), le jeu rest
   `playManifest(anim)` applique le facteur de la feuille de l'anim par rapport à celle de l'idle
   (`manifestSheetFactor`, multiplicatif : l'échelle réglée par l'appelant est gardée) -- Geralt
   ne grandit plus de 18 % en marchant. Bêtes (Ghil't, Kainati) : feuilles cohérentes, non calibrées.
+- Contrôle (2026-10-23) : audit de placement (bas visible / surface de marche, 20 scénarios,
+  ~430 objets : décors, feux, totems, PNJ, Xara, cochons, ennemis, joueur, empreintes) →
+  0 écart > 2 px hors exceptions volontaires (en l'air, suspendus, objets ramassables qui
+  flottent) ; PNJ en marche et cochons sur relief ≤ 1,7 px hors marches. Hauteurs affichées :
+  idle 83 px, talk 83-84, receive_item 83-85, death de 71 (à genoux) à 35 (couchée), slash
+  à surface égale à l'idle (√px 48-49 contre 47).
+
+### Fonds, liquide et caméra verticale (2026-10-23, rétro-compatible)
+Clés de zone toutes optionnelles (LevelKit) ; sans elles, rendu et caméra historiques.
+- **Ligne de base des fonds** : `backgroundBaseline: y` (monde) ou `background: { id,
+  baseline, groundLine }` (la forme chaîne `background: 'fond_x'` reste valable ; préférer
+  `backgroundBaseline` si la scène réécrit `background`, cf. ForetFlottante1/2Scene.js). Le BAS
+  VISIBLE des arbres du fond (forêt procédurale) est posé sur `y` (2 px dessous) et la ligne
+  de sol de l'image de fond (`groundLine`, fraction de sa hauteur, défaut 1 = bord bas ; aussi
+  lue dans l'entrée ITEM_MANIFEST) tombe sur `y` quand la caméra est au plus bas.
+  `zoneBackgroundId(data)` / `zoneBackdropSpec(data)` normalisent.
+- **Bande de liquide / brume** : `liquidFloor: { y, style: 'mousse'|'eau'|'brume', color?,
+  x1?, x2?, image?, height?, front? }` — nappe de `y` jusque sous le monde, DEVANT les fonds
+  (masque le bas des arbres), derrière le sol et les personnages (`front: true` : devant
+  eux). Image du manifest : `image`, sinon celle du style (mousse : `liquide_mousse_toxique` ;
+  eau : `liquide_mare_fond`) — bande tuilable en tileSprite à l'échelle du manifest (ou
+  `height` px), crête calée sur `y`, couleur du bas prolongée dessous ; sinon rendu par code
+  (mousse = celui de l'épreuve : nappe, surface bosselée, points lumineux). Bulles : VFX
+  `vfx_mousse_toxique` (`bulle`) si l'art existe, sinon cercles. Visuel seul : la chute
+  reste `fall`. `scene.liquidFloor`.
+- **Bords du fond lointain** : dès que la caméra défile verticalement (`tallLevel`,
+  `camera.vertical`) ou avec une ligne de base, l'image de fond est prolongée en haut et en
+  bas par sa propre couleur de bord (plus de bande vide en haut de l'écran en montant).
+- **Monde plus haut** : `levelTop: -1600` (défaut -400 ; jamais plus bas) — marge du monde
+  au-dessus de y=0 (physique, caméra, éditeur).
+- **Caméra de zone** : `camera: { vertical: true, deadzoneTop: 0.35, deadzoneBottom: 0.7,
+  lerp: 0.08 | smoothTime: 0.24, lookAhead: 60, lookAheadX: 0 }`. Horizontal inchangé
+  (centré). Vertical : zone morte (ne monte que si le buste d'Agarica passe au-dessus de 35 %
+  du cadre, ne redescend que sous 70 %), ressort amorti sans dépassement (accélère puis
+  freine, `lerp` 0,08 ≈ 0,21 s), regard de `lookAhead` px dans le sens d'une montée/chute
+  rapide, bornes = monde (`levelTop` → `levelHeight`). Un saut normal (172 px) tient dans la
+  zone morte : pas de tremblement. Cinématiques : `{camera}` détache, `{cameraFollow}` /
+  fin de cinématique rendent la main via `cameraFollowPlayer(scene)` (LevelKit).
+- **Ciel qui se révèle** : `skyReveal: true | { start: 0.1, end: 0.85, low: [haut, bas],
+  high: [haut, bas], shade: 0.55, clouds: 7, rays: true, leaves: true, flashAt: 0.55,
+  treesScrollY: 0.6, farScrollY: 0.08 }` (fractions de la course verticale de la caméra).
+  La forêt du fond est posée en bas du monde (ligne de base, défilement vertical 0,6 :
+  `treesAtScreenBottom` est alors ignoré) et descend quand on monte ; derrière apparaissent
+  le fond lointain puis un dégradé de ciel fixé à l'écran (sombre/forêt → jour), voile de
+  sous-bois qui s'efface, nuages en parallaxe lente, rayons de soleil additifs, feuilles qui
+  tombent dans la canopée, éclat doux à la sortie de la canopée (`flashAt`). Images du
+  manifest utilisées si présentes : `ciel_jour`, `nuages`, `rayons_soleil` (sinon code).
+  À utiliser avec `camera.vertical`. `scene.__sky.progress` (0 → 1).
+- Valeurs conseillées : forêt flottante 1 `levelTop` selon l'ascension (ex. -1300),
+  `camera: { vertical: true, deadzoneTop: 0.35, deadzoneBottom: 0.7, lerp: 0.08, lookAhead: 60 }`,
+  `skyReveal: { start: 0.1, end: 0.85 }` ; forêt flottante 2 (déjà au-dessus de la canopée),
+  si elle monte : même `camera`, `skyReveal: { start: -1, end: 0, leaves: false }` (plein
+  jour) ; épreuve du singe `backgroundBaseline: 492`, `liquidFloor: { y: 476, style: 'mousse' }`
+  (remplace `epreuveDrawToxicMoss`).
 
 ## Progression & flags d'histoire (noms figés)
 
@@ -462,6 +528,17 @@ Détails compétences (agent Formes) :
   Papillon : nuée (`player.getHealHitbox()`), itère `scene.enemies` + `scene.healTargets`
   (tableau optionnel pour un boss hors groupe) ; émet `'papillon-swarm'` (rect) chaque frame
   et `'papillon-heal'` (enemy) au soin.
+- **Compétences « avec la forme »** (2026-10-23, `Player.startSkillFormPose(kind, now,
+  {onRelease})`, visuel seul : corps physique, énergie et délais inchangés ; seulement depuis
+  la forme humaine, sinon comportement d'avant). **Pierre** : transfo `transfo_singe` (150 ms)
+  → singe qui lance (anim `throw` du manifest `singe` si l'art existe, sinon singe debout +
+  élan du corps, 260 ms ; la pierre part à 45 % du geste, de la main) → transfo inverse
+  (150 ms) ; relance pendant la pose = nouveau lancer sans retransformation. **Papillon** :
+  transfo `transfo_papillon` (130 ms) → forme papillon (anim `cast` si l'art existe, sinon
+  `glide`/`flap`) centrée 48 px au-dessus des pieds, AU CENTRE de la nuée qui tourbillonne
+  autour d'elle 420 ms (`PAPILLON_HOLD_MS`) puis file devant et finit au même endroit
+  qu'avant (portée du soin inchangée) → transfo inverse. Sans art de transfo : gerbe de
+  feuilles / poussière lumineuse. Interrompue par un coup reçu, une pose narrative, une liane.
 - **Règle pour LevelKit (Fondation)** : si une boucle générique applique une hitbox de
   compétence aux ennemis, elle DOIT appeler `SKILL_DEFS[id].onHitEnemy(player, enemy)`
   quand il existe AU LIEU de `takeHit`/`defeat` (papillon → `heal()`, ne tue jamais).
