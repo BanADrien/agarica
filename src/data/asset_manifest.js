@@ -102,6 +102,23 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P1] Geralt invoque Clak (duel de la forêt flottante 1, art Codex du
+  // 2026-10-23) : rangée 0 = préparation / élévation, rangée 1 = canalisation
+  // (yeux blancs) / retour au sol. Même échelle que `geralt`.
+  geralt_invocation: {
+    dir: "assets/sprites/geralt_invocation_frames", prefix: "geralt_invocation",
+    anims: {
+      rise: { row: 0, frames: 4, fps: 6, repeat: 0 },
+      channel: { row: 1, frames: 4, fps: 6, repeat: 0 },
+    },
+    scale: 0.3,
+    facing: "right",
+    placeholder: { w: 60, h: 75, color: 0x6b4a2e, label: "Geralt" },
+    sheets: [
+      { file: "assets/sprites/geralt_invocation.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P1] Forme papillon d'Agarica (3e forme aérienne, 2026-10-23) : au 2e saut,
   // un battement d'ailes depuis la position actuelle puis un dash en ligne
   // droite en diagonale avant-haut. Grand papillon lumineux aux couleurs d'Agarica.
@@ -625,6 +642,20 @@ const ASSET_MANIFEST = {
     placeholder: { w: 120, h: 60, color: 0x6bbf3a, label: "Vague" },
     sheets: [
       { file: "assets/vfx/vfx_vague_mousse.png", rows: [0] },
+    ],
+    cut: "grid", align: "bottom",
+  },
+  // [P1] VFX - colonne de lumière où Clak se matérialise (invocation de Geralt).
+  vfx_invocation_clak: {
+    dir: "assets/vfx/vfx_invocation_clak_frames", prefix: "vfx_invocation_clak",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 6, repeat: 0 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 100, h: 260, color: 0xfff6e0, label: "Invocation" },
+    sheets: [
+      { file: "assets/vfx/vfx_invocation_clak.png", rows: [0] },
     ],
     cut: "grid", align: "bottom",
   },
