@@ -786,6 +786,15 @@ const MONKEY_JUMP_VELOCITY = -500;
 // encore comme un saut au sol. Sans forme aérienne, c'est la seule façon de
 // sauter en l'air -- sans elle, rater le bord d'un pixel ne laisse plus rien.
 const JUMP_COYOTE_MS = 110;
+// Tampon de saut (« jump buffer », passage juice) : un appui sur Espace en
+// l'air qui ne fait RIEN (aucun saut aérien disponible) déclenche le saut au
+// sol s'il arrive dans les 120 ms avant l'atterrissage -- sinon l'appui
+// fait juste avant de toucher le sol était perdu.
+const JUMP_BUFFER_MS = 120;
+// Juice (visuel seul) : couleurs des éclats de transformation par forme.
+const FORM_FX_COLORS = {
+  agarica: 0xff9fc9, wolf: 0x7dfcd8, eagle: 0xfff1c0, monkey: 0xa8e07a, butterfly: 0xffb3f0, octopus: 0x9fe3ff,
+};
 // Même idée en sortant de l'eau (forme pieuvre) : la nage s'arrête
 // `waterGraceMs` après la surface ; un saut dans cette fenêtre fait sortir
 // de l'eau (avant, c'était le « double saut de base » qui s'en chargeait).
@@ -1535,6 +1544,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     ensureManifestAnims(scene, 'singe');
     ensureManifestAnims(scene, 'transfo_singe');
     ensureManifestAnims(scene, 'agarica_extra');
+    // Lot Codex n°8 : grimpe/lancer du singe (`singe_extra` : climb, throw) et
+    // incantation du papillon (`forme_papillon_extra` : cast), séparés des
+    // feuilles d'origine ; repli sur les anims de `singe` / `forme_papillon`.
+    ensureManifestAnims(scene, 'singe_extra');
+    ensureManifestAnims(scene, 'forme_papillon_extra');
     // Transfo singe : jouée seulement si l'art existe (sinon bascule nette).
     this.monkeyTransfoAnimKey = null;
     this.monkeyTransfoReverseKey = null;
@@ -1577,6 +1591,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     });
     this.jumpsUsed = 0;
     this.justJumped = false;
+    // Tampon de saut (cf. JUMP_BUFFER_MS) et état du juice (visuel seul).
+    this.jumpBufferedAt = -Infinity;
+    this.juicePrevVy = 0;
+    this.juiceStepAt = 0;
+    this.juiceGhostAt = 0;
+    this.juiceFeatherAt = 0;
+    this.juiceLastDir = 0;
+    this.juicePrevForm = 'agarica';
+    this.juiceFormFxAt = -Infinity;
+    this.slashObstacleDone = true;
     // Détecte l'atterrissage (transition air -> sol) pour la pose Loup
     // dédiée à la réception, cf. WOLF_LANDING_TEXTURE plus bas.
     this.wasOnGround = false;
@@ -1684,6 +1708,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.skillHitboxPendingRect && now >= this.skillHitboxActivateAt) {
       this.skillHitboxRect = this.skillHitboxPendingRect;
       this.skillHitboxPendingRect = null;
+      // Juice : l'impact du fracas (poussière des deux côtés, onde au sol).
+      if (this.skillHitboxId === 'ours') {
+        spawnFx(this.scene, 'slam', this.x, this.y, { size: this.skillSizeMultiplier || 1 });
+        juiceShake(this.scene, 'medium');
+        playSfx('ours_slam');
+      }
     }
     if (this.skillHitboxRect && now >= this.skillActiveUntil) this.skillHitboxRect = null;
     if (!this.skillHitboxRect && !this.skillHitboxPendingRect) this.skillHitboxId = null;
@@ -1726,12 +1756,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // plus bas dans la sélection d'anim Aigle) + petit ralentissement
       // global pour appuyer le tir, restauré après coup par le delayedCall.
       this.featherFlapEndTime = now + FEATHER_FLAP_DURATION_MS;
-      this.scene.physics.world.timeScale = FEATHER_SLOWMO_PHYSICS_TIMESCALE;
-      this.scene.anims.globalTimeScale = FEATHER_SLOWMO_ANIM_TIMESCALE;
-      this.scene.time.delayedCall(FEATHER_SLOWMO_DURATION_MS, () => {
-        this.scene.physics.world.timeScale = 1;
-        this.scene.anims.globalTimeScale = 1;
+      // Ralenti centralisé (juiceSlowMo, LevelKit) : mêmes valeurs qu'avant,
+      // sans conflit avec un hit-stop ni un ralenti de boss en cours.
+      juiceSlowMo(this.scene, {
+        ms: FEATHER_SLOWMO_DURATION_MS, physics: FEATHER_SLOWMO_PHYSICS_TIMESCALE, anims: FEATHER_SLOWMO_ANIM_TIMESCALE,
       });
+      spawnFx(this.scene, 'feathers', this.x, this.y - 40, { count: 2, power: 0.8 });
+      playSfx('feather_shot');
     } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.butterflyPhase && !this.vine
       && now >= this.attackCooldownEndTime) {
       // (Sur une liane : aucune attaque -- les deux mains tiennent la liane,
@@ -1746,6 +1777,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // Loup : morsure-ruée (inchangée), durée calée sur ses 8 frames.
         this.slashDir = null;
         this.attackEndTime = now + this.attackDuration;
+        playSfx('wolf_bite');
+        // Juice : ruée -- traits de vitesse derrière le loup.
+        spawnFx(this.scene, 'streaks', this.x, this.y - 22, { dir: this.facingDir, count: 3, spread: 14 });
       } else {
         // Humaine / singe : coup directionnel (cf. SLASH_ARCS). `this.onGround`
         // = état de l'image précédente (le sol n'est relu que plus bas).
@@ -1758,6 +1792,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.pogoDone = false;
         this.attackEndTime = now + SLASH_TOTAL_MS;
         this.startSlashVfx();
+        // Juice : impact de l'arc sur un obstacle (une fois par coup, cf.
+        // updateSlashObstacleFx) ; petit élan du corps.
+        this.slashObstacleDone = false;
+        juiceSquash(this, 1.05, 0.96, 140);
+        playSfx('slash', { dir: this.slashDir });
       }
       this.attackCooldownEndTime = now + this.attackCooldown;
       this.attackDashActive = this.form === 'wolf';
@@ -1898,17 +1937,30 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Xara s'en sert pour mimiquer ce saut si elle est à portée (cf.
     // XARA_JUMP_RANGE dans Xara.js). Remise à faux au début de chaque
     // update() (cf. tout en haut), jamais laissée traîner.
-    if (jumpJustPressed && groundLikeJump && !jumpConsumed) this.justJumped = true;
+    // Tampon de saut (cf. JUMP_BUFFER_MS) : appui récent resté sans effet en
+    // l'air, rejoué à l'atterrissage comme un saut au sol.
+    const bufferedJump = !jumpJustPressed && onGround && !swimming && !this.vine
+      && now - this.jumpBufferedAt <= JUMP_BUFFER_MS;
+    const jumpPress = jumpJustPressed || bufferedJump;
+    if (jumpPress && groundLikeJump && !jumpConsumed) this.justJumped = true;
+    // Juice : type de saut de cette image ('ground' | 'air'), pour l'étirement.
+    let juiceJump = null;
+    let jumpActed = false;
 
-    if (jumpJustPressed && !jumpConsumed && !this.vine) {
+    if (jumpPress && !jumpConsumed && !this.vine) {
       if (groundLikeJump) {
         this.setVelocityY(this.jumpVelocity);
         this.jumpsUsed = 1;
         this.wolfJumpCarry = sprinting;
+        juiceJump = 'ground';
+        jumpActed = true;
+        this.jumpBufferedAt = -Infinity;
       } else if (!swimming && airForm === 'monkey' && this.jumpsUsed < 2) {
         // Saut court du singe (transformation visuelle singe, cf. sélection
         // de forme plus bas). Sans forme aérienne : AUCUN saut en l'air.
         this.jumpsUsed += 1;
+        jumpActed = true;
+        juiceJump = 'air';
         if (this.jumpsUsed === 2) {
           this.airJumpForm = 'monkey';
           this.setVelocityY(this.monkeyJumpVelocity);
@@ -1921,9 +1973,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // startButterflyDash) ; un 1er appui en l'air (chute d'un bord) reste
         // un saut normal, comme pour le singe et l'aigle.
         this.jumpsUsed += 1;
+        jumpActed = true;
         if (this.jumpsUsed === 2) this.startButterflyDash(now);
-        else this.setVelocityY(this.jumpVelocity);
+        else { this.setVelocityY(this.jumpVelocity); juiceJump = 'air'; }
       } else if (!swimming && airForm === 'eagle' && this.jumpsUsed < 2) {
+        jumpActed = true;
+        juiceJump = 'air';
         // Pose actuelle (montée ou descente du 1er saut) au moment précis
         // du double-saut : décide quelle des deux séquences de
         // transformation jouer (cf. TRANSFO_RISE/FALL_START_KEY).
@@ -1949,6 +2004,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         }
       }
     }
+    // Appui en l'air sans aucun effet : mémorisé pour l'atterrissage.
+    if (jumpJustPressed && !jumpActed && !jumpConsumed && !this.vine && !onGround && !swimming) this.jumpBufferedAt = now;
 
     // Papillon : battement puis dash (écrase vitesse et gravité, cf. plus bas).
     if (this.butterflyPhase) this.updateButterflyDash(now, swimming || onGround);
@@ -1964,6 +2021,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // sans forme aérienne, jumpsUsed >= 1 : toujours aucun saut en l'air.
       this.jumpsUsed = 1;
       this.wolfJumpCarry = false;
+      // Juice : rebond étiré + éclat sous les pieds.
+      juiceSquash(this, 0.86, 1.16, 200);
+      spawnFx(this.scene, 'star', this.x, this.y + 8, { count: 5, angle: [20, 160], power: 1.2 });
+      playSfx('pogo');
       this.scene.events.emit('player-pogo', this);
     }
 
@@ -2322,11 +2383,164 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
+    // Juice (visuel seul) : squash & stretch, poussière, traînées, éclats.
+    this.updateJuice(now, {
+      onGround, justLanded: justLandedThisFrame, dir, sprinting, swimming, eagleDiving, jump: juiceJump,
+    });
+    this.updateSlashObstacleFx(now);
+
     // Remis à faux ici : si la scène ne le repasse pas à `true` via overlap
     // au prochain step physique (plus en contact avec une toile), on reste
     // correctement "hors toile" sans dépendre d'un évènement de sortie.
     this.inWeb = false;
     this.inWater = false;
+  }
+
+  // --- Juice (passage « game feel », 2026-10-23) : rien ici ne touche au
+  // corps physique, aux vitesses ni aux timings -- seulement le dessin
+  // (juiceSquash/juiceRender, appliqués au rendu) et des particules.
+  updateJuice(now, s) {
+    const sc = this.scene;
+    const j = juiceRender(this);
+    const vx = this.body.velocity.x;
+    // Atterrissage : écrasement + poussière proportionnels à la vitesse de chute
+    // (celle de l'image d'avant : à l'impact, la vitesse est déjà remise à 0).
+    if (s.justLanded && !this.vine && !s.swimming) {
+      const fall = this.juicePrevVy;
+      if (fall > 140) {
+        const power = Phaser.Math.Clamp((fall - 160) / 700, 0, 1);
+        spawnFx(sc, 'land', this.x, this.y, { power });
+        const k = 0.07 + 0.17 * power;
+        juiceSquash(this, 1 + k, 1 - k, 160 + 100 * power);
+        if (power > 0.85) juiceShake(sc, 'tiny');
+        playSfx('land', { power });
+      }
+    }
+    // Décollage : étirement (saut au sol, petite bouffée) ; plus discret en l'air.
+    if (s.jump === 'ground') {
+      juiceSquash(this, 0.84, 1.18, 220);
+      spawnFx(sc, 'land', this.x, this.y, { power: 0.1 });
+      playSfx('jump');
+    } else if (s.jump === 'air') {
+      juiceSquash(this, 0.9, 1.1, 180);
+      playSfx('jump_air');
+    }
+    // Course : petites bouffées sous les pas, bouffée et écrasement au demi-tour.
+    const turned = s.dir !== 0 && Math.sign(vx) === -s.dir && this.juiceLastDir !== s.dir;
+    if (s.dir !== 0) this.juiceLastDir = s.dir;
+    if (s.onGround && !this.vine && !s.swimming) {
+      const speed = Math.abs(vx);
+      if (turned && speed > 90) {
+        spawnFx(sc, 'turn', this.x, this.y, { dir: s.dir });
+        juiceSquash(this, 1.07, 0.95, 150);
+      } else if (speed > 110 && now >= this.juiceStepAt) {
+        this.juiceStepAt = now + (s.sprinting ? 80 : 200);
+        spawnFx(sc, 'step', this.x, this.y, { dir: vx > 0 ? 1 : -1, power: s.sprinting ? 1 : 0.4, count: s.sprinting ? 2 : 1 });
+      }
+    }
+    // Sprint loup : penché vers l'avant (au dessin), traînée violette.
+    const wolfRun = this.form === 'wolf' && s.onGround && Math.abs(vx) > 200;
+    const leanWant = wolfRun ? 0.075 * Math.sign(vx) * Math.min(1, (Math.abs(vx) - 200) / 180) : 0;
+    j.lean += (leanWant - j.lean) * 0.25;
+    if (Math.abs(j.lean) < 0.002) j.lean = 0;
+    if (this.form === 'wolf' && Math.abs(vx) > 300 && now >= this.juiceGhostAt) {
+      this.juiceGhostAt = now + 55;
+      juiceGhost(sc, this, { tint: 0x9a7dff, alpha: 0.26, ms: 190 });
+    }
+    // Aigle : plumes qui se détachent en plané, silhouettes en piqué.
+    if (this.form === 'eagle' && !s.onGround && now >= this.juiceFeatherAt) {
+      if (s.eagleDiving) {
+        this.juiceFeatherAt = now + 50;
+        juiceGhost(sc, this, { tint: 0xd8ccf5, alpha: 0.22, ms: 160 });
+      } else if (this.body.velocity.y >= 0) {
+        this.juiceFeatherAt = now + Phaser.Math.Between(180, 320);
+        spawnFx(sc, 'feathers', this.x - this.facingDir * 16, this.y - 34, { count: 1, power: 0.6 });
+      }
+    }
+    // Lâcher de liane : élan visible (silhouettes vertes) au début du vol.
+    if (this.vineFlight && now - this.vineReleasedAt < 340 && now >= this.juiceGhostAt) {
+      this.juiceGhostAt = now + 45;
+      juiceGhost(sc, this, { tint: 0x8fe3b8, alpha: 0.24, ms: 180 });
+    }
+    // Changement de forme : éclat + particules (cf. juiceFormChange).
+    if (this.form !== this.juicePrevForm) {
+      this.juiceFormChange(this.juicePrevForm, this.form, now);
+      this.juicePrevForm = this.form;
+    }
+    this.juicePrevVy = this.body.velocity.y;
+  }
+
+  // Éclat de transformation, couleur de la forme (FORM_FX_COLORS) ; le loup
+  // (qui va et vient à chaque sprint) n'a qu'une bouffée de poussière et
+  // quelques étoiles, pas d'anneau.
+  juiceFormChange(from, to, now) {
+    const sc = this.scene;
+    if (now - this.juiceFormFxAt < 120) return;
+    this.juiceFormFxAt = now;
+    const cy = this.y - 38;
+    const color = FORM_FX_COLORS[to] || 0x8fe3b8;
+    playSfx(`transform_${to}`, { from });
+    if (to === 'wolf' || (from === 'wolf' && to === 'agarica')) {
+      spawnFx(sc, 'land', this.x, this.y, { power: 0.45 });
+      spawnFx(sc, 'star', this.x, cy, { count: 4, tint: [FORM_FX_COLORS.wolf, 0xffffff], power: 0.8 });
+      return;
+    }
+    if (to === 'monkey' && this.vine) return; // gerbe de feuilles déjà faite à la prise
+    if (to === 'butterfly' || from === 'butterfly') return; // poussière d'ailes dédiée (dash)
+    if (to === 'agarica') {
+      spawnFx(sc, 'star', this.x, cy, { count: 5, tint: [color, 0xffffff], power: 0.8 });
+      if (from === 'monkey') spawnFx(sc, 'leaves', this.x, cy, { count: 4, power: 0.7 });
+      if (from === 'eagle') spawnFx(sc, 'feathers', this.x, cy, { count: 3 });
+      return;
+    }
+    spawnFx(sc, 'transform', this.x, cy, { color, size: 0.85 });
+    if (to === 'monkey') spawnFx(sc, 'leaves', this.x, cy, { count: 8 });
+    if (to === 'eagle') spawnFx(sc, 'feathers', this.x, cy, { count: 6, power: 1.3 });
+  }
+
+  // L'arc d'un coup qui heurte le décor (mur, plafond, sol en coup vers le
+  // bas, amas/mur de mousse) : étincelles + poussière au point de contact,
+  // une fois par coup. Visuel seul (aucun rebond, aucun dégât).
+  updateSlashObstacleFx(now) {
+    if (this.slashObstacleDone || !this.isAttacking || !this.slashDir || !this.isSlashActive(now)) return;
+    const sc = this.scene;
+    const r = this.getSlashRect();
+    // Zone d'essai resserrée : le bas d'un coup de côté frôle toujours le sol.
+    const t = new Phaser.Geom.Rectangle(r.x + 6, r.y + 6, r.width - 12, r.height - 12);
+    if (this.slashDir === 'side') t.height = Math.max(4, Math.min(t.height, this.y - 14 - t.y));
+    if (t.width <= 0 || t.height <= 0) return;
+    const bodies = sc.physics.overlapRect(t.x, t.y, t.width, t.height, false, true);
+    let hit = null;
+    for (const b of bodies) {
+      const go = b.gameObject;
+      if (!go) continue;
+      const isGround = sc.ground && sc.ground.contains(go);
+      const st = sc.__story;
+      const isMoss = st && st.mossGroup && st.mossGroup.contains(go);
+      if (!isGround && !isMoss) continue;
+      hit = { b, moss: isMoss };
+      break;
+    }
+    if (!hit) return;
+    this.slashObstacleDone = true;
+    const b = hit.b;
+    let x;
+    let y;
+    if (this.slashDir === 'side') {
+      x = this.slashFacing > 0 ? Math.max(t.x, b.left) : Math.min(t.right, b.right);
+      y = Phaser.Math.Clamp(t.centerY, b.top, b.bottom);
+    } else {
+      x = Phaser.Math.Clamp(t.centerX, b.left, b.right);
+      y = this.slashDir === 'up' ? Math.min(t.bottom, b.bottom) : Math.max(t.y, b.top);
+    }
+    if (hit.moss) {
+      spawnFx(sc, 'chip', x, y, { count: 6, power: 0.8 });
+      spawnFx(sc, 'drop', x, y, { count: 2 });
+    } else {
+      spawnFx(sc, 'wallHit', x, y, { dir: this.slashDir === 'side' ? this.slashFacing : 1 });
+    }
+    juiceShake(sc, 'tiny');
+    playSfx('slash_obstacle', { moss: hit.moss });
   }
 
   setForm(form) {
@@ -2445,8 +2659,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const skillId = this.skillSlots[slotIndex];
     if (!skillId || now < this.skillCooldownEndTime || this.butterflyPhase) return;
     const def = SKILL_DEFS[skillId];
-    if (this.energy < def.cost) return; // pas de retour visuel dédié pour l'instant (TODO UI : flash de la barre ?)
+    if (this.energy < def.cost) {
+      // Retour visuel : la barre d'énergie tremble (juice, HUD).
+      juiceHudDeny(this.scene);
+      return;
+    }
     this.energy -= def.cost;
+    juiceHudSkillPop(this.scene, slotIndex);
+    playSfx(`skill_${skillId}`);
     this.scene.registry.set('energy', this.energy);
     this.lastSkillId = skillId;
     // Compétence INSTANTANÉE (cf. SKILL_DEFS.pierre/papillon dans
@@ -2465,6 +2685,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.skillTransformActive = true;
     this.skillTransformEndTime = now + def.transformDurationMs;
     this.activeSkillId = skillId;
+    // Juice : éclat de transformation (ours : brun doré).
+    spawnFx(this.scene, 'transform', this.x, this.y - 40, { color: skillId === 'ours' ? 0xd9a441 : (def.hudColor || 0x8fe3b8), size: 1 });
     if (def.animKey) {
       // Art dédié (cf. SKILL_DEFS.ours) : le vrai changement de
       // texture/anim se fait dans update() (branché sur skillTransformActive
@@ -2667,6 +2889,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // prochain pas de physique (cf. stepVinePhysics).
     this.setVelocity(0, 0);
     this.body.maxVelocity.set(VINE_BODY_MAX_SPEED, VINE_BODY_MAX_SPEED);
+    // Juice : feuilles qui tombent de la prise, liane qui vibre.
+    spawnFx(this.scene, 'leaves', this.x, this.y - VINE_HANG_OFFSET, { count: 5, power: 0.7 });
+    if (typeof vine.twang === 'function') vine.twang(0.8);
+    playSfx('vine_grab');
     this.scene.events.emit('vine-grab', vine);
   }
 
@@ -2736,6 +2962,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Garde le sens du balancement au lâcher (sinon, sans touche tenue, le
     // singe se retournait vers la dernière direction pressée).
     if (Math.abs(vx) > 40) this.facingDir = vx > 0 ? 1 : -1;
+    // Juice : la liane fouette, feuilles et traits de vitesse au lâcher sauté.
+    if (typeof vine.twang === 'function') vine.twang(withJump ? 1 : 0.5);
+    if (withJump) {
+      spawnFx(this.scene, 'leaves', this.x, this.y - VINE_HANG_OFFSET, { count: 6, power: 1 });
+      spawnFx(this.scene, 'streaks', this.x, this.y - 30, { dir: vx >= 0 ? 1 : -1, count: 3, spread: 18 });
+      juiceSquash(this, 0.88, 1.14, 200);
+      playSfx('vine_release');
+    }
     this.scene.events.emit('vine-release', vine);
   }
 
@@ -2751,6 +2985,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.setAcceleration(0, 0);
     this.setVelocity(0, 0);
     this.spawnButterflySparkles(18);
+    // Juice : halo rose et petit anneau au battement d'ailes.
+    const cy = this.y - BUTTERFLY_CENTER_ABOVE_FEET;
+    juiceBurstImage(this.scene, 'glow', this.x, cy, { size: 90, from: 0.3, to: 1.1, ms: 240, color: 0xffb3f0, alpha: 0.7 });
+    juiceShockRing(this.scene, this.x, cy, { size: 80, ms: 260, color: 0x9ff3ff });
+    playSfx('butterfly_flap');
   }
 
   // `abort` : sol touché, eau... Le dash s'arrête aussi contre un mur/plafond.
@@ -2764,6 +3003,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       if (now >= this.butterflyPhaseEnd) {
         this.butterflyPhase = 'dash';
         this.butterflyPhaseEnd = now + BUTTERFLY_DASH_MS;
+        // Juice : départ du dash (traits de vitesse, poussière d'ailes).
+        spawnFx(this.scene, 'streaks', this.x, this.y - BUTTERFLY_CENTER_ABOVE_FEET, { dir: this.butterflyDir, count: 4, spread: 18 });
+        spawnFx(this.scene, 'wingDust', this.x, this.y - BUTTERFLY_CENTER_ABOVE_FEET, { count: 8, power: 1.4 });
+        playSfx('butterfly_dash');
       }
     }
     if (this.butterflyPhase === 'dash') {
@@ -2781,6 +3024,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.butterflyTrailAt = now + BUTTERFLY_TRAIL_EVERY_MS;
         this.spawnButterflyTrail();
       }
+      // Juice : silhouettes rose / turquoise en alternance derrière le dash.
+      if (now >= this.juiceGhostAt) {
+        this.juiceGhostAt = now + 40;
+        this.juiceGhostFlip = !this.juiceGhostFlip;
+        juiceGhost(this.scene, this, { tint: this.juiceGhostFlip ? 0xffb3f0 : 0x9ff3ff, alpha: 0.26, ms: 200 });
+      }
     }
   }
 
@@ -2793,6 +3042,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(wasDash ? this.butterflyDir * BUTTERFLY_EXIT_SPEED_X : this.body.velocity.x, 0);
     this.jumpsUsed = 2;
     this.spawnButterflySparkles(10);
+    spawnFx(this.scene, 'wingDust', this.x, this.y - BUTTERFLY_CENTER_ABOVE_FEET, { count: 6 });
   }
 
   // Pose du papillon : art `forme_papillon` (flap / dash) ou placeholder,
@@ -2859,24 +3109,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // Gerbe de feuilles autour des mains à la prise d'une liane depuis la forme
   // humaine (cf. update() : pas de transfo dessinée suspendue).
   spawnVineGrabPuff() {
-    const sc = this.scene;
-    const hx = this.x;
     const hy = this.y - (typeof VINE_HANG_OFFSET === 'number' ? VINE_HANG_OFFSET : 58) + 20;
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2 + Math.random() * 0.5;
-      const leaf = sc.add.ellipse(hx, hy, 9, 5, i % 2 ? 0x6fbf5a : 0xa8e07a, 0.95)
-        .setDepth(this.depth + 1).setRotation(a);
-      sc.tweens.add({
-        targets: leaf,
-        x: hx + Math.cos(a) * Phaser.Math.Between(22, 38),
-        y: hy + Math.sin(a) * Phaser.Math.Between(18, 32),
-        rotation: a + 2,
-        alpha: 0,
-        duration: 320,
-        ease: 'Quad.easeOut',
-        onComplete: () => leaf.destroy(),
-      });
-    }
+    // Recette commune du juice (art `fx_feuille` s'il existe) + petit éclat vert.
+    spawnFx(this.scene, 'leaves', this.x, hy, { count: 8, power: 0.9 });
+    spawnFx(this.scene, 'star', this.x, hy, { count: 3, tint: [FORM_FX_COLORS.monkey, 0xffffff], power: 0.6 });
   }
 
   // Pose suspendue (art `singe`, dessiné face à DROITE) : choisie d'après
@@ -2943,12 +3179,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const step = Math.floor(this.vineClimbDist / VINE_CLIMB_STEP_PX);
     let body = FORMS.monkey.body;
     let bob = 0;
-    if (hasManifestArt(sc, 'singe', 'climb') && sc.anims.exists('singe-climb')) {
-      const frames = sc.anims.get('singe-climb').frames;
+    // Art de grimpe : `singe_extra` (lot n°8), sinon `singe` (ancien emplacement).
+    const climbId = ['singe_extra', 'singe'].find((id) => hasManifestArt(sc, id, 'climb') && sc.anims.exists(`${id}-climb`));
+    if (climbId) {
+      const frames = sc.anims.get(`${climbId}-climb`).frames;
       this.anims.stop();
       this.setTexture(frames[step % frames.length].textureKey);
       // Feuille de l'art de grimpe (peut-être une autre image source) : son échelle.
-      const cfg = agaricaSheetPoseConfig(sc, 'singe', 'climb', { method: 'area' });
+      const cfg = agaricaSheetPoseConfig(sc, climbId, 'climb', { method: 'area' });
       this.applyBodyForScale(cfg.scale, cfg.body);
       body = cfg.body;
     } else {
@@ -3098,8 +3336,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         return true;
       }
       const k = progress(p.inEnd, p.actEnd);
-      if (hasManifestArt(sc, 'singe', 'throw') && frameAt('singe-throw', k)) {
-        const cfg = agaricaSheetPoseConfig(sc, 'singe', 'throw', { method: 'area' });
+      // Lancer : `singe_extra` (lot n°8), sinon `singe` (ancien emplacement).
+      const throwId = ['singe_extra', 'singe'].find((id) => hasManifestArt(sc, id, 'throw'));
+      if (throwId && frameAt(`${throwId}-throw`, k)) {
+        const cfg = agaricaSheetPoseConfig(sc, throwId, 'throw', { method: 'area' });
         this.applyBodyForScale(cfg.scale, cfg.body);
         return true;
       }
@@ -3122,6 +3362,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       const k = p.phase === 'in' ? progress(p.start, p.inEnd) : progress(p.actEnd, p.end);
       if (!this.butterflyTransfoKey || !frameAt(this.butterflyTransfoKey, k, p.phase === 'out')) return false;
       cfg = agaricaSheetPoseConfig(sc, 'transfo_papillon', 'transform');
+    } else if (hasManifestArt(sc, 'forme_papillon_extra', 'cast')) {
+      // Incantation du soin : `forme_papillon_extra` (lot n°8), même échelle
+      // que forme_papillon (calibrée sur sa propre feuille).
+      playManifestOn(this, 'forme_papillon_extra', 'cast');
+      cfg = agaricaSheetPoseConfig(sc, 'forme_papillon_extra', 'cast', { method: 'area' });
     } else if (this.butterflyArt) {
       const anim = ['cast', 'glide', 'flap'].find((a) => hasManifestArt(sc, 'forme_papillon', a));
       if (anim) {
@@ -3387,7 +3632,22 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;
     this.hearts -= 1;
     this.scene.registry.set('hearts', this.hearts);
-    this.setTint(0xff4d6d);
+    // Juice (visuel seul, la vitesse reste remise à 0 comme avant) : flash
+    // blanc puis rouge, recul du corps au dessin, micro-pause, secousse,
+    // voile rouge sur les bords de l'écran, étincelles roses.
+    this.setTintFill(0xffffff);
+    this.scene.time.delayedCall(60, () => {
+      if (!this.active || !this.isInvulnerable || !this.tintFill) return;
+      this.tintFill = false;
+      this.setTint(0xff4d6d);
+    });
+    juiceTilt(this, -(this.facingDir >= 0 ? 1 : -1) * 0.2, 280);
+    juiceSquash(this, 0.92, 1.06, 220);
+    juiceHitStop(this.scene, 60);
+    juiceShake(this.scene, 'medium');
+    juiceHurtVignette(this.scene);
+    spawnFx(this.scene, 'spark', this.x, this.y - 40, { count: 9, tint: [0xff4d6d, 0xff9fc9, 0xffffff], power: 0.8 });
+    playSfx('player_hurt');
     this.setVelocity(0, 0);
     const depleted = this.hearts <= 0;
     // Dernier cœur perdu : signalé aux scripts de zone (boss : remise à zéro

@@ -200,7 +200,8 @@ Formes (Player.js) — état & API :
   (`player.vineFlight`) jusqu'au sol/à la liane suivante : gravité normale sans le surplus
   de chute, frein aérien 60 (`VINE_FLIGHT_DRAG`). Mesuré (liane de 240 px, balancement
   plein) : ~460 px parcourus en revenant à la hauteur du lâcher, ~590 px 100 px plus bas
-  (avant ≈ 250 / 330 px). Grimpe : anim `climb` du manifest `singe` si l'art existe
+  (avant ≈ 250 / 330 px). Grimpe : anim `climb` du manifest `singe_extra` (lot Codex n°8 ;
+  repli `singe` climb) si l'art existe
   (frame choisie selon la distance parcourue, une prise tous les 18 px, descente = mêmes
   prises), sinon frames de `liane_hang` au même rythme + traction de 3 px.
 - Combat (humaine + singe) : Z/↑ = viser haut, S/↓ = viser bas (en l'air seulement),
@@ -422,7 +423,9 @@ Clés de zone toutes optionnelles (LevelKit) ; sans elles, rendu et caméra hist
   x1?, x2?, image?, height?, front? }` — nappe de `y` jusque sous le monde, DEVANT les fonds
   (masque le bas des arbres), derrière le sol et les personnages (`front: true` : devant
   eux). Image du manifest : `image`, sinon celle du style (mousse : `liquide_mousse_toxique` ;
-  eau : `liquide_mare_fond`) — bande tuilable en tileSprite à l'échelle du manifest (ou
+  eau : `liquide_mare_fond` + voile avant `liquide_mare_voile` (alpha 0,28) + ligne de surface
+  animée `liquide_mare_surface_0..3` à 8 i/s ; brume : `couche_nappe_brume`, `front: true` →
+  `couche_brume_avant`) — bande tuilable en tileSprite à l'échelle du manifest (ou
   `height` px), crête calée sur `y`, couleur du bas prolongée dessous ; sinon rendu par code
   (mousse = celui de l'épreuve : nappe, surface bosselée, points lumineux). Bulles : VFX
   `vfx_mousse_toxique` (`bulle`) si l'art existe, sinon cercles. Visuel seul : la chute
@@ -448,7 +451,10 @@ Clés de zone toutes optionnelles (LevelKit) ; sans elles, rendu et caméra hist
   le fond lointain puis un dégradé de ciel fixé à l'écran (sombre/forêt → jour), voile de
   sous-bois qui s'efface, nuages en parallaxe lente, rayons de soleil additifs, feuilles qui
   tombent dans la canopée, éclat doux à la sortie de la canopée (`flashAt`). Images du
-  manifest utilisées si présentes : `ciel_jour`, `nuages`, `rayons_soleil` (sinon code).
+  manifest utilisées si présentes (lot Codex n°8, anciens noms en repli) : ciel `couche_ciel_jour`
+  (couvre l'écran sans déformation), nuages `couche_nuage_0..4`, soleil `couche_soleil` (additif,
+  fixé à l'écran), nappes `couche_nappe_nuages` (2 copies en parallaxe, alpha en cloche autour de
+  la sortie de la canopée) ; sinon rendu par code.
   À utiliser avec `camera.vertical`. `scene.__sky.progress` (0 → 1).
 - Valeurs conseillées : forêt flottante 1 `levelTop` selon l'ascension (ex. -1300),
   `camera: { vertical: true, deadzoneTop: 0.35, deadzoneBottom: 0.7, lerp: 0.08, lookAhead: 60 }`,
@@ -456,6 +462,74 @@ Clés de zone toutes optionnelles (LevelKit) ; sans elles, rendu et caméra hist
   si elle monte : même `camera`, `skyReveal: { start: -1, end: 0, leaves: false }` (plein
   jour) ; épreuve du singe `backgroundBaseline: 492`, `liquidFloor: { y: 476, style: 'mousse' }`
   (remplace `epreuveDrawToxicMoss`).
+
+### Juice — « game feel » (2026-10-23, rétro-compatible)
+Effets PUREMENT visuels, regroupés en fin de `src/utils/LevelKit.js` (section « JUICE ») : aucun
+ne change une hitbox, une vitesse, un timing de combat (horloge de scène) ni la durée d'une
+cinématique. Images du lot Codex n°8 utilisées dès qu'elles existent (`fx_*`, `fx_halo_*`,
+`vfx_anneau_choc`), sinon petites textures dessinées par code (`juice-*`, blanches, teintées).
+- **Particules** : `spawnFx(scene, kind, x, y, opts)` — un émetteur Phaser réutilisé par recette
+  et par visite (`FX_PARTICLES`, 160 particules vivantes max par émetteur, aucune création en
+  continu). Effets composés : `land {power 0..1}`, `step {dir, power}`, `turn {dir}`, `impact
+  {power, angle}`, `wallHit {dir}`, `poof {size}`, `leaves`, `feathers`, `transform {color, size}`,
+  `slam {size}`, `embers`, `crackle`, `mossBreak {w, h}`, `melt {w, h}`, `pickup {color}`, `glint`,
+  `motes {count, color, spread}`, `heal`, `wingDust`, `streaks {dir}` ; ou une recette brute
+  (`dust`, `smoke`, `spark`, `star`, `mote`, `leaf`, `feather`, `chip`, `clod`, `earth`, `ember`,
+  `drop`, `bubble`, `streak`, `petal`, `wing`, `uiShard`, `uiStar` — `ui*` fixées à l'écran) avec
+  `opts` `{count, angle: [min, max] (degrés), speed: [min, max] | power, lifespan, tint, spread}`.
+  Les images Codex déjà colorées ne sont pas teintées (sauf `fx_grain_lumiere`, `fx_bulle`).
+  Image unique : `juiceBurstImage(scene, 'glow'|'ring'|'rays'|'item', x, y, {size, color, ms, flat,
+  ui})`, `juiceShockRing(scene, x, y, {size, color, variant: 'talisman'|'toxique', flat})`.
+- **Temps** : `juiceHitStop(scene, ms)` (physique Arcade en pause + anims quasi figées, temps réel,
+  plafonné à 90 ms, pas de rattrapage), `juiceSlowMo(scene, {ms, physics, anims})` (timeScale
+  Arcade et anims ; le ralenti de la plume de l'aigle y passe), `juiceZoomPulse(scene, {zoom, ms})`.
+- **Dessin seul** (appliqué au 'prerender', retiré au 'render' : la physique ne le voit jamais) :
+  `juiceSquash(obj, sx, sy, ms)`, `juiceTilt(obj, rad, ms)`, `juiceRecoil(obj, dx, dy, ms)` (jamais
+  sur le joueur : la caméra le suit pendant le rendu), `juiceRender(obj).lean` (inclinaison
+  continue), `juiceFlash(obj, color, ms)`, `juiceGhost(scene, sprite, {tint, alpha, ms})`
+  (silhouette unie qui s'efface, réserve de 8 images par scène).
+- **Secousses** : `juiceShake(scene, 'tiny'|'light'|'medium'|'heavy'|'huge' | intensité, ms)` — une
+  secousse plus forte remplace la courante, jamais l'inverse. Réglage d'accessibilité
+  **« Secousses d'écran »** (Options : Activées / Réduites ×0,35 / Désactivées), mémorisé dans
+  `agarica-options-v1.screenShake` (`juiceShakeLevel()`, `juiceSetShakeLevel(l)`). `Camera.prototype.shake`
+  est enveloppé : TOUTES les secousses (scripts d'histoire, boss, `{shake}` de cinématique)
+  suivent le réglage ; à « Désactivées » la durée et le rappel de fin restent identiques.
+- **Son** : `playSfx(id, opts)` = points d'accroche VIDES (`SFX_HOOKS[id] = fn` ou `SFX_HOOKS['*']`
+  pour brancher l'audio un jour). Ids posés : jump, jump_air, land, slash, wolf_bite, pogo,
+  slash_obstacle, feather_shot, enemy_hit, enemy_defeat, player_hurt, heart_lost, energy_full,
+  skill_denied, skill_<id>, ours_slam, transform_<forme>, vine_grab, vine_release, butterfly_flap,
+  butterfly_dash, pickup, campfire_rest, totem_activate, form_unlock, lantern_light,
+  platform_reveal, moss_crack, moss_break, moss_melt, purify, boss_end, zone_exit, banner,
+  title_card, dialogue_line, dialogue_blip, dialogue_next, dialogue_choice, menu_move, menu_ok,
+  overlay_open.
+- **Où c'est branché** : Agarica (Player.js) — étirement au saut, écrasement + poussière à
+  l'atterrissage (∝ vitesse de chute), bouffées de pas et de demi-tour, loup penché + traînée,
+  plumes de l'aigle, silhouettes du dash papillon et du lâcher de liane, éclat à chaque
+  changement de forme, fracas de l'ours, impact de l'arc sur le décor (une fois par coup),
+  coup reçu (flash blanc puis rouge, recul au dessin, hit-stop 60 ms, voile rouge
+  `juiceHurtVignette`), **tampon de saut** `JUMP_BUFFER_MS` = 120 ms (le « coyote time »
+  `JUMP_COYOTE_MS` = 110 ms existait déjà). Combat : `damageEnemy` → `juiceOnEnemyHit(scene, enemy,
+  source)` (hit-stop 35-70 ms et secousse selon le coup, étincelles au point d'impact, flash
+  blanc si l'ennemi ne le fait pas, recul + écrasement au dessin, « poof » de défaite) ; la pierre
+  du singe l'appelle aussi. Ghil't soigné (fin du combat) : ralenti 0,7 s + zoom 1,06 (pas
+  Kainati). Monde : feux de camp (halo qui respire, braises, crépitements, embrasement au repos),
+  totems (halo + lueurs avant, éclat + anneau + zoom à l'activation), objets ramassables (halo
+  `fx_halo_objet`, balancement, étoiles ; pop puis aspiration vers Agarica), amas de mousse
+  (fissure `mousse_amas_fissure` + tremblement pendant l'élan de l'ours, puis éclats + hit-stop),
+  murs de mousse (frémissement, gouttes et bulles pendant la fonte), lanternes de reprise (art
+  `decor_lanterne_*`, éclat + halo), plateformes cachées (contour `decor_plateforme_fantome`, cases
+  qui montent une à une + lueurs + onde), lianes (`Liane.twang`), purification, lucioles et
+  papillons d'ambiance (clé de zone optionnelle `ambientLife: false | {fireflies, butterflies}`).
+  Caméra : regard en avant dans le sens de la course (`followOffset.x`, 46 px max, sans toucher
+  au vertical ni aux cinématiques ; une zone qui règle `camera.lookAheadX` garde le sien),
+  fondus de zone adoucis (`juiceFadeIn` 460 ms + posé de caméra 1,03 → 1 ; sortie : même durée
+  qu'avant, 250 ms). Interface : cœurs du HUD qui tremblent puis se vident / repoussent (après la
+  fermeture du menu du feu), barre d'énergie lissée avec traîne, pointe lumineuse, lueur pleine et
+  refus (tremblement) quand l'énergie manque, icône de compétence qui saute, bandeaux (rebond,
+  rayons, étoiles, reflet), formes débloquées (rayons, icône qui pousse), carte-titre (même durée
+  totale), dialogues (boîte et répliques qui rebondissent, nom qui glisse, indicateur qui surgit),
+  menus (surbrillance qui glisse, entrée qui grossit, appui qui rebondit), sac/carte/feu de camp
+  (ouverture `juiceOverlayIn`), écran de fin (lucioles, pétales).
 
 ## Progression & flags d'histoire (noms figés)
 
@@ -531,10 +605,11 @@ Détails compétences (agent Formes) :
 - **Compétences « avec la forme »** (2026-10-23, `Player.startSkillFormPose(kind, now,
   {onRelease})`, visuel seul : corps physique, énergie et délais inchangés ; seulement depuis
   la forme humaine, sinon comportement d'avant). **Pierre** : transfo `transfo_singe` (150 ms)
-  → singe qui lance (anim `throw` du manifest `singe` si l'art existe, sinon singe debout +
+  → singe qui lance (anim `throw` du manifest `singe_extra`, repli `singe`, si l'art existe, sinon singe debout +
   élan du corps, 260 ms ; la pierre part à 45 % du geste, de la main) → transfo inverse
   (150 ms) ; relance pendant la pose = nouveau lancer sans retransformation. **Papillon** :
-  transfo `transfo_papillon` (130 ms) → forme papillon (anim `cast` si l'art existe, sinon
+  transfo `transfo_papillon` (130 ms) → forme papillon (anim `cast` de `forme_papillon_extra`, repli
+  `forme_papillon` cast, si l'art existe, sinon
   `glide`/`flap`) centrée 48 px au-dessus des pieds, AU CENTRE de la nuée qui tourbillonne
   autour d'elle 420 ms (`PAPILLON_HOLD_MS`) puis file devant et finit au même endroit
   qu'avant (portée du soin inchangée) → transfo inverse. Sans art de transfo : gerbe de

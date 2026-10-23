@@ -673,6 +673,16 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
     this.harmless = true;
     if (this.pantTween) this.pantTween.stop();
     this.clearHazards();
+    // Juice : fin du combat -- bref ralenti, petit zoom, lueurs de soin (seul
+    // boss concerné : Kainati est épargné autrement). Horloge de scène
+    // inchangée : la cinématique de soin garde ses durées.
+    if (typeof juiceSlowMo === 'function') {
+      juiceSlowMo(this.scene, { ms: 700, physics: 3, anims: 0.35 });
+      juiceZoomPulse(this.scene, { zoom: 1.06, ms: 1200 });
+      juiceShake(this.scene, 'medium');
+      spawnFx(this.scene, 'heal', this.x, this.y - this.displayHeight * 0.5, { count: 18 });
+      playSfx('boss_end', { boss: 'ghilt' });
+    }
     this.scene.events.emit('ghilt-healed', this);
     return true;
   }

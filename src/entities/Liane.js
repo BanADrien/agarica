@@ -66,12 +66,16 @@ class Liane {
     this.grabbedBy = null;
     this.swingR = this.length;
     this.alive = true;
+    // Vibration visuelle à la prise / au lâcher (juice, cf. twang).
+    this.twangAmp = 0;
+    this.twangAt = 0;
 
     if (scene.textures.exists('item-liane')) {
       this.image = scene.add.image(this.x, this.y, 'item-liane').setOrigin(0.5, 0);
       const def = getItemManifest().liane || {};
       const sx = def.scale || 1;
       this.image.setScale(sx, this.length / this.image.height);
+      this.imageScaleX = sx;
     } else {
       this.gfx = scene.add.graphics();
     }
@@ -124,8 +128,9 @@ class Liane {
     for (let i = 0; i <= steps; i++) {
       const r = (this.length * i) / steps;
       const p = this.pointAt(r, a);
-      // Petite ondulation organique perpendiculaire, nulle à l'attache.
-      const w = Math.sin(i * 1.3 + t * 2 + this.phase) * 2.5 * (i / steps);
+      // Petite ondulation organique perpendiculaire, nulle à l'attache, plus
+      // la vibration de prise/lâcher (twang).
+      const w = Math.sin(i * 1.3 + t * 2 + this.phase) * 2.5 * (i / steps) + this.twangOffset(r);
       pts.push({ x: p.x + nx * w, y: p.y + ny * w });
     }
     g.lineStyle(6, 0x1d3a1f, 1);
@@ -221,6 +226,31 @@ class Liane {
     // (Redessinée par update(), une fois par image, à `displayAngle`.)
     const hand = this.pointAt(r, this.theta);
     return { x: hand.x, y: hand.y + VINE_HANG_OFFSET };
+  }
+
+  // Juice (visuel seul) : la liane vibre quand on la saisit ou la lâche --
+  // onde amortie entre l'attache et les mains (nulle aux deux bouts : la
+  // main reste sur la liane), bout libre qui fouette sous les mains. Art
+  // `liane` (image non déformable) : brève pulsation de son épaisseur.
+  twang(strength = 1) {
+    this.twangAmp = 7 * strength;
+    this.twangAt = this.scene.time.now;
+    if (this.image && this.image.active) {
+      const sx = this.imageScaleX || this.image.scaleX;
+      this.scene.tweens.killTweensOf(this.image);
+      this.image.scaleX = sx * (1 + 0.35 * strength);
+      this.scene.tweens.add({ targets: this.image, scaleX: sx, duration: 280, ease: 'Back.easeOut' });
+    }
+  }
+
+  twangOffset(r) {
+    if (!this.twangAmp) return 0;
+    const dt = this.scene.time.now - this.twangAt;
+    if (dt > 800) { this.twangAmp = 0; return 0; }
+    const env = this.twangAmp * Math.exp(-dt / 210) * Math.cos(dt * 0.045);
+    const hold = this.grabbedBy ? this.swingR : this.length;
+    if (r <= hold) return env * Math.sin((Math.PI * r) / Math.max(1, hold));
+    return env * 0.6 * Math.sin((Math.PI * (r - hold)) / Math.max(1, (this.length - hold) * 2));
   }
 
   bounceOffWall() {

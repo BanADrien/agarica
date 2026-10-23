@@ -60,6 +60,15 @@ class EndScreenScene extends Phaser.Scene {
       stroke: '#15101f', strokeThickness: 5,
     }).setOrigin(0.5).setAlpha(0);
     this.tweens.add({ targets: signoff, alpha: 1, duration: 1200, delay: 1200 });
+    // Juice : lucioles et pétales roses qui tombent doucement (fin de démo).
+    if (typeof menuAddFireflies === 'function') menuAddFireflies(this, 22, { depth: 5 });
+    this.time.addEvent({
+      delay: 380, loop: true,
+      callback: () => spawnFx(this, 'petal', Phaser.Math.Between(20, width - 20), -10, {
+        count: 1, angle: [70, 110], speed: [15, 50], lifespan: [2800, 3600],
+      }),
+    });
+    this.tweens.add({ targets: title, y: title.y - 4, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
     const prompt = this.add.text(width / 2, height - 26, "Appuie sur une touche pour revenir à l'écran-titre", {
       fontFamily: 'sans-serif', fontSize: '14px', color: STORY_UI.textSoft,

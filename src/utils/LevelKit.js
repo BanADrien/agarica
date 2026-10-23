@@ -482,11 +482,16 @@ function addFarBackgroundCaps(scene, far, key, { top, height, coverWidth, camLow
 // `vfx_mousse_toxique` (anim `bulle`) si l'art existe, sinon cercles.
 // Purement visuelle : y tomber reste géré par la clé `fall`.
 // ---------------------------------------------------------------------------
+// Images du lot Codex n°8 (ids du manifest) en premier, anciens noms en repli.
+// Brume : nappe `couche_nappe_brume` ; au premier plan (`front: true`), la
+// bande opaque `couche_brume_avant`. Eau : `liquide_mare_fond`, plus le voile
+// avant `liquide_mare_voile` et la ligne de surface animée `liquide_mare_surface_0..3`.
 const LIQUID_STYLES = {
   mousse: { deep: 0x16280f, blobs: [0x2f5a2a, 0x3e7a2c], glow: 0x9bff5a, images: ['liquide_mousse_toxique', 'liquide_mousse'] },
   eau: { deep: 0x0b1f33, blobs: [0x1d4a6e, 0x245a85], glow: 0x9fe3ff, images: ['liquide_mare_fond', 'liquide_eau'] },
-  brume: { deep: 0x2a3550, blobs: [0x46557a, 0x5a6a90], glow: 0xd6e2ff, images: ['liquide_brume'] },
+  brume: { deep: 0x2a3550, blobs: [0x46557a, 0x5a6a90], glow: 0xd6e2ff, images: ['couche_nappe_brume', 'liquide_brume'], frontImages: ['couche_brume_avant'] },
 };
+const LIQUID_MARE_SURFACE_FRAMES = ['liquide_mare_surface_0', 'liquide_mare_surface_1', 'liquide_mare_surface_2', 'liquide_mare_surface_3'];
 
 function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
   if (!cfg || cfg.y == null) return null;
@@ -499,7 +504,8 @@ function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
   const bottom = Math.max(levelHeight, y) + 400;
   const objs = [];
   const rnd = new Phaser.Math.RandomDataGenerator([`liquide-${style}-${Math.round(y)}`]);
-  const imgId = [cfg.image, ...pal.images].find((id) => id && scene.textures.exists(`item-${id}`));
+  const imgId = [cfg.image, ...(cfg.front && pal.frontImages ? pal.frontImages : []), ...pal.images]
+    .find((id) => id && scene.textures.exists(`item-${id}`));
   if (imgId) {
     const key = `item-${imgId}`;
     const src = scene.textures.get(key).getSourceImage();
@@ -514,6 +520,33 @@ function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
     objs.push(deep, surf);
     // Lente dérive de la surface.
     scene.tweens.add({ targets: surf, tilePositionX: { from: 0, to: src.width }, duration: 60000, repeat: -1 });
+    // Eau (mare, lot n°8) : ligne de surface animée (~8 i/s) et voile avant
+    // translucide par-dessus le corps de l'eau.
+    if (style === 'eau') {
+      const frames = LIQUID_MARE_SURFACE_FRAMES.filter((id) => scene.textures.exists(`item-${id}`));
+      if (frames.length) {
+        const fdef = getItemManifest()[frames[0]] || {};
+        const fsrc = scene.textures.get(`item-${frames[0]}`).getSourceImage();
+        const fk = fdef.scale || k;
+        const line = scene.add.tileSprite(x1, surfTop - fsrc.height * fk * 0.5, x2 - x1, fsrc.height * fk, `item-${frames[0]}`)
+          .setOrigin(0, 0).setTileScale(fk, fk);
+        let fi = 0;
+        scene.time.addEvent({
+          delay: 125, loop: true,
+          callback: () => { if (!line.active) return; fi = (fi + 1) % frames.length; line.setTexture(`item-${frames[fi]}`); },
+        });
+        objs.push(line);
+      }
+      if (scene.textures.exists('item-liquide_mare_voile')) {
+        const vdef = getItemManifest().liquide_mare_voile || {};
+        const vsrc = scene.textures.get('item-liquide_mare_voile').getSourceImage();
+        const vk = vdef.scale || k;
+        const veil = scene.add.tileSprite(x1, surfTop + 4, x2 - x1, vsrc.height * vk, 'item-liquide_mare_voile')
+          .setOrigin(0, 0).setTileScale(vk, vk).setAlpha(0.28);
+        scene.tweens.add({ targets: veil, tilePositionX: { from: 0, to: -vsrc.width }, duration: 45000, repeat: -1 });
+        objs.push(veil);
+      }
+    }
   } else {
     const g = scene.add.graphics();
     g.fillStyle(pal.deep, 1).fillRect(x1, y, x2 - x1, bottom - y);
@@ -593,9 +626,12 @@ function addSkyGradient(scene, sky) {
     return g;
   };
   st.low = grad(cfg.low[0], cfg.low[1]);
-  if (scene.textures.exists('item-ciel_jour')) {
-    st.high = scene.add.image(0, 0, 'item-ciel_jour').setOrigin(0, 0).setScrollFactor(0).setDepth(-19)
-      .setDisplaySize(width, height);
+  // Ciel de jour : `couche_ciel_jour` (lot Codex n°8, repli ancien `ciel_jour`),
+  // couvrant l'écran sans déformation, calé en haut.
+  const skyKey = ['item-couche_ciel_jour', 'item-ciel_jour'].find((k) => scene.textures.exists(k));
+  if (skyKey) {
+    st.high = scene.add.image(width / 2, 0, skyKey).setOrigin(0.5, 0).setScrollFactor(0).setDepth(-19);
+    st.high.setScale(Math.max(width / st.high.width, height / st.high.height));
   } else {
     st.high = grad(cfg.high[0], cfg.high[1]).setDepth(-19);
   }
@@ -619,8 +655,11 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
     const cy = s * cloudScroll + rnd.between(40, Math.round(height * 0.45));
     const cx = ((levelWidth * 0.35 + width) * i) / Math.max(1, n) + rnd.between(0, 200);
     let c;
-    if (scene.textures.exists('item-nuages')) {
-      c = scene.add.image(cx, cy, 'item-nuages').setScale(rnd.realInRange(0.5, 0.9));
+    // Nuages isolés `couche_nuage_0..4` (lot n°8), repli ancien `nuages`.
+    const cloudId = [`couche_nuage_${i % 5}`, 'couche_nuage_0', 'nuages'].find((id) => scene.textures.exists(`item-${id}`));
+    if (cloudId) {
+      const cdef = getItemManifest()[cloudId] || {};
+      c = scene.add.image(cx, cy, `item-${cloudId}`).setScale((cdef.scale || 0.7) * rnd.realInRange(0.75, 1.1));
     } else {
       // Nuage doux : base ombrée, puis boules de plus en plus claires.
       c = scene.add.graphics({ x: cx, y: cy });
@@ -638,8 +677,14 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
   // Rayons de soleil (coin haut droit), additifs, fixés à l'écran.
   st.rays = null;
   if (cfg.rays) {
-    if (scene.textures.exists('item-rayons_soleil')) {
-      st.rays = scene.add.image(width, 0, 'item-rayons_soleil').setOrigin(1, 0).setScrollFactor(0);
+    // Soleil `couche_soleil` (lot n°8, additif, fixé à l'écran), repli ancien
+    // `rayons_soleil`, sinon rayons dessinés.
+    const sunId = ['couche_soleil', 'rayons_soleil'].find((id) => scene.textures.exists(`item-${id}`));
+    if (sunId === 'couche_soleil') {
+      const sdef = getItemManifest().couche_soleil || {};
+      st.rays = scene.add.image(width * 0.86, height * 0.12, 'item-couche_soleil').setScrollFactor(0).setScale(sdef.scale || 0.6);
+    } else if (sunId) {
+      st.rays = scene.add.image(width, 0, `item-${sunId}`).setOrigin(1, 0).setScrollFactor(0);
     } else {
       st.rays = scene.add.graphics().setScrollFactor(0);
       const ox = width * 0.88;
@@ -654,6 +699,22 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
     }
     st.rays.setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
     scene.tweens.add({ targets: st, raySway: { from: -1, to: 1 }, duration: 5200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  // Nappes de nuages `couche_nappe_nuages` (lot n°8, tuilables) : deux copies
+  // à des parallaxes différentes, visibles à la traversée de la canopée puis
+  // de plus en plus transparentes en montant (cf. updateSkyReveal).
+  st.nappes = [];
+  if (scene.textures.exists('item-couche_nappe_nuages')) {
+    const ndef = getItemManifest().couche_nappe_nuages || {};
+    const nsrc = scene.textures.get('item-couche_nappe_nuages').getSourceImage();
+    const nk = ndef.scale || 0.7;
+    const mid = camHigh + (camLow - camHigh) * 0.45;
+    [[0.22, 0.32, 0.62], [0.4, 0.5, 0.78]].forEach(([px, py, at], i) => {
+      const n = scene.add.tileSprite(0, mid * py + height * at, levelWidth * px + width + 40, nsrc.height * nk, 'item-couche_nappe_nuages')
+        .setOrigin(0, 0.5).setTileScale(nk, nk).setScrollFactor(px, py).setAlpha(0);
+      n.tilePositionX = i * 420;
+      st.nappes.push(n);
+    });
   }
   // Éclat de lumière à la sortie de la canopée (au-dessus de tout le décor).
   st.flash = scene.add.rectangle(0, 0, width, height, 0xfff3c4, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(950);
@@ -676,6 +737,8 @@ function updateSkyReveal(scene, dt) {
   st.high.setAlpha(e);
   if (st.shade) st.shade.setAlpha(cfg.shade * (1 - e));
   for (const c of st.clouds || []) c.setAlpha(Phaser.Math.Clamp((e - 0.2) / 0.5, 0, 1) * 0.9);
+  // Nappes : en cloche autour de la sortie de la canopée (0,25 -> 0,95).
+  for (const n of st.nappes || []) n.setAlpha(Math.max(0, Math.sin(Phaser.Math.Clamp((e - 0.25) / 0.7, 0, 1) * Math.PI)) * 0.85);
   if (st.rays) {
     const base = Phaser.Math.Clamp((e - 0.3) / 0.5, 0, 1) * (0.75 + 0.25 * st.raySway);
     st.rays.setAlpha(Phaser.Math.Clamp(base + st.flashBoost, 0, 1));
@@ -1050,8 +1113,10 @@ function setupDebugToggle(scene) {
 const FADE_DURATION = 250;
 const FADE_COLOR = [13, 11, 26]; // #0d0b1a, fond du jeu
 
-function fadeInScene(scene) {
-  scene.cameras.main.fadeIn(FADE_DURATION, ...FADE_COLOR);
+// Fondu d'entrée adouci (cf. juiceFadeIn, section « Juice » en fin de
+// fichier) ; `opts.zoom` : léger « posé » de la caméra (zones de jeu).
+function fadeInScene(scene, opts = {}) {
+  juiceFadeIn(scene, opts);
 }
 
 function goToScene(scene, key, data) {
@@ -1092,8 +1157,9 @@ function goToScene(scene, key, data) {
   // jamais (camerafadeoutcomplete ne se déclenche jamais).
   if (scene.__transitioningAway) return;
   scene.__transitioningAway = true;
-  scene.cameras.main.fadeOut(FADE_DURATION, ...FADE_COLOR);
-  scene.cameras.main.once('camerafadeoutcomplete', () => {
+  // Même durée qu'avant (FADE_DURATION), courbe adoucie + léger zoom (juice).
+  playSfx('zone_exit', { key });
+  juiceFadeOut(scene, FADE_DURATION, () => {
     scene.scene.stop();
     scene.scene.start(key, data);
   });
@@ -1274,6 +1340,20 @@ function showFormUnlockPopup(scene, totemType) {
     },
   ).setOrigin(0.5).setScrollFactor(0).setDepth(UNLOCK_POPUP_DEPTH + 1).setAlpha(0);
 
+  // Juice : rayons de lumière qui tournent lentement derrière la pancarte,
+  // icône qui « pousse » (rebond) avec une gerbe d'étoiles, texte qui monte.
+  const rays = scene.add.graphics().setScrollFactor(0).setDepth(UNLOCK_POPUP_DEPTH - 1)
+    .setPosition(icon.x, icon.y).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2;
+    rays.fillStyle(i % 2 ? 0x8fe3b8 : 0xfff1c0, 0.22);
+    rays.fillTriangle(0, 0, Math.cos(a - 0.07) * 260, Math.sin(a - 0.07) * 260, Math.cos(a + 0.07) * 260, Math.sin(a + 0.07) * 260);
+  }
+  const raysSpin = scene.tweens.add({ targets: rays, angle: 360, duration: 14000, repeat: -1 });
+  const iconScale = icon.scale;
+  const labelY = label.y;
+  playSfx('form_unlock', { form: totemType });
+
   scene.tweens.add({
     targets: banner,
     alpha: 1,
@@ -1283,9 +1363,14 @@ function showFormUnlockPopup(scene, totemType) {
     onComplete: () => {
       banner.play(ANIM_UNLOCK_POPUP_KEY);
       banner.once('animationcomplete', () => {
-        scene.tweens.add({ targets: [icon, label], alpha: 1, duration: UNLOCK_POPUP_ICON_FADE_MS });
+        icon.setScale(iconScale * 0.2);
+        label.setY(labelY + 10);
+        scene.tweens.add({ targets: icon, alpha: 1, scale: iconScale, duration: UNLOCK_POPUP_ICON_FADE_MS + 120, ease: 'Back.Out' });
+        scene.tweens.add({ targets: label, alpha: 1, y: labelY, duration: UNLOCK_POPUP_ICON_FADE_MS + 80, delay: 80, ease: 'Cubic.Out' });
+        scene.tweens.add({ targets: rays, alpha: 1, duration: 300 });
+        spawnFx(scene, 'uiStar', icon.x, icon.y, { count: 14, power: 1.8 });
         scene.tweens.add({
-          targets: [banner, icon, label],
+          targets: [banner, icon, label, rays],
           alpha: 0,
           duration: UNLOCK_POPUP_FADE_OUT_MS,
           delay: UNLOCK_POPUP_HOLD_MS,
@@ -1293,6 +1378,8 @@ function showFormUnlockPopup(scene, totemType) {
             banner.destroy();
             icon.destroy();
             label.destroy();
+            raysSpin.remove();
+            rays.destroy();
           },
         });
       });
@@ -1779,7 +1866,18 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   anchorVisibleFeet(marker);
   marker.body.updateFromGameObject();
   const plants = addTotemPlants(scene, x, y - TOTEM_GROUND_SINK, marker.displayWidth);
-  sendBehindFrontGround(scene, [marker, ...plants]);
+  // Juice : halo qui « respire » derrière le totem tant qu'il n'est pas
+  // activé, lueurs qui montent (cf. l'update plus bas).
+  const haloY = y - marker.displayHeight * 0.55;
+  let halo = null;
+  if (!alreadyHas) {
+    const ht = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
+    const hs = (marker.displayHeight * 1.15) / ht.size;
+    halo = scene.add.image(x, haloY, ht.key).setBlendMode(Phaser.BlendModes.ADD).setTint(0x8fe3b8).setAlpha(0.3).setScale(hs);
+    scene.tweens.add({ targets: halo, alpha: { from: 0.14, to: 0.42 }, scale: { from: hs * 0.9, to: hs * 1.08 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  sendBehindFrontGround(scene, [...(halo ? [halo] : []), marker, ...plants]);
+  let nextMoteAt = 0;
 
   const prompt = scene.add.text(x, y - marker.displayHeight - 14, 'Appuie sur E', {
     fontFamily: 'sans-serif',
@@ -1796,9 +1894,18 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     // `marker`/`scene.player` d'une visite précédente, potentiellement déjà
     // détruits, après un retour dans cette même zone.
     if (scene !== currentLevelScene) return;
+    // Écouteur d'une visite précédente (totem détruit avec elle) : inerte.
+    if (!marker.scene) return;
     if (scene.registry.get(flagName) || isWorldFrozen(scene)) {
       prompt.setVisible(false);
       return;
+    }
+    // Lueurs qui montent du totem encore actif (plus serrées à portée).
+    const now = scene.time.now;
+    if (halo && halo.active && now >= nextMoteAt) {
+      const near = Math.abs(scene.player.x - x) < 220;
+      nextMoteAt = now + (near ? 260 : 520);
+      spawnFx(scene, 'motes', x + Phaser.Math.Between(-18, 18), haloY + Phaser.Math.Between(-20, 30), { count: 1, color: [0x8fe3b8, 0xe8fff2, 0xff9fc9] });
     }
     const inRange = scene.physics.overlap(scene.player, marker);
     prompt.setVisible(inRange);
@@ -1830,6 +1937,22 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     marker.setTexture(totemTextureKey(scene, totemType, 'dim'));
     if (isStoryScene(scene)) saveGame(scene, { silent: true });
     prompt.setVisible(false);
+    // Juice : gros éclat à l'activation (flash du totem, halo, anneau,
+    // gerbe de lueurs), secousse et petit zoom ; le halo s'éteint.
+    juiceFlash(marker, 0xffffff, 140);
+    juiceBurstImage(scene, 'glow', x, haloY, { size: marker.displayHeight * 2.6, from: 0.3, to: 1.2, ms: 520, color: 0xe8fff2, alpha: 0.9 });
+    juiceShockRing(scene, x, haloY, { size: marker.displayHeight * 2.2, ms: 520, color: 0x8fe3b8 });
+    spawnFx(scene, 'motes', x, haloY, { count: 22, spread: 26, power: 2.4, color: [0x8fe3b8, 0xe8fff2, 0xff9fc9] });
+    spawnFx(scene, 'star', x, haloY, { count: 12, power: 2 });
+    juiceShake(scene, 'medium');
+    juiceZoomPulse(scene, { zoom: 1.04, ms: 700 });
+    playSfx('totem_activate', { form: totemType });
+    if (halo) {
+      const h = halo;
+      halo = null;
+      scene.tweens.killTweensOf(h);
+      scene.tweens.add({ targets: h, alpha: 0, scale: h.scale * 1.6, duration: 700, onComplete: () => h.destroy() });
+    }
     showFormUnlockPopup(scene, totemType);
 
     const label = scene.add.text(marker.x, marker.y - marker.displayHeight - 10, message, {
@@ -1899,6 +2022,20 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     .play(ANIM_CAMPFIRE_BURN_KEY);
   anchorVisibleFeet(fire);
   fire.y = footY + GROUND_CONTACT_SINK;
+  // Juice : halo chaud qui respire derrière la flamme, braises qui montent et
+  // petites gerbes d'étincelles au hasard (cf. l'update plus bas).
+  const flameY = footY - fire.displayHeight * 0.42;
+  const glowTex = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
+  const glowScale = (fire.displayWidth * 3.4) / glowTex.size;
+  const halo = scene.add.image(x, flameY, glowTex.key).setBlendMode(Phaser.BlendModes.ADD)
+    .setTint(0xffa860).setAlpha(0.3).setScale(glowScale);
+  scene.children.moveBelow(halo, fire);
+  scene.tweens.add({
+    targets: halo, alpha: { from: 0.28, to: 0.52 }, scale: { from: glowScale * 0.93, to: glowScale * 1.07 },
+    duration: 950, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+  });
+  let nextEmberAt = 0;
+  let nextCrackleAt = 0;
 
   const prompt = scene.add.text(x, y - 90, 'Appuie sur E pour te reposer', {
     fontFamily: 'sans-serif',
@@ -1912,6 +2049,23 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     // Cf. `currentLevelScene` (même raison que dans addAbilityShrine) :
     // ce listener persiste d'une visite à l'autre de la zone.
     if (scene !== currentLevelScene) return;
+    // Écouteur d'une visite précédente (feu détruit avec elle) : inerte.
+    if (!fire.scene) return;
+    // Crépitement : braises en continu, gerbe d'étincelles de temps en temps
+    // (seulement près de l'écran ; aussi pendant le menu, monde gelé).
+    const now = scene.time.now;
+    const view = scene.cameras.main.worldView;
+    if (x > view.x - 120 && x < view.right + 120) {
+      if (now >= nextEmberAt) {
+        nextEmberAt = now + Phaser.Math.Between(120, 260);
+        spawnFx(scene, 'embers', x + Phaser.Math.Between(-8, 8), flameY - 4, { count: 1, spread: 6 });
+      }
+      if (now >= nextCrackleAt) {
+        nextCrackleAt = now + Phaser.Math.Between(1300, 3200);
+        spawnFx(scene, 'crackle', x + Phaser.Math.Between(-6, 6), flameY, { count: Phaser.Math.Between(3, 6) });
+        halo.setAlpha(Math.min(0.55, halo.alpha + 0.12));
+      }
+    }
     // Menu ouvert (scène séparée, cf. CampfireMenuScene.update() pour sa
     // propre fermeture E/Échap) : le prompt "Appuie sur E" (texte MONDE,
     // pas écran) resterait sinon affiché par-dessus, inchangé depuis juste
@@ -1923,6 +2077,12 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     const inRange = Phaser.Math.Distance.Between(scene.player.x, scene.player.y, x, y) <= CAMPFIRE_INTERACT_RANGE;
     prompt.setVisible(inRange);
     if (!inRange || !Phaser.Input.Keyboard.JustDown(scene.player.interactKey)) return;
+    // Juice : le feu s'embrase (flamme qui grandit, gerbe d'étincelles, halo).
+    scene.tweens.add({ targets: fire, scaleX: scale * 1.15, scaleY: scale * 1.28, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
+    spawnFx(scene, 'crackle', x, flameY, { count: 16 });
+    juiceBurstImage(scene, 'glow', x, flameY, { size: fire.displayWidth * 5, from: 0.4, to: 1.1, ms: 600, color: 0xffb070, alpha: 0.6 });
+    spawnFx(scene, 'motes', scene.player.x, scene.player.y - 40, { count: 10, spread: 18, color: [0xffd8a0, 0xff9fc9, 0xe8fff2] });
+    playSfx('campfire_rest');
     scene.player.refillAtCampfire();
     // Coupe l'élan en cours avant de geler les updates (cf.
     // updateLevelFromData, qui n'appelle plus player.update() tant que
@@ -2957,7 +3117,12 @@ function getExitTriggerRect(exit) {
 let currentLevelScene = null;
 
 function buildLevelFromData(scene, data, sceneData) {
-  fadeInScene(scene);
+  // État « juice » de la visite précédente (émetteurs, HUD) : objets déjà
+  // détruits avec la scène, repartir de zéro.
+  scene.__juiceFx = null;
+  scene.__hudFx = null;
+  scene.__juiceZooming = false;
+  fadeInScene(scene, { zoom: 1.03 });
   // Retour utilisateur : "je ne peux plus retourner a la zone1, ça me met
   // un écran vide" -- `goToScene` pose `__transitioningAway = true` sur LA
   // SCÈNE (cf. son commentaire) pour ignorer les frames suivantes tant que
@@ -3246,6 +3411,8 @@ function buildLevelFromData(scene, data, sceneData) {
   // zone...) : cf. LEVEL_DATA_HANDLERS dans StoryKit.js / PLAN_DEV.md.
   runLevelDataHandlers(scene, data);
   storyOnZoneEnter(scene, data, sceneData);
+  // Juice : temps (hit-stop), regard caméra, lucioles/papillons d'ambiance.
+  juiceSetupLevel(scene, data);
 }
 
 // Mêlée / piqué de l'aigle contre UN ennemi : vrai si la portée de l'attaque
@@ -3279,6 +3446,8 @@ function damageEnemy(scene, enemy, source = {}) {
   }
   if (typeof enemy.takeHit === 'function') enemy.takeHit(source);
   else enemy.defeat();
+  // Retour visuel du coup (hit-stop, étincelles, flash, poof) : cf. Juice.
+  juiceOnEnemyHit(scene, enemy, source);
   return true;
 }
 
@@ -3342,6 +3511,8 @@ function createHud(scene) {
 function drawHud(scene) {
   const g = scene.hudGraphics;
   g.clear();
+  // Juice : cœurs perdus/regagnés animés, énergie lissée (cf. juiceHudUpdate).
+  juiceHudUpdate(scene);
   // Art Codex (cœurs hud_coeur*, icônes skill_icone_*) : posé en images par
   // storyDrawHudArt (StoryKit.js, agent UI) ; ici seulement le repli dessiné.
   const art = typeof storyDrawHudArt === 'function' ? storyDrawHudArt(scene) : null;
@@ -3356,17 +3527,14 @@ function drawHud(scene) {
   for (let i = 0; !(art && art.hearts) && i < scene.player.maxHearts; i++) {
     const cx = HUD_MARGIN + HUD_HEART_SIZE / 2 + i * (HUD_HEART_SIZE + HUD_HEART_GAP);
     const cy = baseY + HUD_HEART_SIZE / 2;
-    const filled = i < scene.player.hearts;
-    drawHeartIcon(g, cx, cy, HUD_HEART_SIZE, filled ? 0xff4d6d : 0x4a3d63, filled ? 1 : 0.6);
+    const hf = juiceHudHeart(scene, i, cx, cy);
+    const filled = hf.full;
+    const size = HUD_HEART_SIZE * hf.scale;
+    drawHeartIcon(g, cx + hf.dx, cy + hf.dy, size, filled ? 0xff4d6d : 0x4a3d63, filled ? 1 : 0.6);
+    if (hf.flash > 0) drawHeartIcon(g, cx + hf.dx, cy + hf.dy, size, 0xffffff, 0.7 * hf.flash);
   }
   const barX = HUD_MARGIN;
-  g.fillStyle(0x2a1f45, 1);
-  g.fillRoundedRect(barX, barY, HUD_ENERGY_BAR_WIDTH, HUD_ENERGY_BAR_HEIGHT, 4);
-  const fillRatio = Phaser.Math.Clamp(scene.player.energy / scene.player.maxEnergy, 0, 1);
-  if (fillRatio > 0) {
-    g.fillStyle(0x8fe3b8, 1);
-    g.fillRoundedRect(barX, barY, HUD_ENERGY_BAR_WIDTH * fillRatio, HUD_ENERGY_BAR_HEIGHT, 4);
-  }
+  juiceDrawEnergyBar(scene, g, barX, barY, HUD_ENERGY_BAR_WIDTH, HUD_ENERGY_BAR_HEIGHT);
 
   // Compétences en bas à gauche (cf. HUD_SKILL_* plus haut), ancré au bord
   // BAS de l'écran (comme les cœurs sont ancrés au bord HAUT) donc calculé
@@ -3384,10 +3552,11 @@ function drawHud(scene) {
     // masquée, pour que le joueur voie TOUJOURS ce qu'il a d'équipé.
     const unavailable = !def || now < player.skillCooldownEndTime || player.energy < def.cost;
     const alpha = def && unavailable ? HUD_SKILL_UNAVAILABLE_ALPHA : 1;
+    const s = HUD_SKILL_SIZE * juiceHudSkillScale(scene, i);
     g.fillStyle(def ? def.hudColor : HUD_SKILL_EMPTY_COLOR, alpha);
-    g.fillRoundedRect(cx - HUD_SKILL_SIZE / 2, skillY - HUD_SKILL_SIZE / 2, HUD_SKILL_SIZE, HUD_SKILL_SIZE, 6);
+    g.fillRoundedRect(cx - s / 2, skillY - s / 2, s, s, 6);
     g.lineStyle(2, 0x8fe3b8, def ? alpha : 0.5);
-    g.strokeRoundedRect(cx - HUD_SKILL_SIZE / 2, skillY - HUD_SKILL_SIZE / 2, HUD_SKILL_SIZE, HUD_SKILL_SIZE, 6);
+    g.strokeRoundedRect(cx - s / 2, skillY - s / 2, s, s, 6);
     const text = scene.hudSkillTexts[i];
     text.setText(label);
     text.setPosition(cx, skillY);
@@ -3537,4 +3706,1053 @@ function freezeWorldBodies(scene) {
     enemy.body.setVelocityX(0);
     if (!enemy.body.allowGravity) enemy.body.setVelocityY(0);
   });
+}
+
+// ===========================================================================
+// JUICE — « game feel » (2026-10-23). Effets PUREMENT visuels : particules,
+// secousses dosées, micro-pauses (hit-stop), squash & stretch appliqués au
+// seul moment du dessin (jamais à la hitbox), fondus de zone, recadrage de la
+// caméra. Aucun ne change une hitbox, un timing de combat (horloge de scène)
+// ni la durée d'une cinématique. API (PLAN_DEV.md, section « Juice ») :
+//   spawnFx(scene, kind, x, y, opts)   effet ponctuel (cf. liste avant spawnFx)
+//   juiceShake(scene, force, ms)       secousse dosée (réglage « Secousses d'écran »)
+//   juiceHitStop(scene, ms) · juiceSlowMo(scene, opts) · juiceZoomPulse(scene, opts)
+//   juiceSquash(obj, sx, sy, ms) · juiceRecoil(obj, dx, dy, ms) · juiceTilt(obj, rad, ms)
+//   juiceFlash(obj, color, ms) · juiceGhost(scene, sprite, opts) · juiceBurstImage(...)
+//   playSfx(id, opts)                  point d'accroche audio, sans effet
+// Images du lot Codex n°8 (`fx_*`, `fx_halo_*`, `vfx_anneau_choc`) utilisées
+// dès qu'elles existent, sinon petites textures dessinées par code.
+// ===========================================================================
+
+// --- Son : points d'accroche vides (le projet n'a pas d'audio) -------------
+// Brancher un son plus tard : SFX_HOOKS[id] = (id, opts) => … (ou '*').
+const SFX_HOOKS = {};
+function playSfx(id, opts = {}) {
+  const hook = SFX_HOOKS[id] || SFX_HOOKS['*'];
+  if (!hook) return;
+  try { hook(id, opts); } catch (e) { console.warn('playSfx', id, e); }
+}
+
+// --- Réglage d'accessibilité « Secousses d'écran » --------------------------
+// Mémorisé avec les autres options (menuOptions, MenuKit.js, localStorage).
+const JUICE_SHAKE_LEVELS = { on: 1, reduced: 0.35, off: 0 };
+const JUICE_SHAKE_LABELS = { on: 'Activées', reduced: 'Réduites', off: 'Désactivées' };
+const JUICE_SHAKE_ORDER = ['on', 'reduced', 'off'];
+let juiceShakeCache = { at: -Infinity, level: 'on' };
+
+function juiceShakeLevel() {
+  const now = Date.now();
+  if (now - juiceShakeCache.at > 500) {
+    let level = 'on';
+    try { if (typeof menuOptions === 'function') level = menuOptions().screenShake || 'on'; } catch (e) { level = 'on'; }
+    juiceShakeCache = { at: now, level: JUICE_SHAKE_LEVELS[level] != null ? level : 'on' };
+  }
+  return juiceShakeCache.level;
+}
+
+function juiceSetShakeLevel(level) {
+  if (JUICE_SHAKE_LEVELS[level] == null) return;
+  if (typeof menuSetOption === 'function') menuSetOption('screenShake', level);
+  juiceShakeCache = { at: Date.now(), level };
+}
+
+function juiceShakeFactor() {
+  return JUICE_SHAKE_LEVELS[juiceShakeLevel()];
+}
+
+// TOUTE secousse de caméra (y compris les `cam.shake(...)` des scripts
+// d'histoire et des boss) passe par le réglage : intensité × facteur. À 0 la
+// caméra ne bouge plus, mais la durée et le rappel de fin restent identiques
+// (aucune cinématique ne change de rythme).
+(function juiceInstallShakeGuard() {
+  const proto = Phaser.Cameras.Scene2D.Camera.prototype;
+  if (proto.__juiceShakeGuard) return;
+  const original = proto.shake;
+  proto.shake = function shake(duration, intensity, force, callback, context) {
+    const f = juiceShakeFactor();
+    let k = intensity;
+    if (f !== 1) {
+      if (intensity === undefined) k = 0.05 * f;
+      else if (typeof intensity === 'number') k = intensity * f;
+      else if (intensity && typeof intensity.x === 'number') k = new Phaser.Math.Vector2(intensity.x * f, intensity.y * f);
+    }
+    return original.call(this, duration, k, force, callback, context);
+  };
+  proto.__juiceShakeGuard = true;
+}());
+
+// Secousses dosées : [durée ms, intensité]. Une secousse plus forte remplace
+// celle en cours, jamais l'inverse (un petit coup ne coupe pas un gros).
+const JUICE_SHAKES = {
+  tiny: [70, 0.0012], light: [110, 0.0028], medium: [170, 0.0055], heavy: [260, 0.0095], huge: [420, 0.015],
+};
+
+function juiceShake(scene, force = 'light', ms) {
+  const cam = scene && scene.cameras && scene.cameras.main;
+  if (!cam) return;
+  const preset = typeof force === 'number' ? [ms || 150, force] : (JUICE_SHAKES[force] || JUICE_SHAKES.light);
+  const f = juiceShakeFactor();
+  if (f <= 0) return;
+  const eff = cam.shakeEffect;
+  if (eff && eff.isRunning && eff.intensity && preset[1] * f < eff.intensity.x) return;
+  cam.shake(ms || preset[0], preset[1], true);
+}
+
+// --- Temps : micro-pause (hit-stop) et ralenti ------------------------------
+// Physique Arcade en PAUSE (aucun rattrapage à la reprise) et anims quasi
+// figées, mesurées en temps RÉEL : l'horloge de scène (fenêtres d'attaque,
+// IA, minuteries, cinématiques) continue -- aucun timing de jeu ne bouge.
+const JUICE_HITSTOP_MAX_MS = 90;
+
+function juiceTimeState(scene) {
+  if (!scene || !scene.events || !scene.physics) return null;
+  let st = scene.__juiceTime;
+  if (!st) {
+    st = { stopUntil: 0, slowUntil: 0, slowPhysics: 1, slowAnims: 1, paused: false, ts: null, anim: null };
+    scene.__juiceTime = st;
+    scene.events.on('update', () => juiceUpdateTime(scene));
+    scene.events.on('shutdown', () => juiceResetTime(scene));
+  }
+  return st;
+}
+
+function juiceUpdateTime(scene) {
+  const st = scene.__juiceTime;
+  if (!st) return;
+  const now = performance.now();
+  const stopping = now < st.stopUntil;
+  const slowing = now < st.slowUntil;
+  const world = scene.physics && scene.physics.world;
+  if (world) {
+    if (stopping && !st.paused) { world.pause(); st.paused = true; } else if (!stopping && st.paused) { world.resume(); st.paused = false; }
+    const ts = slowing ? st.slowPhysics : 1;
+    if (st.ts !== ts) { world.timeScale = ts; st.ts = ts; }
+  }
+  const anim = stopping ? 0.02 : (slowing ? st.slowAnims : 1);
+  if (st.anim !== anim && scene.anims) { scene.anims.globalTimeScale = anim; st.anim = anim; }
+}
+
+function juiceResetTime(scene) {
+  const st = scene.__juiceTime;
+  if (!st) return;
+  st.stopUntil = 0;
+  st.slowUntil = 0;
+  const world = scene.physics && scene.physics.world;
+  if (world && st.paused) world.resume();
+  if (world) world.timeScale = 1;
+  st.paused = false;
+  st.ts = 1;
+  if (scene.anims) scene.anims.globalTimeScale = 1;
+  st.anim = 1;
+}
+
+function juiceHitStop(scene, ms = 50) {
+  const st = juiceTimeState(scene);
+  if (!st || ms <= 0) return;
+  const now = performance.now();
+  st.stopUntil = Math.min(now + JUICE_HITSTOP_MAX_MS, Math.max(st.stopUntil, now + ms));
+  juiceUpdateTime(scene);
+}
+
+// Ralenti : physique `physics` fois plus lente (timeScale Arcade), anims × `anims`.
+function juiceSlowMo(scene, { ms = 500, physics = 2.5, anims = 0.4 } = {}) {
+  const st = juiceTimeState(scene);
+  if (!st) return;
+  st.slowUntil = Math.max(st.slowUntil, performance.now() + ms);
+  st.slowPhysics = physics;
+  st.slowAnims = anims;
+  juiceUpdateTime(scene);
+}
+
+// Petit zoom aller-retour de la caméra (mort de boss, gros éclat).
+function juiceZoomPulse(scene, { zoom = 1.05, ms = 900, ease = 'Sine.easeInOut' } = {}) {
+  const cam = scene && scene.cameras && scene.cameras.main;
+  if (!cam || scene.__juiceZooming || Math.abs(cam.zoom - 1) > 0.001) return;
+  scene.__juiceZooming = true;
+  scene.tweens.add({
+    targets: cam, zoom, duration: ms * 0.35, hold: ms * 0.3, yoyo: true, ease,
+    onComplete: () => { cam.setZoom(1); scene.__juiceZooming = false; },
+  });
+}
+
+// --- Squash & stretch, recul, inclinaison : au moment du DESSIN seulement ---
+// Échelle/rotation/décalage posés juste avant le rendu ('prerender') et
+// retirés juste après ('render') : la physique (taille du corps calculée sur
+// l'échelle du sprite) ne les voit jamais. Jamais de décalage sur le joueur :
+// la caméra le suit pendant le rendu (elle suivrait le décalage).
+function juiceRender(obj) {
+  if (!obj || !obj.scene || !obj.scene.events) return null;
+  if (!obj.__juice) {
+    const scene = obj.scene;
+    obj.__juice = { sq: { x: 1, y: 1 }, off: { x: 0, y: 0 }, tilt: { r: 0 }, lean: 0, saved: null };
+    juiceRenderSet(scene).add(obj);
+    obj.once('destroy', () => { if (scene.__juiceRenderSet) scene.__juiceRenderSet.delete(obj); });
+  }
+  return obj.__juice;
+}
+
+function juiceRenderSet(scene) {
+  if (!scene.__juiceRenderSet) {
+    const set = new Set();
+    scene.__juiceRenderSet = set;
+    scene.events.on('prerender', () => {
+      for (const o of set) {
+        const j = o.__juice;
+        j.saved = null;
+        if (!o.active || !o.visible) continue;
+        const r = j.tilt.r + j.lean;
+        if (j.sq.x === 1 && j.sq.y === 1 && !r && !j.off.x && !j.off.y) continue;
+        j.saved = [o.scaleX, o.scaleY, o.rotation, o.x, o.y];
+        o.scaleX *= j.sq.x;
+        o.scaleY *= j.sq.y;
+        o.rotation += r;
+        o.x += j.off.x;
+        o.y += j.off.y;
+      }
+    });
+    scene.events.on('render', () => {
+      for (const o of set) {
+        const j = o.__juice;
+        if (!j.saved) continue;
+        [o.scaleX, o.scaleY, o.rotation, o.x, o.y] = j.saved;
+        j.saved = null;
+      }
+    });
+    scene.events.on('shutdown', () => set.clear());
+  }
+  return scene.__juiceRenderSet;
+}
+
+function juiceSquash(obj, sx, sy, ms = 180, ease = 'Back.easeOut') {
+  const j = juiceRender(obj);
+  if (!j) return;
+  obj.scene.tweens.killTweensOf(j.sq);
+  j.sq.x = sx;
+  j.sq.y = sy;
+  obj.scene.tweens.add({ targets: j.sq, x: 1, y: 1, duration: ms, ease });
+}
+
+function juiceRecoil(obj, dx, dy = 0, ms = 140) {
+  const j = juiceRender(obj);
+  if (!j) return;
+  obj.scene.tweens.killTweensOf(j.off);
+  j.off.x = dx;
+  j.off.y = dy;
+  obj.scene.tweens.add({ targets: j.off, x: 0, y: 0, duration: ms, ease: 'Quad.easeOut' });
+}
+
+function juiceTilt(obj, r, ms = 160) {
+  const j = juiceRender(obj);
+  if (!j) return;
+  obj.scene.tweens.killTweensOf(j.tilt);
+  j.tilt.r = r;
+  obj.scene.tweens.add({ targets: j.tilt, r: 0, duration: ms, ease: 'Back.easeOut' });
+}
+
+// Flash de couleur pleine (blanc par défaut), teinte d'avant rendue ensuite.
+function juiceFlash(obj, color = 0xffffff, ms = 70) {
+  if (!obj || !obj.active || !obj.setTintFill || !obj.scene) return;
+  const hadTint = obj.isTinted;
+  const tint = obj.tintTopLeft;
+  const fill = obj.tintFill;
+  obj.setTintFill(color);
+  obj.scene.time.delayedCall(ms, () => {
+    if (!obj.active) return;
+    if (hadTint) { obj.setTint(tint); obj.tintFill = fill; } else obj.clearTint();
+  });
+}
+
+// --- Textures de repli (dessinées une fois, blanches pour être teintées) ----
+function juiceEnsureTextures(scene) {
+  const tm = scene.textures;
+  if (tm.exists('juice-dot')) return;
+  const make = (key, w, h, draw) => {
+    const t = tm.createCanvas(key, w, h);
+    draw(t.getContext(), w, h);
+    t.refresh();
+  };
+  const radial = (ctx, cx, cy, r, stops) => {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    for (const [at, a] of stops) g.addColorStop(at, `rgba(255,255,255,${a})`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  make('juice-dot', 16, 16, (c) => radial(c, 8, 8, 8, [[0, 1], [0.35, 0.6], [1, 0]]));
+  make('juice-glow', 96, 96, (c) => radial(c, 48, 48, 48, [[0, 0.95], [0.25, 0.55], [0.6, 0.14], [1, 0]]));
+  make('juice-puff', 40, 34, (c) => {
+    for (const [x, y, r] of [[13, 20, 11], [24, 18, 12], [19, 12, 10], [30, 23, 8], [10, 25, 7]]) radial(c, x, y, r, [[0, 0.85], [0.6, 0.45], [1, 0]]);
+  });
+  make('juice-spark', 26, 6, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.65, 'rgba(255,255,255,1)');
+    g.addColorStop(1, 'rgba(255,255,255,0.2)');
+    c.fillStyle = g;
+    c.beginPath();
+    c.ellipse(w / 2, h / 2, w / 2, h / 2 - 0.5, 0, 0, Math.PI * 2);
+    c.fill();
+  });
+  make('juice-star', 18, 18, (c) => {
+    c.fillStyle = '#ffffff';
+    c.beginPath();
+    c.moveTo(9, 0); c.lineTo(10.4, 7.6); c.lineTo(18, 9); c.lineTo(10.4, 10.4);
+    c.lineTo(9, 18); c.lineTo(7.6, 10.4); c.lineTo(0, 9); c.lineTo(7.6, 7.6);
+    c.closePath();
+    c.fill();
+    radial(c, 9, 9, 4, [[0, 1], [1, 0]]);
+  });
+  make('juice-leaf', 14, 8, (c) => {
+    c.fillStyle = '#ffffff';
+    c.beginPath();
+    c.moveTo(0, 4); c.quadraticCurveTo(6, -2, 14, 4); c.quadraticCurveTo(6, 10, 0, 4);
+    c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.25)';
+    c.lineWidth = 0.8;
+    c.beginPath(); c.moveTo(1, 4); c.lineTo(12, 4); c.stroke();
+  });
+  make('juice-feather', 22, 8, (c) => {
+    c.fillStyle = '#ffffff';
+    c.beginPath();
+    c.moveTo(0, 4); c.quadraticCurveTo(9, -1, 22, 3); c.quadraticCurveTo(10, 9, 0, 4);
+    c.fill();
+    c.strokeStyle = 'rgba(120,110,150,0.6)';
+    c.lineWidth = 0.8;
+    c.beginPath(); c.moveTo(0, 4); c.lineTo(20, 3.5); c.stroke();
+  });
+  make('juice-ring', 96, 96, (c) => {
+    c.strokeStyle = 'rgba(255,255,255,0.22)';
+    c.lineWidth = 11;
+    c.beginPath(); c.arc(48, 48, 40, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,1)';
+    c.lineWidth = 3;
+    c.beginPath(); c.arc(48, 48, 42, 0, Math.PI * 2); c.stroke();
+  });
+  make('juice-chip', 10, 9, (c) => {
+    c.fillStyle = '#ffffff';
+    c.beginPath();
+    c.moveTo(1, 3); c.lineTo(5, 0); c.lineTo(10, 2); c.lineTo(8, 8); c.lineTo(2, 9);
+    c.closePath();
+    c.fill();
+  });
+  make('juice-drop', 6, 10, (c) => {
+    c.fillStyle = '#ffffff';
+    c.beginPath();
+    c.moveTo(3, 0); c.quadraticCurveTo(6, 6, 3, 10); c.quadraticCurveTo(0, 6, 3, 0);
+    c.fill();
+  });
+  make('juice-streak', 40, 3, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.9)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  });
+}
+
+// Image du manifest (`item-<id>`) si l'art existe, sinon texture de repli.
+function juiceTexture(scene, artId, fallback) {
+  juiceEnsureTextures(scene);
+  const key = artId && scene.textures.exists(`item-${artId}`) ? `item-${artId}` : fallback;
+  const src = scene.textures.get(key).getSourceImage();
+  return { key, art: key !== fallback, size: Math.max(src.width, src.height, 1) };
+}
+
+// --- Particules : une recette = un émetteur réutilisé par scène -------------
+// `size` : taille à l'écran (px) ; `scale`/`alpha` : facteurs de début/fin
+// (fixes par recette) ; `speed`, `angle` (degrés, 0 = droite, 90 = bas),
+// `lifespan`, `tint` : valeurs par défaut, modifiables à chaque appel
+// (calculées à l'émission seulement : sans effet sur les particules déjà là).
+// Teinte : les images Codex sont déjà colorées -> `artTint` (défaut : aucune)
+// ; seules celles livrées en blanc pour être teintées (`tintArt: true` :
+// grain de lumière, bulle) prennent la teinte de l'appel, comme le repli.
+const FX_PARTICLES = {
+  dust: {
+    art: 'fx_bouffee_poussiere', tex: 'juice-puff', size: 24, depth: 'front', artTint: [0xc9b8f5, 0xb9a9e9],
+    lifespan: [360, 620], speed: [20, 90], angle: [190, 350], gravityY: -30,
+    scale: [0.55, 1.4], alpha: [0.62, 0], tint: [0xd8ccf5, 0xb9a9d9, 0xece6fa], spin: true,
+  },
+  smoke: {
+    art: null, tex: 'juice-puff', size: 30, depth: 'front',
+    lifespan: [420, 720], speed: [30, 110], angle: [0, 360], gravityY: -50,
+    scale: [0.6, 1.6], alpha: [0.6, 0], tint: [0x8a78c0, 0x6a5a9a, 0xb4a6e0], spin: true,
+  },
+  spark: {
+    art: 'fx_etincelle', tex: 'juice-spark', size: 20, depth: 'front', add: true,
+    lifespan: [180, 360], speed: [200, 480], angle: [0, 360], gravityY: 300,
+    scale: [1, 0.25], alpha: [1, 0], tint: [0xffffff, 0xe8fff2, 0x9fffd0, 0xffb3e0], alignToVelocity: true,
+  },
+  star: {
+    art: 'fx_grain_lumiere', tex: 'juice-star', size: 12, depth: 'front', add: true, tintArt: true,
+    lifespan: [420, 800], speed: [20, 90], angle: [0, 360], gravityY: -20,
+    scale: [1, 0], alpha: [1, 0.2], tint: [0xffffff, 0x8fe3b8, 0xff9fc9], spin: true,
+  },
+  mote: {
+    art: 'fx_grain_lumiere', tex: 'juice-dot', size: 12, depth: 'front', add: true, tintArt: true,
+    lifespan: [700, 1300], speed: [10, 45], angle: [245, 295], gravityY: -40,
+    scale: [1, 0.2], alpha: [0.95, 0], tint: [0x8fe3b8, 0xe8fff2, 0xff9fc9],
+  },
+  leaf: {
+    art: 'fx_feuille', tex: 'juice-leaf', size: 12, depth: 'front',
+    lifespan: [650, 1050], speed: [60, 190], angle: [0, 360], gravityY: 240,
+    scale: [1, 0.8], alpha: [1, 0], tint: [0x6fbf5a, 0xa8e07a, 0x4f9a48], spin: true,
+  },
+  feather: {
+    art: null, tex: 'juice-feather', size: 15, depth: 'behind',
+    lifespan: [900, 1500], speed: [15, 70], angle: [0, 360], gravityY: 50,
+    scale: [1, 0.7], alpha: [0.9, 0], tint: [0xf3ecff, 0xd9cff0, 0xfff6e0], spin: true,
+  },
+  chip: {
+    art: 'fx_eclat_mousse', tex: 'juice-chip', size: 9, depth: 'front',
+    lifespan: [450, 800], speed: [130, 330], angle: [200, 340], gravityY: 760,
+    scale: [1, 0.7], alpha: [1, 0], tint: [0x6fae3a, 0x9bff5a, 0x3e7a2c], spin: true,
+  },
+  clod: {
+    art: 'fx_motte_mousse', tex: 'juice-chip', size: 15, depth: 'front',
+    lifespan: [500, 850], speed: [100, 260], angle: [215, 325], gravityY: 820,
+    scale: [1, 0.8], alpha: [1, 0], tint: [0x2f5a2a, 0x3e7a2c, 0x24451f], spin: true,
+  },
+  earth: {
+    art: 'fx_motte_terre', tex: 'juice-chip', size: 10, depth: 'front',
+    lifespan: [400, 700], speed: [110, 280], angle: [210, 330], gravityY: 820,
+    scale: [1, 0.7], alpha: [1, 0], tint: [0x5a4630, 0x7a5f40, 0x3d2f22], spin: true,
+  },
+  ember: {
+    art: 'fx_braise', tex: 'juice-dot', size: 6, depth: 'front', add: true,
+    lifespan: [700, 1300], speed: [15, 55], angle: [250, 290], gravityY: -55,
+    scale: [1, 0.3], alpha: [1, 0], tint: [0xffc36b, 0xff9a3c, 0xffe29a],
+  },
+  drop: {
+    art: 'fx_goutte_toxique', tex: 'juice-drop', size: 7, depth: 'front',
+    lifespan: [450, 750], speed: [20, 90], angle: [60, 120], gravityY: 620,
+    scale: [1, 0.8], alpha: [1, 0], tint: [0x9bff5a, 0x6fdc3a],
+  },
+  bubble: {
+    art: 'fx_bulle', tex: 'juice-ring', size: 10, depth: 'front', tintArt: true,
+    lifespan: [600, 1000], speed: [15, 50], angle: [245, 295], gravityY: -70,
+    scale: [0.6, 1.25], alpha: [0.9, 0], tint: [0xff9fc9, 0xffd0e6, 0xd0b060],
+  },
+  streak: {
+    art: 'fx_trait_vent', tex: 'juice-streak', size: 34, depth: 'behind', add: true,
+    lifespan: [180, 280], speed: [0, 30], angle: [0, 0], gravityY: 0,
+    scale: [1, 0.6], alpha: [0.55, 0], tint: [0xffffff, 0xd8ccf5],
+  },
+  petal: {
+    art: 'fx_petale_rose', tex: 'juice-leaf', size: 9, depth: 'front',
+    lifespan: [800, 1300], speed: [40, 140], angle: [0, 360], gravityY: 120,
+    scale: [1, 0.7], alpha: [1, 0], tint: [0xff9fc9, 0xffd0e6], spin: true,
+  },
+  wing: {
+    art: 'fx_etincelle_papillon', tex: 'juice-star', size: 9, depth: 'front', add: true,
+    lifespan: [320, 560], speed: [20, 110], angle: [0, 360], gravityY: 40,
+    scale: [1, 0.1], alpha: [1, 0], tint: [0x9ff3ff, 0x6fd8ff, 0xffb3f0, 0xfff6a0],
+  },
+  // Interface (fixées à l'écran) : éclats de cœur, étincelles de bandeau.
+  uiShard: {
+    art: null, tex: 'juice-chip', size: 6, depth: 'ui',
+    lifespan: [380, 600], speed: [60, 170], angle: [200, 340], gravityY: 520,
+    scale: [1, 0.6], alpha: [1, 0], tint: [0xff4d6d, 0xff9fc9, 0xffd1e1], spin: true,
+  },
+  uiStar: {
+    art: null, tex: 'juice-star', size: 11, depth: 'ui', add: true,
+    lifespan: [380, 700], speed: [30, 140], angle: [0, 360], gravityY: 0,
+    scale: [1, 0], alpha: [1, 0.3], tint: [0xffffff, 0x8fe3b8, 0xff9fc9],
+  },
+};
+
+const FX_DEPTHS = { behind: CHARACTER_DEPTH - 1, front: CHARACTER_DEPTH + 2, ui: 2300 };
+// Plafond de particules VIVANTES par émetteur (les mortes sont recyclées).
+const FX_MAX_ALIVE = 160;
+
+function juiceFxState(scene) {
+  if (!scene.__juiceFx) scene.__juiceFx = { emitters: {}, ghosts: [], ghostIdx: 0 };
+  return scene.__juiceFx;
+}
+
+function juiceEmitter(scene, kind) {
+  const st = juiceFxState(scene);
+  let e = st.emitters[kind];
+  if (e && e.scene) return e;
+  const r = FX_PARTICLES[kind];
+  if (!r) return null;
+  const tex = juiceTexture(scene, r.art, r.tex);
+  const base = r.size / tex.size;
+  const cfg = {
+    emitting: false,
+    lifespan: { min: r.lifespan[0], max: r.lifespan[1] },
+    speed: { min: r.speed[0], max: r.speed[1] },
+    angle: { min: r.angle[0], max: r.angle[1] },
+    gravityY: r.gravityY || 0,
+    scale: { start: r.scale[0] * base, end: r.scale[1] * base },
+    alpha: { start: r.alpha[0], end: r.alpha[1] },
+    tint: r.tint,
+    maxAliveParticles: FX_MAX_ALIVE,
+    blendMode: r.add ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL,
+  };
+  if (r.alignToVelocity) cfg.rotate = { onEmit: (p) => Phaser.Math.RadToDeg(Math.atan2(p.velocityY, p.velocityX)) };
+  else if (r.spin) cfg.rotate = { min: 0, max: 360 };
+  if (tex.art && !r.tintArt) cfg.tint = r.artTint ?? 0xffffff;
+  e = scene.add.particles(0, 0, tex.key, cfg).setDepth(FX_DEPTHS[r.depth] ?? FX_DEPTHS.front);
+  if (r.depth === 'ui') e.setScrollFactor(0);
+  e.__recipe = r;
+  e.__fixedTint = tex.art && !r.tintArt ? (r.artTint ?? 0xffffff) : null;
+  st.emitters[kind] = e;
+  return e;
+}
+
+// Émet `count` particules de la recette `kind` en (x, y). opts : count,
+// angle [min, max], speed [min, max] ou `power` (multiplie la vitesse),
+// lifespan [min, max], tint (couleur ou tableau), spread (px autour du point).
+function juiceParticles(scene, kind, x, y, opts = {}) {
+  if (!scene || !scene.add || !scene.sys || !scene.sys.isActive()) return null;
+  const e = juiceEmitter(scene, kind);
+  if (!e) return null;
+  const r = e.__recipe;
+  const power = opts.power ?? 1;
+  const sp = opts.speed || r.speed;
+  const ang = opts.angle || r.angle;
+  e.setEmitterAngle({ min: ang[0], max: ang[1] });
+  e.setParticleSpeed({ min: sp[0] * power, max: sp[1] * power });
+  const life = opts.lifespan || r.lifespan;
+  e.setParticleLifespan({ min: life[0], max: life[1] });
+  if (e.__fixedTint !== null) e.setParticleTint(e.__fixedTint);
+  else e.setParticleTint(opts.tint !== undefined && opts.tint !== null ? opts.tint : r.tint);
+  const count = Math.max(0, Math.round(opts.count ?? 6));
+  const spread = opts.spread || 0;
+  if (!spread) {
+    e.explode(count, x, y);
+  } else {
+    for (let i = 0; i < count; i++) e.explode(1, x + Phaser.Math.FloatBetween(-spread, spread), y + Phaser.Math.FloatBetween(-spread / 2, spread / 2));
+  }
+  return e;
+}
+
+// Image unique qui grandit et s'efface. `kind` : 'ring' (anneau dessiné) |
+// 'glow' (halo, art fx_halo_doux) | 'rays' (art fx_halo_rayons) | 'item'
+// (art fx_halo_objet). `flat` : aplatissement vertical (onde au sol).
+function juiceBurstImage(scene, kind, x, y, { size = 80, from = 0.3, to = 1, ms = 380, color = 0xffffff, alpha = 0.9, depth, ui = false, flat = 1, ease = 'Cubic.easeOut' } = {}) {
+  if (!scene || !scene.add) return null;
+  const arts = { ring: null, glow: 'fx_halo_doux', rays: 'fx_halo_rayons', item: 'fx_halo_objet' };
+  const tex = juiceTexture(scene, arts[kind], kind === 'ring' ? 'juice-ring' : 'juice-glow');
+  const img = scene.add.image(x, y, tex.key).setTint(color).setAlpha(alpha)
+    .setBlendMode(Phaser.BlendModes.ADD)
+    .setDepth(depth ?? (ui ? FX_DEPTHS.ui : FX_DEPTHS.front));
+  if (ui) img.setScrollFactor(0);
+  const k = size / tex.size;
+  img.setScale(k * from, k * from * flat);
+  scene.tweens.add({
+    targets: img, scaleX: k * to, scaleY: k * to * flat, alpha: 0, duration: ms, ease,
+    onComplete: () => img.destroy(),
+  });
+  return img;
+}
+
+// Anneau de choc : art `vfx_anneau_choc` (anim 'talisman' ou 'toxique') s'il
+// existe, sinon anneau dessiné.
+function juiceShockRing(scene, x, y, { size = 120, color = 0xe8fff2, ms = 420, variant = 'talisman', flat = 1, depth } = {}) {
+  if (typeof hasManifestArt === 'function' && hasManifestArt(scene, 'vfx_anneau_choc', variant)) {
+    const fx = addManifestSprite(scene, x, y, 'vfx_anneau_choc', variant, { origin: [0.5, 0.5] })
+      .setDepth(depth ?? FX_DEPTHS.front).setBlendMode(Phaser.BlendModes.ADD);
+    const k = size / Math.max(fx.width, 1);
+    fx.setScale(k, k * flat);
+    fx.once('animationcomplete', () => fx.destroy());
+    scene.time.delayedCall(ms + 800, () => { if (fx.active) fx.destroy(); });
+    return fx;
+  }
+  return juiceBurstImage(scene, 'ring', x, y, { size, color, ms, from: 0.2, to: 1, alpha: 0.85, flat, depth });
+}
+
+// Silhouette fantôme (traînée) : copie de la frame courante, d'une couleur
+// unie, qui s'efface.
+// Réserve de 8 images par scène, réutilisées (aucune création en continu).
+const JUICE_GHOST_POOL = 8;
+function juiceGhost(scene, sprite, { tint = 0x9a7dff, alpha = 0.38, ms = 200, add = true } = {}) {
+  if (!sprite || !sprite.active || !sprite.frame || !sprite.visible) return;
+  const st = juiceFxState(scene);
+  st.ghostIdx = (st.ghostIdx + 1) % JUICE_GHOST_POOL;
+  let g = st.ghosts[st.ghostIdx];
+  if (!g || !g.scene) {
+    g = scene.add.image(0, 0, sprite.texture.key, sprite.frame.name);
+    st.ghosts[st.ghostIdx] = g;
+  }
+  scene.tweens.killTweensOf(g);
+  g.setTexture(sprite.texture.key, sprite.frame.name)
+    .setOrigin(sprite.originX, sprite.originY)
+    .setPosition(sprite.x, sprite.y)
+    .setScale(sprite.scaleX, sprite.scaleY)
+    .setFlip(sprite.flipX, sprite.flipY)
+    .setRotation(sprite.rotation)
+    .setDepth(sprite.depth - 1)
+    // Silhouette pleine de la couleur (les formes sont sombres : une simple
+    // teinte additive ne se verrait pas) -> contour lumineux façon DA.
+    .setTintFill(tint)
+    .setBlendMode(add ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL)
+    .setAlpha(alpha)
+    .setVisible(true);
+  scene.tweens.add({ targets: g, alpha: 0, duration: ms, ease: 'Quad.easeOut', onComplete: () => g.setVisible(false) });
+}
+
+// --- Effets composés : spawnFx(scene, kind, x, y, opts) ---------------------
+//   'land' {power 0..1}            poussière des deux côtés des pieds
+//   'step' {dir, power}            petite bouffée derrière les pieds (course)
+//   'turn' {dir}                   bouffée devant (demi-tour)
+//   'impact' {power, angle}        étincelles + éclat (coup qui porte)
+//   'wallHit' {dir}                étincelles + poussière contre un obstacle
+//   'poof' {size}                  nuage violet + lueurs (ennemi vaincu)
+//   'leaves' {count, power, angle} gerbe de feuilles (lianes, singe)
+//   'feathers' {count}             plumes (aigle)
+//   'transform' {color, size}      halo + anneau + étoiles (changement de forme)
+//   'slam' {size}                  fracas au sol (ours)
+//   'embers' {count} / 'crackle'   braises du feu de camp / gerbe d'étincelles
+//   'mossBreak' {w, h} / 'melt' {w, h}   mousse qui éclate / qui fond
+//   'pickup' {color} / 'glint'     objet ramassé / petite étoile qui scintille
+//   'motes' {count, color, spread} lueurs qui montent (totem, lanterne)
+//   'heal' {count}                 lueurs douces (soin)
+//   'wingDust' {count}             poussière d'ailes (papillon)
+//   'streaks' {dir, count}         traits de vitesse
+//   ou le nom d'une recette de FX_PARTICLES (opts de juiceParticles).
+// Toujours sans effet sur le jeu.
+function spawnFx(scene, kind, x, y, opts = {}) {
+  if (!scene || !scene.add || !scene.sys || !scene.sys.isActive()) return;
+  const dir = opts.dir >= 0 ? 1 : -1;
+  const power = Phaser.Math.Clamp(opts.power ?? 1, 0, 2);
+  switch (kind) {
+    case 'land': {
+      const n = Math.round(2 + 7 * power);
+      const life = [300, 520 + 200 * power];
+      juiceParticles(scene, 'dust', x - 10, y - 4, { count: Math.ceil(n / 2), angle: [182, 215], power: 0.6 + power, lifespan: life });
+      juiceParticles(scene, 'dust', x + 10, y - 4, { count: Math.ceil(n / 2), angle: [325, 358], power: 0.6 + power, lifespan: life });
+      if (power > 0.6) juiceParticles(scene, 'earth', x, y - 2, { count: Math.round(3 * power), power: 0.6 });
+      break;
+    }
+    case 'step':
+      juiceParticles(scene, 'dust', x - dir * 10, y - 3, { count: opts.count ?? 1, angle: dir > 0 ? [190, 230] : [310, 350], power: 0.5 * power + 0.3, lifespan: [260, 420] });
+      break;
+    case 'turn':
+      juiceParticles(scene, 'dust', x + dir * 12, y - 3, { count: 3, angle: dir > 0 ? [300, 345] : [195, 240], power: 0.9, lifespan: [280, 460] });
+      break;
+    case 'impact':
+      juiceParticles(scene, 'spark', x, y, { count: Math.round(6 + 6 * power), angle: opts.angle || [0, 360], power: 0.7 + 0.5 * power });
+      juiceBurstImage(scene, 'glow', x, y, { size: 60 + 36 * power, from: 0.4, to: 1, ms: 190, color: opts.color ?? 0xe8fff2, alpha: 0.9 });
+      if (power >= 1) juiceShockRing(scene, x, y, { size: 70 + 40 * power, ms: 260, color: opts.color ?? 0xe8fff2 });
+      break;
+    case 'wallHit':
+      juiceParticles(scene, 'spark', x, y, { count: 6, angle: dir > 0 ? [140, 220] : [-40, 40], power: 0.7 });
+      juiceParticles(scene, 'dust', x, y, { count: 3, angle: dir > 0 ? [150, 210] : [-30, 30], power: 0.6 });
+      juiceParticles(scene, 'earth', x, y, { count: 2, power: 0.5 });
+      break;
+    case 'poof': {
+      const s = opts.size ?? 1;
+      juiceParticles(scene, 'smoke', x, y, { count: Math.round(7 * s), power: s, spread: 10 * s });
+      juiceParticles(scene, 'mote', x, y, { count: Math.round(6 * s), spread: 14 * s, tint: [0xff9fc9, 0x8fe3b8, 0xc77dff] });
+      juiceShockRing(scene, x, y, { size: 60 * s, ms: 300, color: 0xc77dff });
+      break;
+    }
+    case 'leaves':
+      juiceParticles(scene, 'leaf', x, y, { count: opts.count ?? 7, power, angle: opts.angle, spread: opts.spread });
+      break;
+    case 'feathers':
+      juiceParticles(scene, 'feather', x, y, { count: opts.count ?? 4, power, spread: 8 });
+      break;
+    case 'transform': {
+      const color = opts.color ?? 0x8fe3b8;
+      const s = opts.size ?? 1;
+      juiceBurstImage(scene, 'glow', x, y, { size: 90 * s, from: 0.3, to: 1.1, ms: 260, color, alpha: 0.75 });
+      juiceShockRing(scene, x, y, { size: 96 * s, ms: 320, color });
+      juiceParticles(scene, 'star', x, y, { count: Math.round(8 * s), tint: [color, 0xffffff, 0xff9fc9], power: 1.2 * s });
+      break;
+    }
+    case 'slam': {
+      const s = opts.size ?? 1;
+      juiceParticles(scene, 'dust', x - 20, y - 4, { count: Math.round(6 * s), angle: [180, 200], power: 2.2 * s, lifespan: [420, 760] });
+      juiceParticles(scene, 'dust', x + 20, y - 4, { count: Math.round(6 * s), angle: [340, 360], power: 2.2 * s, lifespan: [420, 760] });
+      juiceParticles(scene, 'earth', x, y - 4, { count: Math.round(8 * s), power: 1.2 });
+      juiceShockRing(scene, x, y - 6, { size: 230 * s, ms: 380, color: 0xffe2b0, flat: 0.28 });
+      break;
+    }
+    case 'embers':
+      juiceParticles(scene, 'ember', x, y, { count: opts.count ?? 2, spread: opts.spread ?? 10 });
+      break;
+    case 'crackle':
+      juiceParticles(scene, 'ember', x, y, { count: opts.count ?? 6, speed: [60, 150], angle: [235, 305], spread: 6, lifespan: [400, 800] });
+      break;
+    case 'mossBreak': {
+      const w = opts.w || 96;
+      const h = opts.h || 96;
+      const n = Phaser.Math.Clamp(Math.round((w * h) / 900), 8, 26);
+      juiceParticles(scene, 'chip', x, y, { count: n, spread: w / 3, power: 1.1 });
+      juiceParticles(scene, 'clod', x, y, { count: Math.round(n / 2), spread: w / 3 });
+      juiceParticles(scene, 'drop', x, y, { count: Math.round(n / 3), spread: w / 2, angle: [200, 340], speed: [60, 200] });
+      juiceParticles(scene, 'dust', x, y + h / 2 - 6, { count: 8, spread: w / 2, angle: [190, 350], power: 1.4, tint: [0x6f8f5a, 0x9bbf7a, 0x4f6a43] });
+      juiceShockRing(scene, x, y, { size: Math.max(w, h) * 1.3, ms: 340, color: 0x9bff5a, variant: 'toxique' });
+      break;
+    }
+    case 'melt': {
+      const w = opts.w || 96;
+      const h = opts.h || 192;
+      juiceParticles(scene, 'drop', x, y - h / 2, { count: opts.count ?? 4, spread: w / 2 });
+      juiceParticles(scene, 'bubble', x, y, { count: opts.count ?? 3, spread: w / 2 });
+      break;
+    }
+    case 'pickup': {
+      const color = opts.color ?? 0x8fe3b8;
+      juiceParticles(scene, 'star', x, y, { count: 10, power: 1.4, tint: [color, 0xffffff, 0xff9fc9] });
+      juiceShockRing(scene, x, y, { size: 70, ms: 300, color });
+      juiceBurstImage(scene, 'glow', x, y, { size: 70, from: 0.4, to: 1.2, ms: 260, color, alpha: 0.7 });
+      break;
+    }
+    case 'glint':
+      juiceParticles(scene, 'star', x, y, { count: 1, speed: [0, 8], lifespan: [380, 520], tint: opts.tint ?? 0xffffff });
+      break;
+    case 'motes':
+      juiceParticles(scene, 'mote', x, y, { count: opts.count ?? 3, spread: opts.spread ?? 12, tint: opts.color, power });
+      break;
+    case 'heal':
+      juiceParticles(scene, 'mote', x, y, { count: opts.count ?? 8, spread: 16, tint: [0xfff6c2, 0x9ffcff, 0xffb6e8, 0xd8ffb0] });
+      break;
+    case 'wingDust':
+      juiceParticles(scene, 'wing', x, y, { count: opts.count ?? 4, spread: opts.spread ?? 6, power });
+      break;
+    case 'streaks':
+      juiceParticles(scene, 'streak', x, y, { count: opts.count ?? 2, spread: opts.spread ?? 16, angle: dir > 0 ? [180, 180] : [0, 0], speed: [40, 90] });
+      break;
+    default:
+      juiceParticles(scene, kind, x, y, opts);
+  }
+}
+
+// --- Combat : retour de chaque coup porté (appelé par damageEnemy) ----------
+// Hit-stop 35-70 ms et secousse dosés selon la force du coup, étincelles au
+// point d'impact, flash blanc et recul (dessin seulement) de l'ennemi touché,
+// « poof » de défaite. Jamais de changement de PV, de vitesse ou de hitbox.
+const JUICE_HIT_PROFILES = {
+  melee: { stop: 55, shake: 'light', power: 0.9 },
+  dive: { stop: 40, shake: 'light', power: 0.8 },
+  feather: { stop: 35, shake: 'tiny', power: 0.6 },
+  pierre: { stop: 45, shake: 'tiny', power: 0.7 },
+  skill: { stop: 70, shake: 'medium', power: 1.4 },
+};
+
+function juiceOnEnemyHit(scene, enemy, source = {}) {
+  if (!scene || !enemy || !scene.sys || !scene.sys.isActive()) return;
+  const isProjectile = source instanceof Phaser.GameObjects.GameObject;
+  const kind = source.kind === 'skill' || source.skillId ? 'skill' : (source.kind || (isProjectile ? 'pierre' : 'melee'));
+  const prof = JUICE_HIT_PROFILES[kind] || JUICE_HIT_PROFILES.melee;
+  const killed = !!enemy.defeated && !enemy.healed;
+  let b = null;
+  try { b = enemy.getBounds(); } catch (e) { b = null; }
+  // Point d'impact : centre de l'intersection coup / ennemi, sinon le bord
+  // de l'ennemi côté joueur (projectiles : leur position).
+  const player = (!isProjectile && source.player) || scene.player;
+  let ix = b ? b.centerX : enemy.x;
+  let iy = b ? b.centerY : enemy.y;
+  const hitRect = !isProjectile && (source.rect || (kind === 'melee' && player && player.getAttackHitbox ? player.getAttackHitbox() : null));
+  if (b && hitRect) {
+    const r = Phaser.Geom.Rectangle.Intersection(hitRect, b);
+    if (r.width > 0 && r.height > 0) { ix = r.centerX; iy = r.centerY; }
+  } else if (b && player) {
+    ix = Phaser.Math.Clamp(player.x, b.x, b.right);
+  }
+  if (typeof source.x === 'number' && kind !== 'melee') { ix = source.x; iy = source.y; }
+  const from = player ? (enemy.x >= player.x ? 1 : -1) : 1;
+  juiceHitStop(scene, killed ? prof.stop + 15 : prof.stop);
+  juiceShake(scene, killed && prof.shake === 'light' ? 'medium' : prof.shake);
+  spawnFx(scene, 'impact', ix, iy, { power: prof.power + (killed ? 0.3 : 0), angle: kind === 'skill' ? null : (from > 0 ? [-60, 60] : [120, 240]) });
+  playSfx(killed ? 'enemy_defeat' : 'enemy_hit', { kind });
+  if (!enemy.active) return;
+  // Flash blanc si l'ennemi ne s'en charge pas déjà (corrompus, loup alpha…).
+  if (!(enemy.isTinted && enemy.tintFill)) juiceFlash(enemy, 0xffffff, killed ? 90 : 70);
+  juiceRecoil(enemy, from * (killed ? 10 : 7), -2, 150);
+  juiceSquash(enemy, 1.12, 0.9, 170);
+  if (killed) {
+    // Le poof part pendant que l'ennemi disparaît (fondu ~200 ms).
+    const cx = b ? b.centerX : enemy.x;
+    const cy = b ? b.centerY : enemy.y;
+    const size = b ? Phaser.Math.Clamp(Math.max(b.width, b.height) / 60, 0.7, 2) : 1;
+    scene.time.delayedCall(110, () => spawnFx(scene, 'poof', cx, cy, { size }));
+  }
+}
+
+// --- Caméra : regard en avant dans le sens de la course ---------------------
+// Décalage horizontal doux (followOffset) vers l'avant d'Agarica, plus marqué
+// en courant ; ne touche jamais au vertical (caméra de zone). En pause pendant
+// une cinématique qui a pris la caméra, monde gelé, ou si la zone règle
+// elle-même `camera.lookAheadX`.
+const JUICE_LOOK_AHEAD = 46;
+
+function juiceUpdateCameraLook(scene, dt) {
+  const cam = scene.cameras.main;
+  const p = scene.player;
+  if (!p || !p.active || !p.body || cam._follow !== p || scene.__cameraDetached) return;
+  if (cam.panEffect && cam.panEffect.isRunning) return;
+  const zc = scene.__zoneCamera;
+  if (zc && zc.cfg && zc.cfg.lookAheadX) return;
+  if (typeof isWorldFrozen === 'function' && isWorldFrozen(scene)) return;
+  const vx = p.body.velocity.x;
+  const facing = p.facingDir >= 0 ? 1 : -1;
+  const run = Phaser.Math.Clamp((Math.abs(vx) - 30) / 330, 0, 1);
+  const want = -facing * JUICE_LOOK_AHEAD * (0.3 + 0.7 * run);
+  const k = 1 - Math.exp(-dt * (run > 0.2 ? 1.8 : 1.1));
+  cam.followOffset.x += (want - cam.followOffset.x) * k;
+}
+
+// --- Vie ambiante : lucioles (nuit) et papillons (jour) ---------------------
+// Clé de zone optionnelle `ambientLife: false | { fireflies: n, butterflies: n }`
+// (défaut selon le fond : lucioles la nuit, quelques papillons le jour).
+// Nombre fixe d'objets par visite (pas d'émission continue).
+const JUICE_DAY_BACKGROUNDS = ['fond_bosquet', 'fond_foret_flottante'];
+
+function juiceAddAmbientLife(scene, data) {
+  if (data.decor === false || data.ambientLife === false) return;
+  const cfg = data.ambientLife && typeof data.ambientLife === 'object' ? data.ambientLife : {};
+  const bg = zoneBackgroundId(data);
+  const day = JUICE_DAY_BACKGROUNDS.includes(bg);
+  const lw = scene.levelWidth || scene.scale.width;
+  const rnd = new Phaser.Math.RandomDataGenerator([`ambiant-${lw}-${bg}`]);
+  const nFire = cfg.fireflies ?? (day ? 3 : Phaser.Math.Clamp(Math.round(lw / 190), 6, 30));
+  const tex = juiceTexture(scene, 'fx_luciole', 'juice-dot');
+  const colors = [0xd8ffb0, 0x8fe3b8, 0xfff6a0, 0xd8ffb0, 0xffb3e0];
+  for (let i = 0; i < nFire; i++) {
+    const x = rnd.between(30, Math.max(31, lw - 30));
+    const ground = groundStandYAt(scene, x, 448);
+    const y = (ground ?? 440) - rnd.between(24, 190);
+    const front = rnd.frac() < 0.25;
+    const size = front ? rnd.between(9, 13) : rnd.between(5, 8);
+    const f = scene.add.image(x, y, tex.key).setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(tex.art ? 0xffffff : colors[i % colors.length]).setScale((size * (tex.art ? 2.2 : 1)) / tex.size).setAlpha(0)
+      .setDepth(front ? DECOR_FOREGROUND_DEPTH - 3 : CHARACTER_DEPTH - 2);
+    scene.tweens.add({
+      targets: f, x: x + rnd.between(-60, 60), y: y + rnd.between(-30, 30),
+      duration: rnd.between(3200, 6400), yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: rnd.between(0, 2000),
+    });
+    scene.tweens.add({
+      targets: f, alpha: { from: 0.08, to: front ? 0.55 : 0.85 },
+      duration: rnd.between(900, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: rnd.between(0, 2500),
+    });
+  }
+  const hasButterflies = (data.animals || []).some((a) => a && a.type === 'papillons');
+  const nBut = cfg.butterflies ?? (day && !hasButterflies ? Phaser.Math.Clamp(Math.round(lw / 900), 2, 5) : 0);
+  if (nBut > 0 && typeof spawnButterflies === 'function') {
+    for (let i = 0; i < nBut; i++) {
+      const x = rnd.between(200, Math.max(220, lw - 200));
+      const ground = groundStandYAt(scene, x, 448);
+      spawnButterflies(scene, x, (ground ?? 440) - rnd.between(50, 120), 1, { radius: 70, scale: 0.8, depth: CHARACTER_DEPTH - 1 });
+    }
+  }
+}
+
+// --- Entrée / sortie de zone ------------------------------------------------
+// Fondu plus doux : voile à courbe adoucie (au lieu du fondu linéaire de la
+// caméra) et léger « posé » de la caméra (zoom 1,03 → 1) à l'arrivée. La
+// sortie garde sa durée (FADE_DURATION) : une cinématique qui finit par un
+// changement de zone ne change pas de rythme.
+const JUICE_FADE_IN_MS = 460;
+const JUICE_VEIL_DEPTH = 9500;
+
+function juiceFadeIn(scene, { ms = JUICE_FADE_IN_MS, zoom = 0 } = {}) {
+  const { width, height } = scene.scale;
+  const veil = scene.add.rectangle(0, 0, width, height, 0x0d0b1a, 1).setOrigin(0).setScrollFactor(0).setDepth(JUICE_VEIL_DEPTH);
+  scene.tweens.add({ targets: veil, alpha: 0, duration: ms, ease: 'Sine.easeOut', onComplete: () => veil.destroy() });
+  const cam = scene.cameras.main;
+  if (zoom && cam) {
+    cam.setZoom(zoom);
+    scene.tweens.add({ targets: cam, zoom: 1, duration: ms + 260, ease: 'Sine.easeOut', onComplete: () => cam.setZoom(1) });
+  }
+}
+
+function juiceFadeOut(scene, ms, onDone) {
+  const { width, height } = scene.scale;
+  const veil = scene.add.rectangle(0, 0, width, height, 0x0d0b1a, 1).setOrigin(0).setScrollFactor(0)
+    .setDepth(JUICE_VEIL_DEPTH).setAlpha(0);
+  scene.tweens.add({ targets: veil, alpha: 1, duration: ms, ease: 'Sine.easeIn', onComplete: onDone });
+  const cam = scene.cameras.main;
+  if (cam && Math.abs(cam.zoom - 1) < 0.001) scene.tweens.add({ targets: cam, zoom: 1.025, duration: ms, ease: 'Sine.easeIn' });
+}
+
+// Remise à zéro par visite (instance de scène réutilisée) + crochet caméra +
+// vie ambiante. Appelée à la fin de buildLevelFromData.
+function juiceSetupLevel(scene, data) {
+  juiceTimeState(scene);
+  juiceResetTime(scene);
+  if (!scene.__juiceCameraHook) {
+    scene.__juiceCameraHook = true;
+    scene.events.on('postupdate', (time, delta) => {
+      if (scene !== currentLevelScene || !scene.player) return;
+      juiceUpdateCameraLook(scene, Math.min(delta || 16, 50) / 1000);
+    });
+  }
+  try { juiceAddAmbientLife(scene, data); } catch (e) { console.warn('juiceAddAmbientLife', e); }
+}
+
+// --- HUD : cœurs qui tremblent puis se vident, énergie qui se remplit -------
+// État par visite (scene.__hudFx) ; lu par drawHud (repli dessiné) et par
+// storyDrawHudArt (StoryKit, cœurs Codex).
+const JUICE_HEART_SHAKE_MS = 220;
+const JUICE_HEART_EMPTY_MS = 300;
+const JUICE_HEART_GAIN_MS = 300;
+
+function juiceHudState(scene) {
+  const p = scene.player;
+  let st = scene.__hudFx;
+  if (!st || st.player !== p) {
+    st = {
+      player: p, hearts: p.hearts, fx: [], energyShown: p.energy, energyTrail: p.energy,
+      trailHoldUntil: 0, lastEnergy: p.energy, denyAt: -Infinity, fullAt: -Infinity, skillPop: [],
+    };
+    scene.__hudFx = st;
+  }
+  return st;
+}
+
+// Appelée une fois par image par drawHud : détecte les changements.
+function juiceHudUpdate(scene) {
+  const p = scene.player;
+  const st = juiceHudState(scene);
+  const now = scene.time.now;
+  if (p.hearts < st.hearts) {
+    for (let i = Math.max(0, p.hearts); i < st.hearts; i++) st.fx[i] = { kind: 'lost', t0: now, burst: false };
+    playSfx('heart_lost');
+  } else if (p.hearts > st.hearts) {
+    // Cœurs rendus au feu de camp : l'animation attend la fermeture du menu
+    // (sinon elle se jouerait cachée dessous).
+    if (scene.scene.isActive('CampfireMenuScene')) return st;
+    for (let i = Math.max(0, st.hearts); i < p.hearts; i++) st.fx[i] = { kind: 'gain', t0: now + (i - st.hearts) * 80, burst: false };
+  }
+  st.hearts = p.hearts;
+  // Énergie : la barre monte en douceur ; une dépense la fait tomber net,
+  // avec une traîne pâle qui suit après un court instant.
+  const dt = Math.min(scene.game.loop.delta || 16, 50) / 1000;
+  const e = p.energy;
+  if (e < st.lastEnergy) st.trailHoldUntil = now + 260;
+  if (e >= p.maxEnergy && st.lastEnergy < p.maxEnergy) { st.fullAt = now; playSfx('energy_full'); }
+  st.lastEnergy = e;
+  if (st.energyShown < e) st.energyShown = Math.min(e, st.energyShown + Math.max(20, (e - st.energyShown) * 6) * dt);
+  else st.energyShown = e;
+  if (st.energyTrail < st.energyShown) st.energyTrail = st.energyShown;
+  else if (now > st.trailHoldUntil) st.energyTrail = Math.max(st.energyShown, st.energyTrail - Math.max(30, (st.energyTrail - st.energyShown) * 5) * dt);
+  return st;
+}
+
+// État visuel du cœur i : { full, dx, dy, scale, flash } (+ éclats au bon moment).
+function juiceHudHeart(scene, i, cx, cy) {
+  const st = scene.__hudFx;
+  const p = scene.player;
+  const base = { full: i < p.hearts, dx: 0, dy: 0, scale: 1, flash: 0 };
+  const f = st && st.fx[i];
+  if (!f) return base;
+  const t = scene.time.now - f.t0;
+  if (f.kind === 'lost') {
+    if (t < JUICE_HEART_SHAKE_MS) {
+      const k = t / JUICE_HEART_SHAKE_MS;
+      return { full: true, dx: Math.sin(t * 0.12) * 3.5 * (1 - k), dy: 0, scale: 1 + 0.18 * Math.sin(k * Math.PI), flash: 1 - k };
+    }
+    if (!f.burst) {
+      f.burst = true;
+      spawnFx(scene, 'uiShard', cx, cy, { count: 7 });
+    }
+    const k = (t - JUICE_HEART_SHAKE_MS) / JUICE_HEART_EMPTY_MS;
+    if (k >= 1) { st.fx[i] = null; return base; }
+    return { full: false, dx: 0, dy: 0, scale: 0.72 + 0.28 * Phaser.Math.Easing.Back.Out(k), flash: 0 };
+  }
+  if (t < 0) return { ...base, full: false };
+  if (!f.burst) {
+    f.burst = true;
+    spawnFx(scene, 'uiStar', cx, cy, { count: 4, power: 0.7 });
+  }
+  const k = t / JUICE_HEART_GAIN_MS;
+  if (k >= 1) { st.fx[i] = null; return base; }
+  return { full: true, dx: 0, dy: 0, scale: 0.5 + 0.5 * Phaser.Math.Easing.Back.Out(k), flash: 1 - k };
+}
+
+// Refus visuel (compétence sans assez d'énergie) : la barre tremble, liseré rouge.
+function juiceHudDeny(scene) {
+  if (!scene || !scene.player || !scene.hudGraphics) return;
+  juiceHudState(scene).denyAt = scene.time.now;
+  playSfx('skill_denied');
+}
+
+// Icône de compétence qui « saute » quand la compétence part.
+function juiceHudSkillPop(scene, slotIndex) {
+  if (!scene || !scene.player || !scene.hudGraphics) return;
+  juiceHudState(scene).skillPop[slotIndex] = scene.time.now;
+}
+
+function juiceHudSkillScale(scene, i) {
+  const st = scene.__hudFx;
+  const t0 = st && st.skillPop[i];
+  if (t0 == null) return 1;
+  const t = (scene.time.now - t0) / 260;
+  if (t >= 1 || t < 0) return 1;
+  return 1 + 0.28 * Math.sin(t * Math.PI) * (1 - t * 0.4);
+}
+
+// Barre d'énergie : fond, traîne pâle, remplissage lissé, reflet, pointe
+// lumineuse pendant qu'elle monte, lueur qui respire quand elle est pleine.
+function juiceDrawEnergyBar(scene, g, x, y, w, h) {
+  const p = scene.player;
+  const st = scene.__hudFx || juiceHudState(scene);
+  const now = scene.time.now;
+  const dk = (now - st.denyAt) / 260;
+  const deny = dk < 1 ? Math.sin(dk * Math.PI * 4) * 3 * (1 - dk) : 0;
+  const bx = x + deny;
+  g.fillStyle(0x2a1f45, 1);
+  g.fillRoundedRect(bx, y, w, h, 4);
+  const max = Math.max(1, p.maxEnergy);
+  const trail = Phaser.Math.Clamp(st.energyTrail / max, 0, 1);
+  const shown = Phaser.Math.Clamp(st.energyShown / max, 0, 1);
+  if (trail > shown + 0.002) {
+    g.fillStyle(0xffe9f5, 0.45);
+    g.fillRoundedRect(bx, y, Math.max(h, w * trail), h, 4);
+  }
+  if (shown > 0) {
+    g.fillStyle(0x8fe3b8, 1);
+    g.fillRoundedRect(bx, y, Math.max(h * 0.8, w * shown), h, 4);
+    g.fillStyle(0xe8fff2, 0.35);
+    g.fillRect(bx + 3, y + 1, Math.max(0, w * shown - 6), 2);
+    if (st.energyShown < p.energy - 0.5) {
+      g.fillStyle(0xffffff, 0.85);
+      g.fillCircle(bx + w * shown, y + h / 2, h * 0.65);
+    }
+  }
+  if (dk < 1) {
+    g.lineStyle(2, 0xff4d6d, 0.9 * (1 - dk));
+    g.strokeRoundedRect(bx - 1, y - 1, w + 2, h + 2, 5);
+  }
+  if (p.energy >= max) {
+    const burst = Math.max(0, 1 - (now - st.fullAt) / 500);
+    const breathe = 0.25 + 0.2 * Math.sin(now / 320);
+    g.lineStyle(2, 0x8fe3b8, Math.min(1, breathe + burst));
+    g.strokeRoundedRect(bx - 1.5, y - 1.5, w + 3, h + 3, 5);
+  }
+}
+
+// Voile rouge sur les bords de l'écran (Agarica touchée), qui s'efface.
+function juiceHurtVignette(scene, color = 0xff2a55) {
+  if (!scene || !scene.add) return;
+  const { width, height } = scene.scale;
+  const d = 64;
+  const a = 0.38;
+  const g = scene.add.graphics().setScrollFactor(0).setDepth(1500);
+  g.fillGradientStyle(color, color, color, color, a, a, 0, 0);
+  g.fillRect(0, 0, width, d);
+  g.fillGradientStyle(color, color, color, color, 0, 0, a, a);
+  g.fillRect(0, height - d, width, d);
+  g.fillGradientStyle(color, color, color, color, a, 0, a, 0);
+  g.fillRect(0, 0, d, height);
+  g.fillGradientStyle(color, color, color, color, 0, a, 0, a);
+  g.fillRect(width - d, 0, d, height);
+  scene.tweens.add({ targets: g, alpha: 0, duration: 450, ease: 'Quad.easeIn', onComplete: () => g.destroy() });
+}
+
+// Ouverture d'un écran par-dessus le jeu (sac, carte, feu de camp) : la
+// caméra de l'overlay apparaît en fondu avec un léger rebond d'échelle.
+function juiceOverlayIn(scene, { ms = 240 } = {}) {
+  const cam = scene && scene.cameras && scene.cameras.main;
+  if (!cam) return;
+  cam.setAlpha(0).setZoom(0.96);
+  scene.tweens.add({ targets: cam, alpha: 1, duration: ms * 0.7 });
+  scene.tweens.add({ targets: cam, zoom: 1, duration: ms, ease: 'Back.Out', onComplete: () => cam.setZoom(1) });
+  playSfx('overlay_open', { key: scene.scene && scene.scene.key });
 }

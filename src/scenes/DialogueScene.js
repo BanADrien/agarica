@@ -49,7 +49,15 @@ class DialogueScene extends Phaser.Scene {
     this.box = this.computeBox();
     const B = this.box;
     this.root = this.add.container(0, 0).setAlpha(0);
-    this.tweens.add({ targets: this.root, alpha: 1, duration: 140 });
+    // Juice : la boîte arrive avec un petit rebond (du bas, ou du haut).
+    this.root.y = B.top ? -16 : 16;
+    this.tweens.add({ targets: this.root, alpha: 1, duration: 160 });
+    // (Le masque rond du portrait n'est pas dans le conteneur : il suit.)
+    this.tweens.add({
+      targets: this.root, y: 0, duration: 320, ease: 'Back.Out',
+      onUpdate: () => { if (this.portraitMask) this.portraitMask.y = this.root.y; },
+    });
+    this.lastWho = null;
 
     const framed = addStoryVineFrame(this, B.x, B.y, B.w, B.h, { scale: DIALOGUE_FRAME_SCALE, container: this.root });
     if (framed) {
@@ -75,7 +83,9 @@ class DialogueScene extends Phaser.Scene {
     this.nextMarker = this.add.text(I.x + I.w - 18, I.y + I.h - 8, '▼', {
       fontFamily: 'sans-serif', fontSize: '14px', color: '#8fe3b8',
     }).setOrigin(0.5, 1).setVisible(false);
-    this.tweens.add({ targets: this.nextMarker, y: this.nextMarker.y + 4, duration: 450, yoyo: true, repeat: -1 });
+    // Indicateur « suite » : rebond doux + pulsation (cf. completeLine : il surgit).
+    this.tweens.add({ targets: this.nextMarker, y: this.nextMarker.y + 4, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: this.nextMarker, alpha: { from: 1, to: 0.55 }, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.choiceLayer = this.add.container(0, 0);
     this.root.add([this.portraitLayer, this.namePlate, this.nameText, this.bodyText, this.nextMarker, this.choiceLayer]);
 
@@ -140,6 +150,21 @@ class DialogueScene extends Phaser.Scene {
     this.bodyText.setText(this.fullText);
     const textY = Math.max(I.y + 12, I.y + (I.h - this.bodyText.height) / 2);
     this.bodyText.setPosition(textX, Math.round(textY));
+    // Juice : chaque réplique arrive avec un petit rebond ; changement de
+    // personne -> plaque de nom qui glisse, médaillon qui s'illumine.
+    this.tweens.killTweensOf(this.bodyText);
+    this.bodyText.setY(Math.round(textY) + 7).setAlpha(0.35);
+    this.tweens.add({ targets: this.bodyText, y: Math.round(textY), alpha: 1, duration: 240, ease: 'Back.Out' });
+    if (who !== this.lastWho) {
+      this.lastWho = who;
+      this.tweens.killTweensOf([this.nameText, this.portraitLayer]);
+      const nx = this.nameText.x;
+      this.nameText.setX(nx - 10).setAlpha(0);
+      this.tweens.add({ targets: this.nameText, x: nx, alpha: 1, duration: 220, ease: 'Cubic.Out' });
+      this.portraitLayer.setAlpha(0.35);
+      this.tweens.add({ targets: this.portraitLayer, alpha: 1, duration: 260, ease: 'Sine.easeOut' });
+    }
+    playSfx('dialogue_line', { who });
 
     this.clearChoices();
     this.shown = 0;
@@ -153,6 +178,7 @@ class DialogueScene extends Phaser.Scene {
       callback: () => {
         this.shown += 1;
         this.bodyText.setText(this.fullText.slice(0, this.shown));
+        if (this.shown % 3 === 0) playSfx('dialogue_blip');
         if (this.shown >= this.fullText.length) this.completeLine();
       },
     });
@@ -194,6 +220,7 @@ class DialogueScene extends Phaser.Scene {
       const shape = this.make.graphics({}, false);
       shape.fillStyle(0xffffff, 1);
       shape.fillCircle(cx, cy, R);
+      shape.y = this.root ? this.root.y : 0;
       img.setMask(shape.createGeometryMask());
       this.portraitMask = shape;
       this.portraitLayer.add(img);
@@ -249,8 +276,13 @@ class DialogueScene extends Phaser.Scene {
     this.typing = false;
     this.bodyText.setText(this.fullText);
     const line = this.lines[this.index];
-    if (line.choices && line.choices.length) this.showChoices(line.choices);
-    else this.nextMarker.setVisible(true);
+    if (line.choices && line.choices.length) {
+      this.showChoices(line.choices);
+    } else if (!this.nextMarker.visible) {
+      // L'indicateur surgit (rebond) au lieu d'apparaître d'un coup.
+      this.nextMarker.setVisible(true).setScale(0);
+      this.tweens.add({ targets: this.nextMarker, scale: 1, duration: 240, ease: 'Back.Out' });
+    }
   }
 
   // Choix : petit cadre de lianes (même art, même échelle) au-dessus de la
@@ -333,9 +365,11 @@ class DialogueScene extends Phaser.Scene {
       return;
     }
     if (this.choiceItems) {
+      playSfx('dialogue_choice');
       this.pickChoice(this.choiceIndex);
       return;
     }
+    playSfx('dialogue_next');
     this.showLine(this.index + 1);
   }
 

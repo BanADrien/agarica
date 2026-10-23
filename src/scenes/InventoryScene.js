@@ -81,6 +81,8 @@ class InventoryScene extends Phaser.Scene {
     this.select(0);
 
     this.input.keyboard.on('keydown', this.onKey, this);
+    // Juice : ouverture avec un léger rebond.
+    juiceOverlayIn(this);
   }
 
   select(i) {
@@ -94,6 +96,10 @@ class InventoryScene extends Phaser.Scene {
     const info = itemInfo(id);
     if (this.descIcon) this.descIcon.destroy();
     this.descIcon = addItemIcon(this, this.descX + this.descW / 2, this.descTop + 54, id, 80);
+    // Juice : l'objet choisi « saute » dans le cadre de description.
+    const s0 = this.descIcon.scale;
+    this.descIcon.setScale(s0 * 0.7);
+    this.tweens.add({ targets: this.descIcon, scale: s0, duration: 220, ease: 'Back.Out' });
     this.descName.setText(info.name);
     this.descText.setText(info.desc);
   }

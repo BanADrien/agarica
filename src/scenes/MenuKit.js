@@ -159,7 +159,8 @@ function menuStartChapter(scene, index) {
 // ---------------------------------------------------------------------------
 const MENU_OPTIONS_KEY = 'agarica-options-v1';
 const MENU_PROGRESS_KEY = 'agarica-progress-v1';
-const MENU_OPTIONS_DEFAULTS = { controlsHint: false, musicVolume: 80, sfxVolume: 80 };
+// `screenShake` : 'on' | 'reduced' | 'off' (accessibilité, cf. juiceShake dans LevelKit).
+const MENU_OPTIONS_DEFAULTS = { controlsHint: false, musicVolume: 80, sfxVolume: 80, screenShake: 'on' };
 
 function menuReadJson(key) {
   try {
@@ -397,9 +398,29 @@ class MenuList {
       });
     });
     this.enabled = true;
+    // Juice : surbrillance qui glisse d'une entrée à l'autre (hl.y) et respire.
+    this.hl = { y: null };
     this.refresh();
     const first = items.findIndex((it) => !it.disabled);
     this.select(first === -1 ? 0 : first, { silent: true });
+    const breathe = scene.tweens.add({ targets: this.highlight, alpha: { from: 1, to: 0.72 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // Liste détruite avec son calque (menu titre) : la pulsation s'arrête aussi.
+    this.highlight.once('destroy', () => breathe.remove());
+  }
+
+  // Surbrillance (fond rose, feuille + fleur) à la hauteur `y`.
+  drawHighlight(y) {
+    const g = this.highlight;
+    g.clear();
+    const hx = this.items[0].x - this.width / 2;
+    g.fillStyle(STORY_UI.pink, 0.1);
+    g.fillRoundedRect(hx + 6, y - 17, this.width - 12, 34, 10);
+    g.lineStyle(1.5, STORY_UI.pink, 0.45);
+    g.strokeRoundedRect(hx + 6, y - 17, this.width - 12, 34, 10);
+    g.fillStyle(STORY_UI.vineLight, 1);
+    g.fillEllipse(hx + 20, y, 12, 6);
+    g.fillStyle(STORY_UI.pink, 1);
+    g.fillCircle(hx + 27, y, 3.5);
   }
 
   refresh() {
@@ -416,24 +437,27 @@ class MenuList {
       const on = k === i;
       o.text.setColor(on ? '#ffc4dd' : (o.dim ? STORY_UI.textSoft : STORY_UI.text));
       o.text.setShadow(0, 0, '#ff9fc9', on ? 10 : 0, false, true);
+      // Juice : l'entrée choisie grossit un peu (rebond), les autres reviennent.
+      if (!silent && (on || o.text.scale !== 1)) {
+        this.scene.tweens.killTweensOf(o.text);
+        this.scene.tweens.add({ targets: o.text, scale: on ? 1.06 : 1, duration: on ? 220 : 120, ease: on ? 'Back.easeOut' : 'Sine.easeOut' });
+      } else if (silent) {
+        o.text.setScale(on ? 1.06 : 1);
+      }
     });
-    const g = this.highlight;
-    g.clear();
-    const hx = it.x - this.width / 2;
-    g.fillStyle(STORY_UI.pink, 0.1);
-    g.fillRoundedRect(hx + 6, it.y - 17, this.width - 12, 34, 10);
-    g.lineStyle(1.5, STORY_UI.pink, 0.45);
-    g.strokeRoundedRect(hx + 6, it.y - 17, this.width - 12, 34, 10);
-    // Feuille + fleur à gauche de l'entrée choisie.
-    g.fillStyle(STORY_UI.vineLight, 1);
-    g.fillEllipse(hx + 20, it.y, 12, 6);
-    g.fillStyle(STORY_UI.pink, 1);
-    g.fillCircle(hx + 27, it.y, 3.5);
-    if (changed && !silent) {
-      g.setAlpha(0.3);
-      this.scene.tweens.add({ targets: g, alpha: 1, duration: 160 });
-      this.scene.tweens.add({ targets: it.text, scale: { from: 0.96, to: 1 }, duration: 160, ease: 'Back.easeOut' });
+    // Surbrillance : glisse depuis l'entrée précédente (au lieu de sauter).
+    const fromY = this.hl.y;
+    this.scene.tweens.killTweensOf(this.hl);
+    if (changed && !silent && fromY != null) {
+      this.scene.tweens.add({
+        targets: this.hl, y: it.y, duration: 150, ease: 'Cubic.easeOut',
+        onUpdate: () => this.drawHighlight(this.hl.y),
+      });
+      if (typeof playSfx === 'function') playSfx('menu_move');
+    } else {
+      this.hl.y = it.y;
     }
+    this.drawHighlight(this.hl.y);
     if (this.onSelect && changed) this.onSelect(it, i);
   }
 
@@ -450,6 +474,15 @@ class MenuList {
   activate() {
     const it = this.items[this.index];
     if (!it || it.disabled) return;
+    // Juice : l'entrée « s'enfonce » puis rebondit, petite gerbe d'étoiles.
+    this.scene.tweens.killTweensOf(it.text);
+    it.text.setScale(0.94);
+    this.scene.tweens.add({ targets: it.text, scale: 1.06, duration: 220, ease: 'Back.easeOut' });
+    if (typeof spawnFx === 'function') {
+      const m = this.container.getWorldTransformMatrix();
+      spawnFx(this.scene, 'uiStar', m.tx + it.x - this.width / 2 + 27, m.ty + it.y, { count: 6, power: 0.7 });
+    }
+    if (typeof playSfx === 'function') playSfx('menu_ok');
     if (it.action) it.action(it);
     else if (it.onRight) it.onRight();
     this.refresh();

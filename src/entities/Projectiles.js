@@ -55,6 +55,8 @@ class PierreProjectile extends Phaser.Physics.Arcade.Sprite {
         if (this.done || enemy.defeated) return;
         if (typeof enemy.takeHit === 'function') enemy.takeHit(this);
         else if (typeof enemy.defeat === 'function') enemy.defeat();
+        // Juice (LevelKit) : micro-pause, étincelles, flash, poof si vaincu.
+        if (typeof juiceOnEnemyHit === 'function') juiceOnEnemyHit(scene, enemy, this);
         if (scene.player) scene.player.gainEnergy(ENERGY_PER_HIT);
         this.shatter();
       });

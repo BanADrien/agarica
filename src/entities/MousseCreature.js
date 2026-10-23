@@ -116,6 +116,12 @@ function purifyCorruptedEnemy(enemy, { onClean, fleeDistance = 200, fleeMs = 180
   const cx = enemy.getCenter().x;
   const cy = enemy.getCenter().y;
   spawnLightParticles(scene, cx, cy, { count: 16 });
+  // Juice : anneau de lumière douce et petite étoile (visuel seul).
+  if (typeof juiceShockRing === 'function') {
+    juiceShockRing(scene, cx, cy, { size: 96, ms: 460, color: 0xfff6c2 });
+    spawnFx(scene, 'star', cx, cy, { count: 6, tint: [0xfff6c2, 0x9ffcff, 0xffb6e8], power: 1 });
+    playSfx('purify');
+  }
   scene.time.delayedCall(180, () => {
     if (!enemy.active) return;
     enemy.clearTint();

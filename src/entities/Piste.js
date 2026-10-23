@@ -85,9 +85,15 @@ class HiddenPlatform {
     const size = typeof GROUND_TILE_SIZE !== 'undefined' ? GROUND_TILE_SIZE : 64;
     this.rect = new Phaser.Geom.Rectangle(cfg.gx * size, cfg.gy * size, w * size, size);
     // Contour fantôme : indice discret quand le loup approche (avant révélation).
-    this.hint = scene.add.graphics();
-    this.hint.lineStyle(2, PISTE_COLOR, 1);
-    this.hint.strokeRect(this.rect.x + 2, this.rect.y + 2, this.rect.width - 4, this.rect.height * 0.75);
+    // Art `decor_plateforme_fantome` (lot Codex n°8) s'il existe.
+    if (scene.textures.exists('item-decor_plateforme_fantome')) {
+      this.hint = scene.add.image(this.rect.centerX, this.rect.y, 'item-decor_plateforme_fantome').setOrigin(0.5, 0)
+        .setDisplaySize(this.rect.width, this.rect.height).setTint(PISTE_COLOR).setBlendMode(Phaser.BlendModes.ADD);
+    } else {
+      this.hint = scene.add.graphics();
+      this.hint.lineStyle(2, PISTE_COLOR, 1);
+      this.hint.strokeRect(this.rect.x + 2, this.rect.y + 2, this.rect.width - 4, this.rect.height * 0.75);
+    }
     this.hint.setAlpha(0);
   }
 
@@ -115,14 +121,27 @@ class HiddenPlatform {
     // Mêmes tuiles/hitbox que le sol normal, ajoutées à scene.ground (déjà en
     // collision avec joueur, Xara, ennemis).
     const images = renderAutotileGrid(scene, scene.ground, this.cells);
+    // Juice : les cases montent une à une depuis la gauche (images seules,
+    // les corps physiques sont déjà en place), lueurs et onde du loup.
     for (const img of images) {
       img.setAlpha(0);
       if (scene.player && scene.children.moveBelow) scene.children.moveBelow(img, scene.player);
+      const y0 = img.y;
+      const k = (img.x - this.rect.x) / Math.max(1, this.rect.width);
+      img.y = y0 + 18;
+      scene.tweens.add({ targets: img, alpha: 1, y: y0, duration: 420, delay: 40 + k * 260, ease: 'Back.Out' });
     }
-    scene.tweens.add({ targets: images, alpha: 1, duration: 450 });
     const flash = scene.add.rectangle(this.rect.centerX, this.rect.centerY, this.rect.width, this.rect.height, PISTE_COLOR, 0.5)
       .setBlendMode(Phaser.BlendModes.ADD);
     scene.tweens.add({ targets: flash, alpha: 0, duration: 600, onComplete: () => flash.destroy() });
+    if (typeof spawnFx === 'function') {
+      for (let x = this.rect.x + 16; x < this.rect.right; x += 40) {
+        spawnFx(scene, 'motes', x, this.rect.y + 6, { count: 2, spread: 10, color: [PISTE_COLOR, 0xe8fff2] });
+      }
+      juiceShockRing(scene, this.rect.centerX, this.rect.y + 4, { size: this.rect.width * 1.3, ms: 460, color: PISTE_COLOR, flat: 0.25 });
+      juiceShake(scene, 'light');
+      playSfx('platform_reveal');
+    }
     scene.events.emit('hidden-platform-revealed', this);
   }
 }

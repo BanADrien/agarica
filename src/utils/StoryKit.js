@@ -855,10 +855,17 @@ function storyDrawHudArt(scene) {
     art.hearts.forEach((img, i) => {
       img.setVisible(i < n);
       if (i >= n) return;
-      const key = i < player.hearts ? 'item-hud_coeur' : 'item-hud_coeur_vide';
+      const cx = HUD_MARGIN + HUD_HEART_SIZE / 2 + i * (HUD_HEART_SIZE + HUD_HEART_GAP);
+      const cy = HUD_MARGIN + HUD_HEART_SIZE / 2;
+      // Juice (LevelKit) : cœur perdu qui tremble puis se vide, regagné qui pousse.
+      const hf = typeof juiceHudHeart === 'function' ? juiceHudHeart(scene, i, cx, cy)
+        : { full: i < player.hearts, dx: 0, dy: 0, scale: 1, flash: 0 };
+      const key = hf.full ? 'item-hud_coeur' : 'item-hud_coeur_vide';
       if (img.texture.key !== key) img.setTexture(key);
-      img.setScale(HUD_ART_HEART_H / img.height);
-      img.setPosition(HUD_MARGIN + HUD_HEART_SIZE / 2 + i * (HUD_HEART_SIZE + HUD_HEART_GAP), HUD_MARGIN + HUD_HEART_SIZE / 2);
+      img.setScale((HUD_ART_HEART_H / img.height) * hf.scale);
+      img.setPosition(cx + hf.dx, cy + hf.dy);
+      if (hf.flash > 0.45) img.setTintFill(0xffffff);
+      else if (img.isTinted) img.clearTint();
     });
   }
 
@@ -890,7 +897,8 @@ function storyDrawHudArt(scene) {
     result.skills[i] = true;
     const cx = HUD_MARGIN + HUD_SKILL_SIZE / 2 + i * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
     if (slot.icon.texture.key !== key) slot.icon.setTexture(key);
-    slot.icon.setPosition(cx, skillY).setScale(HUD_ART_SKILL_SIZE / Math.max(slot.icon.width, slot.icon.height));
+    const pop = typeof juiceHudSkillScale === 'function' ? juiceHudSkillScale(scene, i) : 1;
+    slot.icon.setPosition(cx, skillY).setScale((HUD_ART_SKILL_SIZE / Math.max(slot.icon.width, slot.icon.height)) * pop);
     // Même règle que drawHud : grisée en recharge ou sans assez d'énergie.
     const unavailable = scene.time.now < player.skillCooldownEndTime || player.energy < def.cost;
     slot.icon.setAlpha(unavailable ? HUD_SKILL_UNAVAILABLE_ALPHA : 1);
@@ -930,16 +938,29 @@ function showStoryBanner(scene, { kicker, title, desc = '', itemId = null, color
     drawStoryPanel(g, x, y, w, h, { seed: 3 });
     c.add(g);
     let textX = x + 24;
+    // Juice : rayons qui tournent derrière l'icône, icône qui « pousse » avec
+    // une gerbe d'étoiles, reflet qui balaie le panneau (cf. plus bas).
+    let iconFx = null;
     if (itemId) {
       const ringX = x + 58;
       const ringY = y + h / 2;
+      const rays = scene.add.graphics().setPosition(ringX, ringY).setBlendMode(Phaser.BlendModes.ADD);
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        rays.fillStyle(color, 0.16);
+        rays.fillTriangle(0, 0, Math.cos(a - 0.12) * 52, Math.sin(a - 0.12) * 52, Math.cos(a + 0.12) * 52, Math.sin(a + 0.12) * 52);
+      }
       const ring = scene.add.graphics();
       ring.fillStyle(STORY_UI.nightSoft, 1);
       ring.fillCircle(ringX, ringY, 36);
       ring.lineStyle(2, color, 0.9);
       ring.strokeCircle(ringX, ringY, 36);
       c.add(ring);
-      c.add(addItemIcon(scene, ringX, ringY, itemId, 56));
+      c.add(rays);
+      const icon = addItemIcon(scene, ringX, ringY, itemId, 56);
+      c.add(icon);
+      iconFx = { rays, icon, x: ringX, y: ringY, scale: icon.scale };
+      icon.setScale(icon.scale * 0.2);
       textX = x + 110;
     }
     const kick = scene.add.text(textX, y + 14, kicker.toUpperCase(), {
@@ -956,11 +977,27 @@ function showStoryBanner(scene, { kicker, title, desc = '', itemId = null, color
         wordWrap: { width: x + w - textX - 18 }, lineSpacing: 2,
       }));
     }
-    c.y = -12;
-    scene.tweens.add({ targets: c, alpha: 1, y: 0, duration: 300, ease: 'Back.Out' });
+    c.y = -34;
+    scene.tweens.add({ targets: c, alpha: 1, y: 0, duration: 420, ease: 'Back.Out' });
+    let spin = null;
+    if (iconFx) {
+      scene.tweens.add({ targets: iconFx.icon, scale: iconFx.scale, duration: 420, delay: 140, ease: 'Back.Out' });
+      spin = scene.tweens.add({ targets: iconFx.rays, angle: 360, duration: 9000, repeat: -1 });
+      scene.time.delayedCall(220, () => {
+        if (typeof spawnFx === 'function') spawnFx(scene, 'uiStar', iconFx.x, iconFx.y, { count: 10, power: 1.2 });
+      });
+    }
+    // Reflet : bande claire qui traverse le panneau une fois.
+    const shine = scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    shine.fillStyle(0xffffff, 0.16);
+    shine.fillPoints([{ x: 0, y }, { x: 26, y }, { x: 6, y: y + h }, { x: -20, y: y + h }], true);
+    shine.x = x + 24;
+    c.add(shine);
+    scene.tweens.add({ targets: shine, x: x + w - 30, alpha: { from: 1, to: 0.2 }, duration: 700, delay: 320, ease: 'Sine.easeInOut', onComplete: () => shine.setVisible(false) });
+    if (typeof playSfx === 'function') playSfx('banner', { kicker });
     scene.tweens.add({
-      targets: c, alpha: 0, duration: 400, delay: STORY_BANNER_MS - 400,
-      onComplete: () => c.destroy(),
+      targets: c, alpha: 0, y: -16, duration: 400, delay: STORY_BANNER_MS - 400, ease: 'Sine.easeIn',
+      onComplete: () => { if (spin) spin.remove(); c.destroy(); },
     });
   });
 }
@@ -978,7 +1015,8 @@ function showToast(scene, text, ms = 2600) {
     backgroundColor: '#2a1f45', padding: { x: 12, y: 7 }, wordWrap: { width: 590 }, // ne déborde pas sur le HUD
   }).setOrigin(0.5).setScrollFactor(0).setDepth(2050).setAlpha(0);
   scene.__storyToast = t;
-  scene.tweens.add({ targets: t, alpha: 1, duration: 200 });
+  t.setScale(0.92);
+  scene.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 240, ease: 'Back.Out' });
   scene.tweens.add({ targets: t, alpha: 0, duration: 350, delay: Math.max(400, ms - 350), onComplete: () => t.destroy() });
   return t;
 }
@@ -1199,34 +1237,62 @@ function clearSpeechBubbles(scene, targetOrNpcId = null) {
 }
 
 // Carte de chapitre / nom de zone. Promesse résolue une fois disparue.
+// Juice (même durée totale qu'avant : 500 ms d'entrée + `hold` + 600 ms de
+// sortie, les cinématiques gardent leur rythme) : bande d'ombre douce, titre
+// qui se pose en montant (léger zoom arrière ; pas d'espacement de lettres
+// animé : avec un contour, Phaser décale le trait), filets qui se déploient
+// depuis le centre, losange qui pivote, quelques étincelles, sous-titre décalé.
 function showTitleCard(scene, title, sub, { hold = 1600 } = {}) {
   return new Promise((resolve) => {
     const { width } = scene.scale;
     const y = 225;
     const c = scene.add.container(0, 0).setScrollFactor(0).setDepth(2200).setAlpha(0);
-    const titleText = scene.add.text(width / 2, y, title, {
+    const band = scene.add.graphics();
+    const bandH = sub ? 150 : 120;
+    band.fillGradientStyle(0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0, 0, 0.55, 0.55);
+    band.fillRect(0, y - bandH / 2, width, bandH / 2);
+    band.fillGradientStyle(0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0.55, 0.55, 0, 0);
+    band.fillRect(0, y, width, bandH / 2 + (sub ? 30 : 0));
+    const titleText = scene.add.text(width / 2, y + 8, title, {
       fontFamily: STORY_UI.serif, fontSize: '36px', color: '#ffe9f5', fontStyle: 'bold',
       stroke: '#15101f', strokeThickness: 6, padding: { x: 20, y: 16 },
     }).setOrigin(0.5);
     titleText.setShadow(0, 0, '#ff9fc9', 14, true, true);
-    const half = Math.min(320, titleText.width / 2 + 60);
-    const g = scene.add.graphics();
-    g.lineStyle(2, STORY_UI.vineLight, 0.8);
-    g.lineBetween(width / 2 - half, y + 30, width / 2 - 12, y + 30);
-    g.lineBetween(width / 2 + 12, y + 30, width / 2 + half, y + 30);
-    g.fillStyle(STORY_UI.pink, 1);
-    g.fillTriangle(width / 2, y + 23, width / 2 + 7, y + 30, width / 2, y + 37);
-    g.fillTriangle(width / 2, y + 23, width / 2 - 7, y + 30, width / 2, y + 37);
-    c.add([g, titleText]);
+    titleText.setScale(1.1);
+    const half = Math.min(320, titleText.width / 2 + 40);
+    const lineL = scene.add.graphics().setPosition(width / 2 - 12, y + 30);
+    lineL.lineStyle(2, STORY_UI.vineLight, 0.8);
+    lineL.lineBetween(-(half - 12), 0, 0, 0);
+    const lineR = scene.add.graphics().setPosition(width / 2 + 12, y + 30);
+    lineR.lineStyle(2, STORY_UI.vineLight, 0.8);
+    lineR.lineBetween(0, 0, half - 12, 0);
+    lineL.scaleX = 0;
+    lineR.scaleX = 0;
+    const gem = scene.add.graphics().setPosition(width / 2, y + 30);
+    gem.fillStyle(STORY_UI.pink, 1);
+    gem.fillTriangle(0, -7, 7, 0, 0, 7);
+    gem.fillTriangle(0, -7, -7, 0, 0, 7);
+    gem.setScale(0).setAngle(-90);
+    c.add([band, lineL, lineR, gem, titleText]);
+    let subText = null;
     if (sub) {
-      c.add(scene.add.text(width / 2, y + 52, sub, {
+      subText = scene.add.text(width / 2, y + 58, sub, {
         fontFamily: STORY_UI.serif, fontSize: '17px', color: '#c9b8f0', fontStyle: 'italic',
         stroke: '#15101f', strokeThickness: 4,
-      }).setOrigin(0.5));
+      }).setOrigin(0.5).setAlpha(0);
+      c.add(subText);
     }
-    scene.tweens.add({ targets: c, alpha: 1, duration: 500 });
+    scene.tweens.add({ targets: c, alpha: 1, duration: 500, ease: 'Sine.easeOut' });
+    scene.tweens.add({ targets: titleText, y, scale: 1, duration: 1000, ease: 'Cubic.easeOut' });
+    scene.tweens.add({ targets: [lineL, lineR], scaleX: 1, duration: 800, delay: 150, ease: 'Cubic.easeOut' });
+    scene.tweens.add({ targets: gem, scale: 1, angle: 0, duration: 520, delay: 250, ease: 'Back.Out' });
+    if (subText) scene.tweens.add({ targets: subText, alpha: 1, y: y + 52, duration: 600, delay: 380, ease: 'Sine.easeOut' });
+    scene.time.delayedCall(330, () => {
+      if (c.active && typeof spawnFx === 'function') spawnFx(scene, 'uiStar', width / 2, y + 30, { count: 6, power: 0.8 });
+    });
+    if (typeof playSfx === 'function') playSfx('title_card', { title });
     scene.tweens.add({
-      targets: c, alpha: 0, duration: 600, delay: 500 + hold,
+      targets: c, alpha: 0, y: -6, duration: 600, delay: 500 + hold, ease: 'Sine.easeIn',
       onComplete: () => { c.destroy(); resolve(); },
     });
   });
@@ -1990,13 +2056,26 @@ LEVEL_DATA_HANDLERS.pickups = (scene, list) => {
     const flag = `pickup_${zone}_${p.item}`;
     if (storyGet(flag) || inventoryHas(p.item) || !storyAllowed(p)) return;
     const y = p.y != null ? p.y : storyGroundY(scene, p.x) - 30;
-    const glow = scene.add.circle(p.x, y, 22, STORY_UI.vineLight, 0.18);
+    // Juice : halo d'objet (art `fx_halo_objet`, sinon halo dessiné) qui
+    // respire, objet qui flotte en se balançant ; petites étoiles de temps en
+    // temps (cf. updateStoryInteractables).
+    let glow;
+    if (typeof juiceTexture === 'function') {
+      const gt = juiceTexture(scene, 'fx_halo_objet', 'juice-glow');
+      const gs = 84 / gt.size;
+      glow = scene.add.image(p.x, y, gt.key).setBlendMode(Phaser.BlendModes.ADD).setTint(gt.art ? 0xffffff : STORY_UI.vineLight)
+        .setAlpha(0.6).setScale(gs);
+      scene.tweens.add({ targets: glow, alpha: { from: 0.4, to: 0.85 }, scale: { from: gs * 0.85, to: gs * 1.1 }, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else {
+      glow = scene.add.circle(p.x, y, 22, STORY_UI.vineLight, 0.18);
+      scene.tweens.add({ targets: glow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1 });
+    }
     const img = addItemIcon(scene, p.x, y, p.item, 40);
     scene.tweens.add({ targets: [img, glow], y: y - 8, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    scene.tweens.add({ targets: glow, alpha: 0.05, duration: 1100, yoyo: true, repeat: -1 });
+    scene.tweens.add({ targets: img, angle: { from: -5, to: 5 }, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     storyPutBehindPlayer(scene, glow);
     storyPutBehindPlayer(scene, img);
-    scene.__story.interactables.push({ kind: 'pickup', data: p, flag, img, glow, x: p.x, y });
+    scene.__story.interactables.push({ kind: 'pickup', data: p, flag, img, glow, x: p.x, y, glintAt: 0 });
   });
 };
 
@@ -2101,24 +2180,58 @@ LEVEL_DATA_HANDLERS.fall = (scene, fall) => {
   scene.__story.fall = { mode: 'hurt', y: scene.scale.height + 60, ...fall };
 };
 
+// Lanternes de reprise : art `decor_lanterne_eteinte` / `_allumee` (lot
+// Codex n°8) s'il existe, sinon lanterne dessinée. Juice : halo qui respire
+// une fois allumée, éclat à l'allumage (cf. updateStoryCheckpoints).
+const STORY_LANTERN_ART = ['item-decor_lanterne_eteinte', 'item-decor_lanterne_allumee'];
+
 LEVEL_DATA_HANDLERS.checkpoints = (scene, list) => {
+  const art = STORY_LANTERN_ART.every((k) => scene.textures.exists(k));
+  const scale = (getItemManifest().decor_lanterne_eteinte || {}).scale || 0.09;
   for (const c of list || []) {
     const y = c.y != null ? c.y : storyGroundY(scene, c.x);
-    const g = scene.add.graphics({ x: c.x, y });
+    let img = null;
+    let g = null;
+    let lampY = y - 18;
+    if (art) {
+      img = scene.add.image(c.x, y, STORY_LANTERN_ART[0]).setOrigin(0.5, 1).setScale(scale);
+      setVisibleBottomY(img, y + GROUND_CONTACT_SINK);
+      lampY = y - img.displayHeight * 0.55;
+    } else {
+      g = scene.add.graphics({ x: c.x, y });
+    }
+    let halo = null;
+    if (typeof juiceTexture === 'function') {
+      const ht = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
+      halo = scene.add.image(c.x, lampY, ht.key).setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(STORY_UI.vineLight).setScale(64 / ht.size).setAlpha(0).setVisible(false);
+    }
     const draw = (lit) => {
-      g.clear();
-      g.fillStyle(0x2b2440, 1);
-      g.fillRoundedRect(-9, -30, 18, 30, 5);
-      g.fillStyle(lit ? STORY_UI.vineLight : 0x5a5070, lit ? 1 : 0.8);
-      g.fillCircle(0, -18, 4);
+      if (img) {
+        img.setTexture(STORY_LANTERN_ART[lit ? 1 : 0]);
+      } else {
+        g.clear();
+        g.fillStyle(0x2b2440, 1);
+        g.fillRoundedRect(-9, -30, 18, 30, 5);
+        g.fillStyle(lit ? STORY_UI.vineLight : 0x5a5070, lit ? 1 : 0.8);
+        g.fillCircle(0, -18, 4);
+        if (lit) {
+          g.fillStyle(STORY_UI.vineLight, 0.2);
+          g.fillCircle(0, -18, 12);
+        }
+      }
+      if (!halo) return;
+      scene.tweens.killTweensOf(halo);
+      halo.setVisible(lit);
       if (lit) {
-        g.fillStyle(STORY_UI.vineLight, 0.2);
-        g.fillCircle(0, -18, 12);
+        const hs = 64 / juiceTexture(scene, 'fx_halo_doux', 'juice-glow').size;
+        scene.tweens.add({ targets: halo, alpha: { from: 0.3, to: 0.55 }, scale: { from: hs * 0.9, to: hs * 1.1 }, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
     };
     draw(false);
-    storyPutBehindPlayer(scene, g);
-    scene.__story.checkpoints.push({ x: c.x, y, draw, lit: false });
+    if (halo) storyPutBehindPlayer(scene, halo);
+    storyPutBehindPlayer(scene, img || g);
+    scene.__story.checkpoints.push({ x: c.x, y, draw, lit: false, lampY });
   }
 };
 
@@ -2198,6 +2311,11 @@ function updateStoryInteractables(scene) {
       label = 'E : parler';
     } else if (it.kind === 'pickup') {
       if (it.done) continue;
+      // Juice : étoile qui scintille sur l'objet de temps en temps.
+      if (typeof spawnFx === 'function' && scene.time.now >= it.glintAt) {
+        it.glintAt = scene.time.now + Phaser.Math.Between(700, 1500);
+        spawnFx(scene, 'glint', it.x + Phaser.Math.Between(-12, 12), it.img.y + Phaser.Math.Between(-12, 8));
+      }
       x = it.x;
       topY = it.y - 28;
       if (Math.abs(player.y - 40 - it.y) > STORY_INTERACT_RANGE_Y) continue;
@@ -2230,16 +2348,57 @@ function updateStoryInteractables(scene) {
     it.done = true;
     storySet(it.flag, true);
     inventoryAdd(scene, it.data.item);
-    scene.tweens.killTweensOf([it.img, it.glow]);
-    scene.tweens.add({
-      targets: [it.img, it.glow], y: it.y - 40, alpha: 0, duration: 400,
-      onComplete: () => { it.img.destroy(); it.glow.destroy(); },
-    });
+    storyPickupJuice(scene, it);
     if (it.data.cutscene) runCutscene(scene, it.data.cutscene);
   } else if (it.kind === 'mossWall') {
     if (inventoryHas('repulsif')) openMossWall(scene, it.wall);
     else showToast(scene, "Un mur de mousse épaisse et visqueuse. Impossible de passer…\nIl faudrait quelque chose pour la dissoudre.");
   }
+}
+
+// Ramassage (juice, visuel seul) : l'objet « saute » (pop), puis est aspiré
+// vers la poitrine d'Agarica en rapetissant ; gerbe d'étoiles à l'arrivée.
+function storyPickupJuice(scene, it) {
+  const player = scene.player;
+  scene.tweens.killTweensOf([it.img, it.glow]);
+  if (typeof playSfx === 'function') playSfx('pickup', { item: it.data.item });
+  if (typeof spawnFx !== 'function' || !player) {
+    scene.tweens.add({
+      targets: [it.img, it.glow], y: it.y - 40, alpha: 0, duration: 400,
+      onComplete: () => { it.img.destroy(); it.glow.destroy(); },
+    });
+    return;
+  }
+  const s0 = it.img.scale;
+  // Devant Agarica le temps d'être aspiré (il était posé derrière elle).
+  it.img.setDepth(CHARACTER_DEPTH + 3);
+  spawnFx(scene, 'star', it.img.x, it.img.y, { count: 6, power: 1 });
+  scene.tweens.add({ targets: it.glow, alpha: 0, scale: it.glow.scale * 1.8, duration: 300, onComplete: () => it.glow.destroy() });
+  scene.tweens.add({
+    targets: it.img, scale: s0 * 1.45, y: it.img.y - 14, angle: 0, duration: 140, ease: 'Back.Out',
+    onComplete: () => {
+      const from = { x: it.img.x, y: it.img.y };
+      const k = { t: 0 };
+      scene.tweens.add({
+        targets: k, t: 1, duration: 280, ease: 'Cubic.easeIn',
+        onUpdate: () => {
+          if (!it.img.active) return;
+          // Courbe vers la poitrine (qui peut bouger), légèrement en cloche.
+          const tx = player.active ? player.x : from.x;
+          const ty = player.active ? player.y - 44 : from.y;
+          it.img.setPosition(from.x + (tx - from.x) * k.t, from.y + (ty - from.y) * k.t - Math.sin(k.t * Math.PI) * 26);
+          it.img.setScale(s0 * (1.45 - 1.1 * k.t));
+        },
+        onComplete: () => {
+          if (player.active) {
+            spawnFx(scene, 'pickup', player.x, player.y - 44, { color: STORY_UI.vineLight });
+            juiceSquash(player, 1.08, 0.94, 180);
+          }
+          it.img.destroy();
+        },
+      });
+    },
+  });
 }
 
 function openMossWall(scene, wall) {
@@ -2255,6 +2414,20 @@ function openMossWall(scene, wall) {
     scene.tweens.add({ targets: b, y: b.y - 50, alpha: 0, duration: 700 + i * 40, delay: i * 50, onComplete: () => b.destroy() });
   }
   if (v.setTint) v.setTint(0xb07ad0);
+  // Juice : le mur frémit (dessin seulement), coule en gouttes et bulles
+  // pendant toute la fonte (même durée qu'avant), bouffée au pied à la fin.
+  if (typeof spawnFx === 'function') {
+    const j = juiceRender(v);
+    if (j) scene.tweens.add({ targets: j.sq, x: { from: 0.94, to: 1.06 }, duration: 110, yoyo: true, repeat: 4 });
+    juiceBurstImage(scene, 'glow', wall.x, wall.y, { size: Math.max(wall.w, wall.h) * 1.4, from: 0.5, to: 1.1, ms: 600, color: STORY_UI.pink, alpha: 0.5 });
+    scene.time.addEvent({
+      delay: 110, repeat: 8,
+      callback: () => spawnFx(scene, 'melt', wall.x, baseY - Phaser.Math.Between(20, wall.h * 0.7), { w: wall.w, h: 60, count: 2 }),
+    });
+    scene.time.delayedCall(1000, () => spawnFx(scene, 'dust', wall.x, baseY - 4, { count: 8, spread: wall.w / 2, power: 0.8, tint: [0xb07ad0, 0xd8ccf5] }));
+    juiceShake(scene, 'tiny', 600);
+    playSfx('moss_melt');
+  }
   scene.tweens.add({
     targets: v, alpha: 0, scaleY: 0.1, y: v.y + (v.originY === 1 ? 0 : wall.h / 2), duration: 1100, ease: 'Sine.easeIn',
     onComplete: () => v.destroy(),
@@ -2297,6 +2470,16 @@ function guardStoryMossOverlap(scene) {
 function updateStoryMossBlocks(scene) {
   guardStoryMossOverlap(scene);
   const player = scene.player;
+  // Juice : l'ours prend son élan au-dessus d'un amas -> il se fissure et
+  // tremble AVANT le fracas (la zone de coup est encore en attente).
+  const pending = player.skillHitboxPendingRect;
+  if (pending && player.skillHitboxId === 'ours') {
+    for (const m of scene.__story.mossBlocks) {
+      if (m.destroyed || m.cracked) continue;
+      const rect = new Phaser.Geom.Rectangle(m.x - m.w / 2, m.y - m.h / 2, m.w, m.h);
+      if (Phaser.Geom.Intersects.RectangleToRectangle(pending, rect)) storyMossCrack(scene, m);
+    }
+  }
   const hitbox = player.getSkillHitbox && player.getSkillHitbox();
   if (!hitbox || player.activeSkillId !== 'ours') return;
   for (const m of scene.__story.mossBlocks) {
@@ -2306,16 +2489,71 @@ function updateStoryMossBlocks(scene) {
     m.destroyed = true;
     storySet(m.flag, true);
     removeMossBody(scene, m.body);
-    scene.cameras.main.shake(200, 0.008);
-    for (let i = 0; i < 12; i++) {
-      const p = scene.add.circle(m.x, m.y, Phaser.Math.Between(4, 9), i % 3 ? 0x3e7a2c : 0x9bff5a, 1).setDepth(STORY_PROMPT_DEPTH - 1);
-      scene.tweens.add({
-        targets: p, x: m.x + Phaser.Math.Between(-90, 90), y: m.y + Phaser.Math.Between(-80, 30), alpha: 0,
-        duration: 600, ease: 'Quad.easeOut', onComplete: () => p.destroy(),
-      });
-    }
-    scene.tweens.add({ targets: m.visual, alpha: 0, duration: 350, onComplete: () => m.visual.destroy() });
+    storyMossBreak(scene, m);
     scene.events.emit('moss-destroyed', m);
+  }
+}
+
+// Amas fissuré (juice, visuel seul) : art `mousse_amas_fissure` s'il existe,
+// sinon fissures lumineuses dessinées par-dessus ; tremblement, éclats.
+function storyMossCrack(scene, m) {
+  m.cracked = true;
+  const v = m.visual;
+  if (!v || !v.active) return;
+  const key = 'item-mousse_amas_fissure';
+  if (v.setTexture && scene.textures.exists(key)) {
+    const w = v.displayWidth;
+    const h = v.displayHeight;
+    const bottom = visibleBottomY(v);
+    v.setTexture(key).setDisplaySize(w, h);
+    setVisibleBottomY(v, bottom);
+  } else {
+    const g = scene.add.graphics({ x: m.x, y: m.y });
+    const rnd = new Phaser.Math.RandomDataGenerator([`fissure-${m.x}`]);
+    for (const [col, width] of [[0x10200f, 4], [0x9bff5a, 1.5]]) {
+      g.lineStyle(width, col, 1);
+      for (let k = 0; k < 4; k++) {
+        let px = rnd.realInRange(-m.w / 4, m.w / 4);
+        let py = -m.h / 2 + 10;
+        g.beginPath();
+        g.moveTo(px, py);
+        for (let i = 0; i < 5; i++) {
+          px += rnd.realInRange(-14, 14);
+          py += m.h / 6;
+          g.lineTo(px, py);
+        }
+        g.strokePath();
+      }
+    }
+    if (scene.children.moveAbove) scene.children.moveAbove(g, v);
+    m.crackGfx = g;
+  }
+  if (typeof juiceRender !== 'function') return;
+  for (const o of [v, m.crackGfx].filter(Boolean)) {
+    const j = juiceRender(o);
+    scene.tweens.add({ targets: j.off, x: { from: -3, to: 3 }, duration: 45, yoyo: true, repeat: 5 });
+  }
+  spawnFx(scene, 'chip', m.x, m.y - m.h / 4, { count: 5, spread: m.w / 3, power: 0.5 });
+  spawnFx(scene, 'dust', m.x, m.y + m.h / 2 - 6, { count: 4, spread: m.w / 2, power: 0.6, tint: [0x6f8f5a, 0x9bbf7a] });
+  playSfx('moss_crack');
+}
+
+// Fracas (juice) : éclats, mottes, gouttes, onde, micro-pause et secousse ;
+// l'amas gonfle une fraction de seconde puis s'efface.
+function storyMossBreak(scene, m) {
+  if (typeof spawnFx === 'function') {
+    spawnFx(scene, 'mossBreak', m.x, m.y, { w: m.w, h: m.h });
+    juiceHitStop(scene, 65);
+    juiceShake(scene, 'heavy');
+    playSfx('moss_break');
+  } else {
+    scene.cameras.main.shake(200, 0.008);
+  }
+  for (const o of [m.visual, m.crackGfx].filter((x) => x && x.active)) {
+    scene.tweens.add({
+      targets: o, alpha: 0, scaleX: o.scaleX * 1.12, scaleY: o.scaleY * 0.9, duration: 260, ease: 'Quad.easeOut',
+      onComplete: () => o.destroy(),
+    });
   }
 }
 
@@ -2326,6 +2564,13 @@ function updateStoryCheckpoints(scene) {
     for (const o of scene.__story.checkpoints) if (o.lit) { o.lit = false; o.draw(false); }
     c.lit = true;
     c.draw(true);
+    // Juice : la lanterne s'allume avec un éclat et une gerbe de lueurs.
+    if (typeof spawnFx === 'function') {
+      juiceBurstImage(scene, 'glow', c.x, c.lampY, { size: 130, from: 0.2, to: 1.2, ms: 520, color: STORY_UI.vineLight, alpha: 0.85 });
+      juiceShockRing(scene, c.x, c.lampY, { size: 90, ms: 420, color: STORY_UI.vineLight });
+      spawnFx(scene, 'motes', c.x, c.lampY, { count: 12, spread: 10, power: 1.8, color: [STORY_UI.vineLight, 0xe8fff2, STORY_UI.pink] });
+      playSfx('lantern_light');
+    }
     scene.__story.checkpoint = { x: c.x, y: c.y };
     // La mort (cœurs à 0, cf. Player.hitByEnemy) ramène aussi ici.
     player.spawnX = c.x;

@@ -94,6 +94,8 @@ class CampfireMenuScene extends Phaser.Scene {
     this.buildStaticSlots();
     this.wireInputEvents();
     this.rebuildUI();
+    // Juice : le menu du feu s'ouvre avec un léger rebond.
+    juiceOverlayIn(this);
 
     this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
   }

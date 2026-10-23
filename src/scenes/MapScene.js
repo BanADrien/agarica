@@ -39,6 +39,8 @@ class MapScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
     this.openedAt = this.time.now;
+    // Juice : la carte s'ouvre avec un léger rebond.
+    juiceOverlayIn(this);
     this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.75).setOrigin(0);
     this.input.keyboard.on('keydown', this.onKey, this);
 

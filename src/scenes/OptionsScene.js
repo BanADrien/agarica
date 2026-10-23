@@ -23,6 +23,14 @@ class OptionsScene extends MenuOverlayScene {
         action: () => this.toggleHint(),
         onLeft: () => this.toggleHint(), onRight: () => this.toggleHint(),
       },
+      {
+        // Accessibilité : intensité de TOUTES les secousses de caméra
+        // (juiceShake / Camera.shake, LevelKit) ; mémorisé (localStorage).
+        label: "Secousses d'écran",
+        value: () => `◂ ${JUICE_SHAKE_LABELS[juiceShakeLevel()]} ▸`,
+        action: () => this.cycleShake(1),
+        onLeft: () => this.cycleShake(-1), onRight: () => this.cycleShake(1),
+      },
       { label: 'Musique', disabled: true, value: () => 'bientôt' },
       { label: 'Effets sonores', disabled: true, value: () => 'bientôt' },
       { label: 'Voir les contrôles', value: () => '›', action: () => menuOpenChild(this, 'ControlsScene') },
@@ -80,6 +88,15 @@ class OptionsScene extends MenuOverlayScene {
 
   toggleHint() {
     menuSetOption('controlsHint', !menuOptions().controlsHint);
+  }
+
+  // Activées -> Réduites -> Désactivées ; petite secousse d'essai à la
+  // nouvelle intensité (aucune si désactivées).
+  cycleShake(dir) {
+    const order = JUICE_SHAKE_ORDER;
+    const i = order.indexOf(juiceShakeLevel());
+    juiceSetShakeLevel(order[(i + dir + order.length) % order.length]);
+    juiceShake(this, 'medium', 220);
   }
 
   async eraseSave() {
