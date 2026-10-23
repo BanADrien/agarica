@@ -350,6 +350,28 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P1] Kainati au sol (refonte du combat, 2026-10-23) : il ne monte plus sur
+  // les lianes ; ses grandes attaques couvrent tout le sol de l'arène et
+  // s'esquivent suspendue aux lianes (forme singe). Même échelle que `kainati`.
+  kainati_sol: {
+    dir: "assets/sprites/kainati_sol_frames", prefix: "kainati_sol",
+    anims: {
+      charge: { row: 0, frames: 4, fps: 12, repeat: -1 },
+      roar: { row: 1, frames: 4, fps: 8, repeat: 0 },
+      slam: { row: 2, frames: 4, fps: 12, repeat: 0 },
+      sweep: { row: 3, frames: 4, fps: 12, repeat: 0 },
+      stunned: { row: 4, frames: 4, fps: 6, repeat: -1 },
+    },
+    scale: 0.6,
+    facing: "right",
+    placeholder: { w: 195, h: 210, color: 0xe8e8e8, label: "Kainati" },
+    sheets: [
+      { file: "assets/sprites/kainati_sol.png", rows: [0, 1] },
+      { file: "assets/sprites/kainati_sol_p2.png", rows: [2, 3] },
+      { file: "assets/sprites/kainati_sol_p3.png", rows: [4] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P2] Kainati - forme d'esprit ancestral (monde spirituel)
   kainati_esprit: {
     dir: "assets/sprites/kainati_esprit_frames", prefix: "kainati_esprit",
@@ -577,6 +599,35 @@ const ASSET_MANIFEST = {
     cut: "grid", align: "bottom",
   },
   // [P2] VFX - impact de pierre (lancers de Kainati)
+  // [P1] VFX - onde de choc au sol de Kainati (couvre tout le sol de l'arène,
+  // le jeu la répète en largeur) : 4 frames, posée au sol.
+  vfx_onde_choc: {
+    dir: "assets/vfx/vfx_onde_choc_frames", prefix: "vfx_onde_choc",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 14, repeat: 0 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 160, h: 50, color: 0xc9b38a, label: "Onde" },
+    sheets: [
+      { file: "assets/vfx/vfx_onde_choc.png", rows: [0] },
+    ],
+    cut: "grid", align: "bottom",
+  },
+  // [P1] VFX - vague de mousse toxique qui balaie le sol (attaque de Kainati)
+  vfx_vague_mousse: {
+    dir: "assets/vfx/vfx_vague_mousse_frames", prefix: "vfx_vague_mousse",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 12, repeat: -1 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 120, h: 60, color: 0x6bbf3a, label: "Vague" },
+    sheets: [
+      { file: "assets/vfx/vfx_vague_mousse.png", rows: [0] },
+    ],
+    cut: "grid", align: "bottom",
+  },
   vfx_impact_pierre: {
     dir: "assets/vfx/vfx_impact_pierre_frames", prefix: "vfx_impact_pierre",
     anims: {
@@ -593,6 +644,13 @@ const ASSET_MANIFEST = {
 };
 
 const ITEM_MANIFEST = {
+  // [P1] Rocher roulant lancé par Kainati sur toute la largeur du sol (le jeu le fait tourner).
+  rocher_roulant: {
+    path: "assets/items/objets/rocher_roulant.png", scale: 0.3,
+    placeholder: { w: 70, h: 70, color: 0x8a8378, label: "Rocher" },
+    src: { file: "assets/_codex_src/rocher_roulant.png" },
+    norm: { mode: "fit", value: 256 },
+  },
   // [P1] a rough grey throwing rock the size of a fist, with a few lighter chips and a tiny moss sp
   pierre: {
     path: "assets/items/objets/pierre.png", scale: 0.16,
