@@ -60,8 +60,12 @@ class Liane {
     this.draw(0);
   }
 
+  // Tenue : angle qui correspond à la position ACTUELLE du corps du joueur
+  // (`drawTheta`, posé par stepSwing avant d'avancer le pendule d'un pas) --
+  // `theta` a déjà un pas d'avance sur le corps, qui ne l'atteindra qu'au
+  // prochain pas de physique. Dessiner `theta` décalait la main de la liane.
   get displayAngle() {
-    if (this.grabbedBy) return this.theta;
+    if (this.grabbedBy) return this.drawTheta ?? this.theta;
     return this.theta + Math.sin(this.scene.time.now / 900 + this.phase) * 0.05;
   }
 
@@ -129,8 +133,14 @@ class Liane {
   }
 
   attach(player) {
-    const { r } = this.measure(player.x, player.y - VINE_HANG_OFFSET);
-    this.theta = this.displayAngle;
+    // La liane vient aux mains (angle attache -> mains), plutôt que l'inverse :
+    // avant, le corps était téléporté jusqu'à 30 px de côté sur la liane au
+    // 1er pas de physique (saut visible à la prise).
+    const hx = player.x - this.x;
+    const hy = player.y - VINE_HANG_OFFSET - this.y;
+    const r = Math.hypot(hx, hy);
+    this.theta = Phaser.Math.Clamp(Math.atan2(hx, hy), -VINE_MAX_ANGLE, VINE_MAX_ANGLE);
+    this.drawTheta = this.theta;
     this.swingR = Phaser.Math.Clamp(r, VINE_MIN_GRAB_R, this.length);
     // Vitesse angulaire déduite de la vitesse du joueur (composante
     // tangentielle), un peu amortie pour une prise franche.
@@ -146,7 +156,9 @@ class Liane {
   }
 
   // Avance le pendule d'un pas et renvoie la position cible des PIEDS.
+  // Appelé à chaque pas de physique (Player.stepVinePhysics, dt fixe).
   stepSwing(player, dir, dt) {
+    this.drawTheta = this.theta;
     const g = this.scene.physics.world.gravity.y;
     if (this.climbTargetR < this.swingR) {
       this.swingR = Math.max(this.climbTargetR, this.swingR - VINE_CLIMB_SPEED * dt);
@@ -164,7 +176,7 @@ class Liane {
       this.theta = Math.sign(this.theta) * VINE_MAX_ANGLE;
       this.omega = 0;
     }
-    this.draw(this.scene.time.now);
+    // (Redessinée par update(), une fois par image, à `displayAngle`.)
     const hand = this.pointAt(r, this.theta);
     return { x: hand.x, y: hand.y + VINE_HANG_OFFSET };
   }
@@ -180,6 +192,7 @@ class Liane {
     const vx = r * this.omega * Math.cos(this.theta);
     const vy = -r * this.omega * Math.sin(this.theta);
     this.grabbedBy = null;
+    this.drawTheta = null;
     // L'oscillation libre est calculée sur toute la longueur.
     this.omega *= r / this.length;
     return { vx, vy };

@@ -663,7 +663,10 @@ const TOTEM_SCALE = 0.35;
 // avant son initialisation.) Appliqué UNIQUEMENT au totem (cf.
 // addAbilityShrine), pas à `groundSurfaceYAt` elle-même (partagée avec les
 // props/le feu de camp, qui n'ont pas ce problème).
-const TOTEM_GROUND_SINK = 16;
+// Valeur désormais propre au jeu de tuiles (AUTOTILE_TILESETS[..].totemSink :
+// 16 pour 'floor', inchangé) : TOTEM_GROUND_SINK est déclaré plus bas, après
+// AUTOTILE_TILESETS (une `const` de haut niveau ne peut pas lire une `const`
+// déclarée après elle).
 
 // Plantes devant le socle de chaque totem (retour utilisateur : "mettre des
 // plantes devant les totems par défaut pour mieux les intégrer") -- mêmes
@@ -1211,12 +1214,8 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
 // vertical exposé sur le côté plutôt que tourné vers le ciel) a été retirée
 // de l'éditeur quand floor.png est passé à une planche terre uniquement,
 // plutôt que de réutiliser les mêmes tuiles sous un faux choix "Roche".
-// DEUX jeux de tuiles de terrain interchangeables. Ils contiennent
-// exactement les mêmes 21 fichiers, aux mêmes noms et dans les mêmes rôles,
-// donc basculer de l'un à l'autre = changer AUTOTILE_TILESET ci-dessous et
-// rien d'autre : aucune constante de ce fichier n'est retouchée, aucune
-// scène n'est modifiée, renderAutotileGrid ne sait même pas lequel est
-// actif.
+// DEUX jeux de tuiles de terrain interchangeables : basculer de l'un à
+// l'autre = changer AUTOTILE_TILESET ci-dessous et rien d'autre.
 //   'floor'  -- le jeu d'origine, généré par IA puis découpé de
 //               assets/decors/floor.png par tools/crop_autotile.py.
 //               Grosses images (283 à 1254 px) réduites à l'affichage :
@@ -1230,16 +1229,43 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
 //               correct pour tout le reste des assets, qui sont dessinés
 //               en grand puis RÉDUITS — un caillou de 3 px devient une
 //               bouillie floue.
-// Les compensations que l'art doit respecter pour rester interchangeable
-// (hauteur des tuiles du haut étirée par AUTOTILE_CORNER_HEIGHT_BOOST,
-// hitbox aux 3/4, miroirs de dirt_angle/coin) sont documentées côté
-// génération, dans l'en-tête de tools/cut_tuiles.py.
+// Les deux jeux n'ont PLUS la même disposition (refonte de 'tuiles', 2026-10) :
+//   layout 'blob'  ('floor') -- les 21 fichiers dirt_*.png, choisis par
+//                  autotilePositionKey (9-slice + coins intérieurs +
+//                  plateformes), herbe DESSINÉE dans les tuiles du haut avec
+//                  du ciel transparent au-dessus, d'où une hitbox aux 3/4
+//                  (grassHitboxFraction 0.75) et les boosts de hauteur.
+//   layout 'atlas' ('tuiles') -- l'atlas en cases nommées découpé par
+//                  tools/cut_tuiles.py (A1..A9, B, C1..C7, D1..D6 + herbes
+//                  séparées, cf. son en-tête et atlasTileFor) : chaque case
+//                  est PLEINE, le haut de la case de surface est la ligne où
+//                  l'on marche et l'herbe est une image à part posée
+//                  par-dessus, sans hitbox -> grassHitboxFraction 1.
+// Basculer de l'un à l'autre reste un seul mot (AUTOTILE_TILESET) : tout ce
+// qui dépend de la hauteur de marche passe par GROUND_STAND_SINK (dérivé de
+// grassHitboxFraction) au lieu d'un « +16 » écrit en dur.
+// Les jeux des biomes (clé de zone `tileset`, TILESET_MANIFEST) sont TOUJOURS
+// au format 'blob' : une zone qui en a un complet est rendue en 'blob' quel
+// que soit le jeu par défaut, avec la ligne de marche du jeu par défaut (cf.
+// autotileLayoutFor et AUTOTILE_BLOB_ART_STAND_SINK).
+// `totemSink` : enfoncement du socle du totem sous le haut VISUEL de la case
+// (cf. TOTEM_GROUND_SINK) -- pour 'floor', la valeur historique réglée à l'œil.
+// `undersideTrim` : px retirés du BAS de la hitbox d'une case sans voisin au
+// sud (dessous d'une plateforme, plafond d'un tunnel), cf.
+// AUTOTILE_UNDERSIDE_TRIM.
 const AUTOTILE_TILESET = 'tuiles';
 const AUTOTILE_TILESETS = {
-  floor: { dir: 'assets/decors/autotile_frames', pixelArt: false },
-  tuiles: { dir: 'assets/decors/tuiles_frames', pixelArt: true },
+  floor: {
+    dir: 'assets/decors/autotile_frames', pixelArt: false, layout: 'blob',
+    grassHitboxFraction: 0.75, totemSink: 16, undersideTrim: 0,
+  },
+  tuiles: {
+    dir: 'assets/decors/tuiles_frames', pixelArt: true, layout: 'atlas',
+    grassHitboxFraction: 1, totemSink: 3, undersideTrim: 16,
+  },
 };
 const AUTOTILE_TILESET_DIR = AUTOTILE_TILESETS[AUTOTILE_TILESET].dir;
+const AUTOTILE_LAYOUT = AUTOTILE_TILESETS[AUTOTILE_TILESET].layout;
 
 const AUTOTILE_POSITIONS = ['tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br'];
 const AUTOTILE_PREFIX = { dirt: 'autotile-dirt-' };
@@ -1279,12 +1305,46 @@ const AUTOTILE_PLATFORM_HEIGHT_BOOST = { 'autotile-dirt-platform2': 1.05 };
 // continue en dessous et ne dessine donc rien pour fermer le dessous.
 const AUTOTILE_PLATFORM_VARIANT_COUNT = 3;
 // Part SOLIDE de la case (pas la part retirée) : 0.75 = les 3/4 du bas
-// restent solides, seul le dernier 1/4 du haut ne l'est plus.
-const AUTOTILE_GRASS_HITBOX_FRACTION = 0.75;
-// Écart entre le haut visuel d'une tuile d'herbe et la surface où l'on marche
-// (haut de sa hitbox) : les décors (props) sont posés sur cette surface, cf.
+// restent solides, seul le dernier 1/4 du haut ne l'est plus. Propriété du
+// jeu de tuiles (cf. AUTOTILE_TILESETS) : 1 pour 'tuiles' (case pleine).
+const AUTOTILE_GRASS_HITBOX_FRACTION = AUTOTILE_TILESETS[AUTOTILE_TILESET].grassHitboxFraction;
+// Écart entre le haut VISUEL d'une case de surface (multiple de 64, ex. 448)
+// et la ligne où l'on MARCHE (haut de sa hitbox) : 16 px pour 'floor', 0 pour
+// 'tuiles'. SEULE source de vérité pour tout ce qui doit se poser à hauteur
+// des pieds d'Agarica (PNJ, arènes de boss, décors, constantes des
+// src/data/*.js et src/story/*.js) -- ne jamais réécrire « 448 + 16 » / 464.
+const GROUND_STAND_SINK = GROUND_TILE_SIZE * (1 - AUTOTILE_GRASS_HITBOX_FRACTION);
+// Les décors (props) sont posés sur la surface de marche, cf.
 // groundStandYAt ; l'éditeur décale son aperçu d'autant.
-const PROP_GROUND_SINK = GROUND_TILE_SIZE * (1 - AUTOTILE_GRASS_HITBOX_FRACTION);
+const PROP_GROUND_SINK = GROUND_STAND_SINK;
+// Passer de 'floor' à 'tuiles' remonte la ligne de marche de 16 px (cases
+// pleines) sans bouger le dessous des cases : toutes les hauteurs libres sous
+// une plateforme ou un plafond perdaient 16 px. Les niveaux sont pleins de
+// plateformes posées une rangée au-dessus du sol (64 px libres + 16 = 80 avec
+// 'floor') : à 64 px, Agarica (corps de ~67 px) restait bloquée dessous
+// (vérifié : Zone1, carrefour de la forêt corrompue). On retire donc ces
+// mêmes 16 px du BAS de la hitbox des cases sans voisin au sud : toutes les
+// distances verticales du jeu (sauts, passages, plafonds) redeviennent
+// identiques au pixel près à celles réglées avec 'floor'. Effet visuel : la
+// tête peut mordre de quelques px (16 au plus, en se cognant) dans le dessous
+// de la case -- à réduire ici si ça se voit trop (garder ≥ 4 px pour
+// qu'Agarica humaine passe encore sous une plateforme à une rangée du sol).
+const AUTOTILE_UNDERSIDE_TRIM = AUTOTILE_TILESETS[AUTOTILE_TILESET].undersideTrim;
+// Cf. son commentaire d'origine plus haut (addAbilityShrine). 'tuiles' : le
+// dessus de l'herbe est un trait plein à la hauteur de marche, un enfoncement
+// de 3 px suffit à planter le socle dedans. (Le feu de camp, lui, se pose
+// directement sur la surface de marche, cf. addCampfire.)
+const TOTEM_GROUND_SINK = AUTOTILE_TILESETS[AUTOTILE_TILESET].totemSink;
+// Art au format 'blob' ('floor' ET jeux Codex des biomes, cf.
+// tools/import_codex_assets.py) : la ligne d'herbe où l'on marche y est
+// dessinée au 1er quart de la case (hitbox d'herbe aux 3/4, 16 px). Quand le
+// jeu par défaut marche plus haut (GROUND_STAND_SINK 0 avec 'tuiles'), le
+// rendu 'blob' d'une zone remonte TOUTES ses images de la différence
+// (AUTOTILE_BLOB_VISUAL_LIFT) : l'herbe dessinée retombe sur la ligne de
+// marche commune, et le dessous des masses sur le dessous de leur hitbox
+// (raccourci d'AUTOTILE_UNDERSIDE_TRIM, la même valeur).
+const AUTOTILE_BLOB_ART_STAND_SINK = 16;
+const AUTOTILE_BLOB_VISUAL_LIFT = AUTOTILE_BLOB_ART_STAND_SINK - GROUND_STAND_SINK;
 // Coin INTÉRIEUR (concave) : les 4 voisins orthogonaux sont pleins (donc
 // pas d'arête exposée, cf. autotilePositionKey) mais un voisin EN DIAGONALE
 // manque — cas d'un escalier en blocs carrés (ex: une marche qui monte en
@@ -1427,7 +1487,34 @@ const AUTOTILE_BACKLAYER_ALPHA = 1;
 // teinte/alpha assombries. Retourne la liste des images créées, pour que
 // l'éditeur puisse les détruire et redessiner à chaque coup de pinceau sans
 // tout reconstruire.
+// [clé de texture, nom de fichier] des 21 cases d'un jeu au format 'blob'
+// (« 9-slice » de terre + plateformes + variantes de centre + coins
+// intérieurs, cf. tools/crop_autotile.py / tools/import_codex_assets.py) :
+// 'floor' et les jeux des biomes (chargés sous `<id>:<clé>`, cf. BootScene).
+// dirt_t2/tl2/tr2 existent encore sur disque mais ne sont plus utilisées
+// (retour utilisateur) : ne pas les rebrancher sans qu'il le redemande.
+function autotileBlobFiles() {
+  const files = AUTOTILE_POSITIONS.map((pos) => [`autotile-dirt-${pos}`, `dirt_${pos}.png`]);
+  for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) files.push([`autotile-dirt-platform${i}`, `dirt_platform${i}.png`]);
+  for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) files.push([`autotile-dirt-c-var${i}`, `dirt_c_var${i}.png`]);
+  files.push(['autotile-dirt-angle', 'dirt_angle.png'], ['autotile-dirt-coin', 'coin.png']);
+  files.push(['autotile-dirt-column', 'dirt_column.png']);
+  return files;
+}
+
+// Disposition d'un rendu : un jeu de biome (`tileset`, toujours 'blob') dont
+// les 21 cases sont chargées l'emporte ; sinon celle du jeu par défaut. Avec
+// le défaut 'floor' (déjà 'blob'), un jeu incomplet garde son ancien repli
+// case par case sur le défaut ; avec 'tuiles' ('atlas'), il n'y a pas de case
+// 'blob' de repli : la zone reste en 'atlas'.
+function autotileLayoutFor(scene, tileset) {
+  if (!tileset || AUTOTILE_LAYOUT === 'blob') return AUTOTILE_LAYOUT;
+  const complete = autotileBlobFiles().every(([key]) => scene.textures.exists(`${tileset}:${key}`));
+  return complete ? 'blob' : AUTOTILE_LAYOUT;
+}
+
 function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
+  if (autotileLayoutFor(scene, options.tileset) === 'atlas') return renderAtlasAutotileGrid(scene, groundGroup, cells, options);
   const isBackLayer = !!options.back;
   const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
   const images = [];
@@ -1492,6 +1579,10 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       isPlatform = true;
     } else if (pos === 'c') {
       textureKey = `autotile-dirt-c-var${Phaser.Math.Between(0, DIRT_CENTER_VARIANT_COUNT - 1)}`;
+    } else if (pos === 'l' && !hasEast) {
+      // Milieu d'une colonne d'une case de large (exposée des DEUX côtés) :
+      // 'l' laissait le flanc droit coupé net.
+      textureKey = 'autotile-dirt-column';
     } else {
       // `material` peut valoir 'rock' sur d'anciennes données de niveau
       // exportées avant le retrait de cette option (cf. AUTOTILE_PREFIX,
@@ -1519,9 +1610,13 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
     // bouger. Calculé ici (avant le bloc hitbox juste en dessous, pas
     // seulement au moment de créer l'image) : la hitbox en a maintenant
     // besoin aussi, cf. son commentaire.
-    const heightBoost = isPlatform
+    // Jeux des biomes : cases déjà à leur proportion naturelle (en-tête de
+    // champignons compris, cf. tools/import_codex_assets.py), jamais étirées.
+    const zoneFrame = visualKey !== textureKey ? scene.textures.getFrame(visualKey) : null;
+    let heightBoost = isPlatform
       ? (AUTOTILE_PLATFORM_HEIGHT_BOOST[textureKey] || 1)
       : (AUTOTILE_CORNER_HEIGHT_BOOST[pos] || 1);
+    if (zoneFrame) heightBoost = zoneFrame.realHeight / zoneFrame.realWidth;
     const baseSize = GROUND_TILE_SIZE + AUTOTILE_OVERLAP * 2;
 
     if (groundGroup && !isBackLayer) {
@@ -1543,13 +1638,23 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
         // est la part SOLIDE de la case (les 3/4 du bas), pas la part
         // retirée — inversé une première fois (retour utilisateur : "tu
         // l'as mise à 1/4 au lieu de 3/4").
+        // Avec le défaut 'tuiles' (zone en jeu de biome), fraction 1 : la
+        // hitbox reste pleine et ce sont les images qui remontent, cf.
+        // AUTOTILE_BLOB_VISUAL_LIFT.
         const solidHeight = GROUND_TILE_SIZE * AUTOTILE_GRASS_HITBOX_FRACTION;
         tile.body.setSize(GROUND_TILE_SIZE, solidHeight);
         tile.body.setOffset(0, GROUND_TILE_SIZE - solidHeight);
       }
+      // Dessous raccourci (cf. AUTOTILE_UNDERSIDE_TRIM, 0 avec 'floor') : il
+      // suit le dessous des images, remontées d'autant.
+      if (AUTOTILE_UNDERSIDE_TRIM && !hasSouth) {
+        const top = tile.body.offset.y;
+        tile.body.setSize(GROUND_TILE_SIZE, GROUND_TILE_SIZE - top - AUTOTILE_UNDERSIDE_TRIM);
+        tile.body.setOffset(0, top);
+      }
     }
     const displayHeight = baseSize * heightBoost;
-    const tileCenterY = cy - (displayHeight - baseSize) / 2;
+    const tileCenterY = cy - (displayHeight - baseSize) / 2 - AUTOTILE_BLOB_VISUAL_LIFT;
     // Retour utilisateur : "les tuiles terre arriere plan ne doivent pas
     // etre transparant du tout" -- AUTOTILE_BACKLAYER_ALPHA=1 ci-dessous
     // (déjà réglé par un retour précédent) ne peut que RÉDUIRE
@@ -1580,7 +1685,7 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
     // second (leur vrai fond, jamais un aplat gris, doit se voir au
     // travers dans les deux cas).
     if (isBackLayer && !AUTOTILE_GRASS_TOP_POSITIONS.has(pos)) {
-      images.push(scene.add.rectangle(cx, cy, GROUND_TILE_SIZE, GROUND_TILE_SIZE, AUTOTILE_BACKLAYER_TINT, 1));
+      images.push(scene.add.rectangle(cx, cy - AUTOTILE_BLOB_VISUAL_LIFT, GROUND_TILE_SIZE, GROUND_TILE_SIZE, AUTOTILE_BACKLAYER_TINT, 1));
     }
     const img = scene.add.image(cx, tileCenterY, visualKey)
       .setDisplaySize(baseSize, displayHeight)
@@ -1596,22 +1701,169 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
   // n'était, ou pire, traversait toute la plateforme).
   if (groundGroup && !isBackLayer) {
     groundGroup.refresh();
-    // Arêtes INTERNES (correctif "paroi qui coince") : une face collée à une
-    // autre case pleine ne doit jamais repousser un corps. Sans ça, la case
-    // pleine SOUS un mur (hitbox entière, haut à y) dépasse de 16 px la case
-    // d'herbe voisine (hitbox aux 3/4) : la séparation Arcade en Y (passe en
-    // premier, tolère overlapBias = 20 px) la traitait comme une marche et
-    // perchait Agarica 16 px plus haut contre le mur. Le petit bout de face
-    // latérale ainsi désactivé est toujours couvert par la case du mur
-    // au-dessus (corps du joueur bien plus haut que 16 px).
-    for (const tile of tileBodies) {
-      const { gx, gy } = tile.__cell;
-      const cc = tile.body.checkCollision;
-      cc.up = !solid.has(gridCellKey(gx, gy - 1));
-      cc.down = !solid.has(gridCellKey(gx, gy + 1));
-      cc.left = !solid.has(gridCellKey(gx - 1, gy));
-      cc.right = !solid.has(gridCellKey(gx + 1, gy));
+    disableInternalGroundFaces(tileBodies, solid);
+  }
+  return images;
+}
+
+// Arêtes INTERNES (correctif "paroi qui coince") : une face collée à une
+// autre case pleine ne doit jamais repousser un corps. Sans ça, avec le jeu
+// 'floor', la case pleine SOUS un mur (hitbox entière, haut à y) dépasse de
+// 16 px la case d'herbe voisine (hitbox aux 3/4) : la séparation Arcade en Y
+// (passe en premier, tolère overlapBias = 20 px) la traitait comme une marche
+// et perchait Agarica 16 px plus haut contre le mur. Le petit bout de face
+// latérale ainsi désactivé est toujours couvert par la case du mur au-dessus
+// (corps du joueur bien plus haut que 16 px). Gardé aussi pour 'atlas' (cases
+// toutes pleines) : une face interne n'a jamais à arrêter quoi que ce soit, et
+// ça évite qu'un corps accroche la jointure entre deux cases d'un même sol.
+function disableInternalGroundFaces(tileBodies, solid) {
+  for (const tile of tileBodies) {
+    const { gx, gy } = tile.__cell;
+    const cc = tile.body.checkCollision;
+    cc.up = !solid.has(gridCellKey(gx, gy - 1));
+    cc.down = !solid.has(gridCellKey(gx, gy + 1));
+    cc.left = !solid.has(gridCellKey(gx - 1, gy));
+    cc.right = !solid.has(gridCellKey(gx + 1, gy));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Disposition 'atlas' (jeu 'tuiles', cf. AUTOTILE_TILESETS et l'en-tête de
+// tools/cut_tuiles.py pour la carte des cases de assets/decors/tuiles.png).
+// ---------------------------------------------------------------------------
+// Clé de texture d'une case de l'atlas : `autotile-atlas-A1`, `…-grass_mid`…
+const AUTOTILE_ATLAS_PREFIX = 'autotile-atlas-';
+const AUTOTILE_ATLAS_TILES = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9',
+  'B', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7',
+  'D1', 'D2', 'D3', 'D4', 'D5', 'D6',
+];
+// Taille d'une case dans l'atlas (px source) : facteur d'agrandissement
+// GROUND_TILE_SIZE / 24, le MÊME pour les cases et les herbes (l'herbe garde
+// sa taille naturelle, elle n'est jamais étirée pour remplir la case).
+const AUTOTILE_ATLAS_SOURCE_TILE = 24;
+// Herbes posées par-dessus les cases de surface, SANS hitbox, à leur taille
+// naturelle : `dx` = décalage (px source) du bord gauche de l'image par
+// rapport au bord gauche de la case -- elles DÉPASSENT du bord exposé
+// (demande utilisateur : « laisser l'herbe dépasser, c'est pour pas que ça
+// fasse trop plat »). Le haut de l'image = le haut de la case = la ligne où
+// l'on marche. Mêmes valeurs que GRASS_SPECS dans tools/cut_tuiles.py.
+const AUTOTILE_ATLAS_GRASS = {
+  mid: { file: 'grass_mid', dx: 0 },      // H1 : voisins des deux côtés
+  left: { file: 'grass_left', dx: -2 },   // H3 : pas de voisin à l'ouest
+  right: { file: 'grass_right', dx: 0 },  // H4 : pas de voisin à l'est
+  single: { file: 'grass_single', dx: -2 }, // H3+H4 : aucun voisin latéral
+};
+
+// Choix de la case de l'atlas pour (gx, gy), d'après `solid` (Set de
+// gridCellKey = l'ensemble S des cases pleines). Règles de l'utilisateur
+// (« une couche de B avant la logique des A en dessous » ; les D sont les
+// coins INTÉRIEURS, les C les variantes « minces » du 9-slice) :
+//  1. Case de surface (pas de voisin N dans S) AVEC un voisin S dans S ET au
+//     moins un voisin E ou O dans S -> B (les « cases B »).
+//  2. Région R = S privé des cases B (les surfaces minces -- plateforme sans
+//     dessous, haut de colonne -- restent donc dans R). Une case de R n'a
+//     pour voisins QUE des cases de R : tout ce qui est hors de R (case B
+//     comprise) compte comme EXPOSÉ. Avec n/s/e/o/no/ne/so/se = voisin ∈ R :
+//       !n && !s : !o && !e -> C4 ; !o -> C1 ; !e -> C3 ; sinon C2
+//       sinon !o && !e : !n -> C5 ; !s -> C7 ; sinon C6
+//       !n && !o -> A1 ; !n && !e -> A3 ; !s && !o -> A7 ; !s && !e -> A9
+//       !n -> A2
+//       !s -> !no -> D1 ; !ne -> D2 ; sinon A8
+//       !o -> A4 ; !e -> A6
+//       intérieur : !no -> D6 ; !ne -> D5 ; !so -> D4 ; !se -> D3 ; sinon A5
+//  3. Herbe sur TOUTE case sans voisin N dans S : H3 (grass_left) sans voisin
+//     O dans S, H4 (grass_right) sans voisin E dans S, les deux
+//     (grass_single) si aucun des deux, sinon H1 (grass_mid).
+// Le petit bout d'herbe H2 de l'atlas n'est pas utilisé (rôle non précisé).
+// Retourne { tile, grass } (`grass` : clé de AUTOTILE_ATLAS_GRASS ou null).
+function atlasTileFor(solid, gx, gy) {
+  const inS = (x, y) => solid.has(gridCellKey(x, y));
+  const isB = (x, y) => inS(x, y) && !inS(x, y - 1) && inS(x, y + 1) && (inS(x - 1, y) || inS(x + 1, y));
+  let grass = null;
+  if (!inS(gx, gy - 1)) {
+    const w = inS(gx - 1, gy);
+    const e = inS(gx + 1, gy);
+    grass = !w && !e ? 'single' : !w ? 'left' : !e ? 'right' : 'mid';
+  }
+  if (isB(gx, gy)) return { tile: 'B', grass };
+  const inR = (x, y) => inS(x, y) && !isB(x, y);
+  const n = inR(gx, gy - 1);
+  const s = inR(gx, gy + 1);
+  const e = inR(gx + 1, gy);
+  const o = inR(gx - 1, gy);
+  let tile;
+  if (!n && !s) tile = !o && !e ? 'C4' : !o ? 'C1' : !e ? 'C3' : 'C2';
+  else if (!o && !e) tile = !n ? 'C5' : !s ? 'C7' : 'C6';
+  else if (!n && !o) tile = 'A1';
+  else if (!n && !e) tile = 'A3';
+  else if (!s && !o) tile = 'A7';
+  else if (!s && !e) tile = 'A9';
+  else if (!n) tile = 'A2';
+  else if (!s) tile = !inR(gx - 1, gy - 1) ? 'D1' : !inR(gx + 1, gy - 1) ? 'D2' : 'A8';
+  else if (!o) tile = 'A4';
+  else if (!e) tile = 'A6';
+  else if (!inR(gx - 1, gy - 1)) tile = 'D6';
+  else if (!inR(gx + 1, gy - 1)) tile = 'D5';
+  else if (!inR(gx - 1, gy + 1)) tile = 'D4';
+  else if (!inR(gx + 1, gy + 1)) tile = 'D3';
+  else tile = 'A5';
+  return { tile, grass };
+}
+
+// Équivalent de renderAutotileGrid pour la disposition 'atlas' (mêmes
+// paramètres, même valeur de retour, même hitbox d'une case par cellule et
+// mêmes faces internes désactivées). Différences : hitbox dont le haut est
+// le haut de la case (grassHitboxFraction 1 ; dessous raccourci de
+// AUTOTILE_UNDERSIDE_TRIM s'il n'y a rien en dessous), cases affichées à
+// EXACTEMENT GROUND_TILE_SIZE (pas d'AUTOTILE_OVERLAP : textures séparées en
+// filtre NEAREST, positions entières sur la grille de 64 -> les bords se
+// touchent pile, et un débord de 0,5 px décalerait la grille de pixels d'une
+// case à l'autre), aucun boost de
+// hauteur, et l'herbe ajoutée en images séparées APRÈS toutes les cases (pour
+// passer devant les cases voisines qu'elle déborde). `options.tileset` (jeux
+// alternatifs du manifest, au format 'blob' à 21 noms) est ignoré : leurs
+// noms de cases ne correspondent pas à cette disposition.
+function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
+  const isBackLayer = !!options.back;
+  const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
+  const scale = GROUND_TILE_SIZE / AUTOTILE_ATLAS_SOURCE_TILE;
+  const images = [];
+  const grassCells = [];
+  const tileBodies = [];
+  for (const [gx, gy] of cells) {
+    const { tile, grass } = atlasTileFor(solid, gx, gy);
+    const { x: cx, y: cy } = gridToWorld(gx, gy);
+    if (groundGroup && !isBackLayer) {
+      const body = groundGroup.create(cx, cy, GROUND_HITBOX_KEY).setVisible(false);
+      body.__cell = { gx, gy };
+      // Haut de la hitbox = haut de la case (ligne de marche) ; dessous
+      // raccourci si rien en dessous, cf. AUTOTILE_UNDERSIDE_TRIM.
+      if (AUTOTILE_UNDERSIDE_TRIM && !solid.has(gridCellKey(gx, gy + 1))) {
+        body.body.setSize(GROUND_TILE_SIZE, GROUND_TILE_SIZE - AUTOTILE_UNDERSIDE_TRIM);
+        body.body.setOffset(0, 0);
+      }
+      tileBodies.push(body);
     }
+    const img = scene.add.image(cx, cy, `${AUTOTILE_ATLAS_PREFIX}${tile}`)
+      .setDisplaySize(GROUND_TILE_SIZE, GROUND_TILE_SIZE);
+    if (isBackLayer) img.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
+    images.push(img);
+    if (grass) grassCells.push([gx, gy, grass]);
+  }
+  // Herbes créées APRÈS toutes les cases de ce rendu (ordre d'affichage =
+  // ordre de création) : un débord latéral passerait sinon sous la case
+  // voisine créée après lui.
+  for (const [gx, gy, grass] of grassCells) {
+    const spec = AUTOTILE_ATLAS_GRASS[grass];
+    const g = scene.add.image(gx * GROUND_TILE_SIZE + spec.dx * scale, gy * GROUND_TILE_SIZE, `${AUTOTILE_ATLAS_PREFIX}${spec.file}`)
+      .setOrigin(0, 0).setScale(scale);
+    if (isBackLayer) g.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
+    images.push(g);
+  }
+  if (groundGroup && !isBackLayer) {
+    groundGroup.refresh();
+    disableInternalGroundFaces(tileBodies, solid);
   }
   return images;
 }
@@ -2102,7 +2354,13 @@ function buildLevelFromData(scene, data, sceneData) {
     scene.physics.add.overlap(scene.player, scene.webs, () => { scene.player.inWeb = true; });
   }
 
-  scene.enemies = scene.physics.add.group();
+  // Personnages devant les décors (cf. CHARACTER_DEPTH) : profondeur posée à
+  // l'AJOUT dans le groupe, donc aussi pour les ennemis qu'un script ajoute
+  // plus tard (renforts, mousses invoquées par Ghil't, boss) ; leurs
+  // projectiles/effets créés ensuite à `this.depth + 1` suivent.
+  scene.enemies = scene.physics.add.group({
+    createCallback: (enemy) => { if (enemy && enemy.setDepth) enemy.setDepth(CHARACTER_DEPTH); },
+  });
   for (const e of data.enemies || []) {
     // Registre data-driven (cf. ENEMY_REGISTRY dans StoryKit.js, chaque
     // fichier d'entité peut s'y enregistrer) à la place de l'ancienne chaîne
@@ -2146,9 +2404,10 @@ function buildLevelFromData(scene, data, sceneData) {
   // (cf. propTopYAt) plutôt que sur un y écrit à la main.
   scene.props = [];
   for (const p of data.props || []) {
-    // Surface où l'on MARCHE (haut de la hitbox, cf. AUTOTILE_GRASS_HITBOX_FRACTION :
-    // 16 px sous le haut visuel des tuiles d'herbe), pas le haut de l'image de
-    // tuile -- sinon les décors flottaient au-dessus de l'herbe.
+    // Surface où l'on MARCHE (haut de la hitbox, cf. GROUND_STAND_SINK :
+    // 16 px sous le haut visuel des tuiles d'herbe avec 'floor', le haut de la
+    // case avec 'tuiles'), pas le haut de l'image de tuile -- sinon, avec
+    // 'floor', les décors flottaient au-dessus de l'herbe.
     const y = groundStandYAt(scene, p.x, p.y) ?? p.y;
     const img = scene.add.image(p.x, y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
     img.propType = p.type;
@@ -2278,6 +2537,9 @@ function createHud(scene) {
 function drawHud(scene) {
   const g = scene.hudGraphics;
   g.clear();
+  // Art Codex (cœurs hud_coeur*, icônes skill_icone_*) : posé en images par
+  // storyDrawHudArt (StoryKit.js, agent UI) ; ici seulement le repli dessiné.
+  const art = typeof storyDrawHudArt === 'function' ? storyDrawHudArt(scene) : null;
   // Construit du HAUT vers le BAS : les cœurs collent au bord haut de
   // l'écran, la barre d'énergie juste en dessous.
   const baseY = HUD_MARGIN;
@@ -2286,7 +2548,7 @@ function drawHud(scene) {
   // ENERGY_MAX) : inclut les bonus de totems équipés (cf.
   // recomputeTotemBonuses dans Player.js), donc la barre/les cœurs
   // s'allongent tout seuls quand un totem "vie"/"énergie" est équipé.
-  for (let i = 0; i < scene.player.maxHearts; i++) {
+  for (let i = 0; !(art && art.hearts) && i < scene.player.maxHearts; i++) {
     const cx = HUD_MARGIN + HUD_HEART_SIZE / 2 + i * (HUD_HEART_SIZE + HUD_HEART_GAP);
     const cy = baseY + HUD_HEART_SIZE / 2;
     const filled = i < scene.player.hearts;
@@ -2308,6 +2570,7 @@ function drawHud(scene) {
   const player = scene.player;
   const now = scene.time.now;
   HUD_SKILL_LABELS.forEach((label, i) => {
+    if (art && art.skills[i]) return; // icône Codex (storyDrawHudArt)
     const cx = HUD_MARGIN + HUD_SKILL_SIZE / 2 + i * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
     const skillId = player.skillSlots[i];
     const def = skillId ? SKILL_DEFS[skillId] : null;

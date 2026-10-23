@@ -563,8 +563,8 @@ ZONE_SCRIPTS.acte2_ff1 = {
     scene.__a2 = { duel: null, walls: null };
     a2InteractReset(scene);
     a2Ff1Atmosphere(scene);
-    a2DrawTotemRuin(scene, 3120, 128 + 16, 56);
-    a2DrawTotemRuin(scene, 3260, 128 + 16, 34, 0x8a7a66);
+    a2DrawTotemRuin(scene, 3120, 128 + GROUND_STAND_SINK, 56);
+    a2DrawTotemRuin(scene, 3260, 128 + GROUND_STAND_SINK, 34, 0x8a7a66);
     if (storyGet('geraltMet')) {
       // Revisite : Geralt au pied de la corniche, plongé dans sa carte.
       const g = a2Npc(scene, 'geralt');
@@ -748,8 +748,8 @@ function a2Ff2Decor(scene) {
   far.fillStyle(0x6fdc3a, 0.25);
   far.fillEllipse(1500, 440, 500, 60);
   if (bg) a2PlaceAbove(scene, far, st.sky);
-  a2DrawTotemRuin(scene, 1150, 320 + 16, 70);
-  a2DrawTotemRuin(scene, 1370, 320 + 16, 40, 0x8a7a66);
+  a2DrawTotemRuin(scene, 1150, 320 + GROUND_STAND_SINK, 70);
+  a2DrawTotemRuin(scene, 1370, 320 + GROUND_STAND_SINK, 40, 0x8a7a66);
 }
 
 ZONE_SCRIPTS.acte2_ff2 = {
@@ -758,7 +758,7 @@ ZONE_SCRIPTS.acte2_ff2 = {
     scene.__a2 = { hadEagle: !!storyGet('hasEagleForm'), revealQueued: false, beast: null };
     a2InteractReset(scene);
     a2Ff2Decor(scene);
-    if (!storyGet('amaniteMet')) scene.__a2.beast = a2DrawMossBeast(scene, 2070, 384 + 16);
+    if (!storyGet('amaniteMet')) scene.__a2.beast = a2DrawMossBeast(scene, 2070, 384 + GROUND_STAND_SINK);
     else {
       // Trace du passage d'Amanite : une flaque de mousse morte.
       const g = scene.add.graphics();
@@ -1255,7 +1255,7 @@ function a2DrawHutte(scene, x) {
 }
 
 function a2DrawRampe(scene, x) {
-  const y = 256 + 16;
+  const y = 256 + GROUND_STAND_SINK;
   const g = scene.add.graphics({ x, y });
   g.fillStyle(0x8a6a3e, 1);
   g.fillRect(-60, -10, 90, 10);
@@ -1284,7 +1284,7 @@ ZONE_SCRIPTS.acte2_hutte = {
     a2DrawHutte(scene, cfg.x);
     a2DrawRampe(scene, cfg.rampeX);
     a2AddInteract(scene, {
-      x: cfg.sentierX, y: 464, h: 110,
+      x: cfg.sentierX, y: 448 + GROUND_STAND_SINK, h: 110,
       label: () => (inventoryHas('repulsif') ? 'E : descendre le sentier' : 'E : lire le panneau'),
       onUse: (sc) => a2HutteSentier(sc),
     });
@@ -1426,7 +1426,7 @@ async function a2Fc1TotemPulse(scene) {
 
 // Cratère du crash + branches cassées.
 function a2DrawCrater(scene, x) {
-  const y = storyGroundY(scene, x, 448) + 16;
+  const y = storyGroundY(scene, x, 448) + GROUND_STAND_SINK;
   const g = scene.add.graphics();
   g.fillStyle(0x1a2614, 1);
   g.fillEllipse(x, y + 2, 200, 26);
@@ -1441,7 +1441,7 @@ function a2DrawCrater(scene, x) {
 
 // Arbre marqué d'une spirale (Xara la reconnaît sans rien dire).
 function a2DrawSpiralTree(scene, x) {
-  const y = storyGroundY(scene, x, 448) + 16;
+  const y = storyGroundY(scene, x, 448) + GROUND_STAND_SINK;
   const g = scene.add.graphics({ x, y });
   g.fillStyle(0x3b3026, 1);
   g.fillRect(-26, -330, 52, 330);
@@ -1497,7 +1497,7 @@ function a2UpdateMossTufts(scene, time) {
 function a2Fc1CloseBehind(scene, animate) {
   const x = 420;
   const h = 260;
-  const y = storyGroundY(scene, x, 448) - h / 2 + 16;
+  const y = storyGroundY(scene, x, 448) - h / 2 + GROUND_STAND_SINK;
   const v = drawMossVisual(scene, x, y, 90, h, 'mousse_mur', true);
   addMossBody(scene, x, y, 90, h);
   if (animate) {
@@ -1702,10 +1702,11 @@ Object.assign(DIALOGUES, {
 
 CUTSCENES.bosquet_retour = [
   { wait: 400 },
-  // y explicite : hors du sol (x < 64), le PNJ restait posé à 448 (16 px
-  // au-dessus de l'herbe, haut de la hitbox des tuiles = 464).
-  { npcAdd: { id: 'geralt', x: 20, y: 464 } },
-  { npcAdd: { id: 'clak', x: -30, y: 464 } },
+  // y explicite : hors du sol (x < 64), storyStandY n'y trouve aucune tuile.
+  // Pieds à hauteur de marche (haut de la hitbox des tuiles, cf.
+  // GROUND_STAND_SINK : 464 avec le jeu 'floor', 448 avec 'tuiles').
+  { npcAdd: { id: 'geralt', x: 20, y: 448 + GROUND_STAND_SINK } },
+  { npcAdd: { id: 'clak', x: -30, y: 448 + GROUND_STAND_SINK } },
   { parallel: [
     { playerMove: { toX: 560, speed: 150 } },
     { npcMove: { npc: 'geralt', toX: 470, speed: 150 } },

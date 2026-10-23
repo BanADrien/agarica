@@ -163,11 +163,61 @@ function addManifestSprite(scene, x, y, id, anim = 'idle', { physics = false, or
   return sprite;
 }
 
+// Objets de l'inventaire sans art Codex prévu, dessinés par code (plus
+// lisible qu'un rectangle étiqueté) : la note de Geralt = papier griffonné.
+// Canvas sans image source : jamais « tainted », même en file://.
+const STORY_DRAWN_ITEMS = {
+  note_geralt: {
+    w: 100, h: 120, scale: 0.36,
+    draw(ctx, w, h) {
+      ctx.fillStyle = '#e9d3a0';
+      ctx.strokeStyle = '#8a6438';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(8, 10); ctx.lineTo(w - 30, 6); ctx.lineTo(w - 6, 30); ctx.lineTo(w - 10, h - 8);
+      ctx.lineTo(12, h - 4); ctx.lineTo(6, h / 2); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#c9a66a'; // coin replié
+      ctx.beginPath(); ctx.moveTo(w - 30, 6); ctx.lineTo(w - 28, 30); ctx.lineTo(w - 6, 30); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#4a2e16';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 6; i++) {
+        const y = 34 + i * 13;
+        ctx.beginPath();
+        ctx.moveTo(18, y);
+        for (let x = 18; x < w - 22 - (i % 3) * 10; x += 8) ctx.lineTo(x + 4, y + ((x / 8) % 2 ? -2 : 2));
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#b03a2e'; // trace de pince de Clak
+      ctx.beginPath(); ctx.arc(w - 26, h - 24, 6, 0, Math.PI * 2); ctx.fill();
+    },
+  },
+};
+
+function storyDrawnItemKey(scene, id) {
+  const d = STORY_DRAWN_ITEMS[id];
+  if (!d) return null;
+  const key = `drawn-item-${id}`;
+  if (!scene.textures.exists(key)) {
+    const tex = scene.textures.createCanvas(key, d.w, d.h);
+    d.draw(tex.getContext(), d.w, d.h);
+    tex.refresh();
+  }
+  return key;
+}
+
 function addItemImage(scene, x, y, id, { origin = [0.5, 0.5] } = {}) {
   const def = getItemManifest()[id] || {};
-  const key = scene.textures.exists(`item-${id}`) ? `item-${id}` : manifestPlaceholderKey(scene, id);
+  let key = `item-${id}`;
+  let scale = def.scale || 1;
+  if (!scene.textures.exists(key)) {
+    const drawn = storyDrawnItemKey(scene, id);
+    key = drawn || manifestPlaceholderKey(scene, id);
+    if (drawn) scale = STORY_DRAWN_ITEMS[id].scale;
+  }
   const img = scene.add.image(x, y, key).setOrigin(origin[0], origin[1]);
-  img.setScale(def.scale || 1);
+  img.setScale(scale);
   return img;
 }
 
@@ -480,8 +530,9 @@ function unlockSkillFromStory(scene, skillId, { silent = false } = {}) {
 
 const STORY_FORM_INFO = {
   hasWolfForm: { type: 'wolf', name: 'Forme du loup', desc: 'Sprint (Shift ou double appui) : cours, franchis les ravins, suis les pistes.' },
-  hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: 'Double saut plus haut et plané.' },
-  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: 'Double saut, accroche aux lianes et balancement.' },
+  // Sans forme aérienne, Agarica n'a qu'un saut : c'est la forme qui donne le double saut.
+  hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: 'Donne le double saut (plus haut) et le plané.' },
+  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: 'Donne le double saut ; accroche aux lianes et balancement.' },
   hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Nage automatique.' },
 };
 
@@ -620,6 +671,149 @@ function drawStoryVines(g, x, y, w, h, seed = 1) {
     g.fillStyle(0x5fa86f, 1);
     g.fillEllipse(hang[i].x + 5, hang[i].y, 9, 4);
   }
+}
+
+// Cadre Codex `item-dialogue_box` (1692x624 : lianes tressées, champignons
+// cyan aux coins, planches sombres) à n'importe quelle taille SANS étirer les
+// lianes (une 9-slice les déformait : bout de liane écrasé, champignon géant).
+// Sur chaque axe, la 1re moitié est un morceau de l'image et la 2e son miroir
+// (raccord du milieu continu) ; plus grand que l'image, un morceau retourné
+// rallonge chaque moitié (raccord en miroir lui aussi). Taille proche de
+// l'image (±15 %) : l'image entière, à peine étirée. Mesures en px source.
+const STORY_VINE_FRAME = {
+  key: 'item-dialogue_box', w: 1692, h: 624,
+  outer: { l: 36, t: 48, r: 32, b: 40 }, // marge transparente (feuilles qui débordent)
+  inner: { l: 92, t: 100, r: 88, b: 88 }, // début des planches depuis chaque bord
+  maxHalf: { x: 1500, y: 500 }, // au-delà : décor du coin opposé
+  corner: { x: 320, y: 170 }, // coin (champignon + feuilles), jamais répété
+  fitTolerance: 0.15,
+};
+
+function storyVineFrameAxis(target, scale, size, oStart, oEnd, maxHalf, corner) {
+  const natural = size - oStart - oEnd;
+  const want = target / scale;
+  if (Math.abs(want - natural) <= natural * STORY_VINE_FRAME.fitTolerance) {
+    return { k: target / natural, segs: [{ a: 0, b: size, flip: false }], start: oStart, mirrored: false };
+  }
+  const half = Math.round(want / 2 + oStart);
+  let segs = [{ a: 0, b: Math.min(half, maxHalf), flip: false }];
+  if (half > maxHalf) {
+    const r = Math.min(half - maxHalf, maxHalf - corner);
+    segs.push({ a: maxHalf - r, b: maxHalf, flip: true });
+  }
+  segs = segs.concat(segs.slice().reverse().map((s) => ({ ...s, flip: !s.flip })));
+  const length = segs.reduce((sum, s) => sum + s.b - s.a, 0);
+  return { k: target / (length - 2 * oStart), segs, start: oStart, mirrored: true };
+}
+
+// (x, y, w, h) = bords EXTÉRIEURS des lianes (feuilles et champignons
+// débordent d'environ 50 px source × échelle). Les morceaux sont ajoutés à
+// `container` (ou à un nouveau). Renvoie { container, inner } — inner = les
+// planches (zone de texte) en coordonnées écran — ou null sans l'art.
+function addStoryVineFrame(scene, x, y, w, h, { scale = 0.3, container = null } = {}) {
+  const F = STORY_VINE_FRAME;
+  if (!scene.textures.exists(F.key)) return null;
+  const tex = scene.textures.get(F.key);
+  const ax = storyVineFrameAxis(w, scale, F.w, F.outer.l, F.outer.r, F.maxHalf.x, F.corner.x);
+  const ay = storyVineFrameAxis(h, scale, F.h, F.outer.t, F.outer.b, F.maxHalf.y, F.corner.y);
+  // Bords des morceaux arrondis au pixel : morceaux jointifs, sans liseré.
+  const edges = (axis, origin) => {
+    let cum = 0;
+    return [Math.round(origin), ...axis.segs.map((s) => Math.round(origin + (cum += s.b - s.a) * axis.k))];
+  };
+  const xs = edges(ax, x - ax.start * ax.k);
+  const ys = edges(ay, y - ay.start * ay.k);
+  const c = container || scene.add.container(0, 0);
+  ay.segs.forEach((sy, j) => ax.segs.forEach((sx, i) => {
+    const name = `vine_${sx.a}_${sx.b}_${sy.a}_${sy.b}`;
+    if (!tex.has(name)) tex.add(name, 0, sx.a, sy.a, sx.b - sx.a, sy.b - sy.a);
+    c.add(scene.add.image(xs[i], ys[j], F.key, name).setOrigin(0, 0)
+      .setDisplaySize(xs[i + 1] - xs[i], ys[j + 1] - ys[j]).setFlip(sx.flip, sy.flip));
+  }));
+  const insetL = (F.inner.l - F.outer.l) * ax.k;
+  const insetR = (ax.mirrored ? F.inner.l - F.outer.l : F.inner.r - F.outer.r) * ax.k;
+  const insetT = (F.inner.t - F.outer.t) * ay.k;
+  const insetB = (ay.mirrored ? F.inner.t - F.outer.t : F.inner.b - F.outer.b) * ay.k;
+  const inner = { x: x + insetL, y: y + insetT, w: w - insetL - insetR, h: h - insetT - insetB };
+  return { container: c, inner };
+}
+
+// HUD — art Codex, appelé par drawHud (LevelKit.js) à chaque frame : cœurs
+// `hud_coeur` / `hud_coeur_vide` et icônes des compétences équipées
+// (`skill_icone_*`, lettre de la touche en pastille). Images créées une fois
+// par visite puis seulement mises à jour (le Graphics du HUD, lui, est
+// redessiné chaque frame). Renvoie ce que drawHud ne doit PAS dessiner :
+// { hearts: bool, skills: [bool, bool, bool] } (repli dessiné sans l'art).
+const HUD_ART_HEART_H = 24;
+const HUD_ART_SKILL_SIZE = 40;
+
+function storyHudSkillIconKey(skillId) {
+  return `item-${STORY_SKILL_ICON[skillId] || `skill_icone_${skillId}`}`;
+}
+
+function storyDrawHudArt(scene) {
+  const player = scene.player;
+  const result = { hearts: false, skills: [false, false, false] };
+  if (!player || !scene.hudGraphics || !player.skillSlots) return result;
+  let art = scene.__hudArt;
+  // Nouvelle visite : createHud a recréé son Graphics, les anciennes images
+  // ont été détruites avec la scène.
+  if (!art || art.owner !== scene.hudGraphics) {
+    art = scene.__hudArt = { owner: scene.hudGraphics, hearts: [], skills: [] };
+  }
+
+  if (scene.textures.exists('item-hud_coeur') && scene.textures.exists('item-hud_coeur_vide')) {
+    result.hearts = true;
+    const n = player.maxHearts;
+    while (art.hearts.length < n) {
+      art.hearts.push(scene.add.image(0, 0, 'item-hud_coeur').setScrollFactor(0).setDepth(1001));
+    }
+    art.hearts.forEach((img, i) => {
+      img.setVisible(i < n);
+      if (i >= n) return;
+      const key = i < player.hearts ? 'item-hud_coeur' : 'item-hud_coeur_vide';
+      if (img.texture.key !== key) img.setTexture(key);
+      img.setScale(HUD_ART_HEART_H / img.height);
+      img.setPosition(HUD_MARGIN + HUD_HEART_SIZE / 2 + i * (HUD_HEART_SIZE + HUD_HEART_GAP), HUD_MARGIN + HUD_HEART_SIZE / 2);
+    });
+  }
+
+  const skillY = scene.scale.height - HUD_MARGIN - HUD_SKILL_SIZE / 2;
+  HUD_SKILL_LABELS.forEach((label, i) => {
+    const id = player.skillSlots[i];
+    const def = id && typeof SKILL_DEFS !== 'undefined' ? SKILL_DEFS[id] : null;
+    const key = def ? storyHudSkillIconKey(id) : null;
+    const has = !!key && scene.textures.exists(key);
+    let slot = art.skills[i];
+    if (has && !slot) {
+      const badge = scene.add.graphics().setScrollFactor(0).setDepth(1002);
+      badge.fillStyle(STORY_UI.night, 0.95);
+      badge.fillCircle(0, 0, 8);
+      badge.lineStyle(1.5, STORY_UI.vineLight, 0.9);
+      badge.strokeCircle(0, 0, 8);
+      slot = art.skills[i] = {
+        icon: scene.add.image(0, 0, key).setScrollFactor(0).setDepth(1001),
+        badge,
+        letter: scene.add.text(0, 0, label, {
+          fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#ffe9f5',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(1003),
+      };
+    }
+    if (slot) for (const o of [slot.icon, slot.badge, slot.letter]) o.setVisible(has);
+    const text = scene.hudSkillTexts && scene.hudSkillTexts[i];
+    if (text) text.setVisible(!has);
+    if (!has) return;
+    result.skills[i] = true;
+    const cx = HUD_MARGIN + HUD_SKILL_SIZE / 2 + i * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
+    if (slot.icon.texture.key !== key) slot.icon.setTexture(key);
+    slot.icon.setPosition(cx, skillY).setScale(HUD_ART_SKILL_SIZE / Math.max(slot.icon.width, slot.icon.height));
+    // Même règle que drawHud : grisée en recharge ou sans assez d'énergie.
+    const unavailable = scene.time.now < player.skillCooldownEndTime || player.energy < def.cost;
+    slot.icon.setAlpha(unavailable ? HUD_SKILL_UNAVAILABLE_ALPHA : 1);
+    slot.badge.setPosition(cx + 14, skillY + 14);
+    slot.letter.setPosition(cx + 14, skillY + 14);
+  });
+  return result;
 }
 
 // Petit indicateur « Partie sauvegardée » en bas à droite.
@@ -811,6 +1005,8 @@ function hideStoryPrompt(scene) {
 // ---------------------------------------------------------------------------
 // Dialogues
 // ---------------------------------------------------------------------------
+// `portrait` (optionnel) : id du portrait Codex `item-portrait_<id>` s'il
+// diffère de la clé ; `portraitTint` : teinte appliquée (esprit de Kainati).
 const SPEAKERS = {
   agarica: { name: 'Agarica', color: 0xff9fc9 },
   xara: { name: 'Xara', color: 0xc77dff },
@@ -820,7 +1016,7 @@ const SPEAKERS = {
   clak: { name: 'Clak', color: 0xff7f50 },
   morgat: { name: 'Morgat', color: 0x9ad1ff },
   kainati: { name: 'Kainati', color: 0xc08a4a },
-  kainati_esprit: { name: 'Esprit de Kainati', color: 0x7fffd4 },
+  kainati_esprit: { name: 'Esprit de Kainati', color: 0x7fffd4, portrait: 'kainati', portraitTint: 0x9ffff0 },
   ghilt: { name: "Ghil't", color: 0x7bd35a },
   habitant: { name: 'Habitant', color: 0xa99bd6 },
   garde: { name: 'Garde', color: 0x8a8fb5 },
@@ -1258,6 +1454,8 @@ const CUTSCENE_STEP_HANDLERS = {
     if (scene.xara || !scene.player) return;
     const npc = scene.npcs && scene.npcs.xara;
     scene.xara = new Xara(scene, scene.player);
+    scene.xara.setDepth(CHARACTER_DEPTH);
+    storyPutBehindPlayer(scene, scene.xara);
     if (npc) {
       scene.xara.setPosition(npc.x, npc.y);
       delete scene.npcs.xara;
@@ -1402,6 +1600,9 @@ function createStoryNpc(scene, n) {
   npc.npcName = n.name || null;
   npc.lookAtPlayer = n.lookAtPlayer !== false;
   setNpcFacing(npc, n.facing === 'left' ? -1 : 1);
+  // Devant les décors (props, feux, totems), comme tous les personnages ; à
+  // profondeur égale, juste sous le joueur dans la liste d'affichage.
+  npc.setDepth(CHARACTER_DEPTH);
   storyPutBehindPlayer(scene, npc);
   if (scene.npcs[key]) scene.npcs[key].destroy();
   scene.npcs[key] = npc;

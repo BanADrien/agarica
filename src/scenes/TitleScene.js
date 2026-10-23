@@ -238,9 +238,15 @@ class TitleScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: STORY_UI.text,
       wordWrap: { width: w - pad * 2 },
     }));
+    // Cœurs Codex (hud_coeur / hud_coeur_vide) comme en jeu, sinon dessinés.
+    const heartArt = this.textures.exists('item-hud_coeur') && this.textures.exists('item-hud_coeur_vide');
     const hg = this.add.graphics();
-    for (let i = 0; i < s.maxHearts; i++) menuDrawHeart(hg, x + pad + 9 + i * 24, y + 98, 8, i < s.hearts);
     c.add(hg);
+    for (let i = 0; i < s.maxHearts; i++) {
+      if (!heartArt) { menuDrawHeart(hg, x + pad + 9 + i * 24, y + 98, 8, i < s.hearts); continue; }
+      const img = this.add.image(x + pad + 9 + i * 24, y + 98, i < s.hearts ? 'item-hud_coeur' : 'item-hud_coeur_vide');
+      c.add(img.setScale(20 / img.height));
+    }
     // Formes obtenues : icônes si l'art existe, sinon pastilles nommées.
     let fx = x + pad;
     const fy = y + 132;

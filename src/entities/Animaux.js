@@ -13,7 +13,12 @@
 //   butterfliesFollow(list, target, {offsetY}) / butterfliesDisperse(list, ms) → Promise
 //   spawnPiglets(scene, x, y, {w}) → array (3) ; spawnFish(scene, x, y, w, h) → array (3)
 
+// Poissons : profondeur 4, ENTRE les deux couches d'eau de la mare de la forêt
+// sombre 2 (3 et 5, cf. acte1Fs2DrawMare dans src/story/acte1.js) -- à ne pas
+// remonter. Cochons : personnages terrestres, devant les décors comme
+// Agarica (cf. CHARACTER_DEPTH dans LevelKit.js).
 const ANIMAL_DEPTH = 4;
+const PIGLET_DEPTH = CHARACTER_DEPTH;
 const BUTTERFLY_DEPTH = 960;
 const PIGLET_COUNT = 3;
 const FISH_COUNT = 3;
@@ -128,7 +133,7 @@ function spawnPiglets(scene, x, y, { w = 180 } = {}) {
       s = scene.add.sprite(px, groundY, 'bebe-cochon-0').setOrigin(0.5, 1).setScale(PIGLET_SCALES[i]);
       s.setTint(PIGLET_TINTS[i]);
     }
-    s.setDepth(ANIMAL_DEPTH);
+    s.setDepth(PIGLET_DEPTH);
     s.animalKind = 'cochon';
     // `feet` : position des pieds suivie au sol ; le sprite y ajoute le petit
     // saut de surprise (`hop`) et le dandinement.

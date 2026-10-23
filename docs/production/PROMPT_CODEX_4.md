@@ -1,4 +1,4 @@
-# Prompt Codex n°4 — retouches de couleur (2026-10-22)
+# Prompt Codex n°4 — retouches de couleur (2026-10-22, Geralt retiré le 2026-10-23)
 
 ```
 Retouches de couleur sur des images DÉJÀ existantes de « Legend of Agarica ». Il s'agit d'ÉDITIONS d'image, pas de nouvelles créations : pour chaque fichier, garde EXACTEMENT la même image (même taille de toile, même transparence, mêmes poses, même cadrage, même visage, mêmes vêtements, mêmes contours) et ne change QUE la couleur indiquée. Ne déplace rien, ne redessine rien, n'ajoute rien. Ne modifie ni `src/` ni le manifeste. Lis aussi `CODEX_SPRITES_A_GENERER.md` (les fiches d'identité ont été mises à jour).
@@ -24,11 +24,7 @@ Fichiers à retoucher :
    Pour ces frames, travaille image par image et garde une teinte identique d'une frame à l'autre (compare côte à côte). Les animaux (loup, aigle, ours, pieuvre) gardent leurs couleurs : seuls les cheveux d'Agarica changent.
 3. `assets/_codex_src/titre_logo.png` : si une silhouette ou des cheveux rouges d'Agarica y figurent, passe-les dans la même couleur, puis `python tools/import_codex_assets.py --only titre_logo --force`.
 
-B) GERALT (le ranger halfelin, anciennement « Galter ») : même tête et même dessin, mais CHEVEUX, BARBE et poils des pieds GRIS-BLANC (au lieu de brun-roux). Repères : base #B9B6B0, ombres #7E7B78, reflets #E6E3DE. Le reste (peau, yeux, tatouages bleus, vêtements verts, cuir brun, sacoche, arc) ne change pas.
-   - `assets/sprites/geralt.png` et `assets/sprites/geralt_p2.png`
-     → puis `python tools/import_codex_assets.py --only geralt --force`
-   - `assets/_codex_src/portrait_geralt.png`
-     → puis `python tools/import_codex_assets.py --only portrait_geralt --force`
+B) GERALT : AUCUNE retouche (l'utilisateur garde ses cheveux et sa barbe bruns).
 
 Vérification pour chaque fichier : compare avant/après côte à côte. Il ne doit y avoir aucune autre différence que la couleur des cheveux / de la barbe, et aucune frame décalée, coupée ou redimensionnée. Les imports ne doivent afficher aucun AVERTISSEMENT.
 À la fin :

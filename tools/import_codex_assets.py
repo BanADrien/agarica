@@ -32,7 +32,10 @@ garder en double ici). Trois tables y sont lues :
       cover WxH  -> image opaque recadrée/redimensionnée pour couvrir WxH (fonds)
       trim       -> rognage alpha seul
   * TILESET_MANIFEST -- 3 images (sol 4x4, plateformes 1x3, spéciaux 1x3)
-    découpées vers les 21 noms de assets/decors/autotile_frames/.
+    découpées vers les 21 noms de assets/decors/autotile_frames/ (disposition
+    'blob' de LevelKit.js) : contour retiré sur les côtés intérieurs (pas de
+    couture), cases du dessus à leur proportion naturelle, mousse calée sur
+    la ligne de marche (cf. make_tile).
 
 Fonds non transparents : si les 4 coins de l'image sont opaques et qu'elle
 n'est pas censée l'être (fonds `cover` exclus), le fond est retiré : noir via
@@ -69,16 +72,37 @@ ALPHA_T = 10       # comme split_spritesheet.py
 MIN_AREA = 25      # composantes plus petites = bruit
 PAD = 4
 TILE = 256
-# Doit rester synchro avec AUTOTILE_CORNER_HEIGHT_BOOST / AUTOTILE_PLATFORM_HEIGHT_BOOST
-# (LevelKit.js) -- même compensation que tools/cut_tuiles.py.
-HEIGHT_BOOST = {'dirt_tl': 1.16, 'dirt_tr': 1.09, 'dirt_t': 1.07, 'dirt_platform2': 1.05}
+# Chaque case Codex est dessinée comme un carré arrondi à contour sombre : sur
+# un côté qui touche une autre case en jeu, ce contour faisait une couture
+# tous les 64 px. On le retire (TILE_INSET px source, contour + arrondi des
+# coins) sur les côtés NON exposés de chaque case (cf. TILE_EXPOSED : t/b/l/r).
+TILE_INSET = 12
+TILE_EXPOSED = {
+    'dirt_tl': 'tl', 'dirt_t': 't', 'dirt_tr': 'tr',
+    'dirt_l': 'l', 'dirt_r': 'r',
+    'dirt_bl': 'bl', 'dirt_b': 'b', 'dirt_br': 'br',
+    # plateformes : 0 = milieu (voisins des 2 côtés), 2 = bout GAUCHE (miroir
+    # pour le bout droit), 1 = isolée (cf. renderAutotileGrid)
+    'dirt_platform0': 'tb', 'dirt_platform1': 'tblr', 'dirt_platform2': 'tbl',
+    'dirt_column': 'lr',
+}  # absent = case intérieure (centre, variantes, coins intérieurs)
+# Ligne de marche : le jeu remonte les images 'blob' pour que le 1er quart de
+# la case (48 px d'affichage au-dessus du bas de l'image, cf.
+# AUTOTILE_BLOB_ART_STAND_SINK dans LevelKit.js) tombe sur la ligne où l'on
+# marche. Le haut de la mousse (1re rangée opaque à plus de 50 %) des cases du
+# dessus est calé 4 px d'affichage plus haut (pieds un peu dans la mousse) :
+# 52 px d'affichage = 208 px de case (TILE = 4 x 64).
+SURFACE_TARGET = 208
 TILE_GRID = {
     (0, 0): 'dirt_tl', (0, 1): 'dirt_t', (0, 2): 'dirt_tr', (0, 3): 'dirt_c_var0',
     (1, 0): 'dirt_l', (1, 1): 'dirt_c', (1, 2): 'dirt_r', (1, 3): 'dirt_c_var1',
     (2, 0): 'dirt_bl', (2, 1): 'dirt_b', (2, 2): 'dirt_br', (2, 3): 'dirt_c_var2',
     (3, 0): 'dirt_c_var3', (3, 1): 'dirt_c_var4', (3, 2): 'dirt_c_var5',
 }
-TOP_TILES = {'dirt_tl', 'dirt_t', 'dirt_tr', 'dirt_platform0', 'dirt_platform1', 'dirt_platform2'}
+# dirt_angle (coin intérieur du HAUT, au pied d'une marche) : sa mousse prolonge
+# le sol voisin, elle est donc calée comme celle des cases du dessus (cf.
+# compose_inner_corner).
+TOP_TILES = {'dirt_tl', 'dirt_t', 'dirt_tr', 'dirt_platform0', 'dirt_platform1', 'dirt_platform2', 'dirt_angle'}
 PLATFORM_NAMES = ['dirt_platform0', 'dirt_platform1', 'dirt_platform2']
 SPECIAL_NAMES = ['dirt_angle', 'coin', 'dirt_column']
 
@@ -521,26 +545,66 @@ def grid_cells_by_alpha(arr, cols, rows, label):
     return {(r, c): arr[ys[r][0]:ys[r][1] + 1, xs[c][0]:xs[c][1] + 1] for r in range(rows) for c in range(cols)}
 
 
+def body_x_range(cell):
+    """Bords gauche/droit du CORPS de la case (bas de la case, sans la mousse ni
+    les champignons du dessus, qui peuvent déborder sur les côtés)."""
+    h = cell.shape[0]
+    xs = np.nonzero((cell[int(h * 0.55):int(h * 0.9), :, 3] > 40).any(axis=0))[0]
+    return (xs.min(), xs.max() + 1) if len(xs) else (0, cell.shape[1])
+
+
 def make_tile(cell, name):
+    """Case de TILE px de large. Case du dessus (TOP_TILES) : hauteur à
+    l'échelle, en-tête de champignons compris (le jeu l'affiche à sa proportion
+    naturelle, ancrée en bas), et haut de la mousse calé sur SURFACE_TARGET."""
     cell = trim(cell)
+    exposed = TILE_EXPOSED.get(name, '')
     h, w = cell.shape[:2]
-    if name in TOP_TILES:
-        # garde l'en-tête transparent (ciel) : carré de côté max(w,h), contenu en bas
-        side = max(w, h)
-        sq = Image.new('RGBA', (side, side), (0, 0, 0, 0))
-        im = Image.fromarray(cell, 'RGBA')
-        sq.paste(im, ((side - w) // 2, side - h), im)
-    else:
-        side = min(w, h)
-        x0, y0 = (w - side) // 2, (h - side) // 2
-        sq = Image.fromarray(cell[y0:y0 + side, x0:x0 + side], 'RGBA')
-    tile = sq.resize((TILE, TILE), Image.LANCZOS)
-    boost = HEIGHT_BOOST.get(name)
-    if boost:
-        canvas = Image.new('RGBA', (TILE, round(TILE * boost)), (0, 0, 0, 0))
-        canvas.paste(tile, (0, canvas.height - TILE), tile)
-        tile = canvas
-    return tile
+    bx0, bx1 = body_x_range(cell)
+    x0 = 0 if 'l' in exposed else bx0 + TILE_INSET
+    x1 = w if 'r' in exposed else bx1 - TILE_INSET
+    # haut du CORPS : 1re rangée pleine à 90 % (sous un éventuel en-tête de
+    # champignons, cf. dirt_angle)
+    full = (cell[:, bx0:bx1, 3] > 128).mean(axis=1) >= 0.9
+    body_top = int(np.argmax(full)) if full.any() else 0
+    y0 = 0 if 't' in exposed else body_top + TILE_INSET
+    y1 = h if 'b' in exposed else h - TILE_INSET
+    cell = cell[y0:y1, x0:x1]
+    h, w = cell.shape[:2]
+    if name not in TOP_TILES:
+        return Image.fromarray(cell, 'RGBA').resize((TILE, TILE), Image.LANCZOS)
+    im = Image.fromarray(cell, 'RGBA').resize((TILE, max(1, round(h * TILE / w))), Image.LANCZOS)
+    arr = np.array(im)
+    cov = (arr[:, :, 3] > 128).mean(axis=1)
+    surf = next((i for i, c in enumerate(cov) if c > 0.5), 0)
+    above = arr.shape[0] - surf  # hauteur du haut de la mousse au-dessus du bas
+    if name in PLATFORM_NAMES:
+        # rien en dessous : on peut remonter l'île (vide sous elle) ; trop haute,
+        # on la laisse (pieds un peu plus enfoncés) plutôt que de rogner son dessous
+        if above < SURFACE_TARGET:
+            arr = np.vstack([arr, np.zeros((SURFACE_TARGET - above, TILE, 4), arr.dtype)])
+    elif above > SURFACE_TARGET:
+        arr = arr[:arr.shape[0] - (above - SURFACE_TARGET)]  # la case du dessous continue
+    elif above < SURFACE_TARGET - 16:
+        warn(f'{name} : mousse {(SURFACE_TARGET - above) / 4:.0f} px sous la ligne de marche')
+    if arr.shape[0] < TILE:
+        arr = np.vstack([np.zeros((TILE - arr.shape[0], TILE, 4), arr.dtype), arr])
+    return Image.fromarray(arr, 'RGBA')
+
+
+def compose_inner_corner(angle, l_tile):
+    """Coin intérieur du haut (case pleine au pied d'une marche, vide en
+    diagonale en haut à gauche) : en jeu, le haut de la case (au-dessus de la
+    ligne de marche) prolonge le flanc GAUCHE de la marche juste au-dessus --
+    c'est le haut de dirt_l (écorce à gauche) ; la mousse de dirt_angle, calée
+    comme celle du sol voisin, est posée par-dessus. Case carrée (rien ne doit
+    déborder dans la marche)."""
+    a = np.array(angle)
+    if a.shape[0] > TILE:
+        a = a[a.shape[0] - TILE:]
+    base = l_tile.copy()
+    base.alpha_composite(Image.fromarray(a, 'RGBA'), (0, TILE - a.shape[0]))
+    return base
 
 
 def import_tileset(tid, e, force, dry):
@@ -565,12 +629,17 @@ def import_tileset(tid, e, force, dry):
     if srcs['speciaux'].exists():
         cells = grid_cells_by_alpha(load_rgba(srcs['speciaux']), 3, 1, f'{tid} speciaux')
         jobs += [(n, cells[(0, i)]) for i, n in enumerate(SPECIAL_NAMES)]
+    tiles = {}
     for name, cell in jobs:
         if alpha_bbox(cell) is None:
             warn(f'{tid} : tuile {name} vide')
             continue
-        save(make_tile(cell, name), out_dir / f'{name}.png')
-    print(f'  {len(jobs)} tuile(s) -> {rel(out_dir)}')
+        tiles[name] = make_tile(cell, name)
+    if 'dirt_angle' in tiles and 'dirt_l' in tiles:
+        tiles['dirt_angle'] = compose_inner_corner(tiles['dirt_angle'], tiles['dirt_l'])
+    for name, im in tiles.items():
+        save(im, out_dir / f'{name}.png')
+    print(f'  {len(tiles)} tuile(s) -> {rel(out_dir)}')
     return 'cut', missing
 
 
@@ -579,7 +648,7 @@ PRESENT_JS = ROOT / 'src' / 'data' / 'asset_present.js'
 # Les 21 cases d'un jeu de tuiles telles que BootScene.autotileFiles() les charge.
 AUTOTILE_FILES = ([f'dirt_{p}' for p in ('tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br')]
                   + [f'dirt_platform{i}' for i in range(3)] + [f'dirt_c_var{i}' for i in range(6)]
-                  + ['dirt_angle', 'coin'])
+                  + ['dirt_angle', 'coin', 'dirt_column'])
 
 
 def write_asset_present(anims, items, tilesets):

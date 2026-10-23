@@ -1,8 +1,9 @@
 // Kainati, Roi des Simiens — boss du grand arbre (zone grand_arbre_arene) +
 // ses projectiles (pierres lancées, pierres du plafond, ondes de choc) + sa
 // forme d'esprit (PNJ du monde spirituel). La logique de zone (verrouillage
-// de l'arène, lianes-tremplins, victoire, flags) vit dans
-// src/story/boss_kainati.js (ZONE_SCRIPTS.kainati_arene).
+// de l'arène, victoire, flags) vit dans src/story/boss_kainati.js
+// (ZONE_SCRIPTS.kainati_arene). Combat gagnable en forme humaine, saut simple :
+// Kainati n'est vulnérable qu'au sol, sonné après chaque plongeon.
 //
 // Le boss N'EST PAS un corps Arcade : il suit des trajectoires calculées
 // (pendule sur liane, arcs de saut) et ne collisionne avec rien. Ses dégâts
@@ -39,11 +40,14 @@ const KAINATI_GRIP = 90;
 const KAINATI_SWING_AMPLITUDE = 0.14; // rad, balancement au repos
 const KAINATI_STONE_GRAVITY = 900;
 const KAINATI_STONE_RADIUS = 12;
-const KAINATI_DEPTH = 5;
+// Personnages devant les décors (cf. CHARACTER_DEPTH dans LevelKit.js) ; ses
+// effets se placent relativement (mousse +1, impacts +2, « ! » et étoiles +3).
+const KAINATI_DEPTH = CHARACTER_DEPTH;
 // Ombres de télégraphe : au-dessus du sol ET du sous-bois (sinon invisibles).
 const KAINATI_SHADOW_DEPTH = 990;
 
-// Durées de base (phase 1) ; la phase 2 les multiplie par KAINATI_PHASE2_SPEED.
+// Durées de base (phase 1) ; la phase 2 les multiplie par KAINATI_PHASE2_SPEED
+// (sauf stompStun : la fenêtre de frappe reste aussi généreuse en phase 2).
 const KAINATI_TIMINGS = {
   hang: 1000,             // pause sur la liane entre deux actions
   throwTelegraph: 600,    // flash + « ! » avant un lancer
@@ -51,20 +55,28 @@ const KAINATI_TIMINGS = {
   swing: 850,             // saut balancé d'une liane à l'autre
   leapTelegraph: 800,     // ombre au sol avant de plonger
   leap: 750,              // trajectoire du plongeon
-  stompStun: 1600,        // étourdi après land_stomp (fenêtre de frappe)
-  fallStun: 2100,         // étourdi après une chute (déséquilibré par une liane)
-  fall: 450,
+  // Sonné au sol après land_stomp : SEULE fenêtre de frappe (les lianes-
+  // tremplins qui le faisaient tomber ont été retirées). 2,2 s : le temps de
+  // sauter l'onde de choc, de le rejoindre et de frapper deux fois.
+  stompStun: 2200,
+  // Coup encaissé alors qu'il est déjà à sa limite (KAINATI_HITS_PER_STUN) :
+  // il se relève d'un bond peu après, au lieu de rester sonné.
+  stunAfterLastHit: 350,
   recover: 750,           // remonte sur une liane
-  alert: 2500,            // après être remonté : insensible aux lianes un moment
   rainTelegraph: 850,     // ombres au sol avant la chute des pierres du plafond
   hitInvuln: 320,
 };
 const KAINATI_PHASE2_SPEED = 0.75;
+// Coups encaissés au plus par plongeon : 8 PV = au moins 4 plongeons (2 par
+// phase), le combat ne se règle pas en une seule ouverture.
+const KAINATI_HITS_PER_STUN = 2;
 
 // Séquences d'actions en boucle (lisibles et prévisibles : on apprend ses
-// mouvements). 'rain' = cri qui fait tomber des pierres du plafond.
-const KAINATI_PATTERN_P1 = ['throw', 'swing', 'throw', 'swing', 'leap'];
-const KAINATI_PATTERN_P2 = ['throw', 'swing', 'rain', 'throw', 'leap', 'swing'];
+// mouvements). 'rain' = cri qui fait tomber des pierres du plafond. Il plonge
+// (et redescend donc à portée) à chaque cycle : ~toutes les 9 s en phase 1,
+// deux fois par cycle en phase 2.
+const KAINATI_PATTERN_P1 = ['throw', 'swing', 'leap'];
+const KAINATI_PATTERN_P2 = ['throw', 'leap', 'rain', 'swing', 'leap'];
 
 // ---------------------------------------------------------------------------
 // Helpers visuels (placeholders tant que l'art Codex n'existe pas)
@@ -325,7 +337,7 @@ class KainatiBoss {
     this.pendingThrows = [];
     this.pendingPhase2 = false;
     this.invuln = 0;
-    this.alertT = 0;
+    this.stunHits = 0;
     this.clock = 0;
     this.feet = this.feetOnVine(this.vineIndex, 0);
     this.setState('hang');
@@ -356,7 +368,7 @@ class KainatiBoss {
     Object.assign(this, { from: { ...this.feet } }, extra);
     const anim = {
       hang: 'swing_vine', swing: 'swing_vine', throwTelegraph: 'throw_stone', throw: 'throw_stone',
-      leapTelegraph: 'leap', leap: 'leap', fall: 'hit', stunned: 'land_stomp', recover: 'leap',
+      leapTelegraph: 'leap', leap: 'leap', stunned: 'land_stomp', recover: 'leap',
       rainTelegraph: 'throw_stone', roar: 'land_stomp', defeated: 'defeated_lucid', calm: 'idle', idle: 'idle',
     }[state];
     if (anim && this.sprite.playManifest) this.sprite.playManifest(anim);
@@ -378,33 +390,29 @@ class KainatiBoss {
   }
 
   isOnVine() {
-    return ['hang', 'throwTelegraph', 'throw', 'rainTelegraph'].includes(this.state);
+    return ['hang', 'throwTelegraph', 'throw', 'rainTelegraph', 'roar'].includes(this.state);
   }
 
   isVulnerable() {
     return this.state === 'stunned' && !this.defeated;
   }
 
-  // Une liane-tremplin utilisée près de lui le déséquilibre (cf. boss_kainati.js).
-  // Renvoie true s'il tombe.
-  destabilize() {
-    if (!this.active || this.defeated || !this.isOnVine() || this.alertT > 0) return false;
-    this.hazards.list.filter((h) => h.kind === 'shadow').forEach((h) => { h.dead = true; h.img.destroy(); });
-    this.damage(1);
-    if (this.defeated) return true;
-    this.setState('fall', { fallTo: Phaser.Math.Clamp(this.feet.x, this.cfg.minX + 90, this.cfg.maxX - 90) });
-    return true;
-  }
-
   // Appelée une fois par attaque du joueur (cf. contrat takeHit de LevelKit).
+  // Renvoie true si le coup porte. Hors de sa fenêtre (suspendu, en plein
+  // bond) il esquive : éclat bleu, `lastDodge` lu par le script de zone pour
+  // l'indice « attends qu'il retombe ».
   takeHit() {
     if (!this.active || this.defeated || this.invuln > 0) return false;
     if (this.isVulnerable()) {
       this.damage(1);
+      this.stunHits += 1;
+      // Limite atteinte : il se relève vite (cf. KAINATI_HITS_PER_STUN).
+      if (!this.defeated && this.stunHits >= KAINATI_HITS_PER_STUN) {
+        this.stunFor = Math.min(this.stunFor, this.t + KAINATI_TIMINGS.stunAfterLastHit);
+      }
       return true;
     }
-    if (this.isOnVine()) return this.destabilize();
-    // En plein saut : il esquive — petit éclat pour montrer que ça ne passe pas.
+    this.lastDodge = this.clock;
     this.sprite.setTintFill(0x9fd4ff);
     this.scene.time.delayedCall(80, () => this.sprite.active && !this.defeated && this.sprite.clearTint());
     return false;
@@ -512,7 +520,6 @@ class KainatiBoss {
   update(dt, player) {
     this.clock += dt;
     if (this.invuln > 0) this.invuln -= dt;
-    if (this.alertT > 0) this.alertT -= dt;
     this.hazards.update(dt, player);
     if (this.pendingThrows && this.pendingThrows.length) {
       for (const p of this.pendingThrows) p.at -= dt;
@@ -585,18 +592,6 @@ class KainatiBoss {
         if (k >= 1) this.landStomp(player);
         break;
       }
-      case 'fall': {
-        const k = Math.min(1, this.t / KAINATI_TIMINGS.fall);
-        this.feet = { x: Phaser.Math.Linear(this.from.x, this.fallTo, k), y: Phaser.Math.Linear(this.from.y, this.cfg.floorY, k * k) };
-        this.sprite.setAngle(k * 25);
-        if (k >= 1) {
-          this.sprite.setAngle(0);
-          this.scene.cameras.main.shake(180, 0.006);
-          spawnKainatiImpact(this.scene, this.feet.x, this.cfg.floorY);
-          this.setState('stunned', { stunFor: KAINATI_TIMINGS.fallStun });
-        }
-        break;
-      }
       case 'stunned': {
         this.feet = { x: this.feet.x, y: this.cfg.floorY };
         this.stunStars.setText(Math.floor(this.clock / 200) % 2 ? '✦ ✧ ✦' : '✧ ✦ ✧');
@@ -614,7 +609,6 @@ class KainatiBoss {
         this.feet = { x: Phaser.Math.Linear(this.from.x, to.x, k), y: Phaser.Math.Linear(this.from.y, to.y, Math.sqrt(k)) - Math.sin(Math.PI * k) * 60 };
         if (k >= 1) {
           this.vineIndex = this.toVine;
-          this.alertT = KAINATI_TIMINGS.alert;
           if (this.pendingPhase2) {
             this.pendingPhase2 = false;
             this.phase = 2;
@@ -636,7 +630,7 @@ class KainatiBoss {
       default:
         break;
     }
-    if (this.state !== 'swing' && this.state !== 'fall' && this.state !== 'stunned') this.sprite.setAngle(0);
+    if (this.state !== 'swing' && this.state !== 'stunned') this.sprite.setAngle(0);
     if (player && this.state !== 'stunned') this.face(player.x);
     this.applyPosition();
   }
@@ -648,6 +642,7 @@ class KainatiBoss {
     spawnKainatiImpact(this.scene, this.feet.x, this.cfg.floorY);
     this.hazards.shockwaves(this.feet.x);
     if (this.phase === 2) this.rocksFromCeiling(player, 3);
+    this.stunHits = 0;
     this.setState('stunned', { stunFor: KAINATI_TIMINGS.stompStun });
   }
 

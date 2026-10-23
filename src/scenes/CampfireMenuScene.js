@@ -27,8 +27,8 @@
 // Player.equipForm/unequipForm (qui tiennent `equippedForms` + `airForm`).
 const FORM_INFO = {
   wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), perçoit les pistes cachées.' },
-  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : 2e saut court, s\'accroche aux lianes (gauche/droite pour se balancer, Saut pour lâcher).' },
-  eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : 2e saut plus haut puis plané, porté par les courants d\'air (S = piqué).' },
+  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court), s\'accroche aux lianes (gauche/droite pour se balancer, Saut pour lâcher).' },
+  eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : donne le double saut (plus haut) puis le plané, porté par les courants d\'air (S = piqué).' },
   octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
 };
 const FORM_IDS = Object.keys(FORM_INFO);
@@ -192,6 +192,9 @@ class CampfireMenuScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe9f5', align: 'center',
       wordWrap: { width: textW },
     }).setOrigin(0.5);
+    // Libellé long à côté d'une icône (« Ours — Fracas au sol ») : plus petit
+    // plutôt que de déborder de la carte.
+    if (txt.height > h - 2) txt.setFontSize(9).setLineSpacing(-2);
     card.add(txt);
     card.setData('kind', kind);
     card.setData('id', id);
@@ -281,7 +284,10 @@ class CampfireMenuScene extends Phaser.Scene {
       `Bonus actuels : +${player.maxHearts - HEART_MAX} cœur(s)  •  +${player.maxEnergy - ENERGY_MAX} énergie  •  x${player.skillSizeMultiplier.toFixed(2)} taille de compétence`,
     );
     if (!this.descText.text) {
-      this.descText.setText(unlocked.length ? 'Survole une carte pour voir ce qu\'elle fait.' : 'Aucune forme débloquée pour l\'instant.');
+      // Rappel (règle de saut) : seule une forme aérienne équipée donne le double saut.
+      this.descText.setText(unlocked.length
+        ? 'Survole une carte pour voir ce qu\'elle fait. Sans forme aérienne équipée : un seul saut.'
+        : 'Aucune forme débloquée pour l\'instant.');
     }
     this.selectedCard = null;
   }

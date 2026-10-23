@@ -310,12 +310,15 @@ class Xara extends Phaser.GameObjects.Sprite {
 
     // Fil de soie : tracé sous la sprite (créé avant), visible seulement en
     // balancier (et pendant la bascule vers/depuis cet état).
-    const thread = scene.add.graphics();
+    const thread = scene.add.graphics().setDepth(CHARACTER_DEPTH);
 
     super(scene, target.x + XARA_GROUND_OFFSET_X, target.y + XARA_GROUND_OFFSET_Y, `xara-walk-${XARA_WALK_FRAME_INDICES[0]}`);
     scene.add.existing(this);
     this.setOrigin(0.5, 1);
     this.setScale(XARA_SCALE);
+    // Compagnon : devant les décors comme Agarica (cf. CHARACTER_DEPTH dans
+    // LevelKit.js) ; son fil, créé juste avant, reste dessiné sous elle.
+    this.setDepth(CHARACTER_DEPTH);
 
     // Retour utilisateur : "il faudrait que xara ait une hitbox aussi pour
     // simplifier son comportement pour les distances ou les hitbox des

@@ -201,11 +201,15 @@ class BootScene extends Phaser.Scene {
     // Les 21 cases du jeu de tuiles actif (cf. BootScene.autotileFiles) ; les
     // jeux alternatifs du manifest (clé de zone `tileset`) sont chargés sous
     // `<id>:<clé>`.
-    for (const [key, file] of BootScene.autotileFiles()) {
+    // Disposition 'atlas' (jeu 'tuiles') : les cases nommées de l'atlas
+    // (cf. BootScene.atlasTileFiles) à la place des 21 fichiers dirt_*.
+    for (const [key, file] of BootScene.activeTilesetFiles()) {
       this.load.image(key, `${AUTOTILE_TILESET_DIR}/${file}`);
     }
     if (typeof TILESET_MANIFEST !== 'undefined') {
       // Seulement les cases présentes (cf. ASSET_PRESENT, StoryKit.js).
+      // Toujours au format 'blob' à 21 noms (cf. asset_manifest.js) ; seule
+      // la disposition 'blob' s'en sert (cf. renderAtlasAutotileGrid).
       for (const [id, def] of Object.entries(TILESET_MANIFEST)) {
         for (const [key, file] of BootScene.autotileFiles()) {
           const path = `${def.dir}/${file}`;
@@ -271,19 +275,34 @@ class BootScene extends Phaser.Scene {
     }
     // Pleine lune (un croissant découpé par un disque laisserait voir le
     // disque sur le halo) : quelques taches lavande pour le relief.
-    bg.fillStyle(0xfff3d6, 0.92);
-    bg.fillCircle(width / 2, 170, 32);
-    bg.fillStyle(0xd9cdf0, 0.55);
-    bg.fillCircle(width / 2 - 10, 162, 7);
-    bg.fillCircle(width / 2 + 12, 180, 5);
-    bg.fillCircle(width / 2 + 6, 156, 3);
-    objs.push(bg);
+    const moon = this.add.graphics();
+    moon.fillStyle(0xfff3d6, 0.92);
+    moon.fillCircle(width / 2, 170, 32);
+    moon.fillStyle(0xd9cdf0, 0.55);
+    moon.fillCircle(width / 2 - 10, 162, 7);
+    moon.fillCircle(width / 2 + 12, 180, 5);
+    moon.fillCircle(width / 2 + 6, 156, 3);
+    objs.push(bg, moon);
     const title = this.add.text(width / 2, 268, 'Legend of Agarica', {
       fontFamily: ui.serif, fontSize: '40px', fontStyle: 'bold', color: '#ffe9f5',
       stroke: '#15101f', strokeThickness: 6, padding: { x: 20, y: 14 },
     }).setOrigin(0.5);
     title.setShadow(0, 0, '#ff9fc9', 16, true, true);
     objs.push(title);
+    // Logo Codex `titre_logo` (agent UI) : mis en tête de file, il remplace
+    // la lune et le titre texte dès qu'il arrive ; même clé que le manifest
+    // (loadManifestAssets ne le recharge pas).
+    const logoPath = 'assets/ui/titre_logo.png';
+    if (typeof assetPresent === 'function' && assetPresent(logoPath)) {
+      this.load.image('item-titre_logo', logoPath);
+      this.load.once('filecomplete-image-item-titre_logo', () => {
+        const logo = this.add.image(width / 2, 186, 'item-titre_logo').setAlpha(0);
+        logo.setScale(Math.min(450 / logo.width, 290 / logo.height));
+        objs.push(logo);
+        this.tweens.add({ targets: logo, alpha: 1, duration: 500 });
+        this.tweens.add({ targets: [moon, title], alpha: 0, duration: 300 });
+      });
+    }
 
     const barW = 420;
     const barX = (width - barW) / 2;
@@ -341,17 +360,24 @@ class BootScene extends Phaser.Scene {
     });
   }
 
-  // [clé de texture, nom de fichier] des 21 cases d'un jeu de tuiles
-  // (« 9-slice » de terre + plateformes + variantes de centre + coins
-  // intérieurs, cf. tools/crop_autotile.py / tools/cut_tuiles.py).
-  // dirt_t2/tl2/tr2 existent encore sur disque mais ne sont plus utilisées
-  // (retour utilisateur) : ne pas les rebrancher sans qu'il le redemande.
+  // [clé de texture, nom de fichier] des 21 cases d'un jeu au format 'blob'
+  // (cf. autotileBlobFiles dans LevelKit.js, qui s'en sert aussi pour savoir
+  // si le jeu d'une zone est complet).
   static autotileFiles() {
-    const files = AUTOTILE_POSITIONS.map((pos) => [`autotile-dirt-${pos}`, `dirt_${pos}.png`]);
-    for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) files.push([`autotile-dirt-platform${i}`, `dirt_platform${i}.png`]);
-    for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) files.push([`autotile-dirt-c-var${i}`, `dirt_c_var${i}.png`]);
-    files.push(['autotile-dirt-angle', 'dirt_angle.png'], ['autotile-dirt-coin', 'coin.png']);
-    return files;
+    return autotileBlobFiles();
+  }
+
+  // [clé de texture, nom de fichier] des cases de l'atlas 'tuiles' (cf.
+  // tools/cut_tuiles.py et AUTOTILE_ATLAS_* dans LevelKit.js) : A1..A9, B,
+  // C1..C7 et les 4 herbes.
+  static atlasTileFiles() {
+    const names = [...AUTOTILE_ATLAS_TILES, ...Object.values(AUTOTILE_ATLAS_GRASS).map((g) => g.file)];
+    return names.map((name) => [`${AUTOTILE_ATLAS_PREFIX}${name}`, `${name}.png`]);
+  }
+
+  // Fichiers du jeu de tuiles ACTIF (AUTOTILE_TILESET), selon sa disposition.
+  static activeTilesetFiles() {
+    return AUTOTILE_LAYOUT === 'atlas' ? BootScene.atlasTileFiles() : BootScene.autotileFiles();
   }
 
   // Jeu de tuiles en pixel art (cf. AUTOTILE_TILESET dans LevelKit.js) :
@@ -366,10 +392,7 @@ class BootScene extends Phaser.Scene {
   // la config (main.js), qui ferait créneler tout le reste.
   static applyTilesetFilter(scene) {
     if (!AUTOTILE_TILESETS[AUTOTILE_TILESET].pixelArt) return;
-    const keys = AUTOTILE_POSITIONS.map((pos) => `autotile-dirt-${pos}`);
-    keys.push('autotile-dirt-angle', 'autotile-dirt-coin');
-    for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) keys.push(`autotile-dirt-platform${i}`);
-    for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) keys.push(`autotile-dirt-c-var${i}`);
+    const keys = BootScene.activeTilesetFiles().map(([key]) => key);
     for (const key of keys) {
       const texture = scene.textures.get(key);
       if (texture) texture.setFilter(Phaser.Textures.FilterMode.NEAREST);

@@ -44,6 +44,8 @@ class Feather extends Phaser.Physics.Arcade.Sprite {
     scene.physics.add.existing(this);
 
     this.setScale(FEATHER_SCALE);
+    // Effet du joueur : au niveau des personnages, devant les décors.
+    this.setDepth(CHARACTER_DEPTH);
     this.body.setAllowGravity(false);
     this.play(ANIM_FEATHER_FLUTTER_KEY);
     const vx = dir * FEATHER_SPEED_X;

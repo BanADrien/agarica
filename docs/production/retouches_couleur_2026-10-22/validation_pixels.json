@@ -1,0 +1,1590 @@
+{
+  "applique": false,
+  "palette_source": {
+    "agarica_hd": [
+      128.0,
+      234.0,
+      252.0
+    ],
+    "agarica_legacy": [
+      105.0,
+      190.0,
+      213.0
+    ],
+    "geralt": [
+      64.0,
+      117.0,
+      142.0
+    ],
+    "geralt_portrait": [
+      91.0,
+      133.0,
+      170.0
+    ]
+  },
+  "fichiers": [
+    {
+      "path": "assets/sprites/agarica_extra.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 44298,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_hd",
+      "rois": [
+        [
+          266,
+          133,
+          391,
+          227
+        ],
+        [
+          713,
+          96,
+          846,
+          186
+        ],
+        [
+          1199,
+          105,
+          1319,
+          199
+        ],
+        [
+          234,
+          434,
+          369,
+          531
+        ],
+        [
+          715,
+          449,
+          850,
+          541
+        ],
+        [
+          1208,
+          445,
+          1344,
+          538
+        ],
+        [
+          191,
+          755,
+          338,
+          855
+        ],
+        [
+          673,
+          757,
+          804,
+          853
+        ],
+        [
+          1219,
+          779,
+          1351,
+          872
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_extra.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_extra_p2.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 68271,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_hd",
+      "rois": [
+        [
+          158,
+          78,
+          311,
+          187
+        ],
+        [
+          550,
+          123,
+          701,
+          242
+        ],
+        [
+          972,
+          180,
+          1107,
+          265
+        ],
+        [
+          1357,
+          194,
+          1497,
+          266
+        ],
+        [
+          117,
+          381,
+          284,
+          497
+        ],
+        [
+          502,
+          387,
+          667,
+          499
+        ],
+        [
+          877,
+          384,
+          1042,
+          497
+        ],
+        [
+          1256,
+          385,
+          1417,
+          499
+        ],
+        [
+          181,
+          828,
+          309,
+          888
+        ],
+        [
+          557,
+          834,
+          682,
+          891
+        ],
+        [
+          938,
+          817,
+          1063,
+          898
+        ],
+        [
+          1327,
+          846,
+          1443,
+          893
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_extra_p2.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_extra_p3.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 51406,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_hd",
+      "rois": [
+        [
+          384,
+          76,
+          486,
+          174
+        ],
+        [
+          736,
+          78,
+          837,
+          174
+        ],
+        [
+          1127,
+          76,
+          1225,
+          177
+        ],
+        [
+          220,
+          427,
+          316,
+          524
+        ],
+        [
+          575,
+          424,
+          664,
+          520
+        ],
+        [
+          948,
+          427,
+          1043,
+          515
+        ],
+        [
+          1308,
+          426,
+          1404,
+          521
+        ],
+        [
+          90,
+          732,
+          228,
+          828
+        ],
+        [
+          386,
+          731,
+          521,
+          826
+        ],
+        [
+          719,
+          718,
+          821,
+          811
+        ],
+        [
+          1036,
+          718,
+          1136,
+          812
+        ],
+        [
+          1306,
+          731,
+          1443,
+          828
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_extra_p3.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_extra_p4.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 37458,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_hd",
+      "rois": [
+        [
+          140,
+          376,
+          330,
+          511
+        ],
+        [
+          517,
+          377,
+          691,
+          510
+        ],
+        [
+          874,
+          379,
+          975,
+          514
+        ],
+        [
+          1254,
+          378,
+          1440,
+          513
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_extra_p4.jpg"
+    },
+    {
+      "path": "assets/sprites/transfo_singe.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 15856,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_hd",
+      "rois": [
+        [
+          148,
+          366,
+          365,
+          508
+        ],
+        [
+          628,
+          437,
+          737,
+          564
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transfo_singe.jpg"
+    },
+    {
+      "path": "assets/_codex_src/portrait_agarica.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "pixels_changed": 307669,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_hd",
+      "rois": [
+        [
+          105,
+          17,
+          1193,
+          761
+        ]
+      ],
+      "proof": "comparaisons/assets___codex_src__portrait_agarica.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_attack.png",
+      "size": [
+        2172,
+        724
+      ],
+      "pixels_changed": 47395,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          130,
+          205,
+          333,
+          341
+        ],
+        [
+          539,
+          212,
+          759,
+          345
+        ],
+        [
+          906,
+          216,
+          1130,
+          348
+        ],
+        [
+          1799,
+          217,
+          2014,
+          346
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_attack.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_ours.png",
+      "size": [
+        2171,
+        724
+      ],
+      "pixels_changed": 45605,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          93,
+          144,
+          327,
+          314
+        ],
+        [
+          516,
+          147,
+          793,
+          316
+        ],
+        [
+          1066,
+          151,
+          1376,
+          255
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_ours.jpg"
+    },
+    {
+      "path": "assets/_codex_src/titre_logo.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 37047,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          495,
+          142,
+          1136,
+          439
+        ]
+      ],
+      "proof": "comparaisons/assets___codex_src__titre_logo.jpg"
+    },
+    {
+      "path": "assets/sprites/geralt.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 92789,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "geralt",
+      "rois": [
+        [
+          185,
+          85,
+          340,
+          205
+        ],
+        [
+          187,
+          278,
+          347,
+          320
+        ],
+        [
+          530,
+          85,
+          700,
+          205
+        ],
+        [
+          524,
+          278,
+          688,
+          320
+        ],
+        [
+          885,
+          85,
+          1045,
+          205
+        ],
+        [
+          851,
+          278,
+          1002,
+          320
+        ],
+        [
+          1220,
+          85,
+          1395,
+          205
+        ],
+        [
+          1193,
+          278,
+          1341,
+          320
+        ],
+        [
+          180,
+          405,
+          345,
+          545
+        ],
+        [
+          186,
+          611,
+          372,
+          653
+        ],
+        [
+          540,
+          405,
+          710,
+          545
+        ],
+        [
+          524,
+          611,
+          677,
+          653
+        ],
+        [
+          880,
+          405,
+          1055,
+          545
+        ],
+        [
+          849,
+          612,
+          1059,
+          654
+        ],
+        [
+          1215,
+          405,
+          1395,
+          545
+        ],
+        [
+          1183,
+          611,
+          1384,
+          653
+        ],
+        [
+          75,
+          730,
+          230,
+          890
+        ],
+        [
+          81,
+          924,
+          275,
+          965
+        ],
+        [
+          385,
+          730,
+          555,
+          890
+        ],
+        [
+          372,
+          925,
+          567,
+          966
+        ],
+        [
+          685,
+          730,
+          860,
+          905
+        ],
+        [
+          663,
+          925,
+          894,
+          966
+        ],
+        [
+          990,
+          730,
+          1165,
+          905
+        ],
+        [
+          970,
+          922,
+          1213,
+          968
+        ],
+        [
+          1305,
+          730,
+          1480,
+          905
+        ],
+        [
+          1293,
+          925,
+          1452,
+          966
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__geralt.jpg"
+    },
+    {
+      "path": "assets/sprites/geralt_p2.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 141343,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "geralt",
+      "rois": [
+        [
+          110,
+          45,
+          300,
+          198
+        ],
+        [
+          13,
+          275,
+          292,
+          325
+        ],
+        [
+          430,
+          55,
+          610,
+          215
+        ],
+        [
+          301,
+          277,
+          645,
+          325
+        ],
+        [
+          715,
+          100,
+          905,
+          280
+        ],
+        [
+          606,
+          274,
+          938,
+          311
+        ],
+        [
+          1075,
+          185,
+          1245,
+          325
+        ],
+        [
+          926,
+          299,
+          1280,
+          325
+        ],
+        [
+          1310,
+          65,
+          1500,
+          240
+        ],
+        [
+          1291,
+          285,
+          1525,
+          333
+        ],
+        [
+          215,
+          375,
+          405,
+          540
+        ],
+        [
+          194,
+          621,
+          454,
+          673
+        ],
+        [
+          485,
+          370,
+          685,
+          525
+        ],
+        [
+          496,
+          619,
+          748,
+          672
+        ],
+        [
+          835,
+          370,
+          1030,
+          545
+        ],
+        [
+          815,
+          620,
+          1030,
+          673
+        ],
+        [
+          1145,
+          375,
+          1330,
+          550
+        ],
+        [
+          1131,
+          624,
+          1370,
+          677
+        ],
+        [
+          70,
+          720,
+          255,
+          875
+        ],
+        [
+          73,
+          948,
+          256,
+          998
+        ],
+        [
+          390,
+          720,
+          585,
+          875
+        ],
+        [
+          392,
+          948,
+          575,
+          998
+        ],
+        [
+          700,
+          720,
+          890,
+          875
+        ],
+        [
+          691,
+          950,
+          866,
+          1000
+        ],
+        [
+          990,
+          720,
+          1175,
+          880
+        ],
+        [
+          987,
+          949,
+          1184,
+          998
+        ],
+        [
+          1310,
+          720,
+          1490,
+          885
+        ],
+        [
+          1285,
+          949,
+          1492,
+          998
+        ],
+        [
+          349,
+          205,
+          416,
+          279
+        ],
+        [
+          605,
+          247,
+          690,
+          311
+        ],
+        [
+          925,
+          255,
+          1018,
+          319
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__geralt_p2.jpg"
+    },
+    {
+      "path": "assets/_codex_src/portrait_geralt.png",
+      "size": [
+        1254,
+        1254
+      ],
+      "pixels_changed": 287709,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "geralt_portrait",
+      "rois": [
+        [
+          0,
+          0,
+          1254,
+          815
+        ]
+      ],
+      "proof": "comparaisons/assets___codex_src__portrait_geralt.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row0_0.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 7285,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          23,
+          6,
+          184,
+          131
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row0_0.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row0_1.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 7197,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          24,
+          7,
+          185,
+          131
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row0_1.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row0_2.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 7094,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          22,
+          5,
+          190,
+          129
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row0_2.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row0_3.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 7163,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          21,
+          6,
+          187,
+          130
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row0_3.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row0_4.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 7259,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          22,
+          7,
+          186,
+          132
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row0_4.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row0_5.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 7250,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          21,
+          6,
+          188,
+          131
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row0_5.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row1_0.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5944,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          20,
+          50,
+          174,
+          162
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row1_0.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row1_1.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5979,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          30,
+          48,
+          171,
+          160
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row1_1.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row1_2.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5987,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          16,
+          48,
+          167,
+          162
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row1_2.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row1_3.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5913,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          28,
+          48,
+          168,
+          162
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row1_3.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row1_4.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 6038,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          19,
+          48,
+          173,
+          161
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row1_4.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row2_0.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5990,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          16,
+          123,
+          160,
+          235
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row2_0.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row2_1.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5629,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          4,
+          111,
+          145,
+          222
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row2_1.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row2_2.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5831,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          18,
+          103,
+          161,
+          216
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row2_2.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row2_3.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5497,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          12,
+          130,
+          158,
+          236
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row2_3.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row2_4.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5533,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          7,
+          120,
+          148,
+          230
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row2_4.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_frames/agarica_row2_5.png",
+      "size": [
+        232,
+        357
+      ],
+      "pixels_changed": 5573,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          12,
+          147,
+          154,
+          257
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_frames__agarica_row2_5.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_walk_frames/agarica_walk_0.png",
+      "size": [
+        261,
+        357
+      ],
+      "pixels_changed": 7871,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          13,
+          6,
+          191,
+          132
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_walk_frames__agarica_walk_0.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_walk_frames/agarica_walk_1.png",
+      "size": [
+        261,
+        357
+      ],
+      "pixels_changed": 7720,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          23,
+          6,
+          185,
+          132
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_walk_frames__agarica_walk_1.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_walk_frames/agarica_walk_2.png",
+      "size": [
+        261,
+        357
+      ],
+      "pixels_changed": 7764,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          6,
+          6,
+          181,
+          132
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_walk_frames__agarica_walk_2.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_walk_frames/agarica_walk_3.png",
+      "size": [
+        261,
+        357
+      ],
+      "pixels_changed": 7716,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          15,
+          6,
+          177,
+          132
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_walk_frames__agarica_walk_3.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_attack_frames/agarica_attack_0.png",
+      "size": [
+        1424,
+        366
+      ],
+      "pixels_changed": 11434,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          553,
+          8,
+          756,
+          144
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_attack_frames__agarica_attack_0.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_attack_frames/agarica_attack_1.png",
+      "size": [
+        1424,
+        366
+      ],
+      "pixels_changed": 11913,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          500,
+          10,
+          720,
+          143
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_attack_frames__agarica_attack_1.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_attack_frames/agarica_attack_2.png",
+      "size": [
+        1424,
+        366
+      ],
+      "pixels_changed": 12543,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          556,
+          20,
+          780,
+          152
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_attack_frames__agarica_attack_2.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_attack_frames/agarica_attack_3.png",
+      "size": [
+        1424,
+        366
+      ],
+      "pixels_changed": 11505,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          569,
+          21,
+          784,
+          150
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_attack_frames__agarica_attack_3.jpg"
+    },
+    {
+      "path": "assets/sprites/agarica_attack_frames/agarica_attack_4.png",
+      "size": [
+        487,
+        354
+      ],
+      "pixels_changed": 11535,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          96,
+          20,
+          284,
+          168
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__agarica_attack_frames__agarica_attack_4.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_frames/transfo_row0_1.png",
+      "size": [
+        308,
+        266
+      ],
+      "pixels_changed": 4742,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          129,
+          60,
+          263,
+          163
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_frames__transfo_row0_1.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_frames/transfo_row0_2.png",
+      "size": [
+        308,
+        266
+      ],
+      "pixels_changed": 3136,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          157,
+          76,
+          284,
+          161
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_frames__transfo_row0_2.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_frames/transfo_row1_1.png",
+      "size": [
+        308,
+        266
+      ],
+      "pixels_changed": 4387,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          98,
+          25,
+          245,
+          130
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_frames__transfo_row1_1.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_loup_frames/transfoloup_1.png",
+      "size": [
+        1503,
+        1046
+      ],
+      "pixels_changed": 72087,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          427,
+          23,
+          1338,
+          402
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_loup_frames__transfoloup_1.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_loup_frames/transfoloup_2.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels_changed": 29090,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          869,
+          221,
+          1396,
+          487
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_loup_frames__transfoloup_2.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_loup_piaf_frames/transfoloup_piaf_0.png",
+      "size": [
+        1453,
+        1024
+      ],
+      "pixels_changed": 0,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_loup_piaf_frames__transfoloup_piaf_0.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_ours_frames/transfo_ours_row0_0.png",
+      "size": [
+        738,
+        493
+      ],
+      "pixels_changed": 14903,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          290,
+          7,
+          524,
+          176
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_ours_frames__transfo_ours_row0_0.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_ours_frames/transfo_ours_row0_1.png",
+      "size": [
+        738,
+        493
+      ],
+      "pixels_changed": 15295,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          297,
+          6,
+          574,
+          175
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_ours_frames__transfo_ours_row0_1.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_ours_frames/transfo_ours_row0_2.png",
+      "size": [
+        738,
+        493
+      ],
+      "pixels_changed": 12333,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          307,
+          5,
+          617,
+          109
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_ours_frames__transfo_ours_row0_2.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_0.png",
+      "size": [
+        332,
+        436
+      ],
+      "pixels_changed": 325,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          65,
+          71,
+          85,
+          114
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_pieuvre_frames__transfopieuvre_0.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_1.png",
+      "size": [
+        332,
+        436
+      ],
+      "pixels_changed": 36,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [
+        [
+          39,
+          93,
+          51,
+          113
+        ]
+      ],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_pieuvre_frames__transfopieuvre_1.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_2.png",
+      "size": [
+        332,
+        436
+      ],
+      "pixels_changed": 0,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_pieuvre_frames__transfopieuvre_2.jpg"
+    },
+    {
+      "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_3.png",
+      "size": [
+        332,
+        436
+      ],
+      "pixels_changed": 0,
+      "alpha_identique": true,
+      "hors_masque_identique": true,
+      "family": "agarica_legacy",
+      "rois": [],
+      "proof": "comparaisons/assets__sprites__transformation__transfo_pieuvre_frames__transfopieuvre_3.jpg"
+    }
+  ]
+}

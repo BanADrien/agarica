@@ -30,7 +30,7 @@ const CONTROLS_GROUPS = [
     title: 'Se déplacer',
     rows: [
       { keys: ['←', '→'], alt: ['Q', 'D'], text: 'Marcher' },
-      { keys: ['Z', '↑', 'Espace'], text: 'Sauter (encore en l\'air : double saut)' },
+      { keys: ['Z', '↑', 'Espace'], text: 'Sauter (double saut : seulement en Singe ou en Aigle)' },
       { keys: ['Shift'], text: 'Courir — forme du Loup (ou double appui ← / →)' },
       { keys: ['S', '↓'], text: 'Piqué de l\'Aigle · lâcher une liane' },
     ],
@@ -52,8 +52,8 @@ const CONTROLS_GROUPS = [
     ],
   },
 ];
-const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, double saut = Singe ou Aigle, '
-  + 'eau = Pieuvre. Au feu de camp : soin, sauvegarde, formes et compétences.';
+const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, double saut = Singe ou Aigle '
+  + '(sans forme aérienne, un seul saut), eau = Pieuvre. Au feu de camp : soin, sauvegarde, formes et compétences.';
 // Rappel discret affiché en jeu si l'option est activée.
 const CONTROLS_HINT_LINE = '←→/QD bouger · Z/↑/Espace sauter · Shift courir · K attaquer · E agir · A F R compétences · I sac · Échap pause';
 

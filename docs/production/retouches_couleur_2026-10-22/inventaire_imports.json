@@ -1,0 +1,641 @@
+[
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row0_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "8af72698e192ae24f9aeaba17abee188bb4b216cb1638a43b89e359517a00fa2"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row0_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "98fc9a523b854cc5d790cce1f2cff8112c228cef0d637ab8b5289ba28cc96792"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row0_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "74c95f0fbdf8ef60fef6bf916e51b82af8cd6f5835c5ec72ad3745bc14a5382e"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row1_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "6a9e8a7af3ad49785e38c7b4071ecc5bea16d7dbb8d72832017867947564ff61"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row1_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "f44c4b43fa0421cd86f6333c83b18bda76d263b9935c373719aa2b8fd38c5afe"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row1_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "ffb2188233d436c603371da6c2d6961d5a59b4fe86febe80bae8700b0ef220cf"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row2_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "af94e5facd4554340386bb193fe9fd8d2171334cd539770518b028f86e6f474f"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row2_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "d29efecdffea12d0ada7e453572546d91f9798b680bd96c20d0c1bc4f1a06870"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row2_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "0363617aa005be84660b2c3937345b5fdf6cc9155ae689e85a3cccdfd02e41bc"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row3_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "23c8c2884c215036fd5ca6208894f01b40f7ba0289572ed2eac903c961d98cda"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row3_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "194188d4dfbbfdc46be2a356629c3ded55501228d1c111503cbc37a65a1c378b"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row3_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "774eca7df2664284622c81516d2e76edcb28d438aa216e4093fd999bc3272d1c"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row3_3.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "c6e81382c09636a2abb6bd4e944c9d9427c0de23749f646366ac20bbfe15493e"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row4_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "f05c2bd5fb6cea02fab82d7ff30ed37fcfb711abdd9c4da0e7a30b222c18db54"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row4_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "4ee7f248188c23ed879dca89165d0ff3b7debbcb3e39bc29a6edd9229e480138"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row4_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "5bb03699d1310508455fcfa5ccd6ab5fc90f328e7993737a600c085978d61e00"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row4_3.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "984f475278c7123385fcb53411e6825cdf449252951e94e6c403a824ebe0a714"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row5_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "b9e53382858b834764d71bd4b80693921a797df88d884505f3a2e38979f6031c"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row5_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "d10e32f1736ebe9dbe9e08a921d9d184fb1fb01b3949c84200abde916099ac80"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row5_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "dffd904abe2775580e7a7a853f836164b108a09480aab23d03e32c26a8319c56"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row5_3.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "6557ef77010c87050c48a96279101a3919ffda6aaa0ae5c4f0521b00b40e4764"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row6_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "af04e19fd1b9904a7e87bac9ff906b64bb83f3042d5daa62f8549ef4a8673a31"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row6_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "c4b300da40ce7047c734033edbec7c962b7cd1b730697e2cd9f65b6d2835cf4e"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row6_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "38dfaa7c4dc76cbcf4d58715e31c2849ed63f66bcbf0d2840a57309002865bb7"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row7_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "835417f5a087f36bbdf47a5f1dc45b8c123348bc04ee337ed2e12d069e93596c"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row7_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "065e573b93d700ac9bb6f836c0aa3a5e44ac74cd5cad18f431435eaa45e29abc"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row7_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "765ad4f46be2e52cee7a5d24762621760b2d88814503ad327aae35cc7f86b94b"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row7_3.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "80ad598dd672667cfa4586e78502f8a4b08530be1af5ed5aa28c4d20d4ebabf0"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row8_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "fb2c120557947e17a6a62fab54b9aed0c443e521e7f848d39b9f0b3d1734f89b"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row8_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "821d38a25b1df76c87a982475ec9e570a99b33fd17f0c062f0568d20ead9e1b8"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row8_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "4a2ae59bd8fc843660c04b95bf29820ef39d64daeb28315d9077a901ae617490"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row8_3.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "ac29726cbb2d529ca708fd9f1f17427ff0d3b18fb35b77761d1e02b7e2b9ff59"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row8_4.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "6ecfa6491311110087313e045daffffa14f98977c0e6667e5f8e080a40fe40da"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row9_0.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "dcffff4091ab2de728a2908ff6f5ddb5ddfed7ec616492b14bfb91095cd77cde"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row9_1.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "3b0b36a898bda8b0a39dd6c5ee226c7d2500eb5cd663b25edf49e4c10ab68523"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row9_2.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "2400c3088dd99cadb1087324a3eec1997f7cc6cc6777e0bc361d54e7cfe66542"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_frames/agarica_extra_row9_3.png",
+    "size": [
+      328,
+      346
+    ],
+    "mode": "RGBA",
+    "sha256": "1c756e07dbfbae672fabe9d144fba4a6698be66348d8b462f9ce6547dd1e6f51"
+  },
+  {
+    "path": "assets/sprites/transfo_singe_frames/transfo_singe_row0_0.png",
+    "size": [
+      282,
+      330
+    ],
+    "mode": "RGBA",
+    "sha256": "08458e9c53c42b1e36052a041f4e712ceec4dcf36d4ac594b7560f99174768dc"
+  },
+  {
+    "path": "assets/sprites/transfo_singe_frames/transfo_singe_row0_1.png",
+    "size": [
+      282,
+      330
+    ],
+    "mode": "RGBA",
+    "sha256": "80437a521827814134da558c6cd8ed7c76df53445431d0986e0f3f0b9709b4d3"
+  },
+  {
+    "path": "assets/sprites/transfo_singe_frames/transfo_singe_row0_2.png",
+    "size": [
+      282,
+      330
+    ],
+    "mode": "RGBA",
+    "sha256": "c91307e925cdb61954821b30a73a74231a6428fd89df8fe2531f38b60e3558bd"
+  },
+  {
+    "path": "assets/sprites/transfo_singe_frames/transfo_singe_row0_3.png",
+    "size": [
+      282,
+      330
+    ],
+    "mode": "RGBA",
+    "sha256": "544b68c48b7db4f2bfc903d678dd8a6f81f67a7026bd744d41b9ebe877f2a0e0"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row0_0.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "7a1b4fbd4b4816c25ae997839d06a7d1f22722dfb48912468dfee0c2aebc47e2"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row0_1.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "9be5461a0fe13d1ac551671ddf7fb8280e866b8a4254e95d872bb962e3ee866c"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row0_2.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "c3b74b988c4cd1c30ed127100541af741989c33db8301f23ccbe67a94739ec55"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row0_3.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "9fa09db30135a73724ef8766714d307289d3f13a4786218787214da7a63c5820"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row1_0.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "feffde58d1da1814dd1de6c2384139f9e4f057bc626d7f8ac4bb176f08c22f64"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row1_1.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "6695668153bb9deefcc7696f8b25b688c4e161462dc46570c1abd5dc3b2d2b98"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row1_2.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "9dd6426b2bfb958bd6bd3d31b7465dc9188b39f040e730db5cba6e0bbc16c531"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row1_3.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "45dc5230ba2dbef1c62097dc78c32467410f0b074240bf73c4a8e64ec89d93d0"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row2_0.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "a64f02aaa4d009885e890c003e75955eb0627cf668aebc9a81c6c0d2bef0d27f"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row2_1.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "8afb5c805a4a87818fa916dddf2729b5e2ecb080a81f2aa10030bddfa57bb95e"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row2_2.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "e8f3479235500682296265d0a34f388ac7e633fa457bdc5c733d14fb837e3803"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row2_3.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "f049a473fdee58dffeba916335a5d4c3d97626572d4c51a8aca981a7cb9404ff"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row2_4.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "24b329a0f5c34c5c24196f953234c6089e59ceccd0598c51d5d1c5a30da609e9"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row3_0.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "d4d204ec38a8d7ce3290b752d8a25bd11973c14bae4ff0459ed1948677cb78d4"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row3_1.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "a967661a5757d3083229f25d53064e769d3eb03c6311f041a4356714dac49db4"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row3_2.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "edc4b8b8a7e70e9e3d0e09da1100328bf8a4a8ea19c02a7c77f77a9c7aaf77b7"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row3_3.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "b7c331517398ca7b94b80c0e442e175e7f7fdbf160b8b86a91f9d70c01ec7d62"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row3_4.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "2f9d1628fe1524cab8d2de4607efe2f08b58ac85bfd0d9a14ec40c33f130f6e9"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row4_0.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "74432e6742e1539cf62a3d0a91caa1544f2a26ed63b668300e2bfa33bd26aeae"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row4_1.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "59059f9c86beb76a75d973cd278914cbd9d109c0c6fe12f1b6a2fc598c3e6776"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row4_2.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "06e849fe065d2952b2f44a44c137c099a187f7047ebf1ec098b6c99777e973a7"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row4_3.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "ed5d775f249d1ec8c42294d436514f31f850a67791d9bd11ab323fc0efd29199"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row5_0.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "17fbf7356066de613f6be182b37fdd695e5be79bf454fd64befb67ff296087d5"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row5_1.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "66de629eefa55b040d4580c777a46f21510e3f4381bcec6ec1ecba431f44961a"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row5_2.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "a16fdb3fc0cbec930136b263e6ccc7c25b84a93af9ca7f4246983ae6ac084253"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row5_3.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "dbaedec80216942c4c141eadff351db927b5fb17ba34594fb0c7347af3afb5dc"
+  },
+  {
+    "path": "assets/sprites/geralt_frames/geralt_row5_4.png",
+    "size": [
+      362,
+      300
+    ],
+    "mode": "RGBA",
+    "sha256": "8f78950d99f146e49d2dbad72d8ede3c9c96f134de49c92a297290002784fbf8"
+  },
+  {
+    "path": "assets/ui/portraits/agarica.png",
+    "size": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "sha256": "dc7bae699ac04d934f826af2b5bb5aaf014cecced30266f5e5b6d2b60ad0bcbe"
+  },
+  {
+    "path": "assets/ui/portraits/geralt.png",
+    "size": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "sha256": "a1d7a1bdd903c59c1cb2508e63401b48922fd2442da1bc8b44814e63c1c0fa9a"
+  },
+  {
+    "path": "assets/ui/titre_logo.png",
+    "size": [
+      1024,
+      670
+    ],
+    "mode": "RGBA",
+    "sha256": "d9cd1668737d884fb1042973c9dfb2e7982dc97555dd76d2a8162d44bfa2de31"
+  }
+]

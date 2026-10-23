@@ -261,6 +261,14 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
   (totem `item-totem_monkey_*` si présent).
 - **UI** : `showTitleCard(scene, title, sub) → Promise`, `showStoryBanner`, `drawStoryPanel`,
   `STORY_UI` (palette), `openInventory(scene)`, `openMap(scene)`, `releaseStoryInput(scene)`.
+  `addStoryVineFrame(scene, x, y, w, h, {scale = 0.3, container}) → {container, inner} | null` :
+  cadre Codex `dialogue_box` (lianes + champignons) à n'importe quelle taille SANS étirement
+  (moitiés en miroir), (x, y, w, h) = bords extérieurs des lianes, `inner` = planches (zone de
+  texte) ; null sans l'art (alors `drawStoryPanel`). Utilisé par DialogueScene (boîte + choix).
+  `SPEAKERS[who].portrait` / `.portraitTint` : portrait Codex d'un autre id (esprit de Kainati).
+  HUD : `storyDrawHudArt(scene)` (appelée par `drawHud`, LevelKit) pose les cœurs `hud_coeur*`
+  et les icônes `skill_icone_*` en images ; `drawHud` ne dessine plus que le repli.
+  Objets sans art prévu (`note_geralt`) : icône dessinée par code (`STORY_DRAWN_ITEMS`).
 - **Clé de zone `tileset: 'tuiles_ecorce'`** (TILESET_MANIFEST) : cases chargées sous
   `<id>:<clé>`, case absente → jeu par défaut.
 - **Dev** : `index.html?zone=foret_sombre_1&flags=xaraMet,hearts=2[&load][&enter=id]`.

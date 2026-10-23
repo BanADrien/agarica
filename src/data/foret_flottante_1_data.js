@@ -2,7 +2,8 @@
 // Logique (rencontre de Geralt, duel comique, carte, brume qui se déchire) :
 // ZONE_SCRIPTS.acte2_ff1 dans src/story/acte2.js.
 //
-// Plan (grille 64, surface d'une rangée gy = 64*gy, pieds d'Agarica +16) :
+// Plan (grille 64, surface d'une rangée gy = 64*gy, pieds d'Agarica
+// + GROUND_STAND_SINK) :
 //   x 0-1600     grosse branche d'arrivée depuis le grand arbre + camp de Geralt
 //                (feu de camp, duel entre x 640 et 1600)
 //   x 1600-2176  fin de la branche ; corniche P1 (gy 4, +3 rangées) : il faut

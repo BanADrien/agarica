@@ -12,6 +12,20 @@ const MAP_REGION_LAYOUT = {
 };
 const MAP_INK = 0x4a2e16;
 const MAP_INK_HEX = '#4a2e16';
+// Avec le parchemin Codex `carte_parchemin` (1485x993, régions déjà peintes) :
+// position de chaque région peinte (fx, fy = fraction de l'image), rayon du
+// brouillard qui la cache tant qu'elle n'est pas visitée, et emplacement de
+// son étiquette (nom + note de Geralt).
+const MAP_ART_REGIONS = {
+  bosquet: { fx: 0.2, fy: 0.29, r: 0.12, lx: 0.17, ly: 0.5 },
+  foret_sombre: { fx: 0.49, fy: 0.4, r: 0.17, lx: 0.45, ly: 0.64 },
+  grand_arbre: { fx: 0.818, fy: 0.42, r: 0.07, lx: 0.67, ly: 0.46 },
+  foret_flottante: { fx: 0.835, fy: 0.19, r: 0.12, lx: 0.63, ly: 0.2 },
+  foret_corrompue: { fx: 0.785, fy: 0.69, r: 0.15, lx: 0.66, ly: 0.88 },
+};
+// Le grand X rouge peint au pied des montagnes : la blague du raccourci.
+const MAP_ART_SHORTCUT = { fx: 0.485, fy: 0.785 };
+const MAP_ART_FOG = 0xd8bd88;
 
 class MapScene extends Phaser.Scene {
   constructor() {
@@ -26,14 +40,7 @@ class MapScene extends Phaser.Scene {
     const { width, height } = this.scale;
     this.openedAt = this.time.now;
     this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.75).setOrigin(0);
-    this.drawParchment(width, height);
-
-    this.add.text(width / 2, 62, 'Carte de la forêt', {
-      fontFamily: STORY_UI.serif, fontSize: '26px', fontStyle: 'bold italic', color: MAP_INK_HEX,
-    }).setOrigin(0.5);
-    this.add.text(width / 2, 90, 'par Geralt, ranger (et Clak) — incomplète, mais pleine de bonne volonté', {
-      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#6b4a2a',
-    }).setOrigin(0.5);
+    this.input.keyboard.on('keydown', this.onKey, this);
 
     const parent = this.scene.get(this.parentKey);
     const here = parent ? storyZoneEntry(parent) : null;
@@ -43,6 +50,12 @@ class MapScene extends Phaser.Scene {
     }
     if (here) revealed[here.region] = true;
 
+    if (this.textures.exists('item-carte_parchemin')) {
+      this.buildArtMap(revealed, here);
+      return;
+    }
+    this.drawParchment(width, height);
+    this.addMapTitle(width / 2, 62);
     this.drawPath(revealed);
     for (const r of STORY_REGIONS) this.drawRegion(r, revealed[r.id], here && here.region === r.id);
     this.drawCompass(width - 150, height - 140);
@@ -58,10 +71,140 @@ class MapScene extends Phaser.Scene {
       fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'bold', color: '#8a2a1a',
     }).setAngle(-4);
 
-    this.add.text(width / 2, height - 30, 'M / Échap : fermer', {
+    this.addCloseHint(height - 30);
+  }
+
+  addMapTitle(x, y, { ribbon = false } = {}) {
+    if (ribbon) {
+      // Bandeau de parchemin clair sous le titre : la carte peinte est chargée.
+      const g = this.add.graphics();
+      g.fillStyle(0x000000, 0.25);
+      g.fillRoundedRect(x - 262, y - 22, 528, 58, 12);
+      g.fillStyle(0xecd8a6, 0.94);
+      g.fillRoundedRect(x - 265, y - 25, 530, 58, 12);
+      g.lineStyle(1.5, 0x9a7444, 0.8);
+      g.strokeRoundedRect(x - 259, y - 19, 518, 46, 9);
+    }
+    this.add.text(x, y, 'Carte de la forêt', {
+      fontFamily: STORY_UI.serif, fontSize: '26px', fontStyle: 'bold italic', color: MAP_INK_HEX, padding: { x: 4, y: 2 },
+    }).setOrigin(0.5);
+    this.add.text(x, y + 26, 'par Geralt, ranger (et Clak) — incomplète, mais pleine de bonne volonté', {
+      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#6b4a2a',
+    }).setOrigin(0.5);
+  }
+
+  addCloseHint(y) {
+    this.add.text(this.scale.width / 2, y, 'M / Échap : fermer', {
       fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.textSoft,
     }).setOrigin(0.5);
-    this.input.keyboard.on('keydown', this.onKey, this);
+  }
+
+  // Carte peinte (Codex) : l'image entière, proportions gardées. Les régions y
+  // sont déjà dessinées (chemins, boussole, crabe…) : on n'ajoute que le
+  // brouillard des régions inconnues, leur nom + la note de Geralt, et
+  // l'épingle « tu es ici ».
+  buildArtMap(revealed, here) {
+    const { width, height } = this.scale;
+    const img = this.add.image(width / 2, 0, 'item-carte_parchemin').setOrigin(0.5, 0);
+    const scale = Math.min((width - 40) / img.width, (height - 48) / img.height);
+    img.setScale(scale).setY(8);
+    const M = { x: img.x - img.displayWidth / 2, y: img.y, w: img.displayWidth, h: img.displayHeight };
+    const at = (fx, fy) => ({ x: M.x + fx * M.w, y: M.y + fy * M.h });
+
+    for (const r of STORY_REGIONS) {
+      const L = MAP_ART_REGIONS[r.id];
+      if (!L) continue;
+      if (revealed[r.id]) this.addArtRegionLabel(r, L, at);
+      else this.addArtFog(L, at, M.w);
+    }
+    // Épingle après les étiquettes : toujours au-dessus.
+    if (here && MAP_ART_REGIONS[here.region]) {
+      const L = MAP_ART_REGIONS[here.region];
+      this.addHerePin(at(L.fx, L.fy));
+    }
+
+    // Sous le grand X : « raccourci ? » barré, puis « NON. ».
+    const s = at(MAP_ART_SHORTCUT.fx, MAP_ART_SHORTCUT.fy);
+    const sy = s.y + 30;
+    const short = this.add.text(s.x - 44, sy, 'raccourci ?', {
+      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#7a5a3a',
+    }).setOrigin(0, 0.5).setAngle(-6);
+    const g = this.add.graphics();
+    g.lineStyle(2, 0x8a2a1a, 0.8);
+    g.lineBetween(s.x - 48, sy + 6, s.x - 40 + short.width, sy - 6);
+    this.add.text(s.x - 34 + short.width, sy - 6, 'NON.', {
+      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'bold', color: '#8a2a1a',
+    }).setOrigin(0, 0.5).setAngle(-4);
+
+    this.addMapTitle(width / 2, M.y + 34, { ribbon: true });
+    this.addCloseHint(height - 18);
+  }
+
+  // Nom de la région + note de Geralt, à l'encre sur un cartouche clair.
+  addArtRegionLabel(region, L, at) {
+    const p = at(L.lx, L.ly);
+    const name = this.add.text(p.x, p.y, region.name, {
+      fontFamily: STORY_UI.serif, fontSize: '15px', fontStyle: 'bold', color: MAP_INK_HEX,
+    }).setOrigin(0.5, 0);
+    const layout = MAP_REGION_LAYOUT[region.id];
+    const note = this.add.text(p.x, p.y + 19, layout ? layout.note : '', {
+      fontFamily: STORY_UI.serif, fontSize: '11px', fontStyle: 'italic', color: '#6b4a2a', align: 'center',
+    }).setOrigin(0.5, 0);
+    const w = Math.max(name.width, note.width) + 18;
+    const h = 19 + note.height + 8;
+    const g = this.add.graphics();
+    g.fillStyle(0xf0dfb4, 0.88);
+    g.fillRoundedRect(p.x - w / 2, p.y - 4, w, h, 7);
+    g.lineStyle(1, 0x9a7444, 0.6);
+    g.strokeRoundedRect(p.x - w / 2, p.y - 4, w, h, 7);
+    // Cartouche créé après les textes (pour les mesurer) : textes devant.
+    g.setDepth(1);
+    name.setDepth(2);
+    note.setDepth(2);
+  }
+
+  // Région encore inconnue : brume de parchemin aux bords doux (couches de
+  // plus en plus opaques vers le centre) qui cache la peinture, et « ??? ».
+  addArtFog(L, at, mapW) {
+    const c = at(L.fx, L.fy);
+    const r = L.r * mapW;
+    const g = this.add.graphics();
+    const rnd = new Phaser.Math.RandomDataGenerator([`fog${L.fx}`]);
+    const puffs = [];
+    for (let i = 0; i < 11; i++) {
+      const a = (i / 10) * Math.PI * 2 + rnd.realInRange(-0.3, 0.3);
+      const d = i === 0 ? 0 : r * rnd.realInRange(0.3, 0.62);
+      puffs.push({ x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d * 0.7, r: r * rnd.realInRange(0.36, 0.5) });
+    }
+    for (const [k, alpha] of [[1.35, 0.18], [1.15, 0.3], [0.95, 0.5], [0.75, 0.75]]) {
+      g.fillStyle(MAP_ART_FOG, alpha);
+      for (const p of puffs) g.fillCircle(p.x, p.y, p.r * k);
+    }
+    // Hachures de crayon : « zone pas encore cartographiée ».
+    g.lineStyle(1, 0x9a7a4a, 0.35);
+    for (let i = -4; i <= 4; i++) g.lineBetween(c.x + i * 12 - 26, c.y + 26, c.x + i * 12 + 26, c.y - 26);
+    this.add.text(c.x, c.y, '???', {
+      fontFamily: STORY_UI.serif, fontSize: '22px', fontStyle: 'bold', color: '#7a6a4a',
+      stroke: '#e3cb98', strokeThickness: 4,
+    }).setOrigin(0.5);
+  }
+
+  addHerePin(p) {
+    const pin = this.add.graphics();
+    pin.fillStyle(0x000000, 0.3);
+    pin.fillEllipse(p.x, p.y + 2, 16, 6);
+    pin.fillStyle(STORY_UI.pink, 1);
+    pin.fillCircle(p.x, p.y - 18, 8);
+    pin.fillTriangle(p.x - 7, p.y - 14, p.x + 7, p.y - 14, p.x, p.y);
+    pin.fillStyle(0xffffff, 1);
+    pin.fillCircle(p.x, p.y - 18, 3);
+    const label = this.add.text(p.x + 12, p.y - 30, 'tu es ici', {
+      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'bold italic', color: '#b0306a',
+      stroke: '#f3e3bd', strokeThickness: 3,
+    });
+    pin.setDepth(3);
+    label.setDepth(3);
+    this.tweens.add({ targets: [pin, label], y: '-=4', duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
   drawParchment(width, height) {
@@ -69,10 +212,6 @@ class MapScene extends Phaser.Scene {
     const y = 36;
     const w = width - 140;
     const h = height - 86;
-    if (this.textures.exists('item-carte_parchemin')) {
-      this.add.image(width / 2, y + h / 2, 'item-carte_parchemin').setDisplaySize(w + 20, h + 20);
-      return;
-    }
     const g = this.add.graphics();
     // Bords déchirés : polygone légèrement irrégulier.
     const rnd = new Phaser.Math.RandomDataGenerator(['geralt']);

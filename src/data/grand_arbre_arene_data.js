@@ -30,8 +30,8 @@ const GRAND_ARBRE_ARENE_DATA = {
   playerSpawn: { x: 110, y: 412 },
   campfires: [{ x: 300, y: GRAND_ARBRE_ARENE_SURFACE_Y }],
   // Lianes de l'arène (x, y = point d'attache en haut, length vers le bas).
-  // Avant la forme singe ce sont des « lianes-tremplins » (rebond, cf.
-  // boss_kainati.js) ; Kainati s'y suspend et saute de l'une à l'autre.
+  // Kainati s'y suspend et saute de l'une à l'autre ; pour Agarica, simple
+  // décor tant qu'elle n'a pas la forme singe (aucun rebond, cf. boss_kainati.js).
   vines: [
     { x: 752, y: -30, length: 280 },
     { x: 912, y: -30, length: 280 },
@@ -43,10 +43,11 @@ const GRAND_ARBRE_ARENE_DATA = {
   kainatiArena: {
     minX: 512,          // bords de l'arène (rideaux de mousse + caméra figée)
     maxX: 1472,
-    // Haut de la HITBOX du sol (tuiles d'herbe aux 3/4 : 16 px sous le haut de
-    // l'image), là où Agarica pose les pieds : Kainati, ses pierres et ses
-    // ondes flottaient sinon 16 px au-dessus de l'herbe.
-    floorY: GRAND_ARBRE_ARENE_SURFACE_Y + 16,
+    // Haut de la HITBOX du sol, là où Agarica pose les pieds (cf.
+    // GROUND_STAND_SINK : 16 px sous le haut de l'image avec le jeu 'floor',
+    // pile au haut de la case avec 'tuiles') : Kainati, ses pierres et ses
+    // ondes flottaient sinon au-dessus de l'herbe.
+    floorY: GRAND_ARBRE_ARENE_SURFACE_Y + GROUND_STAND_SINK,
     lockX: 600,         // le combat démarre quand Agarica dépasse ce x
     startVine: 2,       // liane où Kainati attend
     calmX: 1390,        // position de Kainati apaisé (revisite)

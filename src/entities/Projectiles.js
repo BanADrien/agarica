@@ -40,6 +40,9 @@ class PierreProjectile extends Phaser.Physics.Arcade.Sprite {
     this.kind = 'pierre'; // source passée à enemy.takeHit(source)
     this.owner = scene.player;
     this.setScale(PIERRE_DISPLAY_SIZE / Math.max(this.width, this.height));
+    // Effets du joueur (pierre, éclats, nuée) : au niveau des personnages,
+    // devant les décors (cf. CHARACTER_DEPTH dans LevelKit.js).
+    this.setDepth(CHARACTER_DEPTH);
     this.body.setCircle(Math.min(this.width, this.height) / 2);
     this.setVelocity(dir * PIERRE_SPEED_X + inheritVx * 0.3, PIERRE_SPEED_Y);
     this.setAngularVelocity(dir * 540);
@@ -63,11 +66,11 @@ class PierreProjectile extends Phaser.Physics.Arcade.Sprite {
     this.done = true;
     const scene = this.scene;
     if (hasManifestArt(scene, 'vfx_impact_pierre')) {
-      const fx = addManifestSprite(scene, this.x, this.y + 6, 'vfx_impact_pierre', 'idle');
+      const fx = addManifestSprite(scene, this.x, this.y + 6, 'vfx_impact_pierre', 'idle').setDepth(CHARACTER_DEPTH + 1);
       fx.once('animationcomplete', () => fx.destroy());
     }
     for (let i = 0; i < 5; i++) {
-      const chip = scene.add.circle(this.x, this.y, 2.5, 0x8a8794, 1);
+      const chip = scene.add.circle(this.x, this.y, 2.5, 0x8a8794, 1).setDepth(CHARACTER_DEPTH + 1);
       scene.tweens.add({
         targets: chip,
         x: this.x + Phaser.Math.Between(-22, 22),
@@ -146,21 +149,21 @@ class PapillonSwarm {
     this.active = true;
     this.healed = new Set();
     this.glow = scene.add.image(this.cx, this.cy, PAPILLON_GLOW_KEY)
-      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff8ff).setScale(2.6).setAlpha(0);
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff8ff).setScale(2.6).setAlpha(0).setDepth(CHARACTER_DEPTH + 1);
     // Art Codex si présent : tourbillon `vfx_soin_papillon` + papillons
     // `papillon` animés ; sinon papillons procéduraux teintés.
     this.swirl = hasManifestArt(scene, 'vfx_soin_papillon', 'swirl')
-      ? addManifestSprite(scene, this.cx, this.cy, 'vfx_soin_papillon', 'swirl', { origin: [0.5, 0.5] }).setAlpha(0)
+      ? addManifestSprite(scene, this.cx, this.cy, 'vfx_soin_papillon', 'swirl', { origin: [0.5, 0.5] }).setAlpha(0).setDepth(CHARACTER_DEPTH + 1)
       : null;
     const flyArt = hasManifestArt(scene, 'papillon');
     this.flyArt = flyArt;
     this.flies = Array.from({ length: PAPILLON_COUNT }, (_, i) => ({
-      sprite: flyArt
+      sprite: (flyArt
         ? addManifestSprite(scene, this.cx, this.cy, 'papillon', 'idle', { origin: [0.5, 0.5] }).setAlpha(0)
         : scene.add.image(this.cx, this.cy, PAPILLON_TEXTURE_KEY)
           .setTint(PAPILLON_COLORS[i % PAPILLON_COLORS.length])
           .setBlendMode(Phaser.BlendModes.ADD)
-          .setAlpha(0),
+          .setAlpha(0)).setDepth(CHARACTER_DEPTH + 2),
       ax: 20 + Math.random() * 45, ay: 12 + Math.random() * 32,
       fx: 1.5 + Math.random() * 2, fy: 2 + Math.random() * 2.5, ph: Math.random() * Math.PI * 2,
     }));
@@ -209,7 +212,7 @@ class PapillonSwarm {
         this.scene.events.emit('papillon-heal', enemy);
         if (hasManifestArt(this.scene, 'vfx_soin_papillon', 'burst')) {
           const b = enemy.getBounds();
-          const fx = addManifestSprite(this.scene, b.centerX, b.centerY, 'vfx_soin_papillon', 'burst', { origin: [0.5, 0.5] });
+          const fx = addManifestSprite(this.scene, b.centerX, b.centerY, 'vfx_soin_papillon', 'burst', { origin: [0.5, 0.5] }).setDepth(CHARACTER_DEPTH + 2);
           fx.once('animationcomplete', () => fx.destroy());
         }
       }

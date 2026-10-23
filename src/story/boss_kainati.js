@@ -2,20 +2,22 @@
 // (zone grand_arbre_arene, donnée `script: 'kainati_arene'` + `kainatiArena`).
 // Entités (boss, pierres, esprit) : src/entities/Kainati.js.
 //
-// RÈGLES DU COMBAT (2-3 min, lisible et généreux) :
-// - Agarica n'a PAS encore la forme singe : les lianes de l'arène sont des
-//   « lianes-tremplins » — la toucher en l'air fait rebondir vers le haut.
+// RÈGLES DU COMBAT (lisible et généreux, gagnable en forme humaine avec un
+// saut simple -- Agarica n'a PAS encore la forme singe) :
+// - Les lianes de l'arène sont un pur décor pour Agarica (décision
+//   utilisateur : en forme humaine, les lianes sont ignorées partout ; les
+//   anciennes « lianes-tremplins » qui la faisaient rebondir sont retirées).
+//   Seul Kainati s'y suspend.
 // - Kainati se balance de liane en liane, lance des salves de pierres en cloche
-//   (flash jaune + « ! » avant), puis plonge sur Agarica (flash rouge + ombre au
-//   sol) : land_stomp = ondes de choc au ras du sol (à sauter) puis il reste
-//   ÉTOURDI ~1,6 s → fenêtre de frappe (1 PV par coup).
-// - « Comprendre ses mouvements » : rebondir sur une liane à moins de
-//   KAINATI_DESTABILIZE_RANGE px de lui pendant qu'il est suspendu le
-//   déséquilibre → il chute (−1 PV) et reste étourdi ~2 s. Le frapper quand il
-//   est suspendu (rare, il faut un rebond) a le même effet. Après être remonté,
-//   il est vigilant 2,5 s (les lianes ne le font plus tomber).
+//   (flash jaune + « ! » avant ; un coup de dague brise une pierre), puis
+//   plonge sur Agarica (flash rouge + ombre au sol) : land_stomp = ondes de
+//   choc au ras du sol (à sauter) puis il reste SONNÉ au sol ~2,2 s → seule
+//   fenêtre de frappe (1 PV par coup, 2 coups au plus par plongeon : il se
+//   relève alors d'un bond). Il plonge à chaque cycle (~9 s en phase 1).
+//   Frappé ailleurs (suspendu, en plein bond), il esquive (éclat bleu).
 // - 8 PV. À 4 PV : phase 2 (cri, tout ×0,75 plus rapide, salves de 3 pierres,
-//   pluie de pierres du plafond avec ombres au sol, y compris après chaque stomp).
+//   deux plongeons par cycle, pluie de pierres du plafond avec ombres au sol,
+//   y compris après chaque stomp).
 // - Victoire à 0 PV : il ne meurt pas (defeated_lucid), la mousse le quitte en
 //   partie, cinématique « kainati_victoire », flag `kainatiDefeated`, rideau de
 //   mousse droit dissous, sorties vers le totem du singe (MondeSpirituelScene)
@@ -29,12 +31,9 @@
 // Flags : `kainatiIntroSeen`, `kainatiDefeated`.
 // Cinématiques / dialogues (surchargeables par src/story/acte1.js, chargé après) :
 //   CUTSCENES|DIALOGUES `kainati_intro`, `kainati_victoire` ; DIALOGUES `kainati_calme`.
-// Événement scène : 'kainati-vine-bounce' (vine) à chaque liane-tremplin utilisée.
+// Indices (toasts, une fois par combat) : au début, au 1er étourdissement, à
+// la 1re esquive.
 
-const KAINATI_DESTABILIZE_RANGE = 300;
-const KAINATI_BOUNCE_VELOCITY = -780;
-const KAINATI_BOUNCE_COOLDOWN = 450;
-const KAINATI_VINE_HALF_WIDTH = 22;
 const KAINATI_TALK_RANGE = 150;
 
 // --- Textes par défaut (ton digne ; l'agent Acte 1 peut les remplacer) ---
@@ -52,7 +51,7 @@ if (!DIALOGUES.kainati_victoire) {
     { who: 'kainati', text: 'La brume se dissipe... Tu... combats la mousse ?' },
     { who: 'agarica', text: "Oui. Elle ronge la forêt. Je cherche un moyen de l'arrêter." },
     { who: 'kainati', text: "Elle m'avait rempli de colère. Je voyais une ennemie là où il n'y avait qu'une enfant des bois." },
-    { who: 'kainati', text: "Tu as suivi mes lianes sans les connaître. Tu as compris mon mouvement." },
+    { who: 'kainati', text: "Tu as lu mes bonds sans les connaître. Tu as compris mon mouvement." },
     { who: 'kainati', text: "Derrière ma branche dort le totem de mon peuple. Va. Écoute-le comme tu m'as écouté." },
   ];
 }
@@ -150,7 +149,8 @@ function kainatiSetCurtain(scene, curtain, closed, instant = false) {
   });
 }
 
-// --- Lianes : celles de l'agent Formes si elles existent, sinon un dessin local ---
+// --- Lianes (décor : Kainati s'y suspend) : celles de Liane.js si elles
+// existent, sinon un dessin local ---
 function kainatiSetupVines(scene, st) {
   st.vineDefs = st.cfgVines.map((v) => ({ ...v, cooldown: 0, visual: null }));
   const formesVines = Array.isArray(scene.vines) && scene.vines.length > 0;
@@ -166,45 +166,19 @@ function kainatiSetupVines(scene, st) {
   }
 }
 
-function kainatiWiggle(scene, vine) {
-  // Liane de l'agent Formes : petite impulsion sur son pendule.
-  const live = (scene.vines || []).find((l) => l && Math.abs(l.x - vine.x) < 2 && Math.abs(l.y - vine.y) < 2);
-  if (live && typeof live.omega === 'number') live.omega += (scene.player.body.velocity.x >= 0 ? 1 : -1) * 1.6;
-  if (!vine.visual) return;
-  scene.tweens.killTweensOf(vine.visual);
-  vine.visual.setAngle(0);
-  scene.tweens.add({ targets: vine.visual, angle: { from: 9, to: 0 }, duration: 600, ease: 'Elastic.Out' });
-}
-
-// Rebond sur une liane-tremplin (avant la victoire seulement : ensuite, la
-// forme singe de l'agent Formes prend le relais).
-function kainatiUpdateVines(scene, st, delta) {
-  const p = scene.player;
-  if (!p || !p.body) return;
-  const grabbing = p.vine || p.grabbedVine || p.onVine;
-  const inAir = !p.body.blocked.down && !p.body.touching.down;
-  const pr = kainatiPlayerRect(p);
-  for (const v of st.vineDefs) {
-    if (v.cooldown > 0) { v.cooldown -= delta; continue; }
-    if (grabbing || !inAir || p.body.velocity.y < -300) continue;
-    const vr = new Phaser.Geom.Rectangle(v.x - KAINATI_VINE_HALF_WIDTH, v.y, KAINATI_VINE_HALF_WIDTH * 2, v.length);
-    if (!Phaser.Geom.Intersects.RectangleToRectangle(pr, vr)) continue;
-    v.cooldown = KAINATI_BOUNCE_COOLDOWN;
-    p.setVelocityY(KAINATI_BOUNCE_VELOCITY);
-    kainatiWiggle(scene, v);
-    scene.events.emit('kainati-vine-bounce', v);
-    kainatiOnVineUsed(scene, st, v);
-  }
-}
-
-function kainatiOnVineUsed(scene, st, vine) {
-  st.vineUses += 1;
-  if (!st.toldBounce) { st.toldBounce = true; kainatiToast(scene, 'La liane te renvoie vers le haut !'); }
+// Indices du combat (une fois chacun par combat, remis à zéro avec lui).
+function kainatiUpdateHints(scene, st) {
   const boss = st.boss;
-  if (!st.fightActive || !boss) return;
-  if (Math.abs(boss.feet.x - vine.x) <= KAINATI_DESTABILIZE_RANGE && boss.destabilize()) {
-    st.destabilized += 1;
-    if (!st.toldFall) { st.toldFall = true; kainatiToast(scene, "Kainati perd l'équilibre ! Frappe-le !"); }
+  if (!st.fightActive || !boss || boss.defeated) return;
+  if (boss.state === 'stunned' && !st.toldStun) {
+    st.toldStun = true;
+    kainatiToast(scene, 'Kainati est sonné au sol : frappe-le !');
+  } else if (boss.lastDodge != null && boss.lastDodge !== st.seenDodge) {
+    st.seenDodge = boss.lastDodge;
+    if (!st.toldDodge && boss.state !== 'stunned') {
+      st.toldDodge = true;
+      kainatiToast(scene, "Il esquive là-haut… Attends qu'il plonge et retombe au sol.");
+    }
   }
 }
 
@@ -245,6 +219,9 @@ async function kainatiStartFight(scene, st) {
   st.boss.start();
   st.fightActive = true;
   st.starting = false;
+  st.toldStun = false;
+  st.toldDodge = false;
+  kainatiToast(scene, "Esquive ses pierres. Quand il plonge, saute l'onde de choc… puis frappe !", 3200);
 }
 
 // Mort d'Agarica (ou sortie forcée) : tout revient à l'état d'avant combat.
@@ -306,7 +283,7 @@ ZONE_SCRIPTS.kainati_arene = {
     const b = cam.getBounds();
     const st = {
       scene, cfg, cfgVines, vineDefs: null, fightActive: false, starting: false, disposed: false,
-      vineUses: 0, destabilized: 0, dying: false, passageRevealed: false,
+      dying: false, passageRevealed: false,
       camBounds: { x: b.x, y: b.y, width: b.width, height: b.height },
     };
     if (scene.__kainati) scene.__kainati.disposed = true;
@@ -340,9 +317,6 @@ ZONE_SCRIPTS.kainati_arene = {
       kainatiPlay(scene, 'kainati_calme').then(() => { st.talking = false; });
     };
     scene.input.keyboard.on('keydown-E', st.onKeyE);
-    // Forme singe (Liane.js) : une vraie prise de liane compte comme un rebond.
-    st.onVineGrab = (vine) => { if (vine && !st.disposed) kainatiOnVineUsed(scene, st, vine); };
-    scene.events.on('vine-grab', st.onVineGrab);
     // Le dernier cœur perdu gèle le monde le temps de la pose `death`
     // (Player.hitByEnemy, ~1,1 s) puis recharge les cœurs : update() (coupé
     // pendant le gel) ne voyait jamais `hearts <= 0`. On écoute le registre.
@@ -352,7 +326,6 @@ ZONE_SCRIPTS.kainati_arene = {
       st.disposed = true;
       scene.registry.events.off('changedata-hearts', st.onHearts);
       scene.input.keyboard.off('keydown-E', st.onKeyE);
-      scene.events.off('vine-grab', st.onVineGrab);
       kainatiHideBar(scene, st);
     });
   },
@@ -368,7 +341,6 @@ ZONE_SCRIPTS.kainati_arene = {
     if (!st.vineDefs) kainatiSetupVines(scene, st);
 
     const defeated = kainatiFlag(scene, 'kainatiDefeated', false);
-    if (!defeated) kainatiUpdateVines(scene, st, dt);
 
     // Mort du joueur (cœurs à 0, puis rechargés au point d'entrée) : reset propre.
     if (p.hearts <= 0) st.dying = true;
@@ -383,6 +355,7 @@ ZONE_SCRIPTS.kainati_arene = {
 
     st.boss.update(dt, p);
     kainatiCheckPlayerHits(scene, st, time);
+    kainatiUpdateHints(scene, st);
     kainatiDrawBar(st);
     if (st.fightActive && st.boss.defeated) kainatiVictory(scene, st);
 

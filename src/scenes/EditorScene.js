@@ -733,8 +733,11 @@ class EditorScene extends Phaser.Scene {
 
   redrawGround() {
     for (const img of this.groundImages) img.destroy();
-    const backImages = renderAutotileGrid(this, null, this.data.groundBackCells, { back: true });
-    const frontImages = renderAutotileGrid(this, null, this.data.groundCells);
+    // Même jeu de tuiles que dans le jeu (clé de zone `tileset`, cf.
+    // autotileLayoutFor) : un jeu de biome change le rendu ET sa disposition.
+    const tileset = this.data.tileset;
+    const backImages = renderAutotileGrid(this, null, this.data.groundBackCells, { back: true, tileset });
+    const frontImages = renderAutotileGrid(this, null, this.data.groundCells, { tileset });
     this.groundImages = [...backImages, ...frontImages];
     EditorScene.setStatus(`${this.data.groundCells.length} case(s) de sol, ${this.data.groundBackCells.length} arrière-plan`);
   }
@@ -2039,6 +2042,7 @@ class EditorScene extends Phaser.Scene {
     if (value === undefined) delete editor.data[key];
     else editor.data[key] = value;
     EditorScene.syncZonePropsUI(editor);
+    if (key === 'tileset') editor.redrawGround();
   }
 
   static syncSelectionUI(scene) {

@@ -100,10 +100,11 @@ const FORET_SOMBRE_2_DATA = {
   ],
   // Mur de mousse vivante à l'entrée de la poche, sous le surplomb : s'ouvre
   // avec le répulsif de Morgat (acte 2). Id cité dans PLAN_DEV.md.
-  // 128 px de large et jusqu'au haut de la HITBOX du sol (y 464, tuiles d'herbe
-  // aux 3/4) : à 64 px, le passage humain → loup (corps plus long) en plein
-  // contact faisait traverser le mur (poche et hutte atteintes sans répulsif).
-  mossWalls: [{ id: 'mur_repulsif_foret_sombre', x: 4384, y: 360, w: 128, h: 208 }],
+  // 128 px de large et jusqu'au haut de la HITBOX du sol (448 +
+  // GROUND_STAND_SINK : 464 avec le jeu 'floor', 448 avec 'tuiles') : à 64 px,
+  // le passage humain → loup (corps plus long) en plein contact faisait
+  // traverser le mur (poche et hutte atteintes sans répulsif). Haut à y 256.
+  mossWalls: [{ id: 'mur_repulsif_foret_sombre', x: 4384, y: 256 + (192 + GROUND_STAND_SINK) / 2, w: 128, h: 192 + GROUND_STAND_SINK }],
   triggers: [
     { id: 'empreintes', x: 380, w: 40, cutscene: 'fs2_empreintes' },
     { id: 'ravin', x: 1088, y: 420, w: 128, h: 80, forbids: { hasWolfForm: true }, cutscene: 'fs2_ravin' },

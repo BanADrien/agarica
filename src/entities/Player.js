@@ -617,17 +617,45 @@ const AIR_FORM_IDS = ['eagle', 'monkey'];
 const FORM_FLAG_BY_ID = {
   wolf: 'hasWolfForm', eagle: 'hasEagleForm', monkey: 'hasMonkeyForm', octopus: 'hasOctopusForm',
 };
-// Double saut SANS forme aérienne : simple, un peu moins haut, aucune
-// transformation. Singe : plus court que l'Aigle (eagleJumpVelocity = -550,
-// inchangé : les anciennes zones sont calibrées dessus).
-const BASE_DOUBLE_JUMP_VELOCITY = -450;
+// Retour utilisateur : SANS forme aérienne (ni singe ni aigle dans
+// l'emplacement aérien), Agarica ne fait qu'UN saut -- l'ancien « double saut
+// de base » (-450, petit nuage) est retiré. Le 2e saut n'existe qu'avec le
+// singe (saut court + lianes) ou l'aigle (saut haut + plané). Singe : plus
+// court que l'Aigle (eagleJumpVelocity = -550, inchangé : les anciennes zones
+// sont calibrées dessus).
 const MONKEY_JUMP_VELOCITY = -500;
+// Tolérance de bord (« coyote time ») : un saut demandé juste après avoir
+// quitté le sol SANS sauter (pas de trop au bord d'une plateforme) compte
+// encore comme un saut au sol. Sans forme aérienne, c'est la seule façon de
+// sauter en l'air -- sans elle, rater le bord d'un pixel ne laisse plus rien.
+const JUMP_COYOTE_MS = 110;
+// Même idée en sortant de l'eau (forme pieuvre) : la nage s'arrête
+// `waterGraceMs` après la surface ; un saut dans cette fenêtre fait sortir
+// de l'eau (avant, c'était le « double saut de base » qui s'en chargeait).
+const WATER_EXIT_JUMP_MS = 350;
+// Vitesse maximale du corps pendant le balancement (la liane impose sa
+// vitesse à chaque pas de physique, cf. stepVinePhysics) ; hors liane, la
+// chute reste plafonnée à PLAYER_MAX_FALL_SPEED (setMaxVelocity du constructeur).
+const VINE_BODY_MAX_SPEED = 2400;
+const PLAYER_MAX_FALL_SPEED = 900;
+// Poses de liane (art `singe`, cf. applyVinePose) : sens = sens du balancement
+// dès que la vitesse angulaire dépasse ce seuil (hystérésis aux extrêmes, où
+// elle s'annule) ; inclinaison du dessin = fraction de l'angle de la liane.
+const VINE_LOOK_OMEGA = 0.35;
+const VINE_ART_TILT = 0.55;
+// Passage pose suspendue (1 bras, anim lente) <-> poses de balancement (2 bras,
+// choisies selon la phase) : seuils d'entrée et de sortie distincts, sinon la
+// pose clignote quand le balancement s'éteint.
+const VINE_SWING_POSE_ENTER = { omega: 1.0, angle: 0.35 };
+const VINE_SWING_POSE_EXIT = { omega: 0.45, angle: 0.18 };
 // Art Codex (manifest `singe`, `agarica_extra`) dessiné face à DROITE,
 // contrairement à la feuille humaine historique (face à gauche).
 const MONKEY_FACES_RIGHT = true;
 const AGARICA_EXTRA_FACES_RIGHT = true;
 const MONKEY_TRANSFO_MS = 200;
-const MONKEY_RELEASE_POSE_MS = 250;
+// Salto du lâcher (`release_flip`, 5 frames à 14 fps) : tenu jusqu'au bout,
+// sinon il était coupé à la 3e frame (saut de pose visible).
+const MONKEY_RELEASE_POSE_MS = 360;
 const HURT_POSE_MS = 300;
 // Invulnérabilité après un coup (cf. hitByEnemy) : durée totale, et
 // clignotement pendant la partie qui suit le flash rouge.
@@ -1032,7 +1060,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.setOrigin(0.5, 1);
 
     this.setCollideWorldBounds(true);
-    this.setMaxVelocity(400, 900);
+    this.setMaxVelocity(400, PLAYER_MAX_FALL_SPEED);
+    // Personnages devant les décors (props, totems, feux à 0), derrière les
+    // plantes de premier plan (cf. CHARACTER_DEPTH dans LevelKit.js).
+    this.setDepth(CHARACTER_DEPTH);
     // Retour utilisateur répété : "les hitbox bloquent mal, je passe à
     // travers, par dessous ou les côtés". Confirmé isolé à un vrai
     // comportement Arcade Physics : sans détection de collision continue,
@@ -1237,15 +1268,29 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // d'œil à l'attaque du Corbeau, mêmes frames d'animation).
     this.eagleDiveGravity = 1600;
     this.eagleDiveMaxSpeed = 700;
-    this.baseDoubleJumpVelocity = BASE_DOUBLE_JUMP_VELOCITY;
     this.monkeyJumpVelocity = MONKEY_JUMP_VELOCITY;
-    // Forme prise par le 2e saut en cours ('eagle' | 'monkey' | null = double
-    // saut de base) -- remise à null à l'atterrissage.
+    // Forme prise par le 2e saut en cours ('eagle' | 'monkey' | null) --
+    // remise à null à l'atterrissage.
     this.airJumpForm = null;
+    // Dernier instant posée au sol (cf. JUMP_COYOTE_MS).
+    this.lastGroundedAt = -Infinity;
     // Liane tenue (forme singe, cf. Liane.js) ou null. `vineMomentumSpeed` :
     // élan horizontal conservé après le lâcher, jusqu'à l'atterrissage (sinon
     // moveMaxSpeed=190 le rabotait aussitôt).
     this.vine = null;
+    // Direction tenue pendant le balancement, lue par stepVinePhysics à chaque
+    // pas de physique ; `vineLook`/`vineSwingPose` : état visuel (cf. applyVinePose).
+    this.vineDir = 0;
+    this.vineLook = 0;
+    this.vineSwingPose = false;
+    // Le pendule avance au rythme FIXE de la physique (60 Hz), pas à celui de
+    // l'affichage : cf. stepVinePhysics (cause du tremblement sur liane).
+    this.onVineWorldStep = (delta) => this.stepVinePhysics(delta);
+    // Référence gardée : au 'shutdown' de la scène, `scene.physics.world`
+    // est déjà remis à null par le plugin Arcade.
+    const world = scene.physics.world;
+    world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, this.onVineWorldStep);
+    scene.events.once('shutdown', () => world.off(Phaser.Physics.Arcade.Events.WORLD_STEP, this.onVineWorldStep));
     this.lastVine = null;
     this.vineReleasedAt = -Infinity;
     this.vineMomentumSpeed = 0;
@@ -1270,11 +1315,18 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       const tAnim = Object.keys(tdef.anims || {})[0];
       const fwdKey = `transfo_singe-${tAnim}`;
       if (scene.anims.exists(fwdKey)) {
-        this.monkeyTransfoAnimKey = fwdKey;
+        // Aller ET retour recréés à la durée de la transfo (MONKEY_TRANSFO_MS) :
+        // l'anim du manifest (10 fps, 400 ms) était coupée à mi-chemin par la
+        // fin de la transfo (200 ms) -- le singe surgissait à la 2e frame.
+        this.monkeyTransfoAnimKey = `${fwdKey}-timed`;
         this.monkeyTransfoReverseKey = `${fwdKey}-reverse`;
+        const fwdFrames = scene.anims.get(fwdKey).frames.map((f) => ({ key: f.textureKey }));
+        const rate = fwdFrames.length / (MONKEY_TRANSFO_MS / 1000);
+        if (!scene.anims.exists(this.monkeyTransfoAnimKey)) {
+          scene.anims.create({ key: this.monkeyTransfoAnimKey, frames: fwdFrames, frameRate: rate, repeat: 0 });
+        }
         if (!scene.anims.exists(this.monkeyTransfoReverseKey)) {
-          const frames = scene.anims.get(fwdKey).frames.map((f) => ({ key: f.textureKey })).reverse();
-          scene.anims.create({ key: this.monkeyTransfoReverseKey, frames, frameRate: frames.length / (MONKEY_TRANSFO_MS / 1000), repeat: 0 });
+          scene.anims.create({ key: this.monkeyTransfoReverseKey, frames: fwdFrames.slice().reverse(), frameRate: rate, repeat: 0 });
         }
         // 1re frame = Agarica encore humaine : ramenée à la hauteur de l'idle
         // (l'art la dessine ~109 px de haut à l'échelle du manifest, d'où un
@@ -1545,11 +1597,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.wolfJumpCarry = false;
       this.airJumpForm = null;
       this.vineMomentumSpeed = 0;
+      this.lastGroundedAt = now;
     }
 
     // Lianes (forme singe, cf. Liane.js) : accroche automatique en l'air,
     // balancement pendulaire (gauche/droite pompe l'élan), Saut = lâcher
-    // avec l'élan, S = se laisser tomber. Sans singe actif : simple décor.
+    // avec l'élan, S = se laisser tomber. Sans singe actif (forme humaine,
+    // aigle, loup) : pur décor, traversé sans rebond ni accroche -- partout,
+    // arène de Kainati comprise (décision utilisateur).
     const airForm = this.getActiveAirForm();
     const monkeyActive = !swimming && airForm === 'monkey';
     let jumpConsumed = false;
@@ -1561,13 +1616,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       } else if (downHeld) {
         this.releaseVine(false, now);
       } else {
-        const dtSec = Math.min(this.scene.game.loop.delta, 50) / 1000;
-        const target = this.vine.stepSwing(this, dir, dtSec);
-        if (this.body.blocked.left || this.body.blocked.right) this.vine.bounceOffWall();
+        // Le mouvement lui-même est imposé à chaque pas de physique (cf.
+        // stepVinePhysics) : ici on ne fait que transmettre la direction.
+        this.vineDir = dir;
         this.setAcceleration(0, 0);
         this.setDrag(0, 0);
-        this.body.maxVelocity.x = 1200;
-        this.setVelocity((target.x - this.x) / dtSec, (target.y - this.y) / dtSec);
+        this.body.maxVelocity.set(VINE_BODY_MAX_SPEED, VINE_BODY_MAX_SPEED);
       }
     } else if (monkeyActive && !onGround && typeof findGrabbableVine === 'function') {
       const vine = findGrabbableVine(this.scene, this, now);
@@ -1580,26 +1634,30 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setDragX(150);
     }
 
+    // Saut « comme au sol » : posée, ou à peine sortie d'un bord sans avoir
+    // sauté (JUMP_COYOTE_MS), ou à la surface de l'eau (WATER_EXIT_JUMP_MS).
+    const groundLikeJump = onGround || (!swimming && this.jumpsUsed === 0
+      && (now - this.lastGroundedAt <= JUMP_COYOTE_MS || now - this.lastInWaterTime <= WATER_EXIT_JUMP_MS));
+
     // Vrai une seule frame, celle du saut de base (pas le double-saut) —
     // Xara s'en sert pour mimiquer ce saut si elle est à portée (cf.
     // XARA_JUMP_RANGE dans Xara.js). Remise à faux au début de chaque
     // update() (cf. tout en haut), jamais laissée traîner.
-    if (jumpJustPressed && onGround && !jumpConsumed) this.justJumped = true;
+    if (jumpJustPressed && groundLikeJump && !jumpConsumed) this.justJumped = true;
 
     if (jumpJustPressed && !jumpConsumed && !this.vine) {
-      if (onGround) {
+      if (groundLikeJump) {
         this.setVelocityY(this.jumpVelocity);
         this.jumpsUsed = 1;
         this.wolfJumpCarry = sprinting;
-      } else if (!swimming && airForm !== 'eagle' && this.jumpsUsed < 2) {
-        // Double saut de base (aucune forme aérienne) ou saut court du singe
-        // (transformation visuelle singe, cf. sélection de forme plus bas).
+      } else if (!swimming && airForm === 'monkey' && this.jumpsUsed < 2) {
+        // Saut court du singe (transformation visuelle singe, cf. sélection
+        // de forme plus bas). Sans forme aérienne : AUCUN saut en l'air.
         this.jumpsUsed += 1;
         if (this.jumpsUsed === 2) {
-          this.airJumpForm = airForm === 'monkey' ? 'monkey' : null;
-          this.setVelocityY(airForm === 'monkey' ? this.monkeyJumpVelocity : this.baseDoubleJumpVelocity);
+          this.airJumpForm = 'monkey';
+          this.setVelocityY(this.monkeyJumpVelocity);
           this.wolfJumpCarry = false;
-          if (airForm !== 'monkey') this.spawnAirJumpPuff();
         } else {
           this.setVelocityY(this.jumpVelocity);
         }
@@ -1706,7 +1764,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // sens avec `facesRight=false` (miroir par rapport au sens de
       // déplacement) — même convention dans les deux sens (entrée/sortie).
       this.beginFormTransition(now, ANIM_TRANSFO_TO_WOLF_KEY, this.wolfTransformDuration, TRANSFO_WOLF_SCALE, TRANSFO_WOLF_BODY, true);
-    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming && leavingWolf) {
+    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming && leavingWolf && this.form !== 'monkey') {
+      // (Loup -> singe : c'est la transfo singe, plus bas, qui prend le relais
+      // -- l'anim Loup -> humaine aurait montré Agarica entre les deux.)
       // `!this.formTransitionActive` (retour utilisateur, reformulé une 2e
       // fois avec plus de détail : "au moment de la transfo la hitbox se
       // desactive ou s'actualise donc je passe à travers les murs pendant
@@ -1743,7 +1803,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // La feuille est dessinée face à gauche, comme la forme humaine.
       this.beginFormTransition(now, ANIM_TRANSFO_TO_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);
     } else if (!transitionTriggeredThisFrame && leavingOctopus) {
-      this.beginFormTransition(now, ANIM_TRANSFO_TO_HUMAN_FROM_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming
+      this.beginFormTransition(now, ANIM_TRANSFO_TO_HUMAN_FROM_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);
+    } else if (this.vine && this.form === 'monkey' && !wasMonkeyForm) {
+      // Prise de liane directement depuis la forme humaine : la transfo
+      // dessinée (poses accroupies AU SOL, ancrées aux pieds) s'affichait
+      // suspendue sous la liane puis sautait sur la pose de prise -- on passe
+      // directement à la pose suspendue, la bascule masquée par une gerbe de feuilles.
+      this.spawnVineGrabPuff();
+    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming
       && this.monkeyTransfoAnimKey && this.form === 'monkey' && !wasMonkeyForm) {
       // Transfo singe (manifest `transfo_singe`) : seulement si l'art existe,
       // sinon bascule nette sur la silhouette (ou le placeholder) du singe.
@@ -1936,14 +2003,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // Singe (manifest `singe` : jump/liane_hang/liane_swing/release_flip)
         // -- placeholder tant que l'art n'existe pas. Sur une liane sans art
         // singe mais avec les poses `agarica_extra`, Agarica suspendue.
-        const sc = this.scene;
         if (this.vine) {
-          const want = Math.abs(this.vine.omega) > 0.8 ? 'liane_swing' : 'liane_hang';
-          if (hasManifestArt(sc, 'singe', want)) { playManifestOn(this, 'singe', want); this.applyVineArtAnchor(); }
-          else if (hasManifestArt(sc, 'singe', 'liane_hang')) { playManifestOn(this, 'singe', 'liane_hang'); this.applyVineArtAnchor(); }
-          else if (hasManifestArt(sc, 'agarica_extra', want)) this.applyAgaricaExtraPose(want);
-          else if (hasManifestArt(sc, 'agarica_extra', 'liane_hang')) this.applyAgaricaExtraPose('liane_hang');
-          else playManifestOn(this, 'singe', 'liane_hang');
+          this.applyVinePose();
         } else {
           playManifestOn(this, 'singe', now < this.monkeyReleasePoseUntil ? 'release_flip' : 'jump');
         }
@@ -2306,7 +2367,48 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.airJumpForm = 'monkey';
     this.vineMomentumSpeed = 0;
     this.wolfJumpCarry = false;
+    this.vineDir = 0;
+    this.vineLook = 0;
+    this.vineSwingPose = false;
+    // Une transfo en cours (saut du singe juste avant la prise) s'afficherait
+    // ancrée aux pieds, sous la liane : la pose suspendue prend la main tout de suite.
+    this.formTransitionActive = false;
+    // Plus d'élan balistique : c'est la liane qui pilote le corps dès le
+    // prochain pas de physique (cf. stepVinePhysics).
+    this.setVelocity(0, 0);
+    this.body.maxVelocity.set(VINE_BODY_MAX_SPEED, VINE_BODY_MAX_SPEED);
     this.scene.events.emit('vine-grab', vine);
+  }
+
+  // Balancement, appelé à CHAQUE pas de physique (événement WORLD_STEP, 60 Hz
+  // fixes) et non une fois par image affichée. Cause du tremblement sur liane :
+  // la vitesse était calculée pour atteindre la cible en `game.loop.delta`
+  // (≈ 7 ms à 144 Hz, 6 ms en test headless) alors qu'Arcade l'intègre par pas
+  // de 16,7 ms, 0, 1 ou 2 fois par image -- le corps dépassait la cible de 2 à
+  // 3 fois puis revenait (±20 px d'une image à l'autre), pendant que la liane,
+  // elle, était redessinée à son angle exact : main décalée, singe qui
+  // tressaute. Ici la cible du pas suivant est atteinte en un pas exactement,
+  // et la liane est dessinée à l'angle qui correspond à la position du corps
+  // (cf. Liane.drawTheta), quel que soit le rythme de l'écran. Les collisions
+  // restent celles d'Arcade (vitesse intégrée, séparation normale).
+  stepVinePhysics(delta) {
+    const vine = this.vine;
+    if (!vine || !this.active || !this.body || !vine.alive || delta <= 0) return;
+    // Monde gelé (dialogue, menu, cinématique) : la physique tourne encore,
+    // mais la liane ne doit plus déplacer Agarica (gravité coupée sur liane).
+    if (typeof isWorldFrozen === 'function' && isWorldFrozen(this.scene)) {
+      this.body.setVelocity(0, 0);
+      return;
+    }
+    const b = this.body;
+    // Mur dans le sens du balancement : renvoi (une fois, pas à chaque pas
+    // de la même image -- `blocked` n'est remis à zéro qu'au 1er pas).
+    if ((b.blocked.right && vine.omega > 0) || (b.blocked.left && vine.omega < 0)) vine.bounceOffWall();
+    const target = vine.stepSwing(this, this.vineDir, delta);
+    // Pieds = bas-centre du corps (invariant de toutes les hitbox du joueur,
+    // cf. FORMS et applyVineArtAnchor) ; `this.x/y` ne sont resynchronisés
+    // sur le corps qu'en fin d'image.
+    b.setVelocity((target.x - b.center.x) / delta, (target.y - b.bottom) / delta);
   }
 
   // `withJump` : lâcher par Saut (élan + petite impulsion vers le haut) ;
@@ -2326,33 +2428,104 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.monkeyReleasePoseUntil = now + MONKEY_RELEASE_POSE_MS;
     }
     this.setVelocity(vx, vy);
+    this.body.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
     this.vineMomentumSpeed = Math.min(Math.abs(vx), VINE_MAX_CARRY_SPEED);
     this.body.maxVelocity.x = Math.max(this.body.maxVelocity.x, this.vineMomentumSpeed);
+    // Garde le sens du balancement au lâcher (sinon, sans touche tenue, le
+    // singe se retournait vers la dernière direction pressée).
+    if (Math.abs(vx) > 40) this.facingDir = vx > 0 ? 1 : -1;
     this.scene.events.emit('vine-release', vine);
   }
 
-  // Petit nuage sous les pieds pour le double saut de base (pas de transfo).
-  spawnAirJumpPuff() {
-    const g = this.scene.add.circle(this.x, this.y, 10, 0xe8f6ff, 0.55).setDepth(this.depth);
-    this.scene.tweens.add({
-      targets: g, scaleX: 2.2, scaleY: 0.8, alpha: 0, duration: 260, onComplete: () => g.destroy(),
-    });
+  // Gerbe de feuilles autour des mains à la prise d'une liane depuis la forme
+  // humaine (cf. update() : pas de transfo dessinée suspendue).
+  spawnVineGrabPuff() {
+    const sc = this.scene;
+    const hx = this.x;
+    const hy = this.y - (typeof VINE_HANG_OFFSET === 'number' ? VINE_HANG_OFFSET : 58) + 20;
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + Math.random() * 0.5;
+      const leaf = sc.add.ellipse(hx, hy, 9, 5, i % 2 ? 0x6fbf5a : 0xa8e07a, 0.95)
+        .setDepth(this.depth + 1).setRotation(a);
+      sc.tweens.add({
+        targets: leaf,
+        x: hx + Math.cos(a) * Phaser.Math.Between(22, 38),
+        y: hy + Math.sin(a) * Phaser.Math.Between(18, 32),
+        rotation: a + 2,
+        alpha: 0,
+        duration: 320,
+        ease: 'Quad.easeOut',
+        onComplete: () => leaf.destroy(),
+      });
+    }
+  }
+
+  // Pose suspendue (art `singe`, dessiné face à DROITE) : choisie d'après
+  // l'état du pendule, pas d'après une anim jouée en boucle. Avant :
+  // `liane_hang` / `liane_swing` alternaient selon |omega| > 0,8 -- deux fois
+  // par oscillation (omega s'annule aux extrêmes), chaque bascule relançant
+  // l'anim à sa 1re frame ; le singe se retournait aussi à chaque changement
+  // de touche (pompe gauche/droite) ; le corps restait vertical sous une
+  // liane penchée. Maintenant : sens = sens du balancement, pose suspendue au
+  // repos (anim lente) / poses de balancement selon la phase, avec hystérésis,
+  // et dessin incliné avec la liane autour du poing (cf. applyVineArtAnchor).
+  applyVinePose() {
+    const sc = this.scene;
+    const vine = this.vine;
+    const theta = vine.displayAngle;
+    const om = vine.omega;
+    if (Math.abs(om) > VINE_LOOK_OMEGA) this.vineLook = om > 0 ? 1 : -1;
+    if (!this.vineLook) this.vineLook = this.facingDir >= 0 ? 1 : -1;
+    this.facingDir = this.vineLook;
+    if (this.vineSwingPose) {
+      if (Math.abs(om) < VINE_SWING_POSE_EXIT.omega && Math.abs(theta) < VINE_SWING_POSE_EXIT.angle) this.vineSwingPose = false;
+    } else if (Math.abs(om) > VINE_SWING_POSE_ENTER.omega || Math.abs(theta) > VINE_SWING_POSE_ENTER.angle) {
+      this.vineSwingPose = true;
+    }
+    const swingFrames = sc.anims.exists('singe-liane_swing') ? sc.anims.get('singe-liane_swing').frames : null;
+    if (this.vineSwingPose && swingFrames && swingFrames.length >= 4) {
+      // Phase : s > 0 = côté vers lequel elle file. Frames de la planche :
+      // 0 jambes traînées derrière, 1 jambes repliées, 3 droite à la
+      // verticale, 2 jambes lancées devant. Au retournement (extrême),
+      // `vineLook` change de signe en même temps que `s` : on passe de 2 à 0,
+      // jambes toujours du même côté de l'écran.
+      const s = theta * this.vineLook;
+      const idx = s < -0.45 ? 0 : s < -0.12 ? 1 : s < 0.32 ? 3 : 2;
+      this.anims.stop();
+      this.setTexture(swingFrames[idx].textureKey);
+    } else if (hasManifestArt(sc, 'singe', 'liane_hang')) {
+      playManifestOn(this, 'singe', 'liane_hang');
+    } else if (hasManifestArt(sc, 'agarica_extra', 'liane_hang')) {
+      this.applyAgaricaExtraPose('liane_hang');
+      return;
+    } else {
+      playManifestOn(this, 'singe', 'liane_hang');
+    }
+    this.setFlipX(MONKEY_FACES_RIGHT ? this.vineLook < 0 : this.vineLook > 0);
+    this.applyVineArtAnchor(-theta * VINE_ART_TILT);
   }
 
   // Art singe suspendu : le poing levé est dessiné 64-96 px au-dessus des
   // pieds, alors que la physique tient les mains à VINE_HANG_OFFSET (58 px,
   // cf. Liane.js -- portée de prise calibrée sur les niveaux). Plutôt que de
-  // changer cette physique, on cale le DESSIN : l'origine passe sur le poing
-  // de la frame courante, posé sur le point de prise ; le corps physique est
-  // compensé pour ne pas bouger d'un pixel. Le flipX de Phaser miroite la
-  // texture dans le même cadre : d'où W - x quand Agarica regarde à gauche.
-  applyVineArtAnchor() {
+  // changer cette physique, on cale le DESSIN : l'origine (pivot de la
+  // rotation) est choisie pour que le poing de la frame courante tombe sur le
+  // point de prise, les pieds physiques (this.x, this.y) restant 58 px
+  // dessous ; le corps physique est compensé pour ne pas bouger d'un pixel.
+  // Repère : texture (u, v) -> monde = pieds + R(rot)·(sx·(u − u0), s·(v − v0)),
+  // sx = −s quand flipX (Phaser miroite autour de l'origine : u0 = W − originX·W).
+  // Poing -> prise impose u0 = poingX + 58·sin(rot)/sx, v0 = poingY + 58·cos(rot)/s.
+  applyVineArtAnchor(rotation = 0) {
     const info = textureAlphaInfo(this.scene, this.texture.key);
     if (!info || typeof VINE_HANG_OFFSET === 'undefined') return;
     const W = this.frame.realWidth;
     const H = this.frame.realHeight;
-    const fx = this.flipX ? W - info.fistX : info.fistX;
-    this.setOrigin(Phaser.Math.Clamp(fx / W, 0, 1), (info.fistY + VINE_HANG_OFFSET / this.scaleY) / H);
+    const s = this.scaleY;
+    const sx = this.flipX ? -this.scaleX : this.scaleX;
+    const u0 = info.fistX + (VINE_HANG_OFFSET * Math.sin(rotation)) / sx;
+    const v0 = info.fistY + (VINE_HANG_OFFSET * Math.cos(rotation)) / s;
+    this.setRotation(rotation);
+    this.setOrigin((this.flipX ? W - u0 : u0) / W, v0 / H);
     const b = FORMS.monkey.body;
     this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
     this.vineArtAnchored = true;
@@ -2362,6 +2535,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.vineArtAnchored) return;
     this.vineArtAnchored = false;
     this.setOrigin(0.5, 1);
+    this.setRotation(0);
   }
 
   applyAgaricaExtraPose(anim) {

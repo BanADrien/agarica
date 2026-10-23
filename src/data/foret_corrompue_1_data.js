@@ -46,9 +46,10 @@ const FORET_CORROMPUE_1_DATA = {
   // Amas dense : fracas de l'ours. Monte jusqu'au tronc tombé (gy 3).
   mossBlocks: [{ id: 'amas_galerie', x: 1824, y: 320, w: 128, h: 256 }],
   // Mur vivant pleine hauteur : répulsif de Morgat.
-  // Jusqu'au haut de la hitbox du sol (464) et 128 px de large : cf. le mur
-  // de foret_sombre_2 (traversée en passant humain → loup contre le mur).
-  mossWalls: [{ id: 'mur_coeur', x: 3200, y: 232, w: 128, h: 464 }],
+  // Jusqu'au haut de la hitbox du sol (448 + GROUND_STAND_SINK : 464 avec le
+  // jeu 'floor', 448 avec 'tuiles') et 128 px de large : cf. le mur de
+  // foret_sombre_2 (traversée en passant humain → loup contre le mur).
+  mossWalls: [{ id: 'mur_coeur', x: 3200, y: (448 + GROUND_STAND_SINK) / 2, w: 128, h: 448 + GROUND_STAND_SINK }],
   enemies: [
     { type: 'mousse_creature', x: 1100, y: 400, patrolMinX: 900, patrolMaxX: 1300 },
     { type: 'crapaud_corrompu', x: 2250, y: 400 },

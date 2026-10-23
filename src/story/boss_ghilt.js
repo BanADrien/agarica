@@ -347,8 +347,9 @@ function ghInstallTick(scene) {
 const GHILT_ARENA = { minX: 300, maxX: 1050, bossX: 960, wallLeft: 30, wallRight: 1314 };
 
 function ghArenaGroundY(scene, x) {
-  // Surface physique = sommet visuel de la tuile + 16 px (herbe, cf. LevelKit).
-  return (groundSurfaceYAt(scene, x, 448) ?? 448) + 16;
+  // Surface physique = sommet visuel de la tuile + GROUND_STAND_SINK (cf.
+  // LevelKit : 16 px d'herbe sans hitbox avec 'floor', 0 avec 'tuiles').
+  return (groundSurfaceYAt(scene, x, 448) ?? 448) + GROUND_STAND_SINK;
 }
 
 // Deux murs de mousse ferment l'arène tant que Ghil't n'est pas guéri.
