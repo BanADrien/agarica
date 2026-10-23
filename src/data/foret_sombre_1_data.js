@@ -44,11 +44,12 @@ const FORET_SOMBRE_1_DATA = {
   ],
   playerSpawn: { x: 140, y: 412 },
   // Décors de la forêt sombre (section `foret_sombre`), posés sur la surface de
-  // marche ; les grands arbres d'abord (dessinés derrière les autres). Jamais
-  // sur une marche/plateforme voisine, ni devant une sortie (cf. rapport niveaux).
+  // marche ; jamais sur une marche/plateforme voisine, ni devant une sortie.
   props: [
-    { type: 'foret_sombre_arbre_moussu', x: 300, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.55 },
-    { type: 'foret_sombre_arbre_moussu', x: 3040, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.6 },
+    // (Pas de `foret_sombre_arbre_moussu` : retiré à la demande de l'utilisateur,
+    // hors de la DA. Des éléments bas et discrets à la place.)
+    { type: 'foret_sombre_fougere_sombre', x: 290, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.28 },
+    { type: 'foret_sombre_souche_champignons', x: 3040, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.32 },
     { type: 'bosquet_fence', x: 60, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.5 },     // palissade du bosquet, derrière elle
     { type: 'foret_sombre_rocher_mousse', x: 450, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 },
     { type: 'foret_sombre_fougere_sombre', x: 780, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 },

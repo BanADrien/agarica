@@ -31,17 +31,22 @@ const MONDE_SPIRITUEL_DATA = {
     ...groundRow(0, 10, [7, 8]),    // clairière d'arrivée (x 0-640)
     ...groundRow(21, 25, [6, 7, 8]), // îlot au milieu du vide (x 1344-1600, y=384)
     ...groundRow(35, 45, [7, 8]),   // pied de l'arbre spirituel (x 2240-2880)
+    // Blocs d'accroche des lianes (branches de lumière).
+    ...groundRow(12, 13, [0]), ...groundRow(18, 19, [0]), ...groundRow(27, 28, [0]), ...groundRow(32, 34, [0]),
   ],
   playerSpawn: { x: 200, y: 412 },
   // Lianes (x, y = attache en haut) : bas à ~130-150 px au-dessus du sol de
   // départ. Une sur deux retirée (demande utilisateur : écart doublé, ~390 px,
   // il faut lâcher avec l'élan) : A et C au-dessus du 1er vide, D et F au-dessus
   // du 2e (B et E retirées). Le guidage de l'esprit suit la même liste.
+  // Chaque liane pend sous un bloc (rangée 0, haut de l'écran) : plus
+  // d'attache flottante. Écarts réglés pour le balancement limité (~55°) et le
+  // lâcher qui compte comme le 2e saut.
   vines: [
-    { x: 770, y: 40, length: 270 },  // A
-    { x: 1160, y: 40, length: 270 }, // C
-    { x: 1730, y: 10, length: 270 }, // D
-    { x: 2115, y: 20, length: 270 }, // F
+    { x: 800, y: 64, length: 246 },  // A (bloc gx 12)
+    { x: 1184, y: 64, length: 246 }, // C (bloc gx 18)
+    { x: 1760, y: 64, length: 226 }, // D (bloc gx 27)
+    { x: 2112, y: 64, length: 226 }, // F (bloc gx 32/33)
   ],
   checkpoints: [
     { x: 420, y: MONDE_SPIRITUEL_SURFACE_Y },

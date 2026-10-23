@@ -132,6 +132,8 @@ function spawnPiglets(scene, x, y, { w = 180 } = {}) {
     } else {
       s = scene.add.sprite(px, groundY, 'bebe-cochon-0').setOrigin(0.5, 1).setScale(PIGLET_SCALES[i]);
       s.setTint(PIGLET_TINTS[i]);
+      // `y` = bas visible des pattes, comme l'art du manifest (cf. addManifestSprite).
+      anchorVisibleFeet(s);
     }
     s.setDepth(PIGLET_DEPTH);
     s.animalKind = 'cochon';

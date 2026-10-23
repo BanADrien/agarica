@@ -1,0 +1,7 @@
+### Correction des couleurs de Geralt — 2026-10-23
+
+La dernière référence fournie par l’utilisateur remplace la consigne antérieure de poils gris-blanc : cheveux, barbe, moustache et poils des pieds sont désormais **brun-roux**, comme le Geralt actuellement présent dans le jeu. Les yeux blancs sans pupilles pendant l’invocation restent conservés, ainsi que les yeux bruns au début et à la fin.
+
+Planche `assets/sprites/geralt_invocation.png` et 8 frames remplacées après édition par image_gen intégré avec la planche précédente comme cible et le sprite actuel comme référence de couleur. L’ancienne version est archivée dans `controles/invocation_clak_2026-10-23/avant_correction_brun/`. Colonne et Clak conservés. Le montage réutilise le plan large archivé dans `controles/invocation_clak_2026-10-23/invocation_clak_plan_large_generation.png` ; la copie précédemment livrée dans `assets/cinematiques/` n’était plus présente au début de cette correction et n’a pas été recréée.
+
+[Nouvel aperçu animé brun — 8,4 s](controles/invocation_clak_2026-10-23/invocation_clak_apercu_brun.gif), [image de contrôle](controles/invocation_clak_2026-10-23/invocation_clak_pic_brun.png), [prompt et résultat](controles/invocation_clak_2026-10-23/correction_brun.json), [validation des 8 poses et de la durée](controles/invocation_clak_2026-10-23/validation_brun.json). L’aperçu principal a également été remplacé. Aucun changement manuel de `src/` ni du manifeste.

@@ -49,10 +49,11 @@ class PisteTrack {
       const py = groundY - 4 + (i % 2 === 0 ? -3 : 3);
       let print;
       if (useVfx) {
-        // Art Codex ancré par le bas (non tourné) : empreinte posée sur la
-        // surface, à peine décalée d'une patte à l'autre.
-        print = addManifestSprite(scene, px, groundY, 'vfx_piste_loup', 'glow');
-        setVisibleBottomY(print, groundY + (i % 2 === 0 ? -1 : 1));
+        // Art Codex ancré par le bas visible (cf. addManifestSprite /
+        // anchorVisibleFeet : `y` = bas de la frame la plus basse de la
+        // lueur) : empreinte posée sur la surface, à peine décalée d'une patte
+        // à l'autre (jamais au-dessus de l'herbe).
+        print = addManifestSprite(scene, px, groundY + (i % 2 === 0 ? 0 : 1), 'vfx_piste_loup', 'glow');
       } else {
         print = scene.add.image(px, py, ensurePawTexture(scene)).setTint(PISTE_COLOR).setOrigin(0.5, 1);
         print.setAngle(90 + (i % 2 === 0 ? -8 : 8)); // orteils vers la droite (sens de la piste)

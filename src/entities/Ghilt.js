@@ -108,6 +108,9 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
     this.setScale(def ? (def.scale || 1) : 1);
     this.setCollideWorldBounds(true);
     this.setBodyWorld(GHILT_BODY_W, GHILT_BODY_H);
+    // `y` = bas VISIBLE des pattes, et bas du corps physique recalé dessus à
+    // chaque image (cf. anchorVisibleFeet) : posé sur l'arène sans flotter.
+    anchorVisibleFeet(this, { body: true });
 
     this.phase = opts.phase || 1;
     this.hpMax = GHILT_HP_MAX;

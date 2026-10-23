@@ -60,38 +60,39 @@ function arbreMossDecor(scene, x, y, w, flip = false) {
   return g;
 }
 
-// Tronc du grand arbre (placeholder dessiné) : écorce violet sombre, sillons,
-// liseré de lumière lunaire et coulures de mousse ; s'évase en racines au pied.
-function arbreDrawTrunk(scene, x1, x2, top, bottom) {
-  const g = scene.add.graphics();
-  const w = x2 - x1;
-  g.fillStyle(0x241a2c, 1);
-  g.fillPoints([
-    { x: x1, y: top }, { x: x2, y: top }, { x: x2, y: bottom - 140 },
-    { x: x2 + 90, y: bottom }, { x: x1 - 90, y: bottom }, { x: x1, y: bottom - 140 },
-  ], true);
-  const rnd = new Phaser.Math.RandomDataGenerator(['tronc']);
-  // Sillons verticaux de l'écorce.
-  for (let i = 0; i < 9; i++) {
-    const gx = x1 + 30 + (w - 60) * (i / 8) + rnd.realInRange(-12, 12);
-    g.lineStyle(rnd.realInRange(3, 6), 0x150f1c, 0.9);
-    g.beginPath();
-    g.moveTo(gx, top);
-    for (let y = top; y <= bottom - 100; y += 60) g.lineTo(gx + Math.sin(y / 90 + i) * 8, y);
-    g.strokePath();
+// Tronc du grand arbre monté avec les morceaux de la planche Codex
+// `grand_arbre_tronc` (parois d'écorce, nœud, sève, fenêtre de lune…) : trois
+// colonnes de pièces empilées qui se recouvrent un peu, derrière les branches.
+// Remplace le tronc provisoire dessiné par code (retiré, retour utilisateur).
+// Sans l'art : pas de tronc du tout, plutôt qu'un placeholder sombre.
+const ARBRE_TRONC_PIECES = [
+  'paroi_ecorce', 'paroi_noeud', 'paroi_ecorce', 'seve_corrompue', 'paroi_ecorce',
+  'champignons_lumineux', 'paroi_noeud', 'paroi_ecorce', 'fenetre_lune',
+];
+
+function arbreTrunkFromArt(scene, x1, x2, top, bottom) {
+  const key = (n) => `${PROP_PREFIX}grand_arbre_tronc_${n}`;
+  if (!ARBRE_TRONC_PIECES.every((n) => scene.textures.exists(key(n)))) return null;
+  const cols = 3;
+  const colW = (x2 - x1) / cols;
+  const imgs = [];
+  let k = 0;
+  for (let c = 0; c < cols; c++) {
+    let yb = bottom + 12; // pied légèrement enfoncé dans le sol
+    while (yb > top) {
+      const n = ARBRE_TRONC_PIECES[(k + c * 4) % ARBRE_TRONC_PIECES.length];
+      k++;
+      const img = scene.add.image(x1 + colW * (c + 0.5), yb, key(n)).setOrigin(0.5, 1);
+      img.setScale((colW * 1.18) / img.width);
+      img.setFlipX((c + k) % 2 === 1);
+      // Pièces empilées volontairement en l'air (pas des décors posés au sol).
+      img.trunkPiece = true;
+      imgs.push(img);
+      yb -= img.displayHeight * 0.9;
+    }
   }
-  // Liseré lunaire (bord gauche) et ombre (bord droit).
-  g.fillStyle(0x5a4a7a, 0.55).fillRect(x1, top, 10, bottom - 140 - top);
-  g.fillStyle(0x0d0912, 0.5).fillRect(x2 - 18, top, 18, bottom - 140 - top);
-  // Coulures de mousse qui grimpent le long du tronc.
-  for (let i = 0; i < 14; i++) {
-    const mx = rnd.realInRange(x1 + 20, x2 - 20);
-    const my = rnd.realInRange(top + 40, bottom - 60);
-    g.fillStyle(i % 2 ? 0x2f5a2a : 0x3e7a2c, 0.85).fillEllipse(mx, my, rnd.realInRange(18, 36), rnd.realInRange(30, 70));
-    g.fillStyle(0x9bff5a, 0.55).fillCircle(mx + rnd.realInRange(-6, 6), my + rnd.realInRange(-10, 10), 2.5);
-  }
-  sendBehindFrontGround(scene, [g]);
-  return g;
+  sendBehindFrontGround(scene, imgs);
+  return imgs;
 }
 
 // Pierre qui tombe des branches supérieures, télégraphiée par une ombre qui
@@ -143,11 +144,10 @@ function arbreDropRock(scene, x, surfaceY, telegraph = 1000) {
 // 4. RACINES DU GRAND ARBRE
 // ---------------------------------------------------------------------------
 CUTSCENES.racines_intro = [
+  // Arrivée au grand arbre (révélation) : court, avec la caméra qui monte.
   { say: [
-    { who: 'agarica', text: "Oh… Je n'avais jamais vu un arbre pareil." },
-    { who: 'xara', text: "Le grand arbre. Il était déjà vieux quand ton bosquet n'était qu'une poignée de graines." },
-    { who: 'agarica', text: "La piste du loup s'arrête ici. Elle grimpe… tout droit dans les racines." },
-    { who: 'xara', text: "Alors grimpons. Doucement : cet arbre a un roi, et il n'aime pas qu'on monte sans y être invitée." },
+    { who: 'agarica', text: 'Oh… Je n\'avais jamais vu un arbre pareil. La piste du loup grimpe tout droit dans ses racines.' },
+    { who: 'xara', text: 'Alors grimpons. Doucement : cet arbre a un roi, et il n\'aime pas qu\'on monte sans y être invitée.' },
   ] },
   { camera: { x: 1800, y: -160, ms: 1600 } },
   { wait: 700 },
@@ -155,60 +155,46 @@ CUTSCENES.racines_intro = [
   { toast: 'Le grand arbre se gravit : de racine en branche, jusqu\'à la cime.' },
 ];
 
-CUTSCENES.racines_tunnel = [
-  { say: [
-    { who: 'xara', text: 'Tu sens ? La mousse est plus épaisse ici. Elle remonte les racines, vers le cœur de l\'arbre.' },
-    { who: 'agarica', text: 'Et ces griffures dans l\'écorce… On dirait des mains. De petites mains.' },
-    { who: 'xara', text: 'Des singes. Ils vivent dans les branches. D\'habitude, ils sont plus… accueillants.' },
-  ] },
-];
+CUTSCENES.racines_tunnel = cutsceneBulles([
+  'Tu sens ? La mousse remonte les racines, vers le cœur de l\'arbre.',
+  { who: 'agarica', text: 'Et ces griffures dans l\'écorce… De petites mains.' },
+  'Des singes. D\'habitude, ils sont plus… accueillants.',
+]);
 
-CUTSCENES.racines_lianes = [
-  { camera: { x: 660, y: -200, ms: 1400 } },
-  { say: [
-    { who: 'xara', text: 'Regarde, là-bas : des lianes au-dessus du vide. Elles mènent à une fente dans l\'écorce.' },
-    { who: 'agarica', text: 'Elles pendent bien trop loin du bord… Je ne pourrais jamais m\'y accrocher.' },
-    { who: 'xara', text: 'Pas avec des mains de druidesse, non. Il faudrait celles d\'un singe.' },
-    { who: 'xara', text: 'Garde cet endroit en tête. Les arbres ont la mémoire longue… et moi aussi.' },
-  ] },
-  { cameraFollow: true },
-];
+CUTSCENES.racines_lianes = cutsceneBulles([
+  'Regarde, à gauche : des lianes au-dessus du vide. Elles mènent à une fente dans l\'écorce.',
+  { who: 'agarica', text: 'Elles pendent bien trop loin du bord… Je ne pourrais jamais m\'y accrocher.' },
+  'Pas avec des mains de druidesse. Il faudrait celles d\'un singe. Garde cet endroit en tête.',
+]);
 
-CUTSCENES.racines_lianes_singe = [
-  { say: [
-    { who: 'xara', text: 'Les lianes de tout à l\'heure… Cette fois, elles te porteront.' },
-    { who: 'xara', text: 'Tu reviens de l\'arbre d\'avant, n\'est-ce pas ? Tu as cette lumière dans les yeux. Je la connais.' },
-    { who: 'agarica', text: 'Tu la connais ? Comment ça ?' },
-    { who: 'xara', text: '… Les lianes, Agarica. Par là, à gauche. L\'épreuve de son peuple t\'attend, si tu le veux.' },
-  ] },
-];
+CUTSCENES.racines_lianes_singe = cutsceneBulles([
+  'Les lianes de tout à l\'heure… Cette fois, elles te porteront.',
+  'Par là, à gauche. L\'épreuve de son peuple t\'attend, si tu le veux.',
+]);
 
-CUTSCENES.racines_pierres = [
-  { call: (scene) => arbreDropRock(scene, scene.player.x + 120, GRAND_ARBRE_RACINES_DATA.rockfall.surfaceY, 900) },
-  { wait: 1400 },
-  { say: [
-    { who: 'xara', text: 'Attention ! Ça tombe de là-haut.' },
-    { who: 'xara', text: 'Regarde la branche : l\'ombre grandit juste avant que la pierre n\'arrive. Ne reste pas dessous.' },
+CUTSCENES.racines_pierres = cutsceneBulles((scene) => {
+  // Une première pierre, pour montrer l'ombre qui l'annonce (sans rien geler).
+  arbreDropRock(scene, scene.player.x + 120, GRAND_ARBRE_RACINES_DATA.rockfall.surfaceY, 900);
+  return [
+    'Attention ! Ça tombe de là-haut. Regarde l\'ombre grandir : ne reste pas dessous.',
     { who: 'agarica', text: 'Quelqu\'un nous les lance… Les singes ?' },
-  ] },
-];
+  ];
+});
 
-CUTSCENES.racines_cime = [
-  { say: [
-    { who: 'xara', text: 'Là-haut, la cime. Quelque chose de grand se balance dans les lianes… Je l\'entends respirer.' },
-    { who: 'agarica', text: 'Le roi de l\'arbre. Je vais lui parler.' },
-    { who: 'xara', text: 'Parle-lui, si tu peux. Et s\'il ne t\'écoute pas… observe ses mouvements. Quand il plonge, il retombe sonné : c\'est là qu\'il faut frapper.' },
-  ] },
-];
+CUTSCENES.racines_cime = cutsceneBulles([
+  'Là-haut, la cime. Quelque chose de grand se balance dans les lianes… Je l\'entends respirer.',
+  { who: 'agarica', text: 'Le roi de l\'arbre. Je vais lui parler.' },
+  'Et s\'il ne t\'écoute pas… Quand il plonge, il retombe sonné : c\'est là qu\'il faut frapper.',
+]);
 
 ZONE_SCRIPTS.grand_arbre_racines = {
   create(scene, data) {
     const st = { cfg: (data && data.rockfall) || null, timer: 600 };
     scene.__arbre = st;
-    arbreDrawTrunk(scene, 1540, 2120, -420, 448);
-    // Morceaux de tronc (décors `grand_arbre_tronc_*`) : devant le tronc
-    // dessiné mais derrière les branches (les décors sont sinon dessinés
-    // devant les tuiles).
+    // Le tronc en morceaux d'art Codex (plus de tronc provisoire dessiné).
+    arbreTrunkFromArt(scene, 1540, 2120, -420, 448);
+    // Décors `grand_arbre_tronc_*` de la donnée : derrière les branches (les
+    // décors sont sinon dessinés devant les tuiles).
     sendBehindFrontGround(scene, (scene.props || []).filter((p) => p.propType && p.propType.startsWith('grand_arbre_tronc_')));
     // Bord droit, sous la grande branche : mur invisible (le monde physique
     // continue 200 px plus loin). Pas de pilier de tuiles : un mur de 2 cases
@@ -285,13 +271,12 @@ DIALOGUES.kainati_victoire = [
 // Route des hauteurs sans la forme du singe : impossible au saut simple (la
 // corniche de Geralt est à +192 px) -- Xara renvoie vers le passage du totem.
 CUTSCENES.arene_sans_singe = [
+  { call: (scene) => storyBulles(scene, [
+    'Attends. Là-haut, les branches s\'écartent de trois bonnes longueurs… Tes jambes n\'y suffiront pas.',
+    'Le passage du totem brille sur la branche derrière nous. Son peuple t\'attend : va d\'abord le voir.',
+  ], 'Le passage du totem du singe : sur la branche haute, à gauche.') },
   { playerFace: 'left' },
-  { say: [
-    { who: 'xara', text: 'Attends. Là-haut, les branches s\'écartent de trois bonnes longueurs… Tes jambes n\'y suffiront pas.' },
-    { who: 'xara', text: 'Le passage du totem brille encore, sur la branche derrière nous. Son peuple t\'attend : va d\'abord le voir.' },
-  ] },
   { playerMove: { toX: 1640 } },
-  { toast: 'Le passage du totem du singe : sur la branche haute, à gauche.' },
 ];
 
 // Kainati apaisé (revisites) : ses mots suivent la progression d'Agarica.
@@ -377,13 +362,8 @@ DIALOGUES.esprit_revisite = [
 ZONE_SCRIPTS.monde_spirituel = {
   create(scene) {
     const done = storyGet('mondeSpirituelFini');
-    // L'arbre spirituel (placeholder dessiné : tronc translucide + couronne de lumière).
-    const tree = scene.add.graphics();
-    sendBehindFrontGround(scene, [tree]);
-    tree.fillStyle(0x9fe3ff, 0.16).fillEllipse(2620, 120, 620, 300);
-    tree.fillStyle(0xbfe8a0, 0.12).fillEllipse(2560, 60, 420, 200);
-    tree.fillStyle(0x7fd8c8, 0.28).fillRoundedRect(2560, 120, 110, 330, 30);
-    tree.fillStyle(0xe8fff6, 0.18).fillRoundedRect(2590, 140, 30, 300, 12);
+    // (L'arbre spirituel provisoire, dessiné en formes translucides, a été
+    // retiré : le fond `fond_monde_spirituel` suffit.)
     arbreMotes(scene, 0, 2880, 60, 460, 26, [0x9fe3ff, 0xbfe8a0, 0xffffff, 0xff9ad5]);
     arbreGlowPassage(scene, 2840, 390, 120, 0x9fe3ff);
 
@@ -437,12 +417,10 @@ CUTSCENES.epreuve_intro = [
   { toast: { text: 'Une lanterne au début de chaque passage : une chute te ramène à la dernière allumée.\nPompe (← →) pour prendre de l\'élan, lâche (Espace) quand la liane monte.', ms: 5200 } },
 ];
 
-CUTSCENES.epreuve_sans_singe = [
-  { say: [
-    { who: 'xara', text: 'Ces lianes filent jusqu\'au bout des branches… mais sans la forme du singe, elles ne te porteront pas.' },
-    { who: 'xara', text: 'L\'esprit de Kainati pourrait t\'apprendre leurs secrets. Le passage de son totem est dans l\'arène.' },
-  ] },
-];
+CUTSCENES.epreuve_sans_singe = cutsceneBulles([
+  'Ces lianes filent jusqu\'au bout des branches… mais sans la forme du singe, elles ne te porteront pas.',
+  'L\'esprit de Kainati pourrait t\'apprendre leurs secrets. Le passage de son totem est dans l\'arène.',
+]);
 
 CUTSCENES.epreuve_forme_aigle = [
   { toast: { text: 'Ici, ce sont les mains du singe qu\'il te faut : choisis-le au feu de camp.', ms: 3200 } },
@@ -470,15 +448,16 @@ CUTSCENES.epreuve_talisman = [
 // La fente du sommet (raccourci vers les racines, bord droit du sommet) ne
 // s'ouvre qu'une fois le talisman pris : sinon l'élan de la dernière liane y
 // jetterait Agarica.
-const EPREUVE_SINGE_SOMMET_X = 13000;
-const EPREUVE_SINGE_SORTIE_SOMMET = { x: 13168, y: -250, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
+const EPREUVE_SINGE_SOMMET_X = 11500;
+const EPREUVE_SINGE_SOMMET_Y = -128;
+const EPREUVE_SINGE_SORTIE_SOMMET = { x: 11696, y: -186, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
 
 function epreuveOuvrirSommet(scene, instant) {
   if (scene.__epreuveSommet) return;
   scene.__epreuveSommet = true;
   scene.__exits = scene.__exits || [];
   scene.__exits.push(EPREUVE_SINGE_SORTIE_SOMMET);
-  const p = arbreGlowPassage(scene, 13150, -250, 110);
+  const p = arbreGlowPassage(scene, 11680, -186, 110);
   if (!instant) [p.glow, p.core].forEach((o) => { o.setScale(0.1); scene.tweens.add({ targets: o, scale: 1, duration: 900, ease: 'Back.Out' }); });
 }
 
@@ -558,17 +537,79 @@ function epreuveUpdateCrumbles(scene, list, now) {
   }
 }
 
+// Pierres EN RYTHME (donnée `rhythmRocks`) : tous les `period` ms, une pierre
+// par couloir, annoncée par l'ombre qui grandit (`telegraph`). Le rythme ne
+// dépend pas d'Agarica (on l'observe, puis on passe entre deux chutes) ; il ne
+// tourne que si elle est dans les parages (`x1`-`x2`).
+function epreuveUpdateRhythms(scene, list, time, delta) {
+  const p = scene.player;
+  for (const r of list) {
+    if (p.x < r.x1 || p.x > r.x2) { r.clock = 0; continue; }
+    r.clock += delta;
+    if (r.clock < r.period) continue;
+    r.clock -= r.period;
+    for (const x of r.lanes) arbreDropRock(scene, x, r.surfaceY, r.telegraph);
+    // Impact (fin de l'ombre) : repère public pour qui veut lire le rythme.
+    r.lastImpactAt = time + r.telegraph + 340;
+  }
+}
+
+// Marée de mousse toxique (donnée `tides`) : une nappe qui monte sur un
+// passage bas puis reflue, en boucle (phases bas / montée / haut / descente,
+// en ms). La toucher = retour à la dernière lanterne, comme une chute.
+function epreuveCreateTide(scene, t) {
+  const g = scene.add.graphics();
+  storyPutBehindPlayer(scene, g);
+  const tide = { ...t, g, phase: 0, t: 0, top: t.low };
+  epreuveDrawTide(tide);
+  return tide;
+}
+
+function epreuveDrawTide(tide) {
+  const g = tide.g;
+  g.clear();
+  const h = 560 - tide.top;
+  if (h <= 0) return;
+  g.fillStyle(0x16280f, 0.95).fillRect(tide.x, tide.top + 6, tide.w, h);
+  g.fillStyle(0x3e7a2c, 1);
+  for (let x = tide.x; x < tide.x + tide.w; x += 28) g.fillEllipse(x + 14, tide.top + 6, 40, 16);
+  g.fillStyle(0x9bff5a, 0.7);
+  for (let x = tide.x + 10; x < tide.x + tide.w; x += 46) g.fillCircle(x, tide.top + 4, 2.5);
+}
+
+function epreuveUpdateTides(scene, list, delta) {
+  const p = scene.player;
+  for (const td of list) {
+    td.t += delta;
+    while (td.t >= td.phases[td.phase]) { td.t -= td.phases[td.phase]; td.phase = (td.phase + 1) % 4; }
+    const k = td.t / td.phases[td.phase];
+    // 0 bas, 1 montée, 2 haut, 3 descente.
+    const ease = (u) => 0.5 - Math.cos(Math.PI * u) / 2;
+    td.top = td.phase === 0 ? td.low : td.phase === 2 ? td.high
+      : td.phase === 1 ? Phaser.Math.Linear(td.low, td.high, ease(k)) : Phaser.Math.Linear(td.high, td.low, ease(k));
+    epreuveDrawTide(td);
+    const inX = p.x > td.x && p.x < td.x + td.w;
+    if (inX && p.body.bottom > td.top + 10 && !isWorldFrozen(scene)) {
+      const back = scene.__story.checkpoint || { x: p.spawnX, y: p.spawnY };
+      if (p.vine) p.releaseVine(false, scene.time.now);
+      p.setVelocity(0, 0);
+      p.setPosition(back.x, back.y - 4);
+      scene.cameras.main.flash(180, 120, 255, 90);
+    }
+  }
+}
+
 ZONE_SCRIPTS.epreuve_singe = {
   create(scene, data) {
     scene.__epreuveSommet = false;
     const sx = EPREUVE_SINGE_SOMMET_X;
     // Au sommet : un autel de pierre et un rai de lumière, visibles de loin.
-    // Socle posé sur la surface de marche du sommet (y -192).
-    const g = scene.add.graphics({ x: sx - 110, y: storyStandY(scene, sx, -192) + 192 });
+    // Socle posé sur la surface de marche du sommet (dessin prévu pour y -192).
+    const g = scene.add.graphics({ x: sx - 110, y: storyStandY(scene, sx, EPREUVE_SINGE_SOMMET_Y) + 192 });
     g.fillStyle(0xffe9a8, 0.08).fillRect(50, -400, 120, 210);
     g.fillStyle(0x4a4058, 1).fillRoundedRect(82, -220, 56, 28, 6);
     g.fillStyle(0x6d6480, 1).fillRoundedRect(90, -228, 40, 10, 4);
-    const beam = scene.add.rectangle(sx, -320, 60, 200, 0xffe9a8, 0.12);
+    const beam = scene.add.rectangle(sx, EPREUVE_SINGE_SOMMET_Y - 128, 60, 200, 0xffe9a8, 0.12);
     storyPutBehindPlayer(scene, beam);
     storyPutBehindPlayer(scene, g);
     scene.tweens.add({ targets: beam, alpha: 0.28, duration: 1300, yoyo: true, repeat: -1 });
@@ -578,6 +619,9 @@ ZONE_SCRIPTS.epreuve_singe = {
     scene.__epreuve = {
       crumbles: epreuveCreateCrumbles(scene, data && data.crumble),
       rockfalls: ((data && data.rockfalls) || []).map((r) => ({ ...r, timer: 600 })),
+      // Pierres en rythme : horloge propre (même cadence à chaque visite).
+      rhythms: ((data && data.rhythmRocks) || []).map((r) => ({ ...r, clock: 0, lastImpactAt: -1e9 })),
+      tides: ((data && data.tides) || []).map((t) => epreuveCreateTide(scene, t)),
     };
     if (storyGet('talismanSinge')) epreuveOuvrirSommet(scene, true);
   },
@@ -587,6 +631,8 @@ ZONE_SCRIPTS.epreuve_singe = {
     const p = scene.player;
     if (!st || !p || !p.body) return;
     epreuveUpdateCrumbles(scene, st.crumbles, time);
+    epreuveUpdateRhythms(scene, st.rhythms, time, delta);
+    epreuveUpdateTides(scene, st.tides, delta);
     // Pierres des guetteurs : seulement quand Agarica est sur l'îlot (ou juste
     // au-dessus), comme sur la grande branche des racines.
     for (const rf of st.rockfalls) {

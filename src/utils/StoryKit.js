@@ -137,11 +137,83 @@ function ensureManifestAnims(scene, id) {
   }
 }
 
+// Rangées (anims) dessinées sur la même IMAGE SOURCE que la rangée `anim` de
+// l'entrée `id` (manifest `sheets: [{file, rows}]`) ; sans `sheets`, toute
+// l'entrée = une feuille. Toutes ces rangées partagent la même échelle de
+// dessin : c'est l'unité de calibrage (cf. manifestSheetScale).
+function manifestSheetAnims(id, anim) {
+  const def = getAssetManifest()[id];
+  if (!def || !def.anims || !def.anims[anim]) return [];
+  const row = def.anims[anim].row;
+  const sheet = (def.sheets || []).find((s) => (s.rows || []).includes(row));
+  return Object.keys(def.anims).filter((a) => !sheet || sheet.rows.includes(def.anims[a].row));
+}
+
+// Échelle calibrée (cf. calibratedScale, LevelKit) de la feuille qui contient
+// la rangée `anim` de `id` : UNE valeur pour toutes ses rangées (ex. `death`,
+// couchée, prend l'échelle de `talk`, debout, dessinée sur la même image).
+// `opts` : refKey / refScale (référence de taille), method, maxScale.
+// { scale, method } mis en cache, ou null sans art (garder l'échelle du manifest).
+const MANIFEST_SHEET_SCALE_CACHE = new Map();
+function manifestSheetScale(scene, id, anim, opts = {}) {
+  const anims = manifestSheetAnims(id, anim);
+  const ck = `${id}|${anims.join(',')}|${opts.refKey}|${opts.refScale}|${opts.method || 'auto'}|${opts.maxScale ?? ''}`;
+  if (MANIFEST_SHEET_SCALE_CACHE.has(ck)) return MANIFEST_SHEET_SCALE_CACHE.get(ck);
+  const keys = anims.flatMap((a) => manifestAnimFrames(scene, id, a).map((f) => f.key));
+  const res = keys.length ? calibratedScale(scene, keys, opts) : null;
+  // Pas de mise en cache d'un échec de lecture (art pas encore chargé).
+  if (res) MANIFEST_SHEET_SCALE_CACHE.set(ck, res);
+  return res;
+}
+
+// Plus petite marge transparente sous les pieds parmi toutes les frames
+// présentes d'une entrée (px de la frame ; 0 sans art). Décalage CONSTANT pour
+// poser le bas visible d'une entité physique sur le bas de son corps sans
+// tressautement d'une anim à l'autre (cf. applyEnemyManifestArt).
+const MANIFEST_FOOT_MARGIN_CACHE = new Map();
+function manifestFootMargin(scene, id) {
+  if (MANIFEST_FOOT_MARGIN_CACHE.has(id)) return MANIFEST_FOOT_MARGIN_CACHE.get(id);
+  let m = Infinity;
+  for (const anim of Object.keys((getAssetManifest()[id] || {}).anims || {})) {
+    for (const f of manifestAnimFrames(scene, id, anim)) {
+      const b = visibleBounds(scene, f.key);
+      if (b && b.exact && !b.empty) m = Math.min(m, b.marginB);
+    }
+  }
+  m = Number.isFinite(m) ? m : 0;
+  MANIFEST_FOOT_MARGIN_CACHE.set(id, m);
+  return m;
+}
+
+// PNJ humanoïdes dont les images sources n'ont pas été dessinées à la même
+// échelle (mesuré : Geralt p2 -- marche, carte -- ~18 % plus grand que p1,
+// Amanite p2 ~12 %) : chaque anim reçoit le facteur de SA feuille par
+// rapport à celle de l'idle (cf. manifestSheetScale, calibrage visuel), il ne
+// grandit plus en se mettant à marcher. Bêtes (Ghil't, Kainati) : feuilles
+// cohérentes à l'œil, et la détection « debout neutre » ne s'y applique pas.
+const MANIFEST_SHEET_CALIBRATED = ['geralt', 'amanite'];
+function manifestSheetFactor(scene, id, anim) {
+  if (!MANIFEST_SHEET_CALIBRATED.includes(id)) return 1;
+  const refKey = manifestFrameKey(id, 'idle', 0);
+  if (!scene.textures.exists(refKey)) return 1;
+  const a = manifestSheetScale(scene, id, anim, { refKey, refScale: 1 });
+  const b = manifestSheetScale(scene, id, 'idle', { refKey, refScale: 1 });
+  return a && b ? a.scale / b.scale : 1;
+}
+
 function attachPlayManifest(sprite, id) {
   sprite.manifestId = id;
   sprite.playManifest = function playManifest(anim, ignoreIfPlaying = true) {
     const key = `${id}-${anim}`;
     if (!this.scene || !this.scene.anims.exists(key)) return this;
+    // Facteur de feuille (cf. manifestSheetFactor), multiplicatif : une
+    // échelle réglée par l'appelant (cochons de tailles différentes…) est gardée.
+    const f = manifestSheetFactor(this.scene, id, anim);
+    const prev = this.__sheetFactor || 1;
+    if (Math.abs(f - prev) > 1e-4) {
+      this.setScale((this.scaleX / prev) * f, (this.scaleY / prev) * f);
+      this.__sheetFactor = f;
+    }
     this.currentManifestAnim = anim;
     // Sortie d'une pose de repos figée (cf. storyNpcRest).
     this.__restPaused = false;
@@ -160,6 +232,10 @@ function addManifestSprite(scene, x, y, id, anim = 'idle', { physics = false, or
   sprite.setScale(def.scale || 1);
   attachPlayManifest(sprite, id);
   sprite.playManifest(anim);
+  // Ancré par le bas : `y` = bas VISIBLE des pieds pour toutes les anims (les
+  // planches Codex gardent 4-5 px transparents sous les pieds, cf.
+  // anchorVisibleFeet) -- PNJ, animaux, VFX posés au sol.
+  if (origin[1] === 1) anchorVisibleFeet(sprite, { body: physics });
   return sprite;
 }
 
@@ -907,6 +983,203 @@ function showToast(scene, text, ms = 2600) {
   return t;
 }
 
+// ---------------------------------------------------------------------------
+// Bulles de parole NON bloquantes (2026-10-23). Retour utilisateur : Xara
+// « coupait le jeu toutes les 4 secondes » avec des dialogues qui gèlent le
+// monde. Une bulle de BD au-dessus de qui parle, qui le SUIT (Agarica peut
+// courir et sauter), ne gèle rien, ne prend aucune touche et s'efface seule.
+//   showSpeechBubble(scene, cible, texte, { ms, who, replace }) → Promise
+//   (résolue quand la bulle a disparu). `cible` : objet de jeu, ou id :
+//   'agarica'/'player' (le joueur), 'xara' (compagnon, sinon PNJ), clé de
+//   scene.npcs ou id de manifest d'un PNJ. Introuvable : toast « Nom : texte ».
+//   Une bulle à la fois par personnage : les suivantes attendent leur tour
+//   (file), sauf `replace: true` (remplace aussitôt). `ms` : durée affichée
+//   (défaut selon la longueur, 2,5-5 s). `who` : qui parle (nom du toast de
+//   repli, et cible si `cible` est vide).
+//   clearSpeechBubbles(scene[, cible]) : retire les bulles (et leurs files).
+// Cinématique : étape `{bubble: {who, text, ms?}}` (n'attend pas, ne gèle
+// rien). Dialogue : une réplique `{who, text, bubble: true}` part en bulle.
+// ---------------------------------------------------------------------------
+const SPEECH_BUBBLE_MAX_W = 220;
+const SPEECH_BUBBLE_PAD = { x: 9, y: 6 };
+const SPEECH_BUBBLE_TAIL = 8; // hauteur de la pointe
+const SPEECH_BUBBLE_GAP = 4; // entre la pointe et le haut visible du personnage
+// Au-dessus des personnages et des plantes de premier plan
+// (DECOR_FOREGROUND_DEPTH), sous les invites « Appuie sur E ».
+const SPEECH_BUBBLE_DEPTH = 1040;
+const SPEECH_BUBBLE_FADE_MS = 220;
+
+function speechBubbleDuration(text) {
+  return Phaser.Math.Clamp(1400 + String(text).length * 45, 2500, 5000);
+}
+
+function speechBubbleTarget(scene, target) {
+  if (target && typeof target === 'object') return target.active === false ? null : target;
+  if (!target) return null;
+  if (target === 'agarica' || target === 'player') return scene.player || null;
+  if (target === 'xara' && scene.xara && scene.xara.active) return scene.xara;
+  const npcs = scene.npcs || {};
+  if (npcs[target] && npcs[target].active) return npcs[target];
+  return Object.values(npcs).find((n) => n && n.active && n.manifestId === target) || null;
+}
+
+// Haut VISIBLE du personnage (cf. objectVisibleBox) ; un sprite tourné
+// (suspendu, penché) : ses bornes. Xara qui parle est cachée sous son sprite
+// de parole (cf. storySpeakerTalkAnim) : c'est lui qu'on suit alors.
+function speechBubbleAnchor(target) {
+  const t = target.__talkSprite && target.__talkSprite.active ? target.__talkSprite : target;
+  if (t.frame && !t.rotation && typeof objectVisibleBox === 'function') {
+    const box = objectVisibleBox(t);
+    if (box) return { x: (box.left + box.right) / 2, top: box.top };
+  }
+  const b = t.getBounds ? t.getBounds() : { centerX: t.x, y: t.y - 60 };
+  return { x: b.centerX, top: b.y };
+}
+
+function speechBubbleState(scene) {
+  if (!scene.__speechBubbles || scene.__speechBubbles.visit !== scene.__storyVisit) {
+    scene.__speechBubbles = { visit: scene.__storyVisit, byTarget: new Map() };
+  }
+  if (!scene.__speechBubbleHook) {
+    // Après la physique et les update() : la bulle suit la position finale.
+    scene.__speechBubbleHook = true;
+    scene.events.on('postupdate', () => updateSpeechBubbles(scene));
+    scene.events.on('shutdown', () => { scene.__speechBubbles = null; });
+  }
+  return scene.__speechBubbles;
+}
+
+function buildSpeechBubble(scene, text) {
+  const label = scene.add.text(0, 0, text, {
+    fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.text, align: 'center', lineSpacing: 1,
+    wordWrap: { width: SPEECH_BUBBLE_MAX_W - SPEECH_BUBBLE_PAD.x * 2, useAdvancedWrap: true },
+  }).setOrigin(0.5, 1);
+  const w = Math.ceil(label.width + SPEECH_BUBBLE_PAD.x * 2);
+  const h = Math.ceil(label.height + SPEECH_BUBBLE_PAD.y * 2);
+  const g = scene.add.graphics();
+  const c = scene.add.container(0, 0, [g, label]).setDepth(SPEECH_BUBBLE_DEPTH).setAlpha(0);
+  return { container: c, g, label, w, h };
+}
+
+// Fond sombre, liseré vert lunaire, pointe vers le personnage (`tipX` relatif
+// au centre de la bulle). Origine du conteneur = bout de la pointe.
+function drawSpeechBubble(b, tipX) {
+  const { g, w, h } = b;
+  const top = -SPEECH_BUBBLE_TAIL - h;
+  const left = -w / 2 - tipX;
+  const tx = Phaser.Math.Clamp(0, left + 12, left + w - 12);
+  g.clear();
+  g.fillStyle(STORY_UI.night, 0.93);
+  g.lineStyle(2, STORY_UI.vineLight, 0.95);
+  g.fillRoundedRect(left, top, w, h, 8);
+  g.strokeRoundedRect(left, top, w, h, 8);
+  g.fillTriangle(tx - 7, top + h - 1, tx + 7, top + h - 1, 0, 0);
+  g.lineBetween(tx - 7, top + h, 0, 0);
+  g.lineBetween(tx + 7, top + h, 0, 0);
+  // Recouvre le liseré sous la base de la pointe (la pointe sort de la bulle).
+  g.lineStyle(3, STORY_UI.night, 1);
+  g.lineBetween(tx - 5.5, top + h - 1, tx + 5.5, top + h - 1);
+  b.label.setPosition(left + w / 2, -SPEECH_BUBBLE_TAIL - SPEECH_BUBBLE_PAD.y);
+}
+
+function positionSpeechBubble(scene, b) {
+  const a = speechBubbleAnchor(b.target);
+  const tipY = a.top - SPEECH_BUBBLE_GAP;
+  // Haut visible lissé : les frames d'une anim n'ont pas toutes la même tête.
+  b.tipY = b.tipY == null || Math.abs(tipY - b.tipY) > 40 ? tipY : b.tipY + (tipY - b.tipY) * 0.25;
+  const view = scene.cameras.main.worldView;
+  // La bulle reste dans l'écran ; seule la pointe suit le personnage.
+  const half = b.w / 2;
+  const cx = Phaser.Math.Clamp(a.x, view.x + half + 4, view.right - half - 4);
+  const y = Math.max(b.tipY, view.y + b.h + SPEECH_BUBBLE_TAIL + 4);
+  b.container.setPosition(a.x, y);
+  drawSpeechBubble(b, a.x - cx);
+}
+
+function updateSpeechBubbles(scene) {
+  const st = scene.__speechBubbles;
+  if (!st) return;
+  for (const [target, slot] of st.byTarget) {
+    const b = slot.current;
+    if (!b) continue;
+    if (!target.active || !b.container.active) { finishSpeechBubble(scene, target, slot, true); continue; }
+    positionSpeechBubble(scene, b);
+  }
+}
+
+function finishSpeechBubble(scene, target, slot, instant = false) {
+  const b = slot.current;
+  if (!b || b.ending) return;
+  b.ending = true;
+  if (b.timer) b.timer.remove(false);
+  const done = () => {
+    if (b.container.active) b.container.destroy();
+    if (slot.current === b) slot.current = null;
+    b.resolve();
+    const next = slot.queue.shift();
+    if (next && target.active && scene.sys.isActive()) startSpeechBubble(scene, target, slot, next);
+    else if (!slot.queue.length) {
+      const st = scene.__speechBubbles;
+      if (st && !slot.current) st.byTarget.delete(target);
+    }
+  };
+  if (instant || !b.container.active) { done(); return; }
+  scene.tweens.add({ targets: b.container, alpha: 0, y: b.container.y - 6, duration: SPEECH_BUBBLE_FADE_MS, onComplete: done });
+}
+
+function startSpeechBubble(scene, target, slot, req) {
+  const b = buildSpeechBubble(scene, req.text);
+  Object.assign(b, { target, resolve: req.resolve, tipY: null });
+  slot.current = b;
+  positionSpeechBubble(scene, b);
+  b.container.setScale(0.85);
+  scene.tweens.add({ targets: b.container, alpha: 1, scale: 1, duration: 140, ease: 'Back.Out' });
+  b.timer = scene.time.delayedCall(req.ms, () => finishSpeechBubble(scene, target, slot));
+}
+
+function showSpeechBubble(scene, targetOrNpcId, text, { ms, who, replace = false } = {}) {
+  if (!scene || !scene.sys || !text) return Promise.resolve();
+  const target = speechBubbleTarget(scene, targetOrNpcId || who);
+  const dur = ms || speechBubbleDuration(text);
+  if (!target) {
+    const id = who || (typeof targetOrNpcId === 'string' ? targetOrNpcId : '');
+    const name = id && SPEAKERS[id] ? SPEAKERS[id].name : '';
+    showToast(scene, name ? `${name} : ${text}` : text, dur);
+    return storyWait(scene, dur);
+  }
+  const st = speechBubbleState(scene);
+  let slot = st.byTarget.get(target);
+  if (!slot) {
+    slot = { current: null, queue: [] };
+    st.byTarget.set(target, slot);
+  }
+  return new Promise((resolve) => {
+    const req = { text: String(text), ms: dur, resolve };
+    if (replace) {
+      for (const q of slot.queue) q.resolve();
+      slot.queue = [req];
+      if (slot.current) finishSpeechBubble(scene, target, slot, true);
+      else startSpeechBubble(scene, target, slot, slot.queue.shift());
+    } else if (slot.current) {
+      slot.queue.push(req);
+    } else {
+      startSpeechBubble(scene, target, slot, req);
+    }
+  });
+}
+
+function clearSpeechBubbles(scene, targetOrNpcId = null) {
+  const st = scene && scene.__speechBubbles;
+  if (!st) return;
+  const only = targetOrNpcId ? speechBubbleTarget(scene, targetOrNpcId) : null;
+  for (const [target, slot] of [...st.byTarget]) {
+    if (only && target !== only) continue;
+    for (const q of slot.queue) q.resolve();
+    slot.queue = [];
+    finishSpeechBubble(scene, target, slot, true);
+  }
+}
+
 // Carte de chapitre / nom de zone. Promesse résolue une fois disparue.
 function showTitleCard(scene, title, sub, { hold = 1600 } = {}) {
   return new Promise((resolve) => {
@@ -1144,6 +1417,10 @@ function storySpeakerTalkAnim(scene, line) {
 let storyDialogueChain = Promise.resolve();
 
 // Promesse résolue à la fin avec `{ lastChoice, choices }` (indices des choix faits).
+// Répliques `bubble: true` (sans choix) : bulle au-dessus de qui parle (cf.
+// showSpeechBubble), sans geler le monde ni attendre ; les autres passent
+// dans la boîte comme avant, dans l'ordre. Un dialogue à choix (indices
+// `goto`) reste entièrement dans la boîte.
 function showDialogue(scene, linesOrId) {
   if (typeof linesOrId === 'string' && DIALOGUES[linesOrId] === undefined && /^[a-z0-9_]+$/.test(linesOrId)) {
     console.warn(`showDialogue : dialogue "${linesOrId}" introuvable dans DIALOGUES.`);
@@ -1151,6 +1428,24 @@ function showDialogue(scene, linesOrId) {
   }
   const lines = resolveDialogueLines(scene, linesOrId);
   if (lines.length === 0) return Promise.resolve({ lastChoice: -1, choices: [] });
+  if (lines.some((l) => l.bubble) && !lines.some((l) => l.choices)) {
+    return (async () => {
+      let result = { lastChoice: -1, choices: [] };
+      let box = [];
+      for (const l of lines) {
+        if (!l.bubble) { box.push(l); continue; }
+        if (box.length) { result = await showDialogueBox(scene, box); box = []; }
+        showSpeechBubble(scene, l.npc || l.who, l.text, { who: l.who, ms: l.ms });
+      }
+      if (box.length) result = await showDialogueBox(scene, box);
+      return result;
+    })();
+  }
+  return showDialogueBox(scene, lines);
+}
+
+// Boîte de dialogue (DialogueScene), monde gelé : `lines` déjà normalisées.
+function showDialogueBox(scene, lines) {
   scene.__storyFreeze = (scene.__storyFreeze || 0) + 1;
   hideStoryPrompt(scene);
   if (scene.player && scene.player.body) scene.player.setVelocityX(0);
@@ -1203,10 +1498,22 @@ function resolveCutsceneSteps(scene, idOrSteps) {
   return steps;
 }
 
+// Étapes qui ne bloquent rien : une cinématique faite uniquement de bulles
+// ne pose pas __cutsceneLock (le monde continue, le joueur garde la main).
+const CUTSCENE_NON_BLOCKING_STEPS = ['bubble'];
+function isNonBlockingCutsceneStep(step) {
+  return !!step && typeof step === 'object' && Object.keys(step).length === 1
+    && CUTSCENE_NON_BLOCKING_STEPS.includes(Object.keys(step)[0]);
+}
+
 function runCutscene(scene, idOrSteps) {
   const steps = resolveCutsceneSteps(scene, idOrSteps);
   if (steps.length === 0) return Promise.resolve();
   const visit = scene.__storyVisit;
+  if (steps.every(isNonBlockingCutsceneStep)) {
+    for (const step of steps) runCutsceneStep(scene, step, visit);
+    return Promise.resolve();
+  }
   scene.__cutsceneLock = (scene.__cutsceneLock || 0) + 1;
   hideStoryPrompt(scene);
   if (scene.player && scene.player.body) scene.player.setVelocityX(0);
@@ -1393,6 +1700,11 @@ const CUTSCENE_STEP_HANDLERS = {
     ? showTitleCard(scene, v.title || v.text, v.sub, v)
     : showTitleCard(scene, v, step.sub)),
   toast: (scene, v) => { showToast(scene, typeof v === 'object' ? v.text : v, v.ms); },
+  // Bulle de parole : n'attend PAS (la cinématique continue aussitôt).
+  bubble: (scene, v) => {
+    const b = typeof v === 'string' ? { who: 'xara', text: v } : v;
+    showSpeechBubble(scene, b.npc || b.who, b.text, { who: b.who, ms: b.ms, replace: b.replace });
+  },
   npcMove: (scene, v) => cutsceneNpcMove(scene, v),
   npcAnim: (scene, { npc: key, anim }) => {
     const npc = storyNpc(scene, key);
@@ -1562,23 +1874,26 @@ function storyStandY(scene, x, refY = 448) {
   return best;
 }
 
-// Où poser les pieds d'un PNJ : sur le haut VISIBLE d'un décor (`onProp: true`
-// ou le type du prop, ex. Xara sur sa souche, cf. propTopYAt), sinon `y`
-// explicite, sinon la surface de marche.
-function storyNpcFootY(scene, n) {
+// Où poser les pieds d'un PNJ (sprite ancré aux pieds visibles, cf.
+// addManifestSprite) : sur le DESSUS d'un décor (`onProp: true` ou le type du
+// prop, ex. Xara sur sa souche, cf. propSurfaceYUnder : sous l'emprise de ses
+// pieds, pas le seul bord arrière du plateau), sinon `y` explicite, sinon la
+// surface de marche. `npc` absent (aperçu sans sprite) : haut visible sous x.
+function storyNpcFootY(scene, n, npc = null) {
   if (n.onProp) {
-    const top = propTopYAt(scene, n.x, n.onProp === true ? null : n.onProp);
+    const type = n.onProp === true ? null : n.onProp;
+    const top = npc ? propSurfaceYUnder(scene, npc, type, n.x) : propTopYAt(scene, n.x, type);
     if (top != null) return top;
   }
   return n.y != null ? n.y : storyStandY(scene, n.x);
 }
 
 // Pose un objet SUR le décor `propType` en x (le bas de ses pixels visibles
-// sur le haut visible du décor, cf. propTopYAt) ; repli si le décor manque :
-// `fallbackY` tel quel. Ex. l'idole sur son autel.
+// sur le dessus du décor sous sa base, cf. propSurfaceYUnder) ; repli si le
+// décor manque : `fallbackY` tel quel. Ex. l'idole sur son autel.
 function storyPlaceOnProp(scene, obj, x, propType, fallbackY) {
-  const top = propTopYAt(scene, x, propType);
-  obj.setPosition(x, top == null ? fallbackY : top);
+  obj.setPosition(x, fallbackY);
+  const top = propSurfaceYUnder(scene, obj, propType, x);
   if (top != null) setVisibleBottomY(obj, top);
   return obj;
 }
@@ -1608,6 +1923,9 @@ function createStoryNpc(scene, n) {
   npc.npcName = n.name || null;
   npc.lookAtPlayer = n.lookAtPlayer !== false;
   setNpcFacing(npc, n.facing === 'left' ? -1 : 1);
+  // Sur un décor : recalé sous l'emprise réelle de ses pieds (sprite créé et
+  // tourné du bon côté).
+  if (n.onProp) npc.y = storyNpcFootY(scene, n, npc);
   // Devant les décors (props, feux, totems), comme tous les personnages ; à
   // profondeur égale, juste sous le joueur dans la liste d'affichage.
   npc.setDepth(CHARACTER_DEPTH);

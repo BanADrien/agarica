@@ -331,6 +331,9 @@ class Xara extends Phaser.GameObjects.Sprite {
     scene.physics.add.existing(this);
     this.body.setSize(160, 130);
     this.body.setOffset((292 - 160) / 2, 320 - 130);
+    // Pieds VISIBLES sur le bas du corps (marge transparente de 4-5 px sous
+    // les pattes, cf. anchorVisibleFeet) : au sol, `y` = bas des pattes.
+    anchorVisibleFeet(this, { body: true });
     // Seul l'état 'ground' bouge via la vraie physique (cf. update) -- en
     // 'swinging'/'bulle', sa position reste pilotée à la main (pendule/
     // flottaison, cf. update), donc la gravité doit rester coupée pour ne

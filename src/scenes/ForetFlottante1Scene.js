@@ -4,7 +4,8 @@ class ForetFlottante1Scene extends Phaser.Scene {
   }
 
   create(sceneData) {
-    resolveZoneData('foret_flottante_1', FORET_FLOTTANTE_1_DATA).then((data) => buildLevelFromData(this, data, sceneData));
+    resolveZoneData('foret_flottante_1', FORET_FLOTTANTE_1_DATA).then((data) =>
+      buildLevelFromData(this, { ...data, background: 'fond_foret_flottante', treesAtScreenBottom: true }, sceneData));
   }
 
   update(time, delta) {

@@ -1,0 +1,18 @@
+## Animations au sol de Kainati — 2026-10-23
+
+Six images créées avec image_gen intégré. Les deux références demandées sont jointes à chaque génération : `assets/sprites/kainati.png` et `assets/sprites/kainati_frames/kainati_row0_0.png`. La fiche complète de Kainati figure dans chaque prompt, y compris comme contexte de palette pour les effets et l’objet. [Prompts](prompts.json) et [générations, variantes et sélection](generation.json).
+
+- `assets/sprites/kainati_sol.png` : 1536 × 1024, charge et roar, 4 + 4 frames ; intervalles horizontaux ≥40 pixels, intervalle entre rangées 67 pixels sur l’alpha non nul. [Aperçu](kainati_sol_final.jpg).
+- `assets/sprites/kainati_sol_p2.png` : 1536 × 1024, slam et sweep, 4 + 4 frames ; intervalles horizontaux ≥40 pixels, intervalle entre rangées 94 pixels sur l’alpha non nul. Les rochers restent en contact avec les mains aux trois premières poses de sweep ; mains vides à la quatrième. [Aperçu](kainati_sol_p2_final.jpg).
+- `assets/sprites/kainati_sol_p3.png` : 1536 × 1024, stunned, 4 frames, bases au bas de la toile ; intervalles horizontaux ≥40 pixels sur l’alpha non nul. [Aperçu](kainati_sol_p3_final.jpg).
+- `assets/vfx/vfx_onde_choc.png` : 1536 × 1024, 4 cellules, étendue maximale 300 × 90 pixels ; terre/écorce brun-beige et crête toxique. [Aperçu](vfx_onde_choc_final.jpg).
+- `assets/vfx/vfx_vague_mousse.png` : 1536 × 1024, 4 cellules, étendue maximale 300 × 70 pixels. [Aperçu](vfx_vague_mousse_final.jpg).
+- `assets/_codex_src/rocher_roulant.png` : 1024 × 1024, rocher gris-beige rond, spirale gravée, mousse toxique, emprise carrée 800 × 800 pixels, sans ombre. Sortie importée : `assets/items/objets/rocher_roulant.png`, 256 × 256. [Aperçu](rocher_roulant_final.jpg).
+
+Chaque pose du boss a une seule composante connexe, sans effet détaché. Orientation droite, couronne, peinture rouge, fourrure blanche et palette contrôlées visuellement. Les silhouettes ne sont pas déformées : réduction uniforme par planche et placement dans les cellules, avec optimisation des positions horizontales pour conserver au moins 40 pixels de vide. Les deux effets sont posés sur une base commune à y=1020, avec 4 pixels transparents sous la base pour éviter l’alerte de bord de cellule de l’importeur.
+
+**Échelle mesurée :** les poses de charge et de retour sur les phalanges font environ 330–360 pixels utiles, les poses redressées de roar environ 410–445 pixels ; le maximum avec poings levés est de 452 pixels. Le dessin de référence existant a 348 pixels utiles sur les phalanges dans une toile de 388 × 396 pixels. Le rendu conserve ainsi un gabarit proche de cette référence, mais la cible de 400 pixels utiles sur les phalanges n’est pas atteinte strictement. Cette différence reste à reprendre si 400 pixels utiles est impératif.
+
+Les bruts retenus sont archivés ici ; les variantes restent dans le dossier de génération indiqué dans `generation.json`. [Normalisation](normalisation.json), [validation](validation.json), [mesures détaillées des trois sources](../kainati_sol.json), script : `docs/production/normaliser_kainati_sol_2026_10_23.py`.
+
+Import ciblé des trois planches ensemble : 20 frames, canvas uniforme 391 × 459. Effets : 4 + 4 frames. Import de l’objet et imports ciblés finaux sans avertissement. Les premiers avertissements de bord inférieur des effets ont été corrigés en ajoutant la marge transparente. Aucun changement manuel de `src/` ou du manifeste par ce travail ; `asset_present.js` est actualisé automatiquement par l’importeur. Des modifications concurrentes de plusieurs fichiers de jeu ont été observées et laissées intactes.

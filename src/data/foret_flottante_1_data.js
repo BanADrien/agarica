@@ -49,6 +49,10 @@ const FORET_FLOTTANTE_1_DATA = {
     { type: 'foret_flottante_fleurs_hautes', x: 1700, y: 448, scale: 0.3 },
     { type: 'foret_flottante_pissenlit_geant', x: 1840, y: 448, scale: 0.32 },
     { type: 'foret_flottante_fleurs_hautes', x: 3430, y: 128, scale: 0.28 },       // le belvédère
+    // Ruines d'anciens totems animaux sur le belvédère (remplacent les
+    // piliers dessinés par le script).
+    { type: 'bosquet_standing_stone', x: 3120, y: 128, scale: 0.34 },
+    { type: 'bosquet_standing_stone', x: 3260, y: 128, scale: 0.24 },
   ],
   npcs: [
     // Avant le duel, Geralt n'a rien à dire (le script lance la rencontre).

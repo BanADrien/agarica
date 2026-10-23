@@ -1,0 +1,149 @@
+{
+  "kainati_sol": {
+    "components": [
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "horizontal_gaps": [
+      66,
+      40,
+      40,
+      71,
+      77,
+      61
+    ],
+    "vertical_gaps": [
+      67
+    ]
+  },
+  "kainati_sol_p2": {
+    "components": [
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "horizontal_gaps": [
+      85,
+      78,
+      70,
+      99,
+      61,
+      40
+    ],
+    "vertical_gaps": [
+      94
+    ]
+  },
+  "kainati_sol_p3": {
+    "components": [
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "horizontal_gaps": [
+      40,
+      41,
+      40
+    ],
+    "vertical_gaps": []
+  },
+  "vfx_onde_choc": {
+    "boxes_in_cells": [
+      [
+        52,
+        976,
+        333,
+        1020
+      ],
+      [
+        42,
+        930,
+        342,
+        1020
+      ],
+      [
+        44,
+        961,
+        340,
+        1020
+      ],
+      [
+        47,
+        976,
+        337,
+        1020
+      ]
+    ],
+    "baseline": 1020
+  },
+  "vfx_vague_mousse": {
+    "boxes_in_cells": [
+      [
+        43,
+        950,
+        341,
+        1020
+      ],
+      [
+        43,
+        956,
+        341,
+        1020
+      ],
+      [
+        45,
+        959,
+        337,
+        1020
+      ],
+      [
+        42,
+        956,
+        342,
+        1020
+      ]
+    ],
+    "baseline": 1020
+  },
+  "reference": {
+    "canvas": [
+      388,
+      396
+    ],
+    "visible_size": [
+      324,
+      348
+    ]
+  },
+  "src_changes_observed": [
+    "src\\data\\asset_present.js",
+    "src\\data\\epreuve_singe_data.js",
+    "src\\data\\grand_arbre_racines_data.js",
+    "src\\data\\monde_spirituel_data.js",
+    "src\\entities\\Player.js",
+    "src\\story\\acte1_arbre.js"
+  ],
+  "note": "Only asset_present.js was written by the importer. Other observed changes are concurrent external edits; not modified or restored by this workflow."
+}

@@ -26,7 +26,12 @@ function applyEnemyManifestArt(sprite, id, bodyW, bodyH, anchor = 'bottom') {
   sprite.body.setSize(bw, bh);
   const fw = sprite.width;
   const fh = sprite.height;
-  sprite.body.setOffset((fw - bw) / 2, anchor === 'bottom' ? fh - bh : (fh - bh) / 2);
+  // Ennemi au sol : bas du corps sur le bas VISIBLE des pattes (marge
+  // transparente des planches, la plus petite de l'entrée : décalage
+  // constant, cf. manifestFootMargin) -- posé sur le bord du cadre, l'art
+  // flottait de 1-2 px au-dessus de l'herbe.
+  sprite.footMargin = anchor === 'bottom' && typeof manifestFootMargin === 'function' ? manifestFootMargin(sprite.scene, id) : 0;
+  sprite.body.setOffset((fw - bw) / 2, anchor === 'bottom' ? fh - bh - sprite.footMargin : (fh - bh) / 2);
   sprite.useManifestArt = true;
   return sprite;
 }

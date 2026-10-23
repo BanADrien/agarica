@@ -103,6 +103,19 @@ Tu peux lire le screenshot avec l'outil Read pour vérifier visuellement.
   actif ou `scene.__cutsceneLock`. `updateLevelFromData` l'utilise.
 - `showBossBar(scene, name, getRatio)` / `hideBossBar(scene)` — barre de vie de boss HUD.
 - `showToast(scene, text, ms)` — petit texte informatif à l'écran (indices de Xara, etc.).
+- **Bulles de parole NON bloquantes** (2026-10-23) : `showSpeechBubble(scene, cible, texte,
+  { ms, who, replace }) → Promise` (résolue quand la bulle a disparu). Bulle de BD au-dessus
+  du personnage (fond sombre, liseré vert lunaire, pointe vers lui, ≤ 220 px de large,
+  retour à la ligne) qui le SUIT (course, saut), ne gèle rien et ne prend aucune touche ;
+  fondu après `ms` (défaut 2,5-5 s selon la longueur). `cible` : objet de jeu, ou
+  `'agarica'`/`'player'`, `'xara'` (compagnon `scene.xara`, sinon PNJ), clé de `scene.npcs`
+  ou id de manifest d'un PNJ ; introuvable → toast « Nom : texte ». Une bulle à la fois par
+  personnage : les suivantes attendent (file), sauf `replace: true`. `clearSpeechBubbles(scene[, cible])`.
+  Étape de cinématique `{bubble: {who, text, ms?, npc?}}` (ou `{bubble: 'texte'}` = Xara) :
+  n'attend pas ; une cinématique faite UNIQUEMENT de bulles ne pose pas `__cutsceneLock`
+  (monde non gelé). Réplique de dialogue `{who, text, bubble: true}` : part en bulle au lieu
+  de la boîte (sauf dialogue à choix, entièrement dans la boîte). Usage côté histoire :
+  `if (typeof showSpeechBubble === 'function') …`.
 
 ### Nouvelles clés de données de zone (gérées via `LEVEL_DATA_HANDLERS`)
 `buildLevelFromData` appelle, pour chaque clé `k` de la donnée présente dans
@@ -135,6 +148,7 @@ Clés gérées par la **Fondation** :
   pour la logique spécifique d'une zone (boss, événements) sans écrire dans la scène
   (les fichiers Scene restent le gabarit générique de l'éditeur).
 - `checkpoints: [{x, y}]` — point de réapparition (sans menu), utilisé par l'épreuve du singe.
+- Bulles non bloquantes (acte1.js, utilisables partout) : `storyBulle(scene, who, text, ms?)`, `storyBulles(scene, lignes, toast?, délai?)`, `cutsceneBulles(lignes, toast?, délai?)` (cinématique « vide » pour un déclencheur : ne gèle rien). S'appuient sur `showSpeechBubble` (StoryKit) si elle existe, sinon un toast. Règle : seules les scènes importantes (rencontres, révélations, boss, objets) restent des dialogues bloquants.
 
 Clés gérées par l'agent **Formes** (fichier `src/entities/Liane.js`, `src/entities/Piste.js`,
 `src/entities/CourantAir.js`) :
@@ -171,6 +185,13 @@ Formes (Player.js) — état & API :
   (`unlockSkillFromStory(scene, 'papillon')` débloque aussi `hasButterflyForm`).
 - Lianes : seule la forme singe s'y accroche ; en forme humaine/aigle/loup elles sont
   ignorées partout (plus de lianes-tremplins, arène de Kainati comprise).
+  Sur une liane (2026-10-23) : Q/D (←/→) pompe le balancement, plafonné à ~55°
+  (`VINE_MAX_ANGLE` ; la pompe s'arrête et la vitesse est plafonnée à ce qui ramène à
+  cet angle) ; Z/↑ monte et S/↓ descend le long de la liane (`VINE_CLIMB_MANUAL_SPEED`
+  140 px/s, de `VINE_CLIMB_TOP_R` = 28 px sous l'attache jusqu'au bout) ; S tout en bas
+  = se laisser tomber ; Espace = lâcher avec l'élan = LE saut du singe : compte comme le
+  double saut (`jumpsUsed = 2`), plus aucun saut avant le sol ou la prochaine liane
+  (l'accroche recharge). Pose de grimpe : `liane_hang` en attendant un art dédié.
 - Combat (humaine + singe) : Z/↑ = viser haut, S/↓ = viser bas (en l'air seulement),
   K/clic = coup dans la direction visée (sinon devant). `player.getAttackHitbox()` renvoie le
   rectangle de l'ARC AFFICHÉ (art `vfx_slash`) pendant ses images actives seulement, null
@@ -310,10 +331,10 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
   sous x ; props gardés dans `scene.props`, `img.propType`), `visibleTopYAt(obj, x)`,
   `visibleBottomY(obj)`, `setVisibleBottomY(obj, y)`. Lecture alpha mise en cache ;
   en `file://` (canvas tainted) repli sur le cadre de l'image.
-- **PNJ** : `npcs[i].onProp: true | 'type_de_prop'` → pieds sur le haut visible du
-  décor sous lui (Xara sur sa souche) ; prioritaire sur `y`. L'éditeur en tient compte.
-  `storyPlaceOnProp(scene, obj, x, propType, fallbackY)` pose un objet sur un décor
-  (idole sur l'autel `bosquet_antler_totem`).
+- **PNJ** : `npcs[i].onProp: true | 'type_de_prop'` → pieds sur le DESSUS du décor sous
+  l'emprise de ses pieds (cf. `propSurfaceYUnder`, « Calibrage visuel ») ; prioritaire sur
+  `y`. L'éditeur en tient compte. `storyPlaceOnProp(scene, obj, x, propType, fallbackY)`
+  pose un objet sur un décor (idole sur l'autel `bosquet_antler_totem`).
 - **Déplacements** : `npcMove` fait suivre le relief aux pieds du PNJ
   (`storyFollowGround(scene, obj, dt, {dir, speed, footOffset, snap})` : marche montée
   dès que l'avant des pieds la touche, descendue quand le centre la dépasse, ~0,1 s par
@@ -322,6 +343,53 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
 - **Props du bosquet** : `bosquet_grove` (3 arbres, les 2 petits flottaient) découpé par
   `tools/split_grove.py` en `bosquet_grand_arbre`, `bosquet_arbre`, `bosquet_arbre_2`
   (à utiliser) ; `bosquet_grove` reste déclaré pour les anciens brouillons.
+  `foret_sombre_arbre_moussu` est RETIRÉ (refusé, hors DA) : plus chargé ni proposé ; un
+  décor dont la texture n'existe pas est ignoré sans erreur (jeu et éditeur).
+
+### Calibrage visuel (2026-10-23, rétro-compatible)
+Les planches (Codex, découpes) gardent des marges transparentes variables (4-9 px sous les
+pieds, plus sur certains décors) et ne sont pas dessinées à la même échelle d'une image source
+à l'autre. Tout ce qui se pose au sol et toute échelle de pose passe par les PIXELS VISIBLES
+(alpha > `VISIBLE_ALPHA_MIN` = 40), mesurés une fois par frame et mis en cache (LevelKit).
+Pixels illisibles (`file://`) : repli sur le cadre (`exact: false`), le jeu reste jouable.
+- `visibleBounds(scene, key, frame?)` / `frameVisibleBounds(frame)` → `{ x0, y0, x1, y1, w, h,
+  frameW, frameH, marginL, marginR, marginT, marginB, area, baseX0, baseX1, topW, exact }`
+  (px de la frame ; `base*` = colonnes des rangées du bas = pieds/socle ; placeholders mesurés
+  pareil). `objectVisibleBox(obj)` = boîte MONDE (origine, échelle, miroirs ; sans rotation).
+  `visibleBottomY` / `setVisibleBottomY` / `visibleTopYAt` / `propTopYAt` inchangés.
+- **Ancrage par le bas visible** : `placeOnGround(scene, obj, x, { refY, onProp, sink })` pose
+  le bas visible sur `groundStandYAt` (ou sur un décor). `GROUND_CONTACT_SINK` (1 px) : les
+  DÉCORS (props, feux, totems via `totemSink`) descendent d'1 px sous la ligne (le dernier rang
+  d'une image réduite est à demi transparent) ; les personnages ont le bas visible pile sur la ligne.
+- `anchorVisibleFeet(sprite, { body })` : pour un sprite d'origine (x, 1), `y` = bas visible des
+  pieds pour TOUTE frame (marge stable = la plus petite de l'anim en cours : pas de tressautement).
+  `body: true` : le bas du corps physique est recalé dessus à chaque image (POST_UPDATE,
+  `syncBodyToVisibleFeet`) → au sol, bas du corps = `y` = bas visible. Appliqué : joueur, Xara,
+  `addManifestSprite` (tout sprite du manifest ancré en bas : PNJ, cochons, Kainati, VFX au sol),
+  feux de camp (flamme animée), totems, Ghil't, loup alpha. Ennemis à origine centrée
+  (`applyEnemyManifestArt`, ancrage 'bottom') : corps décalé de `manifestFootMargin(scene, id)`
+  (plus petite marge sous les pieds de l'entrée, constante).
+- **Sur un décor** : `propSurfaceYUnder(scene, obj, type?, x?)` = 3e quartile du profil du haut
+  visible du décor sous les colonnes des pieds de `obj` : le plateau d'une souche/d'un autel
+  dessiné en perspective, pas son bord arrière (Xara « volait » au-dessus de sa souche).
+- **Taille homogène des poses** : `calibratedScale(scene, frameKeys, { refKey, refScale, maxScale,
+  method: 'auto'|'height'|'area', standing })` → `{ scale, method }` | null. UNE échelle par
+  IMAGE SOURCE (toutes ses rangées sont dessinées à la même échelle) : (1) frames « debout
+  neutres » (tête en haut, rapport largeur/hauteur ≤ celui de la référence + 0,2, hauteur ≥ 90 %
+  de la plus haute) → hauteur visible médiane alignée sur la référence ; (2) sinon (fentes,
+  sauts, couchée) ou `method: 'area'` → surface visible (√ nb de px) alignée.
+  `manifestSheetScale(scene, id, anim, opts)` (StoryKit) regroupe les rangées par feuille via
+  `sheets: [{file, rows}]` du manifest. Agarica (`agaricaSheetScale` / `agaricaSheetPoseConfig`,
+  Player.js ; référence `agarica-idle-0` à `HUMAN_SCALE`) : `agarica_slash` (surface → 0,273 au
+  lieu de 0,335 ; arc `vfx_slash` à la même échelle, positions `SLASH_ARCS` × échelle/0,335, la
+  zone qui touche reste l'arc visible), `agarica_extra` par feuille (p1 sauts/hurt 0,314 ;
+  p2 death/talk/sad 0,292 ; p3 lianes/cast 0,353 ; p4 receive_item 0,252), `transfo_singe`,
+  `transfo_papillon`, `singe` et `forme_papillon` (`method: 'area'`). Debout : hauteur visible =
+  83 px ± 1,5 pour toutes les poses debout ; une fente reste plus basse (genoux pliés), à tête égale.
+  PNJ humanoïdes à plusieurs feuilles (`MANIFEST_SHEET_CALIBRATED` : Geralt, Amanite) :
+  `playManifest(anim)` applique le facteur de la feuille de l'anim par rapport à celle de l'idle
+  (`manifestSheetFactor`, multiplicatif : l'échelle réglée par l'appelant est gardée) -- Geralt
+  ne grandit plus de 18 % en marchant. Bêtes (Ghil't, Kainati) : feuilles cohérentes, non calibrées.
 
 ## Progression & flags d'histoire (noms figés)
 
@@ -333,7 +401,7 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
 | 4 | `grand_arbre_racines` | racines, pierres qui tombent, ennemis, feu de camp, lianes visibles mais inutilisables | — |
 | 5 | `grand_arbre_arene` | Boss Kainati (script `kainati_arene`) → épargné, ouvre accès au totem du singe | `kainatiDefeated` |
 | 6 | `monde_spirituel` | Kainati esprit montre les lianes → forme singe | `hasMonkeyForm` |
-| 7 | `epreuve_singe` (optionnel) | course verticale lianes + checkpoints → talisman du singe | `talismanSinge`, skill `pierre` |
+| 7 | `epreuve_singe` (optionnel) | longue course de lianes en 5 sections (25 lianes, ~13 000 px, une lanterne par section, mousse toxique en contrebas, plateformes qui s'effritent `crumble`, pierres `rockfalls`, singe corrompu) → talisman du singe au sommet (bout droit) | `talismanSinge`, skill `pierre` |
 | 8 | `foret_flottante_1` | Geralt + Clak, duel comique, carte | `geraltMet`, item `carte_geralt` |
 | 9 | `foret_flottante_2` | îles, totem de poche cassé, Amanite (1re rencontre), totem de l'aigle, courants d'air | item `totem_poche_casse`, `amaniteMet`, `hasEagleForm` |
 | 10 | `clairiere_plante` | plane jusqu'à la plante, prélève la fleur | item `fleur_resistante` |

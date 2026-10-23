@@ -1,0 +1,65 @@
+{
+  "cochon_bebe_rose": {
+    "components": [
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "frames": 8,
+    "canvas": [
+      228,
+      188
+    ]
+  },
+  "cochon_bebe_gris": {
+    "components": [
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "frames": 8,
+    "canvas": [
+      228,
+      188
+    ]
+  },
+  "cochon_bebe_orange": {
+    "components": [
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "frames": 8,
+    "canvas": [
+      228,
+      188
+    ]
+  }
+}

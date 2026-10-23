@@ -49,6 +49,63 @@ function acte1FillEnergy(scene) {
   scene.registry.set('energy', p.energy);
 }
 
+// ---------------------------------------------------------------------------
+// Bulles non bloquantes (actes 1 et 2)
+// ---------------------------------------------------------------------------
+// Retour utilisateur : Xara « coupait le jeu toutes les 4 secondes » -- après
+// sa rencontre, un dialogue BLOQUANT tous les 300-600 px (feu, créature,
+// talisman, amas, mousse, empreintes, ravin, loup, ravin, plante…). Seules
+// les scènes importantes (rencontres, révélations, boss, objets) restent des
+// dialogues ; les remarques d'exploration sont des bulles au-dessus de qui
+// parle, sans geler le monde. `showSpeechBubble` (StoryKit, agent Calibrage)
+// si elle existe, sinon un toast « Xara : … ».
+function storyBulleDuree(text) {
+  return Phaser.Math.Clamp(1500 + text.length * 42, 2300, 5200);
+}
+
+function storyBulle(scene, who, text, ms) {
+  if (!scene || !scene.sys || !scene.sys.isActive() || !scene.player) return null;
+  const dur = ms || storyBulleDuree(text);
+  if (typeof showSpeechBubble === 'function') {
+    try {
+      return showSpeechBubble(scene, who === 'agarica' ? scene.player : who, text, { ms: dur });
+    } catch (e) {
+      console.warn('[bulle]', e);
+    }
+  }
+  const name = who && SPEAKERS[who] ? SPEAKERS[who].name : '';
+  return showToast(scene, name ? `${name} : ${text}` : text, dur);
+}
+
+// Enchaîne des bulles ({who, text} ou texte seul = Xara) puis, éventuellement,
+// un toast d'aide ; ne bloque rien. Arrêt si on quitte la zone.
+function storyBulles(scene, lines, toast, delay = 0) {
+  const visit = scene.__storyVisit;
+  const alive = () => scene.sys && scene.sys.isActive() && scene.__storyVisit === visit;
+  let t = delay;
+  for (const l of lines) {
+    const line = typeof l === 'string' ? { who: 'xara', text: l } : l;
+    const dur = storyBulleDuree(line.text);
+    scene.time.delayedCall(t, () => { if (alive()) storyBulle(scene, line.who, line.text, dur); });
+    t += dur + 200;
+  }
+  if (toast) {
+    const tt = typeof toast === 'string' ? { text: toast } : toast;
+    // Sans bulles (repli en toasts), le toast d'aide passe après elles.
+    const at = typeof showSpeechBubble === 'function' ? delay + 500 : t;
+    scene.time.delayedCall(at, () => { if (alive()) showToast(scene, tt.text, tt.ms || 3200); });
+  }
+}
+
+// Cinématique « bulles » pour un déclencheur : renvoie une liste d'étapes
+// VIDE (runCutscene ne verrouille alors rien, pas même un arrêt du joueur).
+function cutsceneBulles(lines, toast, delay = 0) {
+  return (scene) => {
+    storyBulles(scene, typeof lines === 'function' ? lines(scene) : lines, toast, delay);
+    return [];
+  };
+}
+
 // Plaque de mousse « grattable » (bosquet) : simple dessin + PV, sans corps.
 function acte1MossPatch(scene, x, y, w = 70) {
   const g = scene.add.graphics({ x, y });
@@ -482,24 +539,20 @@ CUTSCENES.fs1_rencontre = [
   // Xara n'a pas d'idle : pose de repos (talk figée), la parole est jouée
   // réplique par réplique par StoryKit (storySpeakerTalkAnim).
   { call: (scene) => storyNpcRest(scene.npcs.xara) },
+  // Rencontre : dialogue bloquant gardé, mais resserré à l'essentiel.
   { say: [
     { who: 'agarica', text: 'Qui… qui parle ?' },
-    { who: 'xara', name: '???', text: 'Ici. Sur la souche. Non, un peu plus à droite… Voilà. Bonsoir.' },
+    { who: 'xara', name: '???', text: 'Ici. Sur la souche. Bonsoir.' },
     { who: 'agarica', text: 'Une araignée qui parle ?! … Euh, bonsoir. Je m\'appelle Agarica.' },
     { who: 'xara', text: 'Xara. Et toi, tu es la petite druidesse qu\'on vient de mettre à la porte.' },
-    { who: 'agarica', text: 'Comment tu sais ça ?' },
-    { who: 'xara', text: 'Les portes de l\'est grincent. Et toute la forêt t\'a entendue renifler.' },
   ] },
   { call: (scene) => acte1Fs1LittleSpider(scene) },
   { wait: 900 },
   { say: [
     'Une minuscule araignée, sortie des feuilles, recule vivement devant Xara… comme on s\'incline devant quelqu\'un.',
-    { who: 'agarica', text: 'Oh ! Elle a eu peur de toi ?' },
-    { who: 'xara', text: 'De moi ? … Elle est timide, c\'est tout. Parlons plutôt de toi.' },
-    { who: 'agarica', text: 'Je n\'ai nulle part où aller. Tout ce que je connais est derrière ces portes.' },
-    { who: 'xara', text: 'Moi, je connais chaque sentier d\'ici au grand arbre. Même ceux que la forêt a oubliés.' },
-    { who: 'agarica', text: 'Je veux rentrer chez moi. Prouver au bosquet que je peux l\'aider, malgré tout.' },
-    { who: 'xara', text: 'Alors trouve un moyen d\'agir contre la mousse. Elle ne s\'arrête pas à vos palissades : elle ronge toute la forêt.' },
+    { who: 'xara', text: 'Elle est timide, c\'est tout. Parlons plutôt de toi.' },
+    { who: 'agarica', text: 'Je n\'ai nulle part où aller. Et je veux prouver au bosquet que je peux l\'aider, malgré tout.' },
+    { who: 'xara', text: 'Alors trouve un moyen d\'agir contre la mousse. Je connais chaque sentier d\'ici au grand arbre.' },
     { who: 'agarica', text: 'Tu… tu viendrais avec moi ?' },
     { who: 'xara', text: 'Il faut bien que quelqu\'un t\'empêche de tomber dans le premier ravin venu.' },
   ] },
@@ -509,44 +562,29 @@ CUTSCENES.fs1_rencontre = [
   { toast: 'Objectif : trouver un moyen d\'agir contre la mousse.' },
 ];
 
-CUTSCENES.fs1_feu = [
-  { say: [
-    { who: 'xara', text: 'Un feu de voyageurs. Les braises tiennent encore… Quelqu\'un est passé il n\'y a pas longtemps.' },
-    { who: 'agarica', text: 'De la chaleur ! Je commençais à grelotter.' },
-    { who: 'xara', text: 'Repose-toi près d\'un feu dès que tu en croises un : tes blessures se referment et ton énergie revient.' },
-    { who: 'xara', text: 'Et la forêt se souviendra de ton passage, si jamais tu t\'égares.' },
-    { who: 'xara', text: 'C\'est aussi là que tu prépareras tes formes et tes talismans… quand tu en auras.' },
-    { who: 'agarica', text: 'Mes formes ? Je ne sais pas me transformer, moi.' },
-    { who: 'xara', text: 'Pas encore.' },
-  ] },
-  { toast: 'E près d\'un feu de camp : se reposer (soin, énergie, sauvegarde, préparation).' },
-];
+CUTSCENES.fs1_feu = cutsceneBulles([
+  'Un feu de voyageurs. Repose-toi près des feux : tes blessures s\'y referment.',
+  { who: 'agarica', text: 'De la chaleur ! Je commençais à grelotter.' },
+  'C\'est aussi là que tu prépareras tes formes… quand tu en auras.',
+], { text: 'E près d\'un feu de camp : se reposer (soin, énergie, sauvegarde, préparation).', ms: 4200 });
 
-CUTSCENES.fs1_creature = [
-  { say: [
-    { who: 'xara', text: 'Chut. Quelque chose rampe, devant nous.' },
-    { who: 'agarica', text: 'Une bête… couverte de mousse, comme celle de la source !' },
-    { who: 'xara', text: 'C\'était un blaireau, avant. La mousse ne laisse pas grand-chose de ceux qu\'elle prend.' },
-    { who: 'agarica', text: 'Pauvre petite chose… Pardon. Je dois passer.' },
-  ] },
-  { toast: { text: 'K (ou clic) : attaquer.\nZ/↑ : frapper en haut — S/↓ en l\'air : frapper en bas (rebond)', ms: 4000 } },
-];
+CUTSCENES.fs1_creature = cutsceneBulles([
+  'Chut. Quelque chose rampe, devant nous… C\'était un blaireau, avant la mousse.',
+  { who: 'agarica', text: 'Pauvre petite chose… Pardon. Je dois passer.' },
+], { text: 'K (ou clic) : attaquer.\nZ/↑ : frapper en haut — S/↓ en l\'air : frapper en bas (rebond)', ms: 4500 });
 
 CUTSCENES.fs1_talisman = [
   { playerFace: 'right' },
   { say: [
     { who: 'agarica', text: 'Encore un amas… aussi dur que celui qui étouffe la source du bosquet.' },
     { who: 'xara', text: 'Et les racines, au-dessus, montent jusqu\'au ciel. C\'est le seul passage vers l\'est.' },
-    { who: 'agarica', text: 'Même Orme n\'arrivait pas à les gratter. Comment veux-tu que moi…' },
   ] },
   { call: (scene) => acte1TalismanGlow(scene) },
   { shake: { ms: 260, intensity: 0.004 } },
   { say: [
     'Contre sa poitrine, le talisman de l\'ours se met à battre comme un cœur.',
     { who: 'agarica', text: 'Aïe ! Il est brûlant !' },
-    { who: 'xara', text: 'Un talisman des anciens chefs… Cela faisait bien longtemps que je n\'en avais pas vu un s\'éveiller.' },
-    { who: 'agarica', text: 'Tu en as déjà vu d\'autres ?' },
-    { who: 'xara', text: '… Écoute-le plutôt. Il a quelque chose à te dire.' },
+    { who: 'xara', text: 'Un talisman des anciens chefs qui s\'éveille… Écoute-le.' },
   ] },
   { playerPose: 'cast' },
   { skill: 'ours' },
@@ -554,34 +592,23 @@ CUTSCENES.fs1_talisman = [
   { wait: 1200 },
   { playerPose: null },
   { say: [
-    { who: 'agarica', text: 'Je sens une force immense… comme si un ours se dressait derrière moi.' },
-    { who: 'agarica', text: '« Il te le dira lui-même, le jour venu. » Père… tu savais.' },
+    { who: 'agarica', text: 'Une force immense… comme si un ours se dressait derrière moi. Père… tu savais.' },
     { who: 'xara', text: 'Alors laisse-le frapper.' },
   ] },
   { toast: 'A : Fracas de l\'ours (consomme l\'énergie, la barre sous tes cœurs). Colle-toi à l\'amas et frappe !' },
 ];
 
-CUTSCENES.fs1_amas_brise = [
-  { wait: 500 },
-  { say: [
-    { who: 'agarica', text: 'Il a volé en éclats !' },
-    { who: 'xara', text: 'La mousse a donc un ennemi. Voilà un début.' },
-    { who: 'agarica', text: 'Si le talisman brise ça, il peut peut-être libérer la source… sauver le bosquet !' },
-    { who: 'xara', text: 'Peut-être. Mais la mousse ne pousse pas toute seule. Il faut trouver d\'où elle vient.' },
-    { who: 'agarica', text: 'Alors on trouvera. Ensemble !' },
-    { who: 'xara', text: '… Ensemble. Oui.' },
-  ] },
-  { toast: 'Frapper un ennemi recharge un peu d\'énergie. Un feu de camp la remplit.' },
-];
+CUTSCENES.fs1_amas_brise = cutsceneBulles([
+  { who: 'agarica', text: 'Il a volé en éclats !' },
+  'La mousse a donc un ennemi. Voilà un début.',
+  { who: 'agarica', text: 'Alors on trouvera d\'où elle vient. Ensemble !' },
+  '… Ensemble. Oui.',
+], { text: 'Frapper un ennemi recharge un peu d\'énergie. Un feu de camp la remplit.', ms: 3600 });
 
-CUTSCENES.fs1_mousse_partout = [
-  { say: [
-    { who: 'agarica', text: 'Même ici, si loin du bosquet… la mousse est partout.' },
-    { who: 'xara', text: 'Elle vient de l\'est. Des profondeurs, là où les arbres sont malades depuis longtemps.' },
-    { who: 'agarica', text: 'Tu en sais, des choses.' },
-    { who: 'xara', text: 'J\'ai eu beaucoup de temps pour regarder.' },
-  ] },
-];
+CUTSCENES.fs1_mousse_partout = cutsceneBulles([
+  { who: 'agarica', text: 'Même ici, si loin du bosquet… la mousse est partout.' },
+  'Elle vient de l\'est. Des profondeurs, là où les arbres sont malades depuis longtemps.',
+]);
 
 // Lueur du talisman de l'ours autour d'Agarica (anneaux chauds qui pulsent).
 function acte1TalismanGlow(scene) {
@@ -706,106 +733,61 @@ const FS2_COEUR = { x: 4700, y: 400 };
 const FS2_POCHE = { x0: 4416, x1: 5120 };
 const FS2_MUR_FLAG = 'mosswall_foret_sombre_2_mur_repulsif_foret_sombre';
 
-CUTSCENES.fs2_empreintes = [
-  { say: [
-    { who: 'agarica', text: 'Des empreintes… énormes. Une bête est passée par là, vers l\'est.' },
-    { who: 'xara', text: 'Un loup. Un très vieux loup.' },
-    { who: 'agarica', text: 'Tu peux deviner ça rien qu\'avec des traces ?' },
-    { who: 'xara', text: 'Je te l\'ai dit : je connais ces sentiers.' },
-  ] },
-];
+CUTSCENES.fs2_empreintes = cutsceneBulles([
+  { who: 'agarica', text: 'Des empreintes… énormes. Une bête est passée par là, vers l\'est.' },
+  'Un loup. Un très vieux loup.',
+]);
 
-CUTSCENES.fs2_ravin = [
-  { playerFace: 'right' },
-  { say: [
-    { who: 'agarica', text: 'Oh non… Le sentier s\'arrête net.' },
-    { who: 'agarica', text: 'C\'est bien trop large pour sauter, même avec de l\'élan.' },
-    { who: 'xara', text: 'Pour tes deux jambes, oui. Pas pour quatre pattes lancées au galop.' },
-  ] },
-  { camera: { x: FS2_TOTEM.x + 120, y: 270, ms: 900 } },
-  { say: [
-    { who: 'xara', text: 'Là-haut, sur la butte. Un totem du loup. Les anciens druides venaient y demander sa course.' },
-    { who: 'agarica', text: 'Un totem ? Comme dans les contes que me racontait Père ?' },
-    { who: 'xara', text: 'Les contes ont toujours un peu de retard sur la forêt. Va. Pose la main dessus.' },
-  ] },
-  { cameraFollow: true },
-  { toast: 'Grimpe sur la butte et appuie sur E devant le totem.' },
-];
+CUTSCENES.fs2_ravin = cutsceneBulles([
+  { who: 'agarica', text: 'Le sentier s\'arrête net… C\'est bien trop large pour sauter.' },
+  'Pour tes deux jambes, oui. Pas pour quatre pattes lancées au galop.',
+  'Là, sur la butte : un totem du loup. Va. Pose la main dessus.',
+], { text: 'Grimpe sur la butte et appuie sur E devant le totem.', ms: 3600 });
 
-CUTSCENES.fs2_loup = [
-  { wait: 2600 },
-  { say: [
-    { who: 'agarica', text: 'Mes jambes fourmillent… comme si elles voulaient galoper toutes seules !' },
-    { who: 'xara', text: 'La course du loup coule en toi, maintenant. Je savais que ce vieux totem ne dormait que d\'un œil.' },
-    { who: 'xara', text: 'Cours : garde Shift enfoncé, ou appuie deux fois vers l\'avant. Tu verras bien ce que tu deviens.' },
-    { who: 'xara', text: 'Prends de l\'élan avant le ravin, et saute au tout dernier moment.' },
-    { who: 'xara', text: 'Et ouvre l\'œil : un loup voit des pistes que les autres ne voient pas.' },
-  ] },
-  { toast: 'Shift (ou double appui ← / →) : courir en loup. Saute en pleine course pour franchir le ravin.' },
-];
+// Juste après le totem (sa bannière occupe l'écran ~2,6 s) : bulles ensuite.
+CUTSCENES.fs2_loup = cutsceneBulles([
+  { who: 'agarica', text: 'Mes jambes fourmillent… comme si elles voulaient galoper toutes seules !' },
+  'La course du loup coule en toi. Prends de l\'élan avant le ravin, et saute au dernier moment.',
+  'Et ouvre l\'œil : un loup voit des pistes que les autres ne voient pas.',
+], { text: 'Shift (ou double appui ← / →) : courir en loup. Saute en pleine course pour franchir le ravin.', ms: 4800 }, 2600);
 
-CUTSCENES.fs2_ravin_large = [
-  { playerFace: 'right' },
-  { say: [
-    { who: 'agarica', text: 'Encore un ravin… Celui-là est immense.' },
-    { who: 'xara', text: 'Les pistes, Agarica. Où vont-elles ?' },
-    { who: 'agarica', text: 'Elles… continuent dans le vide ?' },
-    { who: 'xara', text: 'Un loup ne court jamais dans le vide. Approche-toi en courant, et regarde mieux.' },
-  ] },
-  { toast: 'En forme de loup, les pistes et les passages cachés se révèlent.' },
-];
+CUTSCENES.fs2_ravin_large = cutsceneBulles([
+  { who: 'agarica', text: 'Encore un ravin… Celui-là est immense.' },
+  'Regarde les pistes. Un loup ne court jamais dans le vide : approche-toi en courant.',
+], { text: 'En forme de loup, les pistes et les passages cachés se révèlent.', ms: 3600 });
 
 CUTSCENES.fs2_plante = [
-  { say: [
-    { who: 'agarica', text: 'Oh ! De l\'eau claire… et des poissons ! Un, deux, trois.' },
-    { who: 'xara', text: 'Il reste donc des coins que la mousse n\'a pas encore touchés.' },
-  ] },
+  // Révélation (la plante qui repousse la mousse) : dialogue bloquant court.
   { camera: { x: FS2_PLANTE.x + 60, y: 230, ms: 900 } },
   { say: [
-    { who: 'agarica', text: 'Xara, regarde ! Là-haut, sur la branche de l\'arbre mort !' },
-    { who: 'agarica', text: 'Une fleur… et pas un brin de mousse autour d\'elle. La mousse s\'écarte de cette plante !' },
-    { who: 'xara', text: 'Intéressant. Très intéressant.' },
+    { who: 'agarica', text: 'Xara, regarde ! Là-haut, sur la branche : une fleur… et pas un brin de mousse autour d\'elle !' },
+    { who: 'xara', text: 'La mousse s\'écarte de cette plante. Intéressant.' },
   ] },
   { set: { planteVue: true } },
   { say: [
-    { who: 'agarica', text: 'Si j\'arrivais à en cueillir une, on pourrait peut-être s\'en servir contre la mousse !' },
-    { who: 'xara', text: 'Elle est bien trop haut. Ni toi ni ton loup n\'y grimperez.' },
-    { who: 'xara', text: 'Retiens-la. Il en pousse peut-être d\'autres, plus haut dans la forêt… là où il faudrait des ailes.' },
-    { who: 'agarica', text: 'Des ailes… Je m\'en souviendrai.' },
+    { who: 'agarica', text: 'Si j\'arrivais à en cueillir une, on pourrait s\'en servir contre la mousse !' },
+    { who: 'xara', text: 'Bien trop haut. Il en pousse peut-être d\'autres, plus haut dans la forêt… là où il faudrait des ailes.' },
   ] },
   { cameraFollow: true },
 ];
 
-CUTSCENES.fs2_mur = (scene) => {
+CUTSCENES.fs2_mur = cutsceneBulles((scene) => {
   if (storyGet(FS2_MUR_FLAG)) return [];
   if (inventoryHas('repulsif')) {
-    return [
-      { say: [
-        { who: 'xara', text: 'Le vieux passage. Avec le répulsif de Morgat, cette mousse ne tiendra pas longtemps.' },
-      ] },
-      { toast: 'E devant le mur : verser le répulsif.' },
-    ];
+    showToast(scene, 'E devant le mur : verser le répulsif.', 3200);
+    return ['Le vieux passage. Avec le répulsif de Morgat, cette mousse ne tiendra pas longtemps.'];
   }
   return [
-    { say: [
-      { who: 'agarica', text: 'Un mur de mousse, sous le surplomb… Il bouge ! On dirait qu\'il respire.' },
-      { who: 'agarica', text: 'Et si j\'essayais le talisman ?' },
-      { who: 'xara', text: 'Celle-ci est vivante. La frapper ne ferait que l\'épaissir.' },
-      { who: 'xara', text: 'Il y a un vieux passage, derrière. Il montait autrefois vers les hauteurs.' },
-      { who: 'agarica', text: 'Autrefois ? Tu es déjà passée par là ?' },
-      { who: 'xara', text: 'Il y a longtemps. Bien avant la mousse… Viens, ne traînons pas.' },
-    ] },
+    { who: 'agarica', text: 'Un mur de mousse, sous le surplomb… Il bouge ! On dirait qu\'il respire.' },
+    'Celle-ci est vivante : la frapper ne ferait que l\'épaissir. Derrière, il y a un vieux passage…',
   ];
-};
+});
 
 // Arrivée par le vieux sentier de la hutte (acte 2) : on est DANS la poche.
-CUTSCENES.fs2_arrivee_poche = [
-  { wait: 1700 },
-  { say: [
-    { who: 'xara', text: 'Le vieux sentier débouche ici… et la mousse a scellé la sortie de ce côté-ci.' },
-    { who: 'xara', text: 'Verse le répulsif sur le mur, Agarica.' },
-  ] },
-];
+CUTSCENES.fs2_arrivee_poche = cutsceneBulles([
+  'Le vieux sentier débouche ici… et la mousse a scellé la sortie de ce côté-ci.',
+  'Verse le répulsif sur le mur, Agarica.',
+], null, 1700);
 
 CUTSCENES.fs2_coeur = [
   { say: [
@@ -814,17 +796,11 @@ CUTSCENES.fs2_coeur = [
   ] },
 ];
 
-CUTSCENES.fs2_grand_arbre = [
-  { playerFace: 'right' },
-  { say: [
-    { who: 'agarica', text: 'Xara… cet arbre, là-bas. Il touche les nuages !' },
-    { who: 'xara', text: 'Le grand arbre. Le plus vieux de la forêt. Les pistes du loup mènent à ses racines.' },
-    { who: 'xara', text: 'Sois prudente, là-haut : quelque chose veille sur son sommet. Quelque chose qui n\'aime pas les visiteurs.' },
-    { who: 'agarica', text: 'Alors on lui dira bonjour poliment !' },
-    { who: 'xara', text: '… Évidemment.' },
-  ] },
-  { toast: 'Les racines du grand arbre →' },
-];
+CUTSCENES.fs2_grand_arbre = cutsceneBulles([
+  { who: 'agarica', text: 'Xara… cet arbre, là-bas. Il touche les nuages !' },
+  'Le grand arbre. Les pistes du loup mènent à ses racines.',
+  'Prudence, là-haut : quelque chose veille sur son sommet.',
+], 'Les racines du grand arbre →');
 
 // Mare préservée (décor pur, pas de clé `water`) : eau sous un vieux pont de
 // bois ; les trois poissons (clé `animals`, profondeur 4) nagent entre les deux couches.
@@ -850,14 +826,10 @@ function acte1Fs2DrawMare(scene) {
   log.fillStyle(0x2a1d16, 1).fillCircle(x - 14, y, 7).fillCircle(x + w + 14, y, 7);
 }
 
-// L'arbre mort et sa branche (case gy 1) ; la plante qui repousse la mousse,
-// avec un halo doux et une lueur qui bat lentement.
+// La plante qui repousse la mousse, sur sa haute branche (case gy 1), avec
+// un halo doux et une lueur qui bat lentement. (L'ancien tronc d'arbre mort
+// dessiné par code, un pilier sombre, a été retiré : il faisait placeholder.)
 function acte1Fs2DrawPlante(scene) {
-  const trunk = scene.add.graphics();
-  trunk.fillStyle(0x1c1626, 1).fillRect(3486, 110, 40, FS2_MARE.y - 110);
-  trunk.fillStyle(0x2a2238, 1).fillRect(3492, 110, 10, FS2_MARE.y - 110);
-  trunk.fillStyle(0x1c1626, 1).fillTriangle(3466, FS2_MARE.y, 3546, FS2_MARE.y, 3506, FS2_MARE.y - 60);
-  storyPutBehindPlayer(scene, trunk);
   const { x, y } = FS2_PLANTE;
   const halo = scene.add.circle(x, y - 26, 46, 0xffe9f5, 0.12).setBlendMode(Phaser.BlendModes.ADD);
   scene.tweens.add({ targets: halo, scale: 1.25, alpha: 0.05, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -870,30 +842,6 @@ function acte1Fs2DrawPlante(scene) {
   }
   g.fillStyle(0xfff3b0, 1).fillCircle(0, -40, 5);
   scene.tweens.add({ targets: g, angle: 3, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-}
-
-// Le grand arbre, au loin (parallaxe lente) : il se lève à l'horizon au fil
-// de la zone et domine l'écran près de la sortie vers ses racines.
-function acte1Fs2DrawGrandArbre(scene) {
-  const g = scene.add.graphics().setScrollFactor(0.15, 1).setAlpha(0.92);
-  const cx = 1390; // ≈ x 650 à l'écran quand la caméra est en bout de zone
-  g.fillStyle(0x120d26, 1);
-  g.fillRect(cx - 55, 120, 110, 420);
-  g.fillTriangle(cx - 55, 540, cx - 160, 540, cx - 55, 400);
-  g.fillTriangle(cx + 55, 540, cx + 170, 540, cx + 55, 380);
-  for (const [dx, dy, r] of [[0, 90, 150], [-150, 140, 110], [150, 130, 120], [-80, 30, 100], [90, 20, 110], [0, -20, 90]]) {
-    g.fillCircle(cx + dx, dy, r);
-  }
-  // Liseré de lune sur la cime.
-  g.lineStyle(4, 0x9d8cf0, 0.7);
-  g.beginPath();
-  g.arc(cx - 20, -20, 90, Math.PI * 1.05, Math.PI * 1.75);
-  g.strokePath();
-  // Juste devant le ciel, derrière la forêt procédurale (moveAbove ne
-  // déplace pas un objet déjà au-dessus : on vise l'index directement).
-  const bgIndex = scene.children.list.findIndex((o) => o.type === 'TileSprite');
-  if (bgIndex !== -1) scene.children.moveTo(g, bgIndex + 1);
-  return g;
 }
 
 // Empreintes boueuses du sentier de chasse (toujours visibles ; les pistes
@@ -957,7 +905,6 @@ ZONE_SCRIPTS.foret_sombre_2 = {
   create(scene) {
     const st = { hadWolf: !!storyGet('hasWolfForm'), coeurTaken: !!storyGet('coeurBonusForet'), coeur: null };
     scene.__acte1 = st;
-    acte1Fs2DrawGrandArbre(scene);
     acte1Fs2DrawMudPrints(scene, 300, 1120, 448);
     acte1Fs2DrawMare(scene);
     acte1Fs2DrawPlante(scene);

@@ -1,0 +1,24 @@
+{
+  "geralt_frames": 8,
+  "components": [
+    [
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "gif_duration_ms": 8400,
+  "gif_size": [
+    960,
+    540
+  ],
+  "hair": "brown, matching current reference",
+  "eyes": "white during trance, brown first/last"
+}

@@ -11,6 +11,11 @@
 // zone qui lui transmet les coups du joueur (takeHit). Toutes les minuteries
 // sont en `delta` cumulé (pas de scene.time) : le combat se fige
 // naturellement quand le monde est gelé (dialogue, inventaire...).
+// Retours utilisateur (2026-10-23) : il se laisse frapper À TOUT MOMENT (plus
+// d'esquive ; sonné = coups doublés), son contact blesse Agarica, il tient sa
+// liane d'une main dans une pose FIXE (léger balancement lent, la liane suit),
+// pas de mousse dessinée par code (l'art Codex suffit), et une fois battu il
+// reste inerte au sol dans sa pose `defeated_lucid` (dernière frame tenue).
 //
 // ─── API KainatiEsprit (PNJ éthéré, utilisé par l'Acte 1 dans monde_spirituel) ───
 //   const esprit = new KainatiEsprit(scene, x, y, { vine?, facing? });
@@ -34,10 +39,25 @@
 // en jeu, cf. contrat StoryKit). Sert au placement sur les lianes et aux hitbox.
 const KAINATI_DISPLAY = { w: 150, h: 170 };
 const KAINATI_HITBOX_FRACTION = { w: 0.7, h: 0.85 };
-const KAINATI_MAX_HP = 8;
+// Contact qui blesse Agarica : le cœur du corps seulement (plus petit que la
+// zone qui encaisse) -- l'arc de la dague porte au-delà du corps d'Agarica,
+// elle peut donc le frapper sans le toucher.
+const KAINATI_CONTACT_FRACTION = { w: 0.5, h: 0.7 };
+// Frappable à tout moment (14 PV) ; sonné après un plongeon, chaque coup
+// compte double : ~1 min de combat pour une joueuse correcte.
+const KAINATI_MAX_HP = 14;
+const KAINATI_STUN_DAMAGE = 2;
 // Distance depuis le haut de la liane où il s'agrippe (main = haut du corps).
 const KAINATI_GRIP = 90;
-const KAINATI_SWING_AMPLITUDE = 0.14; // rad, balancement au repos
+// Balancement au repos sur sa liane : lent et régulier (retour utilisateur :
+// « il s'excite sur sa branche ») -- ±3°, ~3,8 s par aller-retour.
+const KAINATI_SWING_AMPLITUDE = 0.05; // rad
+const KAINATI_SWING_PERIOD_DIV = 600; // ms (angle = sin(clock / div))
+// Se retourne vers Agarica seulement si elle est nettement de l'autre côté,
+// et pas plus d'une fois par KAINATI_TURN_MS (sinon flips en rafale quand
+// elle passe sous lui).
+const KAINATI_TURN_DEADZONE = 50;
+const KAINATI_TURN_MS = 700;
 const KAINATI_STONE_GRAVITY = 900;
 const KAINATI_STONE_RADIUS = 12;
 // Personnages devant les décors (cf. CHARACTER_DEPTH dans LevelKit.js) ; ses
@@ -55,20 +75,20 @@ const KAINATI_TIMINGS = {
   swing: 850,             // saut balancé d'une liane à l'autre
   leapTelegraph: 800,     // ombre au sol avant de plonger
   leap: 750,              // trajectoire du plongeon
-  // Sonné au sol après land_stomp : SEULE fenêtre de frappe (les lianes-
-  // tremplins qui le faisaient tomber ont été retirées). 2,2 s : le temps de
-  // sauter l'onde de choc, de le rejoindre et de frapper deux fois.
+  // Sonné au sol après land_stomp : fenêtre BONUS (coups doublés, cf.
+  // KAINATI_STUN_DAMAGE). 2,2 s : le temps de sauter l'onde de choc, de le
+  // rejoindre et de frapper deux fois.
   stompStun: 2200,
   // Coup encaissé alors qu'il est déjà à sa limite (KAINATI_HITS_PER_STUN) :
   // il se relève d'un bond peu après, au lieu de rester sonné.
   stunAfterLastHit: 350,
   recover: 750,           // remonte sur une liane
   rainTelegraph: 850,     // ombres au sol avant la chute des pierres du plafond
-  hitInvuln: 320,
+  hitInvuln: 350,         // entre deux coups encaissés (évite le spam)
 };
 const KAINATI_PHASE2_SPEED = 0.75;
-// Coups encaissés au plus par plongeon : 8 PV = au moins 4 plongeons (2 par
-// phase), le combat ne se règle pas en une seule ouverture.
+// Coups encaissés au plus par plongeon (sonné) avant qu'il ne se relève : le
+// combat ne se règle pas en une seule ouverture.
 const KAINATI_HITS_PER_STUN = 2;
 
 // Séquences d'actions en boucle (lisibles et prévisibles : on apprend ses
@@ -177,6 +197,47 @@ function spawnKainatiImpact(scene, x, y) {
       onComplete: () => bit.destroy(),
     });
   }
+}
+
+// Pose suspendue TENUE (art `kainati` swing_vine) : la frame la plus étroite
+// de la rangée (corps droit sous la main levée), et son « poing » (centre des
+// pixels visibles des 20 rangées du haut) en px du canvas, pour accrocher la
+// main au point de prise. Null sans art ou pixels illisibles (placeholder :
+// ancrage aux pieds historique).
+function kainatiHangPose(scene) {
+  if (scene.__kainatiHangPose !== undefined) return scene.__kainatiHangPose;
+  let best = null;
+  const def = kainatiManifestDef('kainati');
+  const a = def && def.anims && def.anims.swing_vine;
+  for (let i = 0; a && i < a.frames; i++) {
+    const key = manifestFrameKey('kainati', 'swing_vine', i);
+    const b = visibleBounds(scene, key);
+    if (!b || !b.exact || b.empty) continue;
+    if (!best || b.w / b.h < best.b.w / best.b.h) best = { key, b };
+  }
+  let pose = null;
+  if (best) {
+    const map = frameAlphaMap(scene.textures.getFrame(best.key));
+    let sx = 0;
+    let n = 0;
+    for (let y = best.b.y0; y < Math.min(map.h, best.b.y0 + 20); y++) {
+      for (let x = 0; x < map.w; x++) if (map.alpha[y * map.w + x] > VISIBLE_ALPHA_MIN) { sx += x; n++; }
+    }
+    pose = { key: best.key, fistX: sx / n, fistY: best.b.y0 + 10, footY: best.b.y1, W: best.b.frameW, H: best.b.frameH };
+  }
+  scene.__kainatiHangPose = pose;
+  return pose;
+}
+
+// Dernière frame de `defeated_lucid` (pose de défaite tenue, inerte).
+function kainatiDefeatedKey(scene) {
+  const def = kainatiManifestDef('kainati');
+  const a = def && def.anims && def.anims.defeated_lucid;
+  for (let i = a ? a.frames - 1 : -1; i >= 0; i--) {
+    const key = manifestFrameKey('kainati', 'defeated_lucid', i);
+    if (scene.textures.exists(key)) return key;
+  }
+  return null;
 }
 
 function kainatiPlayerRect(player) {
@@ -298,31 +359,15 @@ class KainatiBoss {
     this.stunStars = scene.add.text(0, 0, '✦ ✦ ✦', {
       fontFamily: 'sans-serif', fontSize: '18px', color: '#fff2a8', stroke: '#2a1f45', strokeThickness: 4,
     }).setOrigin(0.5, 1).setDepth(KAINATI_DEPTH + 3).setVisible(false);
-    // Plaques de mousse sur sa fourrure (corruption) : se retirent à la victoire.
-    this.moss = scene.add.graphics().setDepth(KAINATI_DEPTH + 1);
-    this.mossLevel = 1;
+    // (Plus de plaques de mousse dessinées par code sur sa fourrure : retour
+    // utilisateur, l'art Codex porte déjà la mousse.)
+    this.hangPose = kainatiHangPose(scene);
+    this.lastTurnAt = -Infinity;
     this.reset();
   }
 
-  setMossLevel(level, ms = 0) {
-    this.scene.tweens.killTweensOf(this);
-    if (!ms) { this.mossLevel = level; this.drawMoss(); return; }
-    this.scene.tweens.add({ targets: this, mossLevel: level, duration: ms, onUpdate: () => this.drawMoss() });
-  }
-
-  drawMoss() {
-    const g = this.moss;
-    g.clear();
-    if (this.mossLevel <= 0.01) return;
-    const { x, y } = this.feet;
-    const H = this.h;
-    const a = Phaser.Math.Clamp(this.mossLevel, 0, 1);
-    const blobs = [[-34, 0.72, 16], [26, 0.6, 20], [-8, 0.42, 14], [40, 0.3, 11], [-44, 0.25, 12], [8, 0.85, 12]];
-    for (const [dx, fy, r] of blobs) {
-      g.fillStyle(0x4f7a2a, 0.85 * a).fillCircle(x + dx, y - H * fy, r * (0.6 + 0.4 * a));
-      g.fillStyle(0x8fb04a, 0.7 * a).fillCircle(x + dx + 3, y - H * fy - 3, r * 0.45 * (0.6 + 0.4 * a));
-    }
-  }
+  // Conservée pour les scripts qui l'appelaient (mousse dessinée retirée).
+  setMossLevel() {}
 
   // Remet le boss à l'état de début de combat (aussi après la mort du joueur).
   reset() {
@@ -347,7 +392,7 @@ class KainatiBoss {
     this.alertIcon.setVisible(false);
     this.stunStars.setVisible(false);
     this.scene.tweens.killTweensOf(this);
-    this.mossLevel = 1;
+    this.releaseLianes();
     this.applyPosition();
   }
 
@@ -357,36 +402,130 @@ class KainatiBoss {
   speed() { return this.phase === 2 ? KAINATI_PHASE2_SPEED : 1; }
   dur(name) { return KAINATI_TIMINGS[name] * this.speed(); }
 
+  // Pieds quand il pend à la liane `i` : même distance main -> bas visible que
+  // la pose tenue (cf. applyHangPose), sinon h * 0.95 (placeholder).
   feetOnVine(i, angle) {
     const g = kainatiGripPoint(this.vines[i], angle);
-    return { x: g.x, y: g.y + this.h * 0.95 };
+    const p = this.hangPose;
+    const d = p ? (p.footY - p.fistY) * Math.abs(this.sprite.scaleY) : this.h * 0.95;
+    return { x: g.x + Math.sin(angle) * d, y: g.y + Math.cos(angle) * d };
   }
 
   setState(state, extra = {}) {
     this.state = state;
     this.t = 0;
     Object.assign(this, { from: { ...this.feet } }, extra);
-    const anim = {
+    // Sur la liane (attente, télégraphes, lancer, cri, saut balancé) : AUCUNE
+    // anim -- la pose suspendue tenue (cf. applyHangPose) ; l'ancienne
+    // alternance swing_vine/throw_stone (poses debout) faisait sauter sa main
+    // d'une frame à l'autre. Les télégraphes restent lisibles (flash + « ! »).
+    const anim = this.hangPose && this.isVineState(state) ? null : {
       hang: 'swing_vine', swing: 'swing_vine', throwTelegraph: 'throw_stone', throw: 'throw_stone',
       leapTelegraph: 'leap', leap: 'leap', stunned: 'land_stomp', recover: 'leap',
-      rainTelegraph: 'throw_stone', roar: 'land_stomp', defeated: 'defeated_lucid', calm: 'idle', idle: 'idle',
+      rainTelegraph: 'throw_stone', roar: 'land_stomp', defeated: 'defeated_lucid', idle: 'idle',
     }[state];
-    if (anim && this.sprite.playManifest) this.sprite.playManifest(anim);
+    if (!this.isVineState(state)) this.clearHangPose();
+    if (state === 'calm') this.holdDefeatedPose();
+    else if (anim && this.sprite.playManifest) this.sprite.playManifest(anim);
     this.alertIcon.setVisible(['throwTelegraph', 'leapTelegraph', 'rainTelegraph', 'roar'].includes(state));
     this.stunStars.setVisible(state === 'stunned');
   }
 
   applyPosition() {
-    this.sprite.setPosition(this.feet.x, this.feet.y);
+    if (!this.hangAnchored) this.sprite.setPosition(this.feet.x, this.feet.y);
     this.alertIcon.setPosition(this.feet.x, Math.max(48, this.feet.y - this.h - 6));
     this.stunStars.setPosition(this.feet.x, this.feet.y - this.h - 4);
-    this.drawMoss();
   }
 
-  getHitRect() {
-    const w = this.size.w * KAINATI_HITBOX_FRACTION.w;
-    const h = this.h * KAINATI_HITBOX_FRACTION.h;
+  isVineState(state = this.state) {
+    return ['hang', 'throwTelegraph', 'throw', 'rainTelegraph', 'roar', 'leapTelegraph', 'swing'].includes(state);
+  }
+
+  // Pose suspendue tenue, la main sur le point de prise `grip`, le corps
+  // incliné de `angle` (comme la liane) : origine du sprite = son poing,
+  // rotation autour de lui. `this.feet` (zones de coup, icônes) suit le bas
+  // visible du corps. Sans art : ancrage aux pieds historique.
+  applyHangPose(grip, angle) {
+    const pose = this.hangPose;
+    if (!pose) {
+      this.feet = { x: grip.x, y: grip.y + this.h * 0.95 };
+      return;
+    }
+    const sp = this.sprite;
+    if (sp.anims.isPlaying) sp.anims.stop();
+    if (sp.texture.key !== pose.key) sp.setTexture(pose.key);
+    const u = sp.flipX ? pose.W - pose.fistX : pose.fistX;
+    sp.setOrigin(u / pose.W, pose.fistY / pose.H);
+    sp.setRotation(-angle);
+    sp.setPosition(grip.x, grip.y);
+    this.hangAnchored = true;
+    const d = (pose.footY - pose.fistY) * Math.abs(sp.scaleY);
+    this.feet = { x: grip.x + Math.sin(angle) * d, y: grip.y + Math.cos(angle) * d };
+  }
+
+  clearHangPose() {
+    if (!this.hangAnchored) return;
+    this.hangAnchored = false;
+    this.sprite.setOrigin(0.5, 1).setRotation(0);
+  }
+
+  // Battu : dernière frame de `defeated_lucid`, figée (aucune anim, aucun
+  // mouvement), posée par son bas visible (origine aux pieds visibles).
+  holdDefeatedPose() {
+    this.clearHangPose();
+    const key = kainatiDefeatedKey(this.scene);
+    const sp = this.sprite;
+    sp.anims.stop();
+    if (key) sp.setTexture(key);
+    sp.setAngle(0);
+  }
+
+  // Liane (Liane.js) sur laquelle il est suspendu : tenue et dessinée à son
+  // angle (au lieu d'osciller de son côté pendant qu'il se balance autrement).
+  lianeFor(i) {
+    const v = this.vines[i];
+    const list = Array.isArray(this.scene.vines) ? this.scene.vines : [];
+    return v ? list.find((l) => l && l.alive && Math.abs(l.x - v.x) < 1 && Math.abs(l.y - v.y) < 1) || null : null;
+  }
+
+  holdLiane(i, angle) {
+    const l = this.lianeFor(i);
+    for (const o of Array.isArray(this.scene.vines) ? this.scene.vines : []) {
+      if (o && o !== l && o.grabbedBy === this) this.releaseLiane(o);
+    }
+    if (!l || (l.grabbedBy && l.grabbedBy !== this)) return;
+    l.grabbedBy = this;
+    l.theta = angle;
+    l.drawTheta = angle;
+    l.omega = 0;
+  }
+
+  releaseLiane(l) {
+    l.grabbedBy = null;
+    l.omega = 0;
+  }
+
+  releaseLianes() {
+    for (const o of Array.isArray(this.scene.vines) ? this.scene.vines : []) {
+      if (o && o.grabbedBy === this) this.releaseLiane(o);
+    }
+  }
+
+  // Suspendu à la liane `i` avec l'angle `angle` (pose tenue + liane tenue).
+  hangOn(i, angle) {
+    this.holdLiane(i, angle);
+    this.applyHangPose(kainatiGripPoint(this.vines[i], angle), angle);
+  }
+
+  getHitRect(fraction = KAINATI_HITBOX_FRACTION) {
+    const w = this.size.w * fraction.w;
+    const h = this.h * fraction.h;
     return new Phaser.Geom.Rectangle(this.feet.x - w / 2, this.feet.y - h, w, h);
+  }
+
+  // Zone dont le contact blesse Agarica (cf. KAINATI_CONTACT_FRACTION).
+  getContactRect() {
+    return this.getHitRect(KAINATI_CONTACT_FRACTION);
   }
 
   isOnVine() {
@@ -398,24 +537,21 @@ class KainatiBoss {
   }
 
   // Appelée une fois par attaque du joueur (cf. contrat takeHit de LevelKit).
-  // Renvoie true si le coup porte. Hors de sa fenêtre (suspendu, en plein
-  // bond) il esquive : éclat bleu, `lastDodge` lu par le script de zone pour
-  // l'indice « attends qu'il retombe ».
+  // Renvoie true si le coup porte : À TOUT MOMENT du combat (retour
+  // utilisateur : plus d'esquive), un coup par KAINATI_TIMINGS.hitInvuln
+  // (flash blanc). Sonné au sol : coups doublés (fenêtre bonus).
   takeHit() {
     if (!this.active || this.defeated || this.invuln > 0) return false;
-    if (this.isVulnerable()) {
-      this.damage(1);
+    const stunned = this.isVulnerable();
+    this.damage(stunned ? KAINATI_STUN_DAMAGE : 1);
+    if (stunned) {
       this.stunHits += 1;
       // Limite atteinte : il se relève vite (cf. KAINATI_HITS_PER_STUN).
       if (!this.defeated && this.stunHits >= KAINATI_HITS_PER_STUN) {
         this.stunFor = Math.min(this.stunFor, this.t + KAINATI_TIMINGS.stunAfterLastHit);
       }
-      return true;
     }
-    this.lastDodge = this.clock;
-    this.sprite.setTintFill(0x9fd4ff);
-    this.scene.time.delayedCall(80, () => this.sprite.active && !this.defeated && this.sprite.clearTint());
-    return false;
+    return true;
   }
 
   damage(n) {
@@ -435,12 +571,15 @@ class KainatiBoss {
   }
 
   // Ne meurt pas : redevient lucide (le script de zone enchaîne la cinématique).
+  // Inerte dès cet instant : plus d'IA, d'attaque ni de contact (cf. update),
+  // posé au sol (bas visible) dans `defeated_lucid` jouée une fois puis tenue.
   defeat() {
     if (this.defeated) return;
     this.defeated = true;
     this.hazards.clear();
     this.pendingThrows = [];
-    this.feet = { x: this.feet.x, y: this.cfg.floorY };
+    this.releaseLianes();
+    this.feet = { x: Phaser.Math.Clamp(this.feet.x, this.cfg.minX + 60, this.cfg.maxX - 60), y: this.cfg.floorY };
     this.setState('defeated');
     this.sprite.clearTint().setAngle(0);
     this.applyPosition();
@@ -453,9 +592,10 @@ class KainatiBoss {
     this.active = false;
     this.hazards.clear();
     this.pendingThrows = [];
+    this.releaseLianes();
     this.feet = { x: x ?? this.feet.x, y: this.cfg.floorY };
-    this.setState('calm');
     this.sprite.clearTint().setAngle(0).setScale(this.baseScaleX(), this.baseScaleY());
+    this.setState('calm');
     this.applyPosition();
   }
 
@@ -527,22 +667,23 @@ class KainatiBoss {
       this.pendingThrows = this.pendingThrows.filter((q) => q.at > 0);
     }
     if (this.calm || this.defeated) {
-      // Hors combat, le sprite fait foi (les cinématiques peuvent le déplacer
-      // via scene.npcs.kainati) : on ne fait que suivre sa position.
+      // Inerte : ni IA, ni attaque, ni contact, ni balancement. Le sprite fait
+      // foi (une cinématique peut le déplacer via scene.npcs.kainati).
       this.feet = { x: this.sprite.x, y: this.sprite.y };
       this.alertIcon.setPosition(this.feet.x, this.feet.y - this.h - 6);
-      this.drawMoss();
       return;
     }
     this.t += dt;
-    const sway = Math.sin(this.clock / 420) * KAINATI_SWING_AMPLITUDE;
+    // Tourné vers Agarica AVANT de poser la pose suspendue (son origine dépend du miroir).
+    if (player && this.state !== 'stunned') this.face(player.x);
+    const sway = Math.sin(this.clock / KAINATI_SWING_PERIOD_DIV) * KAINATI_SWING_AMPLITUDE;
     switch (this.state) {
       case 'hang':
-        this.feet = this.feetOnVine(this.vineIndex, sway);
+        this.hangOn(this.vineIndex, sway);
         if (this.active && this.t >= this.dur('hang')) this.nextAction(player);
         break;
       case 'throwTelegraph':
-        this.feet = this.feetOnVine(this.vineIndex, sway * 0.3);
+        this.hangOn(this.vineIndex, sway);
         this.blink(0xffe066);
         if (this.t >= this.dur('throwTelegraph')) {
           this.sprite.clearTint();
@@ -551,11 +692,11 @@ class KainatiBoss {
         }
         break;
       case 'throw':
-        this.feet = this.feetOnVine(this.vineIndex, sway);
+        this.hangOn(this.vineIndex, sway);
         if (this.t >= 400) this.setState('hang');
         break;
       case 'rainTelegraph':
-        this.feet = this.feetOnVine(this.vineIndex, sway * 0.3);
+        this.hangOn(this.vineIndex, sway);
         this.blink(0xff9a5a);
         if (this.t >= this.dur('throwTelegraph')) {
           this.sprite.clearTint();
@@ -566,16 +707,27 @@ class KainatiBoss {
         break;
       case 'swing': {
         const k = Math.min(1, this.t / this.dur('swing'));
-        const to = this.feetOnVine(this.toVine, 0);
         const e = Phaser.Math.Easing.Sine.InOut(k);
-        // Arc qui plonge vers le bas (balancement) avant de remonter.
-        this.feet = { x: Phaser.Math.Linear(this.from.x, to.x, e), y: Phaser.Math.Linear(this.from.y, to.y, e) + Math.sin(Math.PI * k) * 70 };
-        this.sprite.setAngle((to.x > this.from.x ? 1 : -1) * Math.sin(Math.PI * k) * 18);
+        const dir = this.vines[this.toVine].x > this.vines[this.vineIndex].x ? 1 : -1;
+        if (this.hangPose) {
+          // Main qui file d'une prise à l'autre sur un arc qui plonge, corps
+          // incliné vers l'arrière (pose tenue, aucune anim) ; les lianes
+          // reprennent leur oscillation libre.
+          const a = kainatiGripPoint(this.vines[this.vineIndex], 0);
+          const b = kainatiGripPoint(this.vines[this.toVine], 0);
+          this.releaseLianes();
+          this.applyHangPose({ x: Phaser.Math.Linear(a.x, b.x, e), y: Phaser.Math.Linear(a.y, b.y, e) + Math.sin(Math.PI * k) * 70 },
+            -dir * Math.sin(Math.PI * k) * 0.3);
+        } else {
+          const to = this.feetOnVine(this.toVine, 0);
+          this.feet = { x: Phaser.Math.Linear(this.from.x, to.x, e), y: Phaser.Math.Linear(this.from.y, to.y, e) + Math.sin(Math.PI * k) * 70 };
+          this.sprite.setAngle(dir * Math.sin(Math.PI * k) * 18);
+        }
         if (k >= 1) { this.vineIndex = this.toVine; this.sprite.setAngle(0); this.setState('hang'); }
         break;
       }
       case 'leapTelegraph':
-        this.feet = this.feetOnVine(this.vineIndex, 0);
+        this.hangOn(this.vineIndex, 0);
         this.blink(0xff5a5a);
         this.growMarker(this.t / this.dur('leapTelegraph'));
         if (this.t >= this.dur('leapTelegraph')) { this.sprite.clearTint(); this.setState('leap', { leapX: this.leapX }); }
@@ -587,8 +739,6 @@ class KainatiBoss {
           y: Phaser.Math.Linear(this.from.y, this.cfg.floorY, k * k) - Math.sin(Math.PI * k) * 120,
         };
         this.growMarker(1);
-        // Contact dangereux pendant la descente.
-        if (k > 0.55 && player.body && Phaser.Geom.Intersects.RectangleToRectangle(this.getHitRect(), kainatiPlayerRect(player))) player.hitByEnemy();
         if (k >= 1) this.landStomp(player);
         break;
       }
@@ -623,16 +773,22 @@ class KainatiBoss {
       }
       case 'roar':
         // Entrée en phase 2 : cri + secousse, puis pluie de pierres.
-        this.feet = this.feetOnVine(this.vineIndex, 0);
+        this.hangOn(this.vineIndex, 0);
         if (this.t < 30) this.scene.cameras.main.shake(700, 0.008);
         if (this.t >= 900) { this.rocksFromCeiling(player, 3); this.setState('hang'); }
         break;
       default:
         break;
     }
-    if (this.state !== 'swing' && this.state !== 'stunned') this.sprite.setAngle(0);
-    if (player && this.state !== 'stunned') this.face(player.x);
+    if (this.state !== 'swing' && this.state !== 'stunned' && !this.hangAnchored) this.sprite.setAngle(0);
     this.applyPosition();
+    // Contact : blesse Agarica pendant tout le combat (suspendu, en bond, au
+    // sol), jamais sonné (fenêtre de frappe) ni battu. Invulnérabilité après
+    // un coup gérée par Player.hitByEnemy.
+    if (this.active && this.state !== 'stunned' && player && player.body
+      && Phaser.Geom.Intersects.RectangleToRectangle(this.getContactRect(), kainatiPlayerRect(player))) {
+      player.hitByEnemy();
+    }
   }
 
   landStomp(player) {
@@ -646,8 +802,14 @@ class KainatiBoss {
     this.setState('stunned', { stunFor: KAINATI_TIMINGS.stompStun });
   }
 
+  // Vers Agarica, avec zone morte et délai (cf. KAINATI_TURN_DEADZONE) : il ne
+  // bascule plus d'un côté à l'autre quand elle passe sous lui.
   face(x) {
-    this.sprite.setFlipX(kainatiFlipFor('kainati', x > this.feet.x));
+    const want = kainatiFlipFor('kainati', x > this.feet.x);
+    if (want === this.sprite.flipX) return;
+    if (Math.abs(x - this.feet.x) < KAINATI_TURN_DEADZONE || this.clock - this.lastTurnAt < KAINATI_TURN_MS) return;
+    this.lastTurnAt = this.clock;
+    this.sprite.setFlipX(want);
   }
 
   growMarker(k) {
@@ -665,9 +827,9 @@ class KainatiBoss {
 
   destroy() {
     this.hazards.clear();
+    this.releaseLianes();
     this.alertIcon.destroy();
     this.stunStars.destroy();
-    this.moss.destroy();
     this.sprite.destroy();
   }
 }

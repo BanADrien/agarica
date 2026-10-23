@@ -276,7 +276,8 @@ class MousseCreature extends Phaser.Physics.Arcade.Sprite {
     const w = MOUSSE_BODY_W / this.baseScale / sx;
     const h = MOUSSE_BODY_H / this.baseScale / sy;
     this.body.setSize(w, h, false);
-    this.body.setOffset((this.width - w) / 2, this.height - h);
+    // `footMargin` : marge transparente sous les pieds (cf. applyEnemyManifestArt).
+    this.body.setOffset((this.width - w) / 2, this.height - h - (this.footMargin || 0));
   }
 
   update(player) {

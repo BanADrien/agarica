@@ -11,28 +11,31 @@
 // - Kainati se balance de liane en liane, lance des salves de pierres en cloche
 //   (flash jaune + « ! » avant ; un coup de dague brise une pierre), puis
 //   plonge sur Agarica (flash rouge + ombre au sol) : land_stomp = ondes de
-//   choc au ras du sol (à sauter) puis il reste SONNÉ au sol ~2,2 s → seule
-//   fenêtre de frappe (1 PV par coup, 2 coups au plus par plongeon : il se
-//   relève alors d'un bond). Il plonge à chaque cycle (~9 s en phase 1).
-//   Frappé ailleurs (suspendu, en plein bond), il esquive (éclat bleu).
-// - 8 PV. À 4 PV : phase 2 (cri, tout ×0,75 plus rapide, salves de 3 pierres,
+//   choc au ras du sol (à sauter) puis il reste SONNÉ au sol ~2,2 s → fenêtre
+//   BONUS (2 PV par coup, 2 coups au plus par plongeon : il se relève alors
+//   d'un bond). Il plonge à chaque cycle (~9 s en phase 1).
+//   Il encaisse aussi À TOUT MOMENT (retour utilisateur 2026-10-23 : plus
+//   d'esquive) : 1 PV par coup (arc de dague, coup vers le haut quand il passe
+//   à portée, coup vers le bas avec rebond, pierre), ~0,35 s entre deux coups.
+//   Son contact blesse Agarica (sauf sonné ou battu).
+// - 14 PV. À 7 PV : phase 2 (cri, tout ×0,75 plus rapide, salves de 3 pierres,
 //   deux plongeons par cycle, pluie de pierres du plafond avec ombres au sol,
 //   y compris après chaque stomp).
-// - Victoire à 0 PV : il ne meurt pas (defeated_lucid), la mousse le quitte en
-//   partie, cinématique « kainati_victoire », flag `kainatiDefeated`, rideau de
+// - Victoire à 0 PV : il ne meurt pas (defeated_lucid, dernière frame tenue :
+//   inerte, plus d'IA ni de contact), cinématique « kainati_victoire », flag
+//   `kainatiDefeated`, rideau de
 //   mousse droit dissous, sorties vers le totem du singe (MondeSpirituelScene)
 //   et la route des hauteurs (ForetFlottante1Scene) créées.
 // - Mort d'Agarica : réapparition au point d'entrée, combat remis à zéro
 //   (Kainati plein PV sur sa liane, projectiles effacés, arène rouverte) ; il
 //   redémarre en repassant `lockX` (sans redonner l'intro).
-// - Revisite après victoire : Kainati apaisé au sol, « E : parler »
-//   (dialogue `kainati_calme`), passages ouverts.
+// - Revisite après victoire : Kainati apaisé au sol, immobile dans la même
+//   pose, « E : parler » (dialogue `kainati_calme`), passages ouverts.
 //
 // Flags : `kainatiIntroSeen`, `kainatiDefeated`.
 // Cinématiques / dialogues (surchargeables par src/story/acte1.js, chargé après) :
 //   CUTSCENES|DIALOGUES `kainati_intro`, `kainati_victoire` ; DIALOGUES `kainati_calme`.
-// Indices (toasts, une fois par combat) : au début, au 1er étourdissement, à
-// la 1re esquive.
+// Indices (toasts, une fois par combat) : au début, au 1er étourdissement.
 
 const KAINATI_TALK_RANGE = 150;
 
@@ -172,13 +175,7 @@ function kainatiUpdateHints(scene, st) {
   if (!st.fightActive || !boss || boss.defeated) return;
   if (boss.state === 'stunned' && !st.toldStun) {
     st.toldStun = true;
-    kainatiToast(scene, 'Kainati est sonné au sol : frappe-le !');
-  } else if (boss.lastDodge != null && boss.lastDodge !== st.seenDodge) {
-    st.seenDodge = boss.lastDodge;
-    if (!st.toldDodge && boss.state !== 'stunned') {
-      st.toldDodge = true;
-      kainatiToast(scene, "Il esquive là-haut… Attends qu'il plonge et retombe au sol.");
-    }
+    kainatiToast(scene, 'Kainati est sonné au sol : chaque coup compte double !');
   }
 }
 
@@ -202,6 +199,16 @@ function kainatiCheckPlayerHits(scene, st, time) {
     st.lastSkillRect = sk;
     boss.takeHit({ type: 'skill' });
   }
+  // Pierres lancées par Agarica (compétence pierre) : hors de scene.enemies,
+  // Kainati n'est pas touché par leur overlap -- testées ici.
+  if (typeof PierreProjectile === 'function') {
+    for (const o of scene.children.list) {
+      if (!(o instanceof PierreProjectile) || o.done || !o.active) continue;
+      if (!Phaser.Geom.Intersects.RectangleToRectangle(o.getBounds(), rect)) continue;
+      if (boss.takeHit({ type: 'pierre' }) && typeof ENERGY_PER_HIT !== 'undefined' && p.gainEnergy) p.gainEnergy(ENERGY_PER_HIT);
+      o.shatter();
+    }
+  }
 }
 
 // --- Déroulé ---
@@ -220,8 +227,7 @@ async function kainatiStartFight(scene, st) {
   st.fightActive = true;
   st.starting = false;
   st.toldStun = false;
-  st.toldDodge = false;
-  kainatiToast(scene, "Esquive ses pierres. Quand il plonge, saute l'onde de choc… puis frappe !", 3200);
+  kainatiToast(scene, "Frappe-le dès qu'il passe à ta portée (saute, ↑ + attaque). Quand il plonge, saute l'onde de choc : sonné, il encaisse double !", 3800);
 }
 
 // Mort d'Agarica (ou sortie forcée) : tout revient à l'état d'avant combat.
@@ -261,7 +267,6 @@ async function kainatiVictory(scene, st) {
   st.fightActive = false;
   kainatiHideBar(scene, st);
   kainatiSetFlag(scene, 'kainatiDefeated', true);
-  st.boss.setMossLevel(0.3, 1500); // la mousse se retire (en partie)
   await kainatiDelay(scene, 1300);
   if (st.disposed) return;
   await kainatiPlay(scene, 'kainati_victoire');
@@ -303,7 +308,6 @@ ZONE_SCRIPTS.kainati_arene = {
 
     if (kainatiFlag(scene, 'kainatiDefeated', false)) {
       st.boss.makeCalm(cfg.calmX);
-      st.boss.setMossLevel(0.3, 0);
       kainatiRevealPassage(scene, st, true);
     }
 

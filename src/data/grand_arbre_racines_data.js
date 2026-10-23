@@ -53,16 +53,19 @@ const GRAND_ARBRE_RACINES_DATA = {
     ...groundRow(0, 5, [-2]),       // corniche de l'épreuve du singe (x 0-320, y=-128)
     ...groundRow(29, 32, [-1]),     // branche intermédiaire (x 1856-2048, y=0)
     ...groundRow(34, 50, [-3]),     // grande branche haute (x 2176-3200, y=-192)
+    ...groundRow(13, 14, [-7]), ...groundRow(8, 9, [-7]), // accroches des deux lianes
   ],
   // Le tronc (x ~1540-2120) est dessiné par le script de zone, derrière les branches.
   playerSpawn: { x: 110, y: 412 },
   // Lianes de l'épreuve : décor sans la forme singe (Xara le remarque).
   // (x, y = attache en haut ; bas à ~110 px au-dessus de la branche d'élan.)
-  // Une sur deux retirée (celle du milieu, x 665) : 370 px d'écart, il faut
-  // lâcher avec l'élan (demande utilisateur).
+  // Une sur deux retirée (celle du milieu) : 320 px d'écart, il faut lâcher
+  // avec l'élan (demande utilisateur).
+  // Chaque liane pend sous un bloc (rangée -7, au ras du haut du monde :
+  // au-dessus de la tête d'Agarica quand elle saute depuis la branche d'élan).
   vines: [
-    { x: 850, y: -420, length: 180 },
-    { x: 480, y: -420, length: 180 },
+    { x: 864, y: -384, length: 244 },
+    { x: 544, y: -384, length: 244 },
   ],
   enemies: [
     // Dans le tunnel : la mousse qui remonte vers le tronc.
@@ -73,19 +76,15 @@ const GRAND_ARBRE_RACINES_DATA = {
     { type: 'singe_corrompu', x: 2960, y: -240, patrolMinX: 2820, patrolMaxX: 3110 },
   ],
   campfires: [{ x: 1600, y: 64 }],
-  // Décors du grand arbre (`grand_arbre`) et de son tronc (`grand_arbre_tronc`,
-  // le long de la montée fourche → branche haute, devant le tronc dessiné ; le
-  // script les glisse derrière les branches). Petits dans le tunnel (144 px).
+  // Décors du grand arbre (`grand_arbre`) ; le tronc lui-même (x 1540-2120) est
+  // monté par le script avec les morceaux `grand_arbre_tronc_*`. Petits décors
+  // dans le tunnel (144 px libres).
   props: [
     { type: 'grand_arbre_racine_tunnel', x: 150, y: RACINES_SURFACE_Y, scale: 0.45 },  // le pied de l'arbre
     { type: 'grand_arbre_morceaux_ecorce', x: 440, y: RACINES_SURFACE_Y, scale: 0.28 },
     { type: 'grand_arbre_tas_pierres', x: 1000, y: RACINES_SURFACE_Y, scale: 0.26 },
     { type: 'grand_arbre_champignon_etagere', x: 1472, y: 320, scale: 0.28 },        // sur la butte
     { type: 'grand_arbre_nid_singe', x: 1440, y: 64, scale: 0.26 },                  // sur la fourche
-    { type: 'grand_arbre_tronc_paroi_noeud', x: 1680, y: 64, scale: 0.42 },
-    { type: 'grand_arbre_tronc_seve_corrompue', x: 1800, y: RACINES_SURFACE_Y, scale: 0.5 },
-    { type: 'grand_arbre_tronc_fenetre_lune', x: 1960, y: RACINES_SURFACE_Y, scale: 0.5 },
-    { type: 'grand_arbre_tronc_champignons_lumineux', x: 2240, y: -192, scale: 0.4 },
     { type: 'grand_arbre_tas_pierres', x: 2520, y: -192, scale: 0.26 },
     { type: 'grand_arbre_statue_simien', x: 3060, y: -192, scale: 0.32 },             // avant la cime
     { type: 'grand_arbre_champignon_etagere', x: 2420, y: RACINES_SURFACE_Y, scale: 0.4 },

@@ -1,0 +1,25 @@
+{
+  "mode": "image_gen intégré",
+  "prompts": "prompts.json",
+  "references": [
+    "assets/ui/portraits/geralt.png",
+    "assets/sprites/geralt_frames/geralt_row5_2.png",
+    "assets/sprites/clak.png",
+    "assets/sprites/clak_frames/clak_row0_0.png"
+  ],
+  "outputs": [
+    {
+      "id": 0,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-51cb0725-b511-422f-88af-beda3df3885f.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": 1,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-658e2946-ffc0-433f-a1e4-2b935b283cfb.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "id": 2,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-35c4a73e-28fd-4b7c-b525-fec1eb51c7df.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    }
+  ],
+  "assembly_script": "docs/production/preparer_invocation_clak_2026_10_23.py"
+}

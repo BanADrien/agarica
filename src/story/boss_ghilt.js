@@ -221,6 +221,17 @@ function ghHideBossBar(scene) {
 
 // Listeners de scène : l'instance de scène est réutilisée d'une visite à
 // l'autre, donc tout `on` doit être retiré au shutdown (sinon doublons).
+// Séquence asynchrone du boss : si la zone a été quittée entre deux étapes
+// (menu pause → titre, rechargement…), elle s'arrête sans erreur au lieu de
+// planter sur `scene.player` devenu nul.
+function ghRun(scene, fn, label) {
+  const visit = scene.__storyVisit;
+  return Promise.resolve().then(fn).catch((e) => {
+    if (!scene.sys || !scene.sys.isActive() || scene.__storyVisit !== visit || !scene.player) return;
+    console.error(label, e);
+  });
+}
+
 function ghOn(scene, event, fn) {
   scene.events.on(event, fn);
   scene.events.once('shutdown', () => scene.events.off(event, fn));
@@ -402,7 +413,7 @@ ZONE_SCRIPTS.ghilt_arene = {
     // Juste derrière Agarica (devant le sol) : elle reste lisible quand elle saute par-dessus.
     scene.children.moveBelow(boss, scene.player);
 
-    ghOn(scene, 'ghilt-threshold', () => ghiltChute(scene, st));
+    ghOn(scene, 'ghilt-threshold', () => ghRun(scene, () => ghiltChute(scene, st), 'ghilt chute'));
     ghOn(scene, 'ghilt-weakened', () => ghiltWeakenedHint(scene, st));
     ghOn(scene, 'ghilt-heal-refused', () => {
       const now = scene.time.now;
@@ -410,8 +421,8 @@ ZONE_SCRIPTS.ghilt_arene = {
       st.toastAt = now + 3000;
       ghToast(scene, 'La mousse résiste… Affaiblis-le d\'abord !');
     });
-    ghOn(scene, 'ghilt-healed', () => ghiltSoin(scene, st));
-    ghOn(scene, 'ghilt-player-down', () => ghiltPlayerDown(scene, st));
+    ghOn(scene, 'ghilt-healed', () => ghRun(scene, () => ghiltSoin(scene, st), 'ghilt soin'));
+    ghOn(scene, 'ghilt-player-down', () => ghRun(scene, () => ghiltPlayerDown(scene, st), 'ghilt reprise'));
     // Le dernier cœur perdu gèle le monde le temps de la pose `death`
     // (Player.hitByEnemy, ~1,1 s) puis remet les cœurs au maximum : Ghilt.update
     // (coupé pendant le gel) ne voyait donc jamais `hearts <= 0`, et la phase
@@ -430,7 +441,7 @@ ZONE_SCRIPTS.ghilt_arene = {
     ghOn(scene, 'player-depleted', () => onHearts(null, 0));
 
     const run = phase === 1 ? ghiltIntroPhase1 : ghiltIntroPhase2;
-    run(scene, st).catch((e) => console.error('ghilt intro', e));
+    ghRun(scene, () => run(scene, st), 'ghilt intro');
   },
   // Tout est piloté par Ghilt.update (appelé par LevelKit via scene.enemies)
   // et par ghTick : rien à faire ici.
@@ -753,7 +764,7 @@ ZONE_SCRIPTS.trou_sombre = {
       return;
     }
     scene.__exits = []; // la sortie n'apparaît qu'une fois le totem activé
-    trouSequence(scene, exits).catch((e) => console.error('trou_sombre', e));
+    ghRun(scene, () => trouSequence(scene, exits), 'trou_sombre');
   },
   update() {},
 };

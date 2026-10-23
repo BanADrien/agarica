@@ -115,12 +115,14 @@ const EDITOR_MIN_RECT = 16;
 // Conventions de coordonnées : cf. PLAN_DEV.md (centre pour triggers/
 // mousse, coin haut-gauche pour windCurrents/poissons, grille pour
 // hiddenPlatforms, y absent = posé au sol au runtime).
-// Pieds d'un PNJ dans l'aperçu : `onProp` -> haut visible du décor sous lui,
-// comme au runtime (cf. storyNpcFootY dans StoryKit.js) ; sinon y ou le sol.
-function editorNpcFootY(ed, e) {
+// Pieds d'un PNJ dans l'aperçu : `onProp` -> dessus du décor sous ses pieds,
+// comme au runtime (cf. storyNpcFootY / propSurfaceYUnder) ; sinon y ou le
+// sol. `sprite` (aperçu déjà créé) : emprise réelle de ses pieds.
+function editorNpcFootY(ed, e, sprite = null) {
   if (e.onProp) {
     const props = ed.markers.filter((m) => m.kind === 'prop').map((m) => Object.assign(m.obj[0], { propType: m.entry.type }));
-    const top = propTopYAt({ props }, e.x, e.onProp === true ? null : e.onProp);
+    const type = e.onProp === true ? null : e.onProp;
+    const top = sprite ? propSurfaceYUnder({ props }, sprite, type, e.x) : propTopYAt({ props }, e.x, type);
     if (top != null) return top;
   }
   return e.y != null ? e.y : ed.groundYOr(e.x, 400);
@@ -142,6 +144,7 @@ const EDITOR_STORY_KINDS = {
       const y = editorNpcFootY(ed, e);
       const sprite = addManifestSprite(ed, e.x, y, e.sprite || e.id, e.anim || 'idle');
       if (e.facing === 'left') sprite.setFlipX(true);
+      if (e.onProp) sprite.y = editorNpcFootY(ed, e, sprite);
       const talk = typeof e.talk === 'string' ? e.talk : (e.talk ? '(conditionnel)' : '—');
       return [sprite, ed.markerLabel(e.x, y - sprite.displayHeight - 10, `PNJ ${e.key || e.id} : ${talk}`, '#ffe08a')];
     },
@@ -940,7 +943,7 @@ class EditorScene extends Phaser.Scene {
       // + PROP_GROUND_SINK : addCampfire pose les bûches sur la surface de
       // marche (haut de la hitbox), comme les props -- l'aperçu ne ment pas,
       // même raison que TOTEM_GROUND_SINK pour l'outil Totem juste au-dessus.
-      const obj = this.add.image(worldX, y + PROP_GROUND_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE);
+      const obj = anchorVisibleFeet(this.add.image(worldX, y + PROP_GROUND_SINK + GROUND_CONTACT_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE));
       this.markers.push({ kind: 'campfire', entry, obj: [obj], sourceArray: this.data.campfires });
       return;
     }
@@ -954,7 +957,7 @@ class EditorScene extends Phaser.Scene {
       // runtime (addAbilityShrine), pour que la prévisualisation ne mente
       // pas -- `entry.y` lui reste la référence de surface "propre", non
       // enfoncée (cf. addAbilityShrine, qui applique le même +SINK lui-même).
-      const obj = this.add.image(worldX, y + TOTEM_GROUND_SINK, `totem-${totemType}-lit`).setOrigin(0.5, 1).setScale(TOTEM_SCALE);
+      const obj = anchorVisibleFeet(this.add.image(worldX, y + TOTEM_GROUND_SINK, `totem-${totemType}-lit`).setOrigin(0.5, 1).setScale(TOTEM_SCALE));
       this.markers.push({ kind: 'totem', entry, obj: [obj], sourceArray: this.data.totems });
       return;
     }
@@ -980,7 +983,7 @@ class EditorScene extends Phaser.Scene {
       const y = this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY;
       const entry = { type, x: worldX, y, scale: PROP_SCALE };
       this.data.props.push(entry);
-      const obj = this.add.image(worldX, y + PROP_GROUND_SINK, `${PROP_PREFIX}${type}`).setOrigin(0.5, 1).setScale(PROP_SCALE);
+      const obj = anchorVisibleFeet(this.add.image(worldX, y + PROP_GROUND_SINK + GROUND_CONTACT_SINK, `${PROP_PREFIX}${type}`).setOrigin(0.5, 1).setScale(PROP_SCALE));
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
   }
@@ -1232,13 +1235,15 @@ class EditorScene extends Phaser.Scene {
       ? (this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY)
       : worldY;
 
+    // Aperçus ancrés par leur bas VISIBLE (cf. anchorVisibleFeet), décors
+    // enfoncés de GROUND_CONTACT_SINK : mêmes positions qu'au runtime.
     if (m.kind === 'totem') {
       m.obj[0].setPosition(entry.x, entry.y + TOTEM_GROUND_SINK);
     } else if (m.kind === 'campfire') {
-      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK);
+      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK);
     } else if (m.kind === 'prop') {
       // Même surface que dans le jeu (cf. groundStandYAt / PROP_GROUND_SINK).
-      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK);
+      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK);
     } else if (m.kind === 'enemy') {
       m.obj[0].setPosition(entry.x, entry.y);
       // obj[1] (s'il existe) : bande de patrouille, recentrée avec lui pour
@@ -1752,7 +1757,7 @@ class EditorScene extends Phaser.Scene {
       // par l'outil 'modify', cf. handleModifyWheel) prime sur la constante
       // par défaut si présent -- sinon un totem redimensionné reviendrait à
       // sa taille d'origine à chaque rechargement de la zone.
-      const obj = this.add.image(entry.x, entry.y + TOTEM_GROUND_SINK, `totem-${totemType}-lit`).setOrigin(0.5, 1).setScale(entry.scale || TOTEM_SCALE);
+      const obj = anchorVisibleFeet(this.add.image(entry.x, entry.y + TOTEM_GROUND_SINK, `totem-${totemType}-lit`).setOrigin(0.5, 1).setScale(entry.scale || TOTEM_SCALE));
       this.markers.push({ kind: 'totem', entry, obj: [obj], sourceArray: this.data.totems });
     }
     for (const entry of this.data.enemies) {
@@ -1765,12 +1770,15 @@ class EditorScene extends Phaser.Scene {
       this.markers.push({ kind: 'enemy', entry, obj: extras, sourceArray: this.data.enemies });
     }
     for (const entry of this.data.props) {
-      const obj = this.add.image(entry.x, entry.y + PROP_GROUND_SINK, `${PROP_PREFIX}${entry.type}`).setOrigin(0.5, 1).setScale(entry.scale || PROP_SCALE);
+      // Décor retiré du jeu (cf. DECOR_SECTIONS, ex. arbre_moussu) : non
+      // affiché, sans erreur (l'entrée reste dans le brouillon telle quelle).
+      if (!this.textures.exists(`${PROP_PREFIX}${entry.type}`)) continue;
+      const obj = anchorVisibleFeet(this.add.image(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK, `${PROP_PREFIX}${entry.type}`).setOrigin(0.5, 1).setScale(entry.scale || PROP_SCALE));
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
     for (const entry of this.data.campfires) {
       // `entry.scale` : cf. le commentaire équivalent sur les totems ci-dessus.
-      const obj = this.add.image(entry.x, entry.y + PROP_GROUND_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(entry.scale || CAMPFIRE_SCALE);
+      const obj = anchorVisibleFeet(this.add.image(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(entry.scale || CAMPFIRE_SCALE));
       this.markers.push({ kind: 'campfire', entry, obj: [obj], sourceArray: this.data.campfires });
     }
     for (const entry of this.data.water) {

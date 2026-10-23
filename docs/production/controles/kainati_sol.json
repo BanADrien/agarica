@@ -1,0 +1,111 @@
+[
+  {
+    "source": "assets/sprites/kainati_sol.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      69
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          356,
+          347,
+          341,
+          331
+        ],
+        "horizontal_gaps": [
+          67,
+          40,
+          41
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          434,
+          408,
+          442,
+          359
+        ],
+        "horizontal_gaps": [
+          73,
+          80,
+          63
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/kainati_sol_p2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      96
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          451,
+          342,
+          285,
+          316
+        ],
+        "horizontal_gaps": [
+          87,
+          79,
+          73
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          415,
+          347,
+          254,
+          274
+        ],
+        "horizontal_gaps": [
+          101,
+          64,
+          41
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/kainati_sol_p3.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          335,
+          344,
+          338,
+          335
+        ],
+        "horizontal_gaps": [
+          42,
+          43,
+          42
+        ]
+      }
+    ]
+  }
+]

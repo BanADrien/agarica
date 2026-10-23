@@ -13,7 +13,7 @@
 //   x 2816-3392  ravin de 9 cases : deux plateformes cachées (révélées par
 //                le loup) + pistes
 //   x 3392-3968  clairière préservée : feu de camp (x 3430), mare aux trois poissons (pont de
-//                bois), plante résistante sur la branche d'un arbre mort
+//                bois), plante résistante sur une haute branche
 //                (gx 55-57, y=64 : hors d'atteinte), crapaud corrompu
 //   x 3968-5248  surplomb (gx 65-81, gy 3, surface y=192) : le chemin passe DESSUS ;
 //                dessous, la poche fermée par le mur de mousse
@@ -32,7 +32,8 @@ const FORET_SOMBRE_2_DATA = {
   script: 'foret_sombre_2',
   // Trouée dans la forêt d'arrière-plan (coordonnées de la couche d'arbres,
   // parallaxe 0.35) : elle s'ouvre à l'écran près de la sortie, pour laisser
-  // voir le grand arbre dessiné au loin par le script.
+  // voir le grand arbre peint à l'horizon du fond `fond_foret_sombre` (l'ancienne
+  // silhouette dessinée par code a été retirée : elle faisait placeholder).
   avoidRanges: [[2000, 2600]],
   fall: { y: 620, mode: 'hurt' },
   groundCells: [
@@ -53,7 +54,7 @@ const FORET_SOMBRE_2_DATA = {
     ...groundRow(34, 37, [4]),       // branche haute (élan du loup)
     // gx 44-52 : RAVIN DE 9 CASES (plateformes cachées : hiddenPlatforms)
     ...groundRow(53, 92, [7, 8]),    // clairière, surplomb, sortie
-    ...groundRow(55, 58, [1]),       // branche de l'arbre mort : la plante (hors d'atteinte)
+    ...groundRow(55, 58, [1]),       // haute branche : la plante (hors d'atteinte)
     ...groundRow(61, 62, [6]),       // marchepied vers la corniche
     ...groundRow(62, 65, [4]),       // corniche vers le surplomb ; on passe dessous
     ...groundRow(65, 82, [3]),       // le surplomb (chemin principal, surface y=192)
@@ -90,7 +91,8 @@ const FORET_SOMBRE_2_DATA = {
   // Décors de la forêt sombre (section `foret_sombre`) : jamais sur la butte du
   // totem (le totem est dessiné derrière les décors) ni devant les sorties.
   props: [
-    { type: 'foret_sombre_arbre_moussu', x: 200, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.55 },
+    // (Pas de `foret_sombre_arbre_moussu` : hors de la DA, retiré.)
+    { type: 'foret_sombre_champignons_lumineux', x: 210, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.26 },
     { type: 'foret_sombre_rocher_mousse', x: 520, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.3 },
     { type: 'foret_sombre_fougere_sombre', x: 1180, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.28 }, // piste d'appel
     { type: 'foret_sombre_racine_arche', x: 1760, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },

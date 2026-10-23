@@ -190,3 +190,154 @@ Aucun avertissement.
 asset_present.js : 528 fichier(s) présent(s).
 
 ```
+
+
+## Animations au sol de Kainati — 2026-10-23
+
+Six images créées avec image_gen intégré. Les deux références demandées sont jointes à chaque génération : `assets/sprites/kainati.png` et `assets/sprites/kainati_frames/kainati_row0_0.png`. La fiche complète de Kainati figure dans chaque prompt, y compris comme contexte de palette pour les effets et l’objet. [Prompts](controles/kainati_sol_2026-10-23/prompts.json) et [générations, variantes et sélection](controles/kainati_sol_2026-10-23/generation.json).
+
+- `assets/sprites/kainati_sol.png` : 1536 × 1024, charge et roar, 4 + 4 frames ; intervalles horizontaux ≥40 pixels, intervalle entre rangées 67 pixels sur l’alpha non nul. [Aperçu](controles/kainati_sol_2026-10-23/kainati_sol_final.jpg).
+- `assets/sprites/kainati_sol_p2.png` : 1536 × 1024, slam et sweep, 4 + 4 frames ; intervalles horizontaux ≥40 pixels, intervalle entre rangées 94 pixels sur l’alpha non nul. Les rochers restent en contact avec les mains aux trois premières poses de sweep ; mains vides à la quatrième. [Aperçu](controles/kainati_sol_2026-10-23/kainati_sol_p2_final.jpg).
+- `assets/sprites/kainati_sol_p3.png` : 1536 × 1024, stunned, 4 frames, bases au bas de la toile ; intervalles horizontaux ≥40 pixels sur l’alpha non nul. [Aperçu](controles/kainati_sol_2026-10-23/kainati_sol_p3_final.jpg).
+- `assets/vfx/vfx_onde_choc.png` : 1536 × 1024, 4 cellules, étendue maximale 300 × 90 pixels ; terre/écorce brun-beige et crête toxique. [Aperçu](controles/kainati_sol_2026-10-23/vfx_onde_choc_final.jpg).
+- `assets/vfx/vfx_vague_mousse.png` : 1536 × 1024, 4 cellules, étendue maximale 300 × 70 pixels. [Aperçu](controles/kainati_sol_2026-10-23/vfx_vague_mousse_final.jpg).
+- `assets/_codex_src/rocher_roulant.png` : 1024 × 1024, rocher gris-beige rond, spirale gravée, mousse toxique, emprise carrée 800 × 800 pixels, sans ombre. Sortie importée : `assets/items/objets/rocher_roulant.png`, 256 × 256. [Aperçu](controles/kainati_sol_2026-10-23/rocher_roulant_final.jpg).
+
+Chaque pose du boss a une seule composante connexe, sans effet détaché. Orientation droite, couronne, peinture rouge, fourrure blanche et palette contrôlées visuellement. Les silhouettes ne sont pas déformées : réduction uniforme par planche et placement dans les cellules, avec optimisation des positions horizontales pour conserver au moins 40 pixels de vide. Les deux effets sont posés sur une base commune à y=1020, avec 4 pixels transparents sous la base pour éviter l’alerte de bord de cellule de l’importeur.
+
+**Échelle mesurée :** les poses de charge et de retour sur les phalanges font environ 330–360 pixels utiles, les poses redressées de roar environ 410–445 pixels ; le maximum avec poings levés est de 452 pixels. Le dessin de référence existant a 348 pixels utiles sur les phalanges dans une toile de 388 × 396 pixels. Le rendu conserve ainsi un gabarit proche de cette référence, mais la cible de 400 pixels utiles sur les phalanges n’est pas atteinte strictement. Cette différence reste à reprendre si 400 pixels utiles est impératif.
+
+Les bruts retenus sont archivés ici ; les variantes restent dans le dossier de génération indiqué dans `generation.json`. [Normalisation](controles/kainati_sol_2026-10-23/normalisation.json), [validation](controles/kainati_sol_2026-10-23/validation.json), [mesures détaillées des trois sources](controles/kainati_sol_2026-10-23/../kainati_sol.json), script : `docs/production/normaliser_kainati_sol_2026_10_23.py`.
+
+Import ciblé des trois planches ensemble : 20 frames, canvas uniforme 391 × 459. Effets : 4 + 4 frames. Import de l’objet et imports ciblés finaux sans avertissement. Les premiers avertissements de bord inférieur des effets ont été corrigés en ajoutant la marge transparente. Aucun changement manuel de `src/` ou du manifeste par ce travail ; `asset_present.js` est actualisé automatiquement par l’importeur. Des modifications concurrentes de plusieurs fichiers de jeu ont été observées et laissées intactes.
+
+
+
+### Import final du lot Kainati
+
+Commande : `python tools/import_codex_assets.py`
+
+[Journal complet](imports/final_kainati_sol_2026-10-23.log).
+
+```text
+
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (87) : agarica_extra, agarica_slash, singe, transfo_singe, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_impact_pierre, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 557 fichier(s) présent(s).
+
+```
+
+
+## Trois cochons unis — 2026-10-23
+
+Trois planches refaites avec image_gen intégré, en prenant l’ancien `cochon_bebe.png` comme référence. Pelages unis rose, gris et orangé, sans les anciennes rayures crème. Chaque planche transparente de 1536 × 1024 contient 4 poses idle et 4 poses walk, toutes tournées à droite. Originaux sauvegardés dans `controles/cochons_tricolores_2026-10-23/originaux/`.
+
+- Rose : `assets/sprites/cochon_bebe_rose.png`, 8 frames dans `assets/sprites/cochon_bebe_rose_frames/`.
+- Gris : `assets/sprites/cochon_bebe_gris.png`, 8 frames dans `assets/sprites/cochon_bebe_gris_frames/`.
+- Orangé : `assets/sprites/cochon_bebe_orange.png`, 8 frames dans `assets/sprites/cochon_bebe_orange_frames/`.
+
+Les 24 frames ont une toile commune de 228 × 188 pixels et une silhouette connexe chacune. Nettoyage des halos, réduction uniforme et placement par `docs/production/normaliser_cochons_2026_10_23.py`. [Prompts](controles/cochons_tricolores_2026-10-23/prompts.json), [génération](controles/cochons_tricolores_2026-10-23/generation.json), [mesures](controles/cochons_tricolores_2026-10-23/normalisation.json), [validation](controles/cochons_tricolores_2026-10-23/validation.json).
+
+Le rose remplace également la source commune `assets/sprites/cochon_bebe.png` ; ses 8 frames historiques sont réimportées avec `--only cochon_bebe --force`, sans avertissement. Aucun changement manuel de `src/` ni du manifeste, conformément à la consigne conservée. **Raccordement restant côté jeu :** `spawnPiglets` utilise actuellement cette unique source commune pour les trois cochons ; les variantes grise et orangée sont livrées avec leurs frames, mais le code devra sélectionner ces variantes pour les afficher simultanément. L’importeur complet n’inscrit que les fichiers déjà déclarés au manifeste.
+
+Aperçus : [rose](controles/cochons_tricolores_2026-10-23/cochon_bebe_rose_final.jpg), [gris](controles/cochons_tricolores_2026-10-23/cochon_bebe_gris_final.jpg), [orangé](controles/cochons_tricolores_2026-10-23/cochon_bebe_orange_final.jpg).
+
+
+
+### Import final du lot cochons
+
+Commande : `python tools/import_codex_assets.py`
+
+```text
+
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (87) : agarica_extra, agarica_slash, singe, transfo_singe, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_impact_pierre, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 557 fichier(s) présent(s).
+
+```
+
+
+## Invocation de Clak par Geralt — 2026-10-23
+
+Création via image_gen intégré, puis placement et montage déterministes par `docs/production/preparer_invocation_clak_2026_10_23.py`. Références de Geralt et Clak jointes aux générations ; la nouvelle animation respecte les cheveux/barbe gris-blanc demandés précédemment, malgré les références actuelles brunes. [Prompts](controles/invocation_clak_2026-10-23/prompts.json) et [générations](controles/invocation_clak_2026-10-23/generation.json).
+
+- `assets/sprites/geralt_invocation.png` : planche transparente 1536 × 1024, 8 poses en deux lignes de 4, préparation/ascension puis canalisation/retour. Yeux blancs sans pupilles pendant la transe, pieds relâchés, bras ouverts ; yeux bruns au début et à la fin. Taille debout environ 215 pixels ; frames dans `assets/sprites/geralt_invocation_frames/`, toile uniforme 185 × 249.
+- `assets/vfx/vfx_invocation_clak.png` : planche transparente 1536 × 1024, 4 phases de colonne blanche avec Clak se matérialisant en son milieu. Clak conserve carapace rouge-orangé, rune turquoise et grande pince. Maximum 280 × 770 pixels utiles, sans fond opaque ; frames dans `assets/vfx/vfx_invocation_clak_frames/`, toile 288 × 778.
+- `assets/cinematiques/invocation_clak_plan_large.png` : plan cinématique opaque 1536 × 1024, forêt lointaine minuscule et immense colonne blanche traversant les nuages lumineux. Le fond est volontairement complet pour cette vue du ciel.
+- [Aperçu animé](controles/invocation_clak_2026-10-23/invocation_clak_apercu.gif) : GIF 960 × 540, 8,4 secondes, 10 images/s avant fusion des images identiques. Geralt se soulève, la colonne apparaît, Clak se matérialise, coupe sur le plan large du ciel, retour au pic d’énergie, dissipation, descente de Clak et retour de Geralt au sol. Fond de proximité : bosquet existant. [Storyboard](controles/invocation_clak_2026-10-23/invocation_clak_storyboard.jpg).
+
+8 poses de Geralt avec une silhouette connexe chacune, 4 cellules VFX non coupées, alpha transparent et durée du GIF vérifiés. [Mesures et chronologie](controles/invocation_clak_2026-10-23/normalisation.json), [validation](controles/invocation_clak_2026-10-23/validation.json). Bruts archivés dans le même dossier de contrôle. Les effets sont séparés du personnage ; l’élévation et la descente sont animées dans le montage en conservant l’alignement bas des frames sources.
+
+Aucun changement manuel de `src/` ou du manifeste. Ces nouvelles sources et frames sont livrées avec l’aperçu, mais ne sont pas encore raccordées à une cinématique du jeu ; l’importeur complet ne traite que les entrées déjà déclarées au manifeste.
+
+
+
+### Import final apres creation de l invocation
+
+Commande : `python tools/import_codex_assets.py`
+
+```text
+
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (87) : agarica_extra, agarica_slash, singe, transfo_singe, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_impact_pierre, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 557 fichier(s) présent(s).
+
+```
+
+
+### Correction des couleurs de Geralt — 2026-10-23
+
+La dernière référence fournie par l’utilisateur remplace la consigne antérieure de poils gris-blanc : cheveux, barbe, moustache et poils des pieds sont désormais **brun-roux**, comme le Geralt actuellement présent dans le jeu. Les yeux blancs sans pupilles pendant l’invocation restent conservés, ainsi que les yeux bruns au début et à la fin.
+
+Planche `assets/sprites/geralt_invocation.png` et 8 frames remplacées après édition par image_gen intégré avec la planche précédente comme cible et le sprite actuel comme référence de couleur. L’ancienne version est archivée dans `controles/invocation_clak_2026-10-23/avant_correction_brun/`. Colonne et Clak conservés. Le montage réutilise le plan large archivé dans `controles/invocation_clak_2026-10-23/invocation_clak_plan_large_generation.png` ; la copie précédemment livrée dans `assets/cinematiques/` n’était plus présente au début de cette correction et n’a pas été recréée.
+
+[Nouvel aperçu animé brun — 8,4 s](controles/invocation_clak_2026-10-23/invocation_clak_apercu_brun.gif), [image de contrôle](controles/invocation_clak_2026-10-23/invocation_clak_pic_brun.png), [prompt et résultat](controles/invocation_clak_2026-10-23/correction_brun.json), [validation des 8 poses et de la durée](controles/invocation_clak_2026-10-23/validation_brun.json). L’aperçu principal a également été remplacé. Aucun changement manuel de `src/` ni du manifeste.
+
+
+
+Import final : `python tools/import_codex_assets.py`
+
+```text
+
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (87) : agarica_extra, agarica_slash, singe, transfo_singe, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_impact_pierre, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 557 fichier(s) présent(s).
+
+```
+
+
+## Foret suspendue : cimes et ancrage au sol - 2026-10-23
+
+Dans src/utils/LevelKit.js, les grands arbres gardent une parallaxe horizontale de 0.35 et suivent verticalement le monde (facteur Y=1). Pour le fond foret_flottante, leur sol commun est place sous les plateformes, a partir de la hauteur maximale des textures : seules les cimes restent visibles en contrebas. Les plantes generiques de sol et le plafond de lianes sont omis dans ces zones ouvertes ; les decors des plateformes restent presents.
+
+Verification Playwright/Edge : ForetFlottante1Scene (capture controles/foret_suspendue_cimes.png), ForetFlottante2Scene et Zone1Scene ; aucune erreur JavaScript. Sol des arbres mesure a y=1073 en altitude et y=471 au sol, facteur vertical 1 dans les trois scenes. Des avertissements de ressources absentes et textures transfo-wolf sont egalement journalises par le harnais.
+
+
+### Correction de la repartition des decors - 2026-10-23
+
+Camp de Geralt (ForetFlottante1Scene) : fond foret_sombre et grands arbres normaux, pieds a y=471. Zone suivante (ForetFlottante2Scene) : grands arbres proceduraux totalement retires (largeTrees=false), fond des iles conserve. Reglages appliques apres chargement des brouillons pour fonctionner egalement sur une sauvegarde existante. Les petits arbres poses sur les plateformes restent des decors distincts. Verification Edge/Playwright des deux zones : aucune erreur JavaScript ; 0 grand arbre dans la seconde. Captures : controles/camp_geralt_foret_sombre.png et controles/iles_sans_gros_arbres.png.
+
+
+### Camp de Geralt : arbres au bas du cadre - 2026-10-23
+
+Fond foret_flottante retabli dans ForetFlottante1Scene. Option treesAtScreenBottom : pieds des grands arbres abaisses de 75 pixels, a y=546 pour une vue de 540 pixels (6 pixels pour absorber la marge du sprite), facteur vertical 0 pour les verrouiller au bas du cadre pendant les mouvements de camera. Les autres zones gardent leur comportement ; largeTrees=false dans la zone suivante reste applique. Verification Edge/Playwright : pieds y=546, scrollFactorY=0, aucune erreur JavaScript. Capture : controles/geralt_arbres_bas_cadre.png.

@@ -45,6 +45,7 @@ const FORET_FLOTTANTE_2_DATA = {
     { type: 'foret_flottante_pissenlit_geant', x: 870, y: 256, scale: 0.28 },
     { type: 'bosquet_standing_stone', x: 1120, y: 320, scale: 0.3 },
     { type: 'bosquet_mossy_rock', x: 1310, y: 320, scale: 0.3 },
+    { type: 'bosquet_standing_stone', x: 1370, y: 320, scale: 0.22 },   // ruine du gardien
     { type: 'foret_flottante_arbre_jeune', x: 2090, y: 384, scale: 0.42 },
     { type: 'foret_flottante_fleurs_hautes', x: 1700, y: 384, scale: 0.26 },
     { type: 'foret_flottante_arbre_jeune', x: 3010, y: 192, scale: 0.36 },

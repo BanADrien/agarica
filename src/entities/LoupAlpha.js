@@ -29,6 +29,8 @@ class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
     const bodyHeight = 150;
     this.body.setSize(bodyWidth, bodyHeight);
     this.body.setOffset((WOLF_FRAME_WIDTH - bodyWidth) / 2, WOLF_FRAME_HEIGHT - bodyHeight);
+    // Pattes VISIBLES sur le bas du corps (cf. anchorVisibleFeet, LevelKit).
+    anchorVisibleFeet(this, { body: true });
 
     this.patrolMinX = patrolMinX;
     this.patrolMaxX = patrolMaxX;

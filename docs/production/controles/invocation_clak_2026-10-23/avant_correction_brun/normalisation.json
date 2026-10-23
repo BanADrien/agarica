@@ -1,0 +1,150 @@
+{
+  "geralt_invocation": {
+    "frames": [
+      4,
+      4
+    ],
+    "size": [
+      1536,
+      1024
+    ],
+    "frame_canvas": [
+      185,
+      249
+    ],
+    "placements": [
+      [
+        125,
+        216,
+        259,
+        430
+      ],
+      [
+        490,
+        201,
+        661,
+        430
+      ],
+      [
+        871,
+        201,
+        1048,
+        430
+      ],
+      [
+        1258,
+        197,
+        1429,
+        430
+      ],
+      [
+        107,
+        702,
+        276,
+        942
+      ],
+      [
+        490,
+        701,
+        661,
+        942
+      ],
+      [
+        877,
+        705,
+        1042,
+        942
+      ],
+      [
+        1275,
+        730,
+        1413,
+        942
+      ]
+    ],
+    "standing_height": 215
+  },
+  "vfx_invocation_clak": {
+    "frames": [
+      4
+    ],
+    "size": [
+      1536,
+      1024
+    ],
+    "frame_canvas": [
+      288,
+      778
+    ],
+    "placements": [
+      [
+        101,
+        298,
+        283,
+        1000
+      ],
+      [
+        458,
+        245,
+        694,
+        1000
+      ],
+      [
+        820,
+        230,
+        1100,
+        1000
+      ],
+      [
+        1224,
+        278,
+        1463,
+        1000
+      ]
+    ],
+    "uniform_scale": 0.7977207977207977
+  },
+  "preview": {
+    "path": "docs/production/controles/invocation_clak_2026-10-23/invocation_clak_apercu.gif",
+    "size": [
+      960,
+      540
+    ],
+    "duration_seconds": 8.4,
+    "fps": 10,
+    "timeline": {
+      "preparation": [
+        0,
+        0.8
+      ],
+      "white_eyes_liftoff": [
+        0.8,
+        2.0
+      ],
+      "column_crab": [
+        2,
+        2.8
+      ],
+      "sky_cutaway": [
+        2.8,
+        4.2
+      ],
+      "climax": [
+        4.2,
+        5.2
+      ],
+      "dissipation": [
+        5.2,
+        6
+      ],
+      "crab_lands": [
+        6,
+        6.9
+      ],
+      "recovery": [
+        6.9,
+        8.4
+      ]
+    }
+  }
+}

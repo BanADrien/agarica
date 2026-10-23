@@ -230,28 +230,25 @@ const ARBRE_SINK = 6;
 // puis redescendus ("un peu trop haut" à 100, "encore trop haut, un peu" à 85).
 const ARBRE_GROUND_CLEARANCE = 75;
 
-function addProceduralForest(scene, height, levelWidth, avoidRanges = []) {
+function addProceduralForest(scene, height, levelWidth, avoidRanges = [], canopyView = false, screenBottom = false) {
+  // En altitude, la forêt reste plantée loin sous les plateformes : seules
+  // les cimes dépassent dans le cadre. Tous les troncs gardent le même sol.
+  const tallestTree = canopyView ? Math.max(...Array.from({ length: ARBRE_COUNT }, (_, i) =>
+    scene.textures.get(`${ARBRE_TEXTURE_PREFIX}${i}`).getSourceImage().height,
+  )) * ARBRE_BASE_SCALE * 1.15 : 0;
+  const groundY = screenBottom ? height + ARBRE_SINK
+    : canopyView ? height + tallestTree * 0.72
+      : height - ARBRE_GROUND_CLEARANCE + ARBRE_SINK;
   scatterAlongLevel(scene, levelWidth, avoidRanges, ARBRE_SPACING_MIN, ARBRE_SPACING_MAX, (x) => {
     const variant = Phaser.Math.Between(0, ARBRE_COUNT - 1);
     const scale = ARBRE_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.15);
-    scene.add.image(x, height - ARBRE_GROUND_CLEARANCE + ARBRE_SINK, `${ARBRE_TEXTURE_PREFIX}${variant}`)
+    scene.add.image(x, groundY, `${ARBRE_TEXTURE_PREFIX}${variant}`)
       .setOrigin(0.5, 1)
       .setScale(scale)
       .setFlipX(Math.random() < 0.5)
-      // Retour utilisateur : "à partir d'une certaine hauteur du joueur les
-      // arbres... montent avec moi alors qu'ils devraient rester à la même
-      // hauteur en prenant en compte la caméra qui monte" -- l'ancien Y=0
-      // (calé au bord bas de l'ÉCRAN, pas du MONDE) causait exactement ça :
-      // tant que la caméra ne scrolle pas verticalement (juste après le
-      // spawn, la quasi-totalité du jeu), Y=0 et Y=facteur rendent
-      // IDENTIQUEMENT (screenY = worldY - scrollY*facteur = worldY quand
-      // scrollY=0) -- mais dès que le joueur grimpe assez haut pour que la
-      // caméra scrolle, Y=0 gardait les arbres figés à l'écran au lieu de
-      // les laisser reculer avec le sol réel (scrollFactor par défaut,
-      // jamais changé). Même facteur qu'en X (0.35) plutôt que 1 plein : ce
-      // plan reste un arrière-plan lointain, doit continuer à parallaxer
-      // plus lentement que le sol dans les DEUX axes, pas juste en X.
-      .setScrollFactor(0.35);
+      // Au camp de Geralt, le pied du décor reste au bas du cadre.
+      // Les autres forêts gardent leur ancrage vertical dans le monde.
+      .setScrollFactor(0.35, screenBottom ? 0 : 1);
   });
 }
 
@@ -321,7 +318,7 @@ function addProceduralHangingPlants(scene, levelWidth) {
 // `background` (optionnel, clé de zone `background`) : id d'un fond de
 // ITEM_MANIFEST (texture `item-<id>`) qui remplace le ciel plan4 ; plan4 reste
 // le repli tant que l'image n'existe pas.
-function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null) {
+function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null, largeTrees = true, treesAtScreenBottom = false) {
   const coverWidth = Math.ceil(levelWidth * 1.4);
   const bgKey = background && scene.textures.exists(`item-${background}`) ? `item-${background}` : 'decor-plan4';
   const sourceHeight = bgKey === 'decor-plan4' ? DECOR_SOURCE_HEIGHT : scene.textures.get(bgKey).getSourceImage().height;
@@ -332,8 +329,10 @@ function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], bac
     .setTileScale(scale, scale)
     .setScrollFactor(0.08);
 
-  addProceduralForest(scene, height, levelWidth, avoidRanges);
-  addProceduralGroundPlants(scene, height, levelWidth, avoidRanges);
+  const floatingBackground = background === 'fond_foret_flottante';
+  const canopyView = floatingBackground && !treesAtScreenBottom;
+  if (largeTrees) addProceduralForest(scene, height, levelWidth, canopyView ? [] : avoidRanges, canopyView, treesAtScreenBottom);
+  if (!floatingBackground) addProceduralGroundPlants(scene, height, levelWidth, avoidRanges);
 }
 
 // Plafond (lianes suspendues, assets/decors/plantes_frames/ — voir
@@ -910,17 +909,45 @@ function groundStandYAt(scene, x, referenceY) {
   return best;
 }
 
-// Pixels VISIBLES d'une image (et non son cadre, qui a des marges
-// transparentes et un sommet irrégulier) : canal alpha de la frame, lu une
-// fois sur un canvas puis mis en cache. Null si la lecture est interdite
-// (page ouverte en file:// : canvas « tainted ») -- les appelants retombent
-// alors sur le cadre de l'image.
+// ===========================================================================
+// CALIBRAGE VISUEL (2026-10-23, cf. PLAN_DEV.md « Calibrage visuel »)
+// Les images (art Codex, planches découpées) ont des marges transparentes
+// variables (4-9 px sous les pieds, davantage sur certains décors) : poser au
+// sol ou mettre à l'échelle d'après le CADRE de l'image laissait des objets
+// flotter de quelques px et donnait des tailles différentes d'une pose à
+// l'autre. Tout passe donc par la boîte des pixels VISIBLES
+// (alpha > VISIBLE_ALPHA_MIN), mesurée une fois par frame (cache). Lecture
+// impossible (page ouverte en file:// : canvas « tainted ») : repli sur le
+// cadre de l'image (`exact: false`), le jeu reste jouable.
+// ===========================================================================
 const FRAME_ALPHA_CACHE = new Map();
 const VISIBLE_ALPHA_MIN = 40;
+// Décors posés au sol (props, feux, objets) : bas visible 1 px SOUS la ligne
+// de marche. Le dernier rang de pixels d'une image réduite (filtrage
+// linéaire) est à demi transparent : posé pile sur la ligne, un filet de
+// fond restait visible entre le décor et l'herbe. Les personnages, eux, ont
+// le bas visible exactement sur la ligne (bas de leur corps physique).
+const GROUND_CONTACT_SINK = 1;
+// Rangées du bas (fraction de la hauteur visible) qui forment la « base »
+// (pieds, socle) et rangées du haut qui forment la « tête » (cf.
+// calibratedScale), mesurées avec la boîte.
+const VISIBLE_BASE_BAND = 0.12;
+const VISIBLE_TOP_BAND = 0.15;
 
+// Canal alpha d'une frame, MIS EN CACHE (requêtes colonne par colonne :
+// haut visible des décors, poing des poses suspendues).
 function frameAlphaMap(frame) {
   const key = `${frame.texture.key}#${frame.name}`;
   if (FRAME_ALPHA_CACHE.has(key)) return FRAME_ALPHA_CACHE.get(key);
+  const map = readFrameAlpha(frame);
+  FRAME_ALPHA_CACHE.set(key, map);
+  return map;
+}
+
+// Lecture brute (sans cache) : la boîte visible des frames de personnages
+// n'a besoin du canal alpha qu'une fois -- inutile de garder des Mo de
+// pixels par frame animée.
+function readFrameAlpha(frame) {
   let map = null;
   try {
     const w = frame.cutWidth;
@@ -937,8 +964,78 @@ function frameAlphaMap(frame) {
   } catch (e) {
     map = null;
   }
-  FRAME_ALPHA_CACHE.set(key, map);
   return map;
+}
+
+// Étendue horizontale [x0, x1[ des pixels visibles des rangées [r0, r1[.
+function visibleColumnSpan(map, r0, r1) {
+  let x0 = map.w;
+  let x1 = -1;
+  for (let y = Math.max(0, r0); y < Math.min(map.h, r1); y++) {
+    for (let x = 0; x < map.w; x++) {
+      if (map.alpha[y * map.w + x] > VISIBLE_ALPHA_MIN) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+      }
+    }
+  }
+  return x1 < 0 ? null : [x0, x1 + 1];
+}
+
+// Boîte des pixels visibles d'une frame, en px de la frame (non mis à
+// l'échelle), mise en cache : { x0, y0, x1, y1 (bornes exclues), w, h,
+// frameW, frameH, marginL, marginR, marginT, marginB (marges transparentes),
+// area (nombre de px visibles), baseX0/baseX1 (colonnes visibles des rangées
+// du bas : pieds, socle), topW (largeur visible des rangées du haut), exact }.
+// Placeholder (canvas dessiné par code) : mesuré pareil (boîte ~pleine).
+const VISIBLE_BOUNDS_CACHE = new Map();
+
+function frameVisibleBounds(frame) {
+  if (!frame || !frame.texture) return null;
+  const key = `${frame.texture.key}#${frame.name}`;
+  if (VISIBLE_BOUNDS_CACHE.has(key)) return VISIBLE_BOUNDS_CACHE.get(key);
+  const fw = frame.cutWidth;
+  const fh = frame.cutHeight;
+  const map = FRAME_ALPHA_CACHE.get(`${frame.texture.key}#${frame.name}`) || readFrameAlpha(frame);
+  let b = { x0: 0, y0: 0, x1: fw, y1: fh, area: fw * fh, baseX0: 0, baseX1: fw, topW: fw, exact: false };
+  if (map) {
+    let x0 = fw; let y0 = fh; let x1 = -1; let y1 = -1; let area = 0;
+    for (let y = 0; y < fh; y++) {
+      for (let x = 0; x < fw; x++) {
+        if (map.alpha[y * fw + x] > VISIBLE_ALPHA_MIN) {
+          area++;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          y1 = y;
+        }
+      }
+    }
+    if (y1 < 0) {
+      b = { ...b, area: 0, exact: true, empty: true };
+    } else {
+      const h = y1 + 1 - y0;
+      const base = visibleColumnSpan(map, y1 + 1 - Math.max(2, Math.round(h * VISIBLE_BASE_BAND)), y1 + 1);
+      const top = visibleColumnSpan(map, y0, y0 + Math.max(2, Math.round(h * VISIBLE_TOP_BAND)));
+      b = {
+        x0, y0, x1: x1 + 1, y1: y1 + 1, area, baseX0: base[0], baseX1: base[1],
+        topW: top[1] - top[0], exact: true,
+      };
+    }
+  }
+  Object.assign(b, {
+    w: b.x1 - b.x0, h: b.y1 - b.y0, frameW: fw, frameH: fh,
+    marginL: b.x0, marginR: fw - b.x1, marginT: b.y0, marginB: fh - b.y1,
+  });
+  VISIBLE_BOUNDS_CACHE.set(key, b);
+  return b;
+}
+
+// Boîte des pixels visibles de la texture `key` (frame `frameName`, sinon
+// l'image entière) ; null si la texture n'existe pas.
+function visibleBounds(scene, key, frameName) {
+  if (!scene || !key || !scene.textures.exists(key)) return null;
+  return frameVisibleBounds(scene.textures.getFrame(key, frameName));
 }
 
 // Coin haut-gauche monde d'une image/sprite non tourné (origine quelconque).
@@ -946,6 +1043,26 @@ function objectFrameTopLeft(obj) {
   return {
     left: obj.x - obj.displayOriginX * Math.abs(obj.scaleX),
     top: obj.y - obj.displayOriginY * Math.abs(obj.scaleY),
+  };
+}
+
+// Boîte MONDE des pixels visibles d'une image/sprite non tourné (miroirs
+// gérés) : { left, right, top, bottom, baseLeft, baseRight }. Null sans frame.
+function objectVisibleBox(obj) {
+  const b = obj && frameVisibleBounds(obj.frame);
+  if (!b) return null;
+  const sx = Math.abs(obj.scaleX);
+  const sy = Math.abs(obj.scaleY);
+  const { left, top } = objectFrameTopLeft(obj);
+  const fx = (c) => (obj.flipX ? b.frameW - c : c);
+  const fy = (r) => (obj.flipY ? b.frameH - r : r);
+  const span = (a, c, f) => [Math.min(f(a), f(c)), Math.max(f(a), f(c))];
+  const [l, r] = span(b.x0, b.x1, fx);
+  const [t, bo] = span(b.y0, b.y1, fy);
+  const [bl, br] = span(b.baseX0, b.baseX1, fx);
+  return {
+    left: left + l * sx, right: left + r * sx, top: top + t * sy, bottom: top + bo * sy,
+    baseLeft: left + bl * sx, baseRight: left + br * sx,
   };
 }
 
@@ -968,37 +1085,94 @@ function visibleTopYAt(obj, x) {
   return null;
 }
 
-// 1re et dernière rangées contenant un pixel opaque (mises en cache sur la carte).
-function opaqueRowRange(map) {
-  if (map.rows) return map.rows;
-  const rowHas = (row) => {
-    for (let col = 0; col < map.w; col++) if (map.alpha[row * map.w + col] > VISIBLE_ALPHA_MIN) return true;
-    return false;
-  };
-  let first = 0;
-  while (first < map.h && !rowHas(first)) first++;
-  let last = map.h - 1;
-  while (last > first && !rowHas(last)) last--;
-  map.rows = first < map.h ? { first, last } : { first: 0, last: map.h - 1 };
-  return map.rows;
-}
-
 // Bas visible (sous la dernière rangée opaque) d'un objet, en coordonnées monde.
 function visibleBottomY(obj) {
-  const f = obj.frame;
-  const sy = Math.abs(obj.scaleY);
-  const { top } = objectFrameTopLeft(obj);
-  const map = frameAlphaMap(f);
-  if (!map) return top + f.cutHeight * sy;
-  const { first, last } = opaqueRowRange(map);
-  // Retourné verticalement : c'est la 1re rangée opaque qui se retrouve en bas.
-  return top + (obj.flipY ? map.h - first : last + 1) * sy;
+  const box = objectVisibleBox(obj);
+  return box ? box.bottom : obj.y;
 }
 
 // Déplace `obj` verticalement pour que le bas de ses pixels visibles soit en `y`.
 function setVisibleBottomY(obj, y) {
   obj.y += y - visibleBottomY(obj);
   return obj;
+}
+
+// Marge transparente sous les pieds (px de la frame), STABLE sur toute
+// l'animation en cours : la plus petite de ses frames -- le personnage ne
+// tressaute pas d'une frame à l'autre (les pieds d'une frame un peu plus
+// haute flottent d'une fraction de px). Frame posée hors de l'anim courante
+// (setTexture direct) : sa propre marge.
+const ANIM_FOOT_MARGIN_CACHE = new WeakMap();
+function stableFootMargin(sprite) {
+  const frame = sprite.frame;
+  const own = frameVisibleBounds(frame);
+  if (!own || own.empty) return 0;
+  const anim = sprite.anims && sprite.anims.currentAnim;
+  if (!anim || !anim.frames.some((f) => f.frame === frame)) return own.marginB;
+  if (!ANIM_FOOT_MARGIN_CACHE.has(anim)) {
+    let m = Infinity;
+    for (const af of anim.frames) {
+      const b = frameVisibleBounds(af.frame);
+      if (b && !b.empty) m = Math.min(m, b.marginB);
+    }
+    ANIM_FOOT_MARGIN_CACHE.set(anim, Number.isFinite(m) ? m : 0);
+  }
+  return ANIM_FOOT_MARGIN_CACHE.get(anim);
+}
+
+// Origine « aux pieds VISIBLES » d'un sprite d'origine (x, 1) : `y` désigne
+// le bas visible (marge stable de l'anim en cours) et non plus le bord du
+// cadre, pour TOUTE frame, quel que soit qui la change (anims, setTexture) --
+// Phaser rappelle updateDisplayOrigin à chaque changement de frame. Sans
+// effet tant que l'origine n'est pas en bas (poses ancrées ailleurs : liane,
+// papillon). `body: true` : le bas du corps physique suit (cf.
+// syncBodyToVisibleFeet), donc au sol : bas du corps = y = bas visible.
+function anchorVisibleFeet(sprite, { body = false } = {}) {
+  if (!sprite || !sprite.updateDisplayOrigin) return sprite;
+  if (!sprite.__visibleFeet) {
+    sprite.__visibleFeet = true;
+    const base = sprite.updateDisplayOrigin;
+    sprite.updateDisplayOrigin = function updateDisplayOriginOnVisibleFeet() {
+      base.call(this);
+      if (this.originY === 1 && this.frame && this.frame.cutHeight) {
+        this._displayOriginY = this.height - stableFootMargin(this) * (this.height / this.frame.cutHeight);
+      }
+      return this;
+    };
+    sprite.updateDisplayOrigin();
+  }
+  if (body && sprite.body && sprite.scene) registerVisibleFeetBody(sprite);
+  return sprite;
+}
+
+// Bas du corps physique d'un sprite ancré aux pieds visibles = son origine.
+// Le code de chaque entité règle `body.offset` d'après le bas du CADRE (offsetY
+// = hauteur de frame - hauteur du corps) : recalé ici après coup, à chaque
+// image (cf. registerVisibleFeetBody), plutôt que dans chacune d'elles.
+function syncBodyToVisibleFeet(sprite) {
+  const body = sprite.body;
+  if (!body || !body.setOffset || sprite.originY !== 1 || !sprite.__visibleFeet) return;
+  const oy = sprite.displayOriginY - body.sourceHeight;
+  if (Math.abs(body.offset.y - oy) > 0.01) body.setOffset(body.offset.x, oy);
+}
+
+// Recalage après la mise à jour de la scène (POST_UPDATE : après les update()
+// des entités, avant le pas de physique suivant). Une liste par instance de
+// scène (le listener reste posé d'une visite à l'autre, la liste se vide des
+// sprites détruits).
+function registerVisibleFeetBody(sprite) {
+  const scene = sprite.scene;
+  if (!scene.__visibleFeetBodies) {
+    scene.__visibleFeetBodies = new Set();
+    scene.events.on('postupdate', () => {
+      for (const s of scene.__visibleFeetBodies) {
+        if (!s.active || !s.body) scene.__visibleFeetBodies.delete(s);
+        else syncBodyToVisibleFeet(s);
+      }
+    });
+  }
+  scene.__visibleFeetBodies.add(sprite);
+  syncBodyToVisibleFeet(sprite);
 }
 
 // Haut visible du décor (`scene.props`, cf. buildLevelFromData) sous `x` : le
@@ -1012,6 +1186,91 @@ function propTopYAt(scene, x, type = null) {
     if (y != null && (best === null || y < best)) best = y;
   }
   return best;
+}
+
+// Dessus d'un décor sous les PIEDS de `obj` (colonnes visibles de ses rangées
+// du bas, cf. frameVisibleBounds) : profil du haut visible du décor colonne
+// par colonne, puis son 3e quartile (vers le bas). Le haut visible d'une
+// souche ou d'un autel dessiné en perspective est le BORD ARRIÈRE de son
+// plateau : posée sur le seul pixel le plus haut sous son centre (ancien
+// calcul), Xara semblait voler au-dessus de sa souche. Le 3e quartile tombe
+// dans le plateau et ignore une écharde isolée. `x` : position où `obj` sera
+// posé (défaut : la sienne). Null si aucun décor sous ses pieds.
+function propSurfaceYUnder(scene, obj, type = null, x = obj.x) {
+  const box = objectVisibleBox(obj);
+  const dx = x - obj.x;
+  const l = (box ? box.baseLeft : obj.x - 4) + dx;
+  const r = (box ? box.baseRight : obj.x + 4) + dx;
+  const n = Math.max(3, Math.min(24, Math.round(r - l)));
+  const ys = [];
+  for (let i = 0; i < n; i++) {
+    const y = propTopYAt(scene, l + ((i + 0.5) * (r - l)) / n, type);
+    if (y != null) ys.push(y);
+  }
+  if (!ys.length) return null;
+  ys.sort((a, c) => a - c);
+  return ys[Math.min(ys.length - 1, Math.floor(ys.length * 0.75))];
+}
+
+// Pose `obj` en `x` pour que le BAS VISIBLE de son image touche la surface de
+// marche sous lui (groundStandYAt ; `refY` départage deux couches), ou le
+// dessus d'un décor (`onProp` : true ou type de prop, cf. propSurfaceYUnder,
+// repli sur le sol). `sink` : enfoncement sous la surface
+// (GROUND_CONTACT_SINK pour un décor, 0 pour un personnage). Renvoie la
+// surface retenue, ou null (rien dessous : y inchangé).
+function placeOnGround(scene, obj, x = obj.x, { refY = obj.y, onProp = null, sink = 0 } = {}) {
+  obj.x = x;
+  let surface = onProp ? propSurfaceYUnder(scene, obj, onProp === true ? null : onProp) : null;
+  if (surface == null) surface = groundStandYAt(scene, x, refY);
+  if (surface == null) return null;
+  setVisibleBottomY(obj, surface + sink);
+  return surface;
+}
+
+// Échelle « même taille apparente » d'une PLANCHE de poses : toutes les
+// frames d'une même image source (feuille Codex) ont été dessinées à la même
+// échelle, on en tire donc UNE échelle, appliquée à toutes ses poses --
+// accroupie, couchée ou bras levé ne sont jamais agrandies ou réduites à
+// tort. Référence : `refKey` affichée à `refScale` (ex. l'idle d'Agarica).
+//  1. Frames « debout neutres » : tête en haut (rangées du haut assez larges,
+//     pas un bras ou une arme levés), rapport largeur/hauteur proche de la
+//     référence, hauteur parmi les plus grandes -> leur hauteur visible
+//     médiane est alignée sur celle de la référence.
+//  2. Sinon (coups en fente, sauts, roulades) ou `method: 'area'` (forme
+//     animale) : surface visible (racine du nombre de px visibles, médiane)
+//     alignée sur celle de la référence -- une fente perd de la hauteur mais
+//     gagne en largeur, la surface reste comparable.
+// `standing` : clés des frames à considérer debout (force la règle 1).
+// Renvoie { scale, method } ou null (art absent / pixels illisibles : garder
+// l'échelle par défaut).
+const CALIB_STANDING_RATIO_TOL = 0.2;
+const CALIB_HEAD_MIN_WIDTH = 0.35;
+const CALIB_TALL_FRACTION = 0.9;
+
+function calibrationMedian(values) {
+  const v = values.slice().sort((a, b) => a - b);
+  const m = v.length >> 1;
+  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+}
+
+function calibratedScale(scene, frameKeys, { refKey, refScale = 1, maxScale = Infinity, method = 'auto', standing = null } = {}) {
+  const ref = visibleBounds(scene, refKey);
+  const frames = frameKeys.map((key) => ({ key, b: visibleBounds(scene, key) })).filter((f) => f.b && !f.b.empty);
+  if (!ref || !ref.exact || ref.empty || !frames.length || frames.some((f) => !f.b.exact)) return null;
+  let scale = null;
+  let used = 'area';
+  if (method !== 'area') {
+    const headUp = frames.filter((f) => f.b.topW >= CALIB_HEAD_MIN_WIDTH * f.b.w);
+    const tallest = Math.max(0, ...headUp.map((f) => f.b.h));
+    const st = standing ? frames.filter((f) => standing.includes(f.key))
+      : headUp.filter((f) => f.b.w / f.b.h <= ref.w / ref.h + CALIB_STANDING_RATIO_TOL && f.b.h >= CALIB_TALL_FRACTION * tallest);
+    if (st.length) {
+      scale = (ref.h * refScale) / calibrationMedian(st.map((f) => f.b.h));
+      used = 'height';
+    }
+  }
+  if (scale == null) scale = (Math.sqrt(ref.area) * refScale) / calibrationMedian(frames.map((f) => Math.sqrt(f.b.area)));
+  return { scale: Math.min(maxScale, scale), method: used };
 }
 
 // Totem sans art historique (singe) : image du manifest `totem_<type>_<état>`
@@ -1034,11 +1293,15 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
 
   // Cf. TOTEM_GROUND_SINK : `y` (déjà calé sur la limite de grille par
   // l'appelant) est légèrement enfoncé pour que le socle touche vraiment
-  // l'herbe au lieu de flotter juste au-dessus.
+  // l'herbe au lieu de flotter juste au-dessus. Origine aux pieds VISIBLES
+  // (cf. anchorVisibleFeet) : c'est le bas du socle dessiné qui est enfoncé,
+  // pas le bord du cadre (marge transparente de ~2 px), y compris après le
+  // passage lumineux -> éteint (setTexture plus bas).
   y += TOTEM_GROUND_SINK;
   const marker = scene.physics.add.staticSprite(x, y, textureKey);
   marker.setOrigin(0.5, 1);
   marker.setScale(scale);
+  anchorVisibleFeet(marker);
   marker.body.updateFromGameObject();
   const plants = addTotemPlants(scene, x, y - TOTEM_GROUND_SINK, marker.displayWidth);
   sendBehindFrontGround(scene, [marker, ...plants]);
@@ -1150,11 +1413,17 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
   // Bûches posées sur la surface de marche (haut de la hitbox, comme les
   // props et les pieds d'Agarica) ; l'ancien enfoncement fixe de 14 px sous
   // le haut de l'image de tuile laissait le feu 3 px au-dessus d'elle.
+  // Bas VISIBLE des bûches (marge transparente la plus basse des 4 flambées,
+  // cf. anchorVisibleFeet : aucun tressautement d'une flambée à l'autre),
+  // enfoncé de GROUND_CONTACT_SINK -- posé sur le bord du cadre, le feu
+  // flottait encore de 1-2 px au-dessus de l'herbe.
   const footY = groundStandYAt(scene, x, y) ?? y;
-  scene.add.sprite(x, footY, `${CAMPFIRE_TEXTURE_PREFIX}0`)
+  const fire = scene.add.sprite(x, footY, `${CAMPFIRE_TEXTURE_PREFIX}0`)
     .setOrigin(0.5, 1)
     .setScale(scale)
     .play(ANIM_CAMPFIRE_BURN_KEY);
+  anchorVisibleFeet(fire);
+  fire.y = footY + GROUND_CONTACT_SINK;
 
   const prompt = scene.add.text(x, y - 90, 'Appuie sur E pour te reposer', {
     fontFamily: 'sans-serif',
@@ -1261,7 +1530,7 @@ const AUTOTILE_TILESETS = {
   },
   tuiles: {
     dir: 'assets/decors/tuiles_frames', pixelArt: true, layout: 'atlas',
-    grassHitboxFraction: 1, totemSink: 3, undersideTrim: 16,
+    grassHitboxFraction: 1, totemSink: 1, undersideTrim: 16,
   },
 };
 const AUTOTILE_TILESET_DIR = AUTOTILE_TILESETS[AUTOTILE_TILESET].dir;
@@ -1412,8 +1681,11 @@ const DECOR_SECTIONS = {
     'cabane_arbre', 'hutte_mousse', 'hutte_paille', 'cottage', 'tour', 'tente',
     'muraille_tour', 'muraille_pan', 'muraille_pan_2', 'muraille_tour_2', 'muraille_porte',
   ],
+  // `arbre_moussu` retiré (refusé par l'utilisateur : hors DA) : plus chargé
+  // ni proposé ; un ancien brouillon qui le cite est ignoré sans erreur (cf.
+  // buildLevelFromData, texture absente -> décor non affiché).
   foret_sombre: [
-    'arbre_moussu', 'souche_champignons', 'rocher_mousse', 'champignons_lumineux',
+    'souche_champignons', 'rocher_mousse', 'champignons_lumineux',
     'racine_arche', 'buisson_epineux', 'tronc_couche', 'fougere_sombre',
     'toile_araignee', 'mare_bord', 'pierre_runique', 'fleur_corniche',
   ],
@@ -2261,8 +2533,8 @@ function buildLevelFromData(scene, data, sceneData) {
   const levelRightPad = 200;
 
   if (data.decor !== false) {
-    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], data.background);
-    addCaveCeiling(scene, levelWidth);
+    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], data.background, data.largeTrees !== false, data.treesAtScreenBottom === true);
+    if (data.background !== 'fond_foret_flottante') addCaveCeiling(scene, levelWidth);
   }
   setupDebugToggle(scene);
 
@@ -2439,12 +2711,18 @@ function buildLevelFromData(scene, data, sceneData) {
   // (cf. propTopYAt) plutôt que sur un y écrit à la main.
   scene.props = [];
   for (const p of data.props || []) {
+    // Décor retiré du jeu (ex. `foret_sombre_arbre_moussu`) ou image absente :
+    // ignoré en silence plutôt qu'affiché en carré « texture manquante ».
+    if (!scene.textures.exists(`${PROP_PREFIX}${p.type}`)) continue;
     // Surface où l'on MARCHE (haut de la hitbox, cf. GROUND_STAND_SINK :
     // 16 px sous le haut visuel des tuiles d'herbe avec 'floor', le haut de la
     // case avec 'tuiles'), pas le haut de l'image de tuile -- sinon, avec
     // 'floor', les décors flottaient au-dessus de l'herbe.
-    const y = groundStandYAt(scene, p.x, p.y) ?? p.y;
-    const img = scene.add.image(p.x, y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
+    // Par le bas VISIBLE de l'image (cf. placeOnGround) : les planches gardent
+    // quelques px de marge transparente sous le socle (2-3 px affichés).
+    const stand = groundStandYAt(scene, p.x, p.y);
+    const img = scene.add.image(p.x, stand ?? p.y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
+    if (stand != null) setVisibleBottomY(img, stand + GROUND_CONTACT_SINK);
     img.propType = p.type;
     scene.props.push(img);
   }

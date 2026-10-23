@@ -41,8 +41,9 @@ const FORET_CORROMPUE_1_DATA = {
     { type: 'foret_corrompue_arbre_malade', x: 600, y: 448, scale: 0.5 },
     { type: 'foret_corrompue_os_creature', x: 1080, y: 448, scale: 0.28 },        // sous la voûte (208 px libres)
     { type: 'bosquet_crates', x: 1560, y: 448, scale: 0.28 },
-    { type: 'bosquet_log_pile', x: 1640, y: 448, scale: 0.3 },
+    { type: 'bosquet_log_pile', x: 1690, y: 448, scale: 0.3 },   // à côté de la note (x 1600), pas devant
     { type: 'foret_corrompue_champignon_toxique', x: 2020, y: 448, scale: 0.3 },
+    { type: 'foret_corrompue_arbre_malade', x: 2470, y: 448, scale: 0.5 },     // l'arbre à la spirale (gravée par le script)
     { type: 'foret_corrompue_racine_tordue', x: 2680, y: 448, scale: 0.33 },
     { type: 'foret_corrompue_rocher_fissure', x: 2960, y: 448, scale: 0.3 },
     { type: 'foret_corrompue_pustule_mousse', x: 3060, y: 448, scale: 0.26 },

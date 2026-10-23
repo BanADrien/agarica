@@ -168,19 +168,11 @@ function a2Npc(scene, key) {
 // 8. FORÊT FLOTTANTE 1 — le chemin des hauteurs, Geralt et Clak
 // ===========================================================================
 Object.assign(DIALOGUES, {
-  ff1_intro: [
-    { who: 'agarica', text: 'Les branches montent si haut… On ne voit même plus le sol.' },
-    { who: 'xara', text: 'Le temps presse, Agarica. La mousse avance plus vite que tes pas.' },
-    { who: 'xara', text: 'La forêt est trop grande pour la nettoyer coin par coin. Il faut remonter jusqu\'à sa source.' },
-    { who: 'agarica', text: 'Et tu sais où elle est, toi ?' },
-    { who: 'xara', text: 'Je connais… un chemin. Par les hauteurs. Grimpe, et garde les yeux ouverts.' },
-  ],
   geralt_rencontre: [
     { who: 'geralt', text: 'HALTE ! Pas un pas de plus, porteuse de mousse !' },
     { who: 'clak', text: 'Clac !' },
     { who: 'agarica', text: 'Porteuse de… quoi ? Je ne porte rien du tout !' },
     { who: 'geralt', text: 'C\'est exactement ce que dirait quelqu\'un qui porte de la mousse. Ou qui vient voler mes notes.' },
-    { who: 'xara', text: 'Il a l\'air très sûr de lui. C\'est rarement bon signe.' },
     { who: 'geralt', text: 'Geralt, ranger des marches boisées. Et voici Clak, mon totem. Tremble.' },
     { who: 'clak', text: 'Clac clac.' },
     { who: 'geralt', text: 'En garde ! Un duel, et la vérité éclatera !' },
@@ -216,7 +208,6 @@ Object.assign(DIALOGUES, {
     { who: 'geralt', text: 'J\'avais une corde, trois pièges et un discours héroïque. Rien de tout ça ne saute plus haut que moi.' },
     { who: 'geralt', text: 'Bon. Va, Agarica. Je garde le camp, et je mettrai la carte à jour avec ce que tu rapporteras.' },
     { who: 'agarica', text: 'Merci, Geralt ! Je reviendrai tout te raconter.' },
-    { who: 'xara', text: 'Il a raison sur un point : la mousse sait où elle va. Suivons-la vers le haut.' },
   ],
   geralt_camp: [
     { who: 'geralt', text: 'Toujours en un seul morceau ? Bien. Ça me fait une alliée de plus et un point d\'interrogation de moins.' },
@@ -227,15 +218,19 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: '… Moi aussi, je t\'aime bien, Clak.' },
   ],
   ff1_vue: [
-    { who: 'agarica', text: 'Oh… Xara, regarde ! La brume se déchire…' },
-    { who: 'agarica', text: 'Le ciel ! En plein jour, sans branches devant. Je ne l\'avais jamais vu comme ça.' },
-    { who: 'xara', text: 'Au-dessus de la canopée, la nuit n\'existe plus. Plus loin, des îles flottent : les anciens gardiens y vivaient.' },
+    { who: 'agarica', text: 'Oh… Xara, regarde ! La brume se déchire… Le ciel, en plein jour !' },
+    { who: 'xara', text: 'Plus loin, des îles flottent : les anciens gardiens y vivaient.' },
     { who: 'agarica', text: 'Et là-bas, tout au loin… cette forêt presque noire.' },
-    { who: 'xara', text: 'C\'est là que la mousse est la plus épaisse. Son cœur. Retiens bien la direction.' },
+    { who: 'xara', text: 'Le cœur de la mousse. Retiens bien la direction.' },
   ],
 });
 
-CUTSCENES.ff1_intro = [{ wait: 200 }, { say: 'ff1_intro' }];
+// Remarques d'arrivée : bulles (cf. storyBulles, acte1.js), plus de gel.
+CUTSCENES.ff1_intro = cutsceneBulles([
+  { who: 'agarica', text: 'Les branches montent si haut… On ne voit même plus le sol.' },
+  'La forêt est trop grande pour la nettoyer coin par coin. Il faut remonter jusqu\'à sa source.',
+  'Je connais un chemin, par les hauteurs. Grimpe, et garde les yeux ouverts.',
+], null, 200);
 CUTSCENES.ff1_vue = [
   { camera: { x: 3420, y: 230, ms: 1100 } },
   { say: 'ff1_vue' },
@@ -383,12 +378,14 @@ function a2DuelUpdate(scene) {
     const tech = GERALT_TECHNIQUES[d.tech % GERALT_TECHNIQUES.length];
     d.tech += 1;
     a2GeraltTechnique(scene, d, g, tech)
-      .catch((e) => console.error('duel Geralt', e))
+      // Zone quittée en plein duel : pas d'erreur (scène éteinte).
+      .catch((e) => { if (scene.sys.isActive() && scene.player) console.error('duel Geralt', e); })
       .finally(() => {
+        if (!scene.sys.isActive() || !scene.player) return;
         d.busy = false;
         d.nextAt = scene.time.now + GERALT_DUEL.pauseMs;
-        if (d.tech === 1) showToast(scene, 'Xara : « Il vise très bien… le crabe. »', 2400);
-        if (d.tech === 3) showToast(scene, 'Xara : « Je crois que le crabe est de ton côté. »', 2400);
+        if (d.tech === 1) storyBulle(scene, 'xara', 'Il vise très bien… le crabe.', 2400);
+        if (d.tech === 3) storyBulle(scene, 'xara', 'Je crois que le crabe est de ton côté.', 2400);
       });
   }
 }
@@ -547,31 +544,12 @@ function a2Ff1AtmosphereUpdate(scene) {
   st.puffs.forEach((pf, i) => pf.setAlpha(0.18 * (1 - t) + (i % 2 ? 0.02 : 0)));
 }
 
-// Ruines d'anciens totems animaux, au bord du chemin.
-function a2DrawTotemRuin(scene, x, y, h, tint = 0x7c6a58) {
-  const g = scene.add.graphics({ x, y });
-  g.fillStyle(tint, 1);
-  g.fillRect(-14, -h, 28, h);
-  g.fillStyle(0x5c4c3e, 1);
-  g.fillRect(-18, -h - 6, 36, 10);
-  g.fillTriangle(-14, -h - 6, -2, -h - 20, 6, -h - 6); // cassure
-  g.fillStyle(0x3f7a52, 0.9);
-  g.fillCircle(-10, -h * 0.4, 6);
-  g.fillCircle(8, -h * 0.2, 5);
-  g.lineStyle(2, 0x3a2e25, 0.8);
-  g.strokeCircle(0, -h * 0.65, 7);
-  storyPutBehindPlayer(scene, g);
-  return g;
-}
-
 ZONE_SCRIPTS.acte2_ff1 = {
   create(scene) {
     a2Ceiling(scene);
     scene.__a2 = { duel: null, walls: null };
     a2InteractReset(scene);
     a2Ff1Atmosphere(scene);
-    a2DrawTotemRuin(scene, 3120, 128 + GROUND_STAND_SINK, 56);
-    a2DrawTotemRuin(scene, 3260, 128 + GROUND_STAND_SINK, 34, 0x8a7a66);
     if (storyGet('geraltMet')) {
       // Revisite : Geralt au pied de la corniche, plongé dans sa carte.
       const g = a2Npc(scene, 'geralt');
@@ -586,7 +564,7 @@ ZONE_SCRIPTS.acte2_ff1 = {
     a2Ff1AtmosphereUpdate(scene);
     if (!storyGet('geraltMet') && !st.encounterStarted && scene.player.x > 920 && scene.player.x < 1500) {
       st.encounterStarted = true;
-      a2Ff1Encounter(scene).catch((e) => console.error('rencontre Geralt', e));
+      a2Ff1Encounter(scene).catch((e) => { if (scene.sys.isActive() && scene.player) console.error('rencontre Geralt', e); });
     }
     a2DuelUpdate(scene);
   },
@@ -596,36 +574,18 @@ ZONE_SCRIPTS.acte2_ff1 = {
 // 9. FORÊT FLOTTANTE 2 — îles, totem de poche, Amanite, aigle
 // ===========================================================================
 Object.assign(DIALOGUES, {
-  ff2_intro: [
-    { who: 'agarica', text: 'Des îles… qui flottent ! Comment est-ce possible ?' },
-    { who: 'xara', text: 'Les anciens gardiens savaient lier la pierre au vent. Leur magie dort encore ici, à moitié.' },
-    { who: 'agarica', text: 'Et là, entre les îles… on voit le vent monter !' },
-    { who: 'xara', text: 'Pour l\'instant, il ne te sert à rien. Pour l\'instant.' },
-  ],
   ff2_totem_poche: [
-    { who: 'agarica', text: 'Qu\'est-ce que c\'est ? Un petit totem… fendu en deux.' },
-    { who: 'agarica', text: 'Il est tout froid. Il ne réagit à rien.' },
-    { who: 'xara', text: 'Ancien. Très ancien. Les gardiens en portaient sur eux, autrefois.' },
-    { who: 'xara', text: 'Garde-le. Les vieilles choses ont parfois la mémoire longue.' },
+    { who: 'agarica', text: 'Qu\'est-ce que c\'est ? Un petit totem… fendu en deux, et tout froid.' },
+    { who: 'xara', text: 'Ancien. Les gardiens en portaient sur eux. Garde-le : les vieilles choses ont la mémoire longue.' },
   ],
   amanite_apres: [
     { who: 'agarica', text: 'Amanite, attends !' },
     { who: 'agarica', text: '… Elle n\'était pas comme ça, avant. Elle voulait aider, elle aussi.', pose: 'sad' },
     { who: 'xara', text: 'Elle veut toujours sauver la forêt. C\'est bien ce qui m\'inquiète.' },
-    { who: 'xara', text: 'Plus haut, sur l\'île au-dessus de nous : un totem t\'attend. Avec le bond du singe, tu devrais l\'atteindre.' },
-  ],
-  aigle_revele: [
-    { who: 'agarica', text: 'Ce vent sous mes bras… Je me sens légère, comme une plume !' },
-    { who: 'xara', text: 'L\'aigle t\'a choisie. Saute, puis saute encore en l\'air : ses ailes s\'ouvriront, et tu planeras.' },
-    { who: 'xara', text: 'Laisse-toi porter. S pour piquer, si tu es pressée de retrouver le sol.' },
-    { who: 'xara', text: 'Essaie de rejoindre l\'île d\'en face. Si tu tombes, l\'îlot du dessous te rattrapera… et le courant d\'air te remontera.' },
   ],
   ff2_envol: [
-    { who: 'agarica', text: 'Xara, là, en contrebas ! Ce cercle vert, au milieu de la mousse…' },
-    { who: 'xara', text: 'La plante que tu avais aperçue depuis la forêt sombre. La mousse n\'ose pas l\'approcher.' },
-    { who: 'agarica', text: 'D\'en bas, je ne pouvais pas l\'atteindre. Mais d\'ici…' },
+    { who: 'agarica', text: 'Xara, là, en contrebas ! Ce cercle vert, au milieu de la mousse… La plante !' },
     { who: 'xara', text: 'D\'ici, tu planes. Prends de l\'élan, saute, ouvre les ailes, et ne regarde pas le vide.' },
-    { who: 'agarica', text: 'Ne pas regarder le vide. D\'accord. Facile.' },
   ],
 });
 
@@ -655,7 +615,10 @@ DIALOGUES.amanite_rencontre = () => {
   ];
 };
 
-CUTSCENES.ff2_intro = [{ wait: 300 }, { say: 'ff2_intro' }];
+CUTSCENES.ff2_intro = cutsceneBulles([
+  { who: 'agarica', text: 'Des îles… qui flottent ! Et entre elles, on voit le vent monter !' },
+  'Les anciens gardiens savaient lier la pierre au vent. Ce vent-là ne te sert à rien… pour l\'instant.',
+], null, 300);
 CUTSCENES.ff2_totem_poche = [{ wait: 400 }, { say: 'ff2_totem_poche' }];
 CUTSCENES.ff2_envol = [
   { camera: { x: 3800, y: 300, ms: 1000 } },
@@ -663,10 +626,11 @@ CUTSCENES.ff2_envol = [
   { cameraFollow: true },
   { toast: 'Saute du bord, puis Espace en l\'air : plane jusqu\'à la clairière →' },
 ];
-CUTSCENES.aigle_revele = [
-  { say: 'aigle_revele' },
-  { toast: 'Espace en l\'air : tu planes — S : piqué — les courants d\'air portent l\'aigle' },
-];
+CUTSCENES.aigle_revele = cutsceneBulles([
+  { who: 'agarica', text: 'Ce vent sous mes bras… Je me sens légère, comme une plume !' },
+  'L\'aigle t\'a choisie. Saute, puis saute encore en l\'air : tu planeras. S pour piquer.',
+  'Rejoins l\'île d\'en face. Si tu tombes, l\'îlot du dessous te rattrapera… et le courant d\'air te remontera.',
+], { text: 'Espace en l\'air : tu planes — S : piqué — les courants d\'air portent l\'aigle', ms: 4500 });
 
 CUTSCENES.amanite_rencontre = (scene) => {
   const st = scene.__a2 || {};
@@ -680,6 +644,8 @@ CUTSCENES.amanite_rencontre = (scene) => {
     { call: (sc) => a2AmaniteLeaves(sc) },
     { say: 'amanite_apres' },
     { set: { amaniteMet: true } },
+    // L'indice du totem : en bulle, après le dialogue.
+    { call: (sc) => storyBulles(sc, ['Plus haut, sur l\'île au-dessus de nous : un totem t\'attend. Le bond du singe devrait suffire.']) },
     { cameraFollow: true },
   ];
 };
@@ -755,8 +721,6 @@ function a2Ff2Decor(scene) {
   far.fillStyle(0x6fdc3a, 0.25);
   far.fillEllipse(1500, 440, 500, 60);
   if (bg) a2PlaceAbove(scene, far, st.sky);
-  a2DrawTotemRuin(scene, 1150, 320 + GROUND_STAND_SINK, 70);
-  a2DrawTotemRuin(scene, 1370, 320 + GROUND_STAND_SINK, 40, 0x8a7a66);
 }
 
 ZONE_SCRIPTS.acte2_ff2 = {
@@ -791,11 +755,6 @@ ZONE_SCRIPTS.acte2_ff2 = {
 // 10. CLAIRIÈRE DE LA PLANTE — la fleur résistante
 // ===========================================================================
 Object.assign(DIALOGUES, {
-  clairiere_arrivee: [
-    { who: 'agarica', text: 'J\'ai… j\'ai réussi ! Je me suis posée !' },
-    { who: 'xara', text: 'Avec une certaine élégance, même. Presque.' },
-    { who: 'agarica', text: 'Regarde, Xara : la plante est juste là. Et autour d\'elle, l\'herbe est verte. Vraiment verte.' },
-  ],
   plante_examen: [
     { who: 'agarica', text: 'La voilà… Elle est encore plus belle de près.' },
     { who: 'xara', text: 'Regarde le sol. La mousse s\'arrête net, en cercle, comme devant un mur invisible.' },
@@ -828,7 +787,11 @@ Object.assign(DIALOGUES, {
   ],
 });
 
-CUTSCENES.clairiere_arrivee = [{ say: 'clairiere_arrivee' }];
+CUTSCENES.clairiere_arrivee = cutsceneBulles([
+  { who: 'agarica', text: 'J\'ai… j\'ai réussi ! Je me suis posée !' },
+  'Avec une certaine élégance, même. Presque.',
+  { who: 'agarica', text: 'La plante est juste là. Et autour d\'elle, l\'herbe est verte. Vraiment verte.' },
+]);
 CUTSCENES.plante_prelevement = [
   { playerFace: 'right' },
   { say: 'plante_examen' },
@@ -984,7 +947,7 @@ ZONE_SCRIPTS.acte2_clairiere = {
     }
     if (st.gate && p.x > 2120 && scene.time.now > (st.gateToastAt || 0)) {
       st.gateToastAt = scene.time.now + 3000;
-      showToast(scene, 'Xara : « La plante d\'abord, Agarica. »', 2200);
+      storyBulle(scene, 'xara', 'La plante d\'abord, Agarica.', 2200);
     }
     a2UpdateInteract(scene);
   },
@@ -994,10 +957,6 @@ ZONE_SCRIPTS.acte2_clairiere = {
 // 11. HUTTE DE MORGAT — répulsif, totem de poche, crash
 // ===========================================================================
 Object.assign(DIALOGUES, {
-  hutte_arrivee: [
-    { who: 'agarica', text: 'Tous ces papillons… on dirait des étincelles qui dansent.' },
-    { who: 'xara', text: 'Les papillons de la guérisseuse. Ils l\'ont déjà prévenue de notre arrivée, j\'en suis sûre.' },
-  ],
   morgat_accueil: [
     { who: 'morgat', text: 'Doucement, mes petites, doucement… Elles t\'ont trouvée bien avant que tu me trouves.' },
     { who: 'morgat', text: 'Je suis Morgat. Et toi, tu sens la clairière : tu portes quelque chose que la mousse ne touche pas.' },
@@ -1041,9 +1000,6 @@ Object.assign(DIALOGUES, {
     { who: 'morgat', text: 'L\'antidote mijote. Lui, il ne se presse pas.' },
     { who: 'morgat', text: 'Mes papillons te trouveront, ma petite. Va, maintenant. La falaise est à l\'est.' },
   ],
-  hutte_pas_encore: [
-    { who: 'xara', text: 'Pas si vite. Morgat nous attend, et ta fleur ne servira à rien au fond de ta besace.' },
-  ],
   hutte_panneau: [
     '« Forêt sombre — en contrebas. » Le sentier dévale la pente entre les racines.',
     { who: 'xara', text: 'Rien à faire là-bas pour l\'instant.' },
@@ -1065,8 +1021,14 @@ Object.assign(DIALOGUES, {
   ],
 });
 
-CUTSCENES.hutte_arrivee = [{ say: 'hutte_arrivee' }];
-CUTSCENES.hutte_pas_encore = [{ say: 'hutte_pas_encore' }, { playerMove: { toX: 2420 } }];
+CUTSCENES.hutte_arrivee = cutsceneBulles([
+  { who: 'agarica', text: 'Tous ces papillons… on dirait des étincelles qui dansent.' },
+  'Les papillons de la guérisseuse. Ils l\'ont déjà prévenue de notre arrivée.',
+]);
+CUTSCENES.hutte_pas_encore = [
+  { call: (sc) => storyBulles(sc, ['Pas si vite. Morgat nous attend, et ta fleur ne servira à rien au fond de ta besace.']) },
+  { playerMove: { toX: 2420 } },
+];
 
 CUTSCENES.morgat_rencontre = (scene) => {
   const steps = [
@@ -1335,17 +1297,6 @@ Object.assign(DIALOGUES, {
   fc1_reveil_2: [
     { who: 'agarica', text: 'Où sommes-nous ? Les arbres sont tout tordus… et la mousse respire.' },
     { who: 'xara', text: 'Le cœur de la corruption. Tu n\'as pas atterri où tu voulais… mais tu en es plus près que quiconque.' },
-    { who: 'agarica', text: 'Plus près que Geralt ?' },
-    { who: 'xara', text: 'Geralt n\'a jamais su voler.' },
-    { who: 'agarica', text: 'Moi non plus, apparemment.' },
-  ],
-  fc1_ferme: [
-    { who: 'agarica', text: 'La mousse… elle se referme derrière moi !' },
-    { who: 'xara', text: 'Elle nous sent. Ne reste pas immobile. Avance.' },
-  ],
-  fc1_amas: [
-    { who: 'xara', text: 'Un amas de mousse, dur comme de l\'écorce. Il bouche toute la galerie.' },
-    { who: 'agarica', text: 'Le talisman de mon père… La force de l\'ours devrait suffire.' },
   ],
   fc1_note_geralt: [
     'Un campement abandonné. Sous une pierre, une page arrachée, couverte d\'une écriture pressée.',
@@ -1354,24 +1305,6 @@ Object.assign(DIALOGUES, {
     '« Je n\'irai pas plus loin seul. Clak refuse aussi. Si tu lis ceci, c\'est que je suis passé par là. Ou que je l\'ai perdue. »',
     { who: 'agarica', text: 'Geralt est venu jusqu\'ici… à pied !' },
     { who: 'xara', text: 'Et il a vu juste. Les bêtes « gardent ». Reste à savoir quoi.' },
-  ],
-  fc1_papillons: [
-    { who: 'agarica', text: 'Des papillons ! Ce sont ceux de Morgat… Ils m\'ont suivie jusqu\'ici ?' },
-  ],
-  fc1_papillons_totem: [
-    { who: 'agarica', text: 'Et le totem de poche… il est tiède, dans ma besace. Il ne l\'était jamais.' },
-    { who: 'xara', text: 'Ils le reconnaissent. Ou lui les reconnaît. Garde-le près de toi.' },
-  ],
-  fc1_spirale: [
-    { who: 'agarica', text: 'Xara, regarde ce tronc. Quelqu\'un y a gravé une spirale… On dirait une toile.' },
-    { who: 'xara', text: '…' },
-    { who: 'xara', text: 'Ne la touche pas.' },
-    { who: 'agarica', text: 'Tu sais ce que c\'est ?' },
-    { who: 'xara', text: 'Je sais que ce n\'est pas le moment. Avance, Agarica.' },
-  ],
-  fc1_mur: [
-    { who: 'xara', text: 'Un mur vivant. Il ne cédera ni à tes coups, ni à l\'ours.' },
-    { who: 'agarica', text: 'Le répulsif de Morgat ! Quelques gouttes, elle a dit…' },
   ],
   fc1_avant_arene: [
     { who: 'agarica', text: 'Ce grondement… On dirait une respiration.' },
@@ -1388,27 +1321,37 @@ CUTSCENES.fc1_reveil = [
   { say: 'fc1_reveil_2' },
   { set: { fc1Reveil: true } },
 ];
-CUTSCENES.fc1_ferme = [{ shake: { ms: 400, intensity: 0.006 } }, { say: 'fc1_ferme' }];
-CUTSCENES.fc1_amas = [
-  { say: 'fc1_amas' },
-  { toast: 'Compétence de l\'ours (touche A, F ou R) : brise l\'amas. Le feu de camp recharge ton énergie.' },
-];
+CUTSCENES.fc1_ferme = cutsceneBulles((scene) => {
+  scene.cameras.main.shake(400, 0.006);
+  return [
+    { who: 'agarica', text: 'La mousse… elle se referme derrière moi !' },
+    'Elle nous sent. Ne reste pas immobile. Avance.',
+  ];
+});
+CUTSCENES.fc1_amas = cutsceneBulles([
+  'Un amas de mousse, dur comme de l\'écorce. Il bouche toute la galerie.',
+  { who: 'agarica', text: 'La force de l\'ours devrait suffire.' },
+], { text: 'Compétence de l\'ours (touche A, F ou R) : brise l\'amas. Le feu de camp recharge ton énergie.', ms: 4200 });
 CUTSCENES.fc1_note_geralt = [{ wait: 300 }, { say: 'fc1_note_geralt' }];
-CUTSCENES.fc1_papillons = (scene) => [
-  { call: (sc) => a2Fc1Butterflies(sc, true) },
-  { wait: 1200 },
-  { say: 'fc1_papillons' },
-  ...(inventoryHas('totem_poche_casse') ? [{ call: (sc) => a2Fc1TotemPulse(sc) }, { say: 'fc1_papillons_totem' }] : []),
-];
-CUTSCENES.fc1_spirale = [
-  { camera: { x: 2470, y: 300, ms: 700 } },
-  { say: 'fc1_spirale' },
-  { cameraFollow: true },
-];
-CUTSCENES.fc1_mur = [
-  { say: 'fc1_mur' },
-  { toast: 'E devant le mur : verser le répulsif' },
-];
+CUTSCENES.fc1_papillons = cutsceneBulles((scene) => {
+  a2Fc1Butterflies(scene, true);
+  const lignes = [{ who: 'agarica', text: 'Des papillons ! Ceux de Morgat… Ils m\'ont suivie jusqu\'ici ?' }];
+  if (inventoryHas('totem_poche_casse')) {
+    scene.time.delayedCall(3200, () => { if (scene.sys.isActive()) a2Fc1TotemPulse(scene); });
+    lignes.push({ who: 'agarica', text: 'Et le totem de poche… il est tiède, dans ma besace.' });
+    lignes.push('Ils le reconnaissent. Ou lui les reconnaît. Garde-le près de toi.');
+  }
+  return lignes;
+}, null, 1200);
+CUTSCENES.fc1_spirale = cutsceneBulles([
+  { who: 'agarica', text: 'Xara, regarde ce tronc. Une spirale gravée… On dirait une toile.' },
+  '… Ne la touche pas.',
+  'Ce n\'est pas le moment. Avance, Agarica.',
+]);
+CUTSCENES.fc1_mur = cutsceneBulles([
+  'Un mur vivant. Il ne cédera ni à tes coups, ni à l\'ours.',
+  { who: 'agarica', text: 'Le répulsif de Morgat ! Quelques gouttes, elle a dit…' },
+], 'E devant le mur : verser le répulsif');
 CUTSCENES.fc1_avant_arene = [{ shake: { ms: 900, intensity: 0.004 } }, { say: 'fc1_avant_arene' }];
 
 // Réveil : allongée dans le cratère, le noir se lève lentement.
@@ -1455,12 +1398,15 @@ function a2DrawCrater(scene, x) {
 // Arbre marqué d'une spirale (Xara la reconnaît sans rien dire).
 function a2DrawSpiralTree(scene, x) {
   const y = storyGroundY(scene, x, 448) + GROUND_STAND_SINK;
-  const g = scene.add.graphics({ x, y });
-  g.fillStyle(0x3b3026, 1);
-  g.fillRect(-26, -330, 52, 330);
-  g.fillStyle(0x2f5a2a, 1);
-  g.fillEllipse(-20, -180, 30, 90);
-  g.fillEllipse(24, -90, 26, 70);
+  // Le tronc est le décor `foret_corrompue_arbre_malade` (donnée de zone) :
+  // on ne dessine plus que la spirale gravée, à mi-hauteur de son tronc.
+  const tree = (scene.props || []).find((pr) => pr.propType === 'foret_corrompue_arbre_malade' && Math.abs(pr.x - x) < 80);
+  const sy = tree ? y + 70 : y;
+  const g = scene.add.graphics({ x, y: sy });
+  if (!tree) {
+    g.fillStyle(0x3b3026, 1);
+    g.fillRect(-26, -330, 52, 330);
+  }
   g.lineStyle(3, 0xb48cff, 0.9);
   g.beginPath();
   for (let i = 0; i <= 60; i++) {
@@ -1476,7 +1422,7 @@ function a2DrawSpiralTree(scene, x) {
     g.lineBetween(0, -150, Math.cos(a) * 22, -150 + Math.sin(a) * 22);
   }
   storyPutBehindPlayer(scene, g);
-  const glow = a2Glow(scene, x, y - 150, 90, 0xb48cff, 0.25, 3);
+  const glow = a2Glow(scene, x, sy - 150, 90, 0xb48cff, 0.25, 3);
   scene.tweens.add({ targets: glow, alpha: 0.05, duration: 1600, yoyo: true, repeat: -1 });
 }
 

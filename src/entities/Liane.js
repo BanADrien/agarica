@@ -2,7 +2,8 @@
 // Donnée de zone : `vines: [{x, y, length}]` — (x, y) = point d'attache EN
 // HAUT, `length` en px. Sans la forme singe active, simple décor qui oscille.
 // Avec : Player.update() appelle findGrabbableVine() en l'air, puis
-// stepSwing() chaque frame (pendule : gravité + pompe gauche/droite).
+// stepSwing() chaque pas de physique (pendule : gravité + pompe gauche/droite,
+// montée/descente le long de la liane avec Z/↑ et S/↓).
 // Visuel : item `liane` du manifest étiré (si l'art existe), sinon tracé
 // procédural vert (Graphics). Événements scène : 'vine-grab' / 'vine-release'.
 
@@ -15,7 +16,14 @@ const VINE_MIN_GRAB_R = 24;
 const VINE_PUMP_ACCEL = 700;
 const VINE_DAMPING = 0.18; // par seconde, pendant le balancement
 const VINE_FREE_DAMPING = 1.4; // liane lâchée : revient vite au repos
-const VINE_MAX_ANGLE = 1.35; // ~77°
+// Amplitude maximale du balancement (retour utilisateur : « on peut pomper
+// trop haut ») : ~55°. La pompe ne rajoute plus d'énergie au-delà, et la
+// vitesse angulaire est plafonnée à celle qui ramènerait juste à cet angle
+// (vitesse max au bas de l'arc ≈ √(2·g·r·(1 − cos 55°)), ~480 px/s pour
+// r = 250). Une prise faite plus loin (jusqu'à VINE_GRAB_MAX_ANGLE) redescend
+// d'elle-même sous la gravité.
+const VINE_MAX_ANGLE = 0.96; // ~55°
+const VINE_GRAB_MAX_ANGLE = 1.35; // ~77°
 const VINE_MAX_OMEGA = 4.2;
 const VINE_REGRAB_COOLDOWN_MS = 350; // même liane, juste après l'avoir lâchée
 const VINE_RELEASE_SPEED_MULT = 1.1;
@@ -25,6 +33,10 @@ const VINE_MAX_CARRY_SPEED = 560;
 // le long de la liane (fraction de la hauteur balistique restante).
 const VINE_CLIMB_FRACTION = 0.6;
 const VINE_CLIMB_SPEED = 380; // px/s
+// Montée / descente volontaire le long de la liane (Z/↑, S/↓) : vitesse, et
+// distance minimale mains -> attache (la tête reste juste sous l'attache).
+const VINE_CLIMB_MANUAL_SPEED = 140; // px/s
+const VINE_CLIMB_TOP_R = 28;
 // Longueur de balancier minimale (fraction de la liane) : correctif, une prise
 // en pleine montée (après un double saut) faisait remonter les mains presque
 // jusqu'à l'attache -> balancier trop court, lâcher sans élan. Une prise plus
@@ -139,7 +151,7 @@ class Liane {
     const hx = player.x - this.x;
     const hy = player.y - VINE_HANG_OFFSET - this.y;
     const r = Math.hypot(hx, hy);
-    this.theta = Phaser.Math.Clamp(Math.atan2(hx, hy), -VINE_MAX_ANGLE, VINE_MAX_ANGLE);
+    this.theta = Phaser.Math.Clamp(Math.atan2(hx, hy), -VINE_GRAB_MAX_ANGLE, VINE_GRAB_MAX_ANGLE);
     this.drawTheta = this.theta;
     this.swingR = Phaser.Math.Clamp(r, VINE_MIN_GRAB_R, this.length);
     // Vitesse angulaire déduite de la vitesse du joueur (composante
@@ -155,25 +167,46 @@ class Liane {
     this.grabbedBy = player;
   }
 
+  // Mains au bas de la liane (S y fait lâcher, cf. Player.update).
+  atBottom() {
+    return this.swingR >= this.length - 0.5;
+  }
+
   // Avance le pendule d'un pas et renvoie la position cible des PIEDS.
   // Appelé à chaque pas de physique (Player.stepVinePhysics, dt fixe).
-  stepSwing(player, dir, dt) {
+  // `climb` : -1 monte (Z/↑), +1 descend (S/↓), 0 rien.
+  stepSwing(player, dir, dt, climb = 0) {
     this.drawTheta = this.theta;
     const g = this.scene.physics.world.gravity.y;
-    if (this.climbTargetR < this.swingR) {
+    if (climb) {
+      // Montée/descente volontaire : remplace la remontée automatique de la prise.
+      this.swingR = Phaser.Math.Clamp(this.swingR + climb * VINE_CLIMB_MANUAL_SPEED * dt, VINE_CLIMB_TOP_R, this.length);
+      this.climbTargetR = this.swingR;
+    } else if (this.climbTargetR < this.swingR) {
       this.swingR = Math.max(this.climbTargetR, this.swingR - VINE_CLIMB_SPEED * dt);
     } else if (this.climbTargetR > this.swingR) {
       this.swingR = Math.min(this.climbTargetR, this.swingR + VINE_CLIMB_SPEED * dt);
     }
     const r = this.swingR;
+    // Amplitude équivalente à l'énergie actuelle (cos de l'angle où le
+    // pendule s'arrêterait) : la pompe ne pousse plus au-delà de VINE_MAX_ANGLE.
+    const cosMax = Math.cos(VINE_MAX_ANGLE);
+    const atMax = Math.cos(this.theta) - (r * this.omega * this.omega) / (2 * g) <= cosMax;
     let alpha = -(g / r) * Math.sin(this.theta);
-    if (dir !== 0 && (dir * this.omega >= -0.25)) alpha += (dir * VINE_PUMP_ACCEL) / r;
+    if (dir !== 0 && (dir * this.omega >= -0.25) && !(atMax && dir * this.omega > 0)) alpha += (dir * VINE_PUMP_ACCEL) / r;
     this.omega += alpha * dt;
     this.omega *= Math.max(0, 1 - VINE_DAMPING * dt);
     this.omega = Phaser.Math.Clamp(this.omega, -VINE_MAX_OMEGA, VINE_MAX_OMEGA);
+    // Vitesse plafonnée à celle qui ramène juste à VINE_MAX_ANGLE (plafond
+    // d'énergie, sans arrêt sec en haut de l'arc). Au-delà de l'angle (prise
+    // lointaine), la gravité le ramène d'elle-même.
+    if (Math.abs(this.theta) <= VINE_MAX_ANGLE) {
+      const cap = Math.sqrt(Math.max(0, (2 * g * (Math.cos(this.theta) - cosMax)) / r));
+      this.omega = Phaser.Math.Clamp(this.omega, -cap, cap);
+    }
     this.theta += this.omega * dt;
-    if (Math.abs(this.theta) > VINE_MAX_ANGLE) {
-      this.theta = Math.sign(this.theta) * VINE_MAX_ANGLE;
+    if (Math.abs(this.theta) > VINE_GRAB_MAX_ANGLE) {
+      this.theta = Math.sign(this.theta) * VINE_GRAB_MAX_ANGLE;
       this.omega = 0;
     }
     // (Redessinée par update(), une fois par image, à `displayAngle`.)

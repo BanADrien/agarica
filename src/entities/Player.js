@@ -347,6 +347,10 @@ const SLASH_ARCS = {
   up: { cx: 8, cy: -92, w: 108, h: 72 },
   down: { cx: 0, cy: 12, w: 100, h: 80 },
 };
+// Échelle de l'art `agarica_slash`/`vfx_slash` au moment où SLASH_ARCS a été
+// réglé : les positions d'arc suivent l'échelle calibrée de la pose (cf.
+// slashArcFactor) pour que l'arc parte toujours de la dague.
+const SLASH_ARCS_ART_SCALE = 0.335;
 // Phases d'un coup, calées sur les 4 frames du corps (`agarica_slash`, une
 // frame par SLASH_WINDUP_MS) : frame 0 = élan (rien ne touche), frames 1-2 =
 // images actives (l'arc est affiché ET touche), frame 3 = retour (l'arc
@@ -838,102 +842,64 @@ function manifestFormConfig(scene, id, anim) {
   };
 }
 
-// Analyse alpha d'une texture (une fois par clé, mise en cache) : boîte
-// opaque et « poing » (point le plus haut de la silhouette : la main levée
-// des poses suspendues). Sert à caler l'art Codex, dont le cadrage varie
-// d'une planche à l'autre, sur la taille et la prise d'Agarica.
-const TEXTURE_ALPHA_CACHE = new Map();
+// « Poing » d'une texture (point le plus haut de la silhouette : la main levée
+// des poses suspendues), en px du canvas, mis en cache. Sert à caler l'art
+// Codex suspendu sur la prise de la liane (cf. applyVineArtAnchor). Lecture
+// des pixels : frameAlphaMap / frameVisibleBounds (calibrage visuel, LevelKit).
+const TEXTURE_FIST_CACHE = new Map();
 function textureAlphaInfo(scene, key) {
-  if (TEXTURE_ALPHA_CACHE.has(key)) return TEXTURE_ALPHA_CACHE.get(key);
+  if (TEXTURE_FIST_CACHE.has(key)) return TEXTURE_FIST_CACHE.get(key);
   let info = null;
-  try {
-    if (scene.textures.exists(key)) {
-      const img = scene.textures.get(key).getSourceImage();
-      const w = img.width;
-      const h = img.height;
-      const c = document.createElement('canvas');
-      c.width = w;
-      c.height = h;
-      const ctx = c.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0);
-      const d = ctx.getImageData(0, 0, w, h).data;
-      let top = -1;
-      let bottom = -1;
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          if (d[(y * w + x) * 4 + 3] > 128) {
-            if (top < 0) top = y;
-            bottom = y;
-            break;
-          }
-        }
-      }
-      if (top >= 0) {
-        let sx = 0;
-        let n = 0;
-        for (let y = top; y < Math.min(h, top + 20); y++) {
-          for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 128) { sx += x; n++; }
-        }
-        info = { w, h, top, bottom, fistX: sx / n, fistY: top + 10 };
-      }
+  const frame = scene.textures.exists(key) ? scene.textures.getFrame(key) : null;
+  const b = frame ? frameVisibleBounds(frame) : null;
+  const map = frame ? frameAlphaMap(frame) : null;
+  if (b && map && !b.empty) {
+    let sx = 0;
+    let n = 0;
+    for (let y = b.y0; y < Math.min(map.h, b.y0 + 20); y++) {
+      for (let x = 0; x < map.w; x++) if (map.alpha[y * map.w + x] > VISIBLE_ALPHA_MIN) { sx += x; n++; }
     }
-  } catch (e) {
-    info = null;
+    info = { w: b.frameW, h: b.frameH, top: b.y0, bottom: b.y1 - 1, fistX: sx / n, fistY: b.y0 + 10 };
   }
-  TEXTURE_ALPHA_CACHE.set(key, info);
+  TEXTURE_FIST_CACHE.set(key, info);
   return info;
 }
 
-// Boîte des pixels visibles (alpha > seuil) d'une texture, en px du canvas
-// (mise en cache). Sert à caler la zone de coup sur l'arc réellement dessiné.
-const TEXTURE_BOX_CACHE = new Map();
-function textureOpaqueBox(scene, key, alphaMin = 48) {
-  const ck = `${key}|${alphaMin}`;
-  if (TEXTURE_BOX_CACHE.has(ck)) return TEXTURE_BOX_CACHE.get(ck);
-  let box = null;
-  try {
-    if (scene.textures.exists(key)) {
-      const img = scene.textures.get(key).getSourceImage();
-      const c = document.createElement('canvas');
-      c.width = img.width;
-      c.height = img.height;
-      const ctx = c.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0);
-      const d = ctx.getImageData(0, 0, img.width, img.height).data;
-      let x0 = Infinity; let y0 = Infinity; let x1 = -1; let y1 = -1;
-      for (let y = 0; y < img.height; y++) {
-        for (let x = 0; x < img.width; x++) {
-          if (d[(y * img.width + x) * 4 + 3] > alphaMin) {
-            if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
-          }
-        }
-      }
-      if (x1 >= 0) box = { x0, y0, x1: x1 + 1, y1: y1 + 1, w: img.width, h: img.height };
-    }
-  } catch (e) {
-    box = null;
+// Boîte des pixels visibles d'une texture, en px du canvas : enveloppe de
+// visibleBounds (LevelKit) au format historique { x0, y0, x1, y1, w, h }
+// (w/h = taille du CANVAS). Sert à caler la zone de coup sur l'arc dessiné.
+function textureOpaqueBox(scene, key) {
+  const b = visibleBounds(scene, key);
+  if (!b || b.empty) return null;
+  return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1, w: b.frameW, h: b.frameH };
+}
+
+// Échelle d'une pose d'Agarica tirée d'une feuille Codex : la FEUILLE entière
+// (cf. manifestSheetScale / calibratedScale) prend la même taille apparente
+// que l'idle humaine (agarica-idle-0 à HUMAN_SCALE) -- debout neutre alignée
+// en hauteur, sinon surface visible. `death` (couchée) prend ainsi l'échelle
+// de `talk` (debout, même image), les coups en fente celle de leur surface.
+// `method: 'area'` pour les formes animales (singe, papillon) : même « masse »
+// visible qu'Agarica. Repli sans art ni pixels lisibles : `fallback`.
+function agaricaSheetScale(scene, id, anim, fallback, opts = {}) {
+  const r = manifestSheetScale(scene, id, anim, { refKey: 'agarica-idle-0', refScale: HUMAN_SCALE, ...opts });
+  return r ? r.scale : fallback;
+}
+
+// Config échelle + hitbox (gabarit humain, cf. transfoBodyConfig) d'une
+// rangée du manifest calibrée par feuille ; mise en cache par scène.
+function agaricaSheetPoseConfig(scene, id, anim, opts = {}) {
+  scene.__agaricaPoseCfg = scene.__agaricaPoseCfg || {};
+  const ck = `${id}|${anim}|${opts.method || 'auto'}`;
+  let cfg = scene.__agaricaPoseCfg[ck];
+  if (!cfg) {
+    const base = manifestFormConfig(scene, id, anim);
+    const scale = agaricaSheetScale(scene, id, anim, base.scale, opts);
+    cfg = { ...base, scale, body: transfoBodyConfig(base.frameWidth, base.frameHeight, scale) };
+    scene.__agaricaPoseCfg[ck] = cfg;
   }
-  TEXTURE_BOX_CACHE.set(ck, box);
-  return box;
+  return cfg;
 }
-
-// Échelle à laquelle la silhouette de la texture `key` a la même hauteur
-// opaque que l'idle humaine historique (~85 px) -- jamais plus grande que
-// `maxScale` (l'échelle du manifest) : on ne fait que réduire l'art trop
-// grand (pose `talk`, `receive_item`, 1re frame de la transfo singe), pour
-// qu'Agarica ne grandisse pas d'un coup en changeant de pose.
-function scaleMatchingHumanHeight(scene, key, maxScale) {
-  const ref = textureAlphaInfo(scene, 'agarica-idle-0');
-  const t = textureAlphaInfo(scene, key);
-  if (!ref || !t) return maxScale;
-  const target = (ref.bottom - ref.top) * HUMAN_SCALE;
-  return Math.min(maxScale, target / Math.max(1, t.bottom - t.top));
-}
-
-// Poses `agarica_extra` où Agarica est DEBOUT (silhouette comparable à
-// l'idle) : leur art est dessiné plus grand que les autres rangées
-// (mesuré : talk ~99 px, receive_item ~112 px contre ~85 px à l'idle).
-const AGARICA_EXTRA_STANDING_ANIMS = ['talk', 'receive_item', 'cast'];
 
 // Joue `${id}-${anim}` si l'anim manifest existe, sinon pose la texture de
 // repli (placeholder) : le jeu marche à l'identique avec ou sans art.
@@ -1244,6 +1210,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Origine ancrée aux pieds : `this.y` = position des pieds, quelle que
     // soit la taille de la frame active (voir commentaire sur FORMS).
     this.setOrigin(0.5, 1);
+    // ... et plus précisément le bas VISIBLE des pieds, pour toutes les poses
+    // (les planches gardent 4-9 px transparents sous les pieds : 1-3 px de
+    // flottement à l'écran) ; le bas du corps physique y est recalé à chaque
+    // image (cf. anchorVisibleFeet / syncBodyToVisibleFeet, LevelKit), donc
+    // posée au sol : bas du corps = this.y = bas visible des bottes.
+    anchorVisibleFeet(this, { body: true });
 
     this.setCollideWorldBounds(true);
     this.setMaxVelocity(400, PLAYER_MAX_FALL_SPEED);
@@ -1484,6 +1456,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Direction tenue pendant le balancement, lue par stepVinePhysics à chaque
     // pas de physique ; `vineLook`/`vineSwingPose` : état visuel (cf. applyVinePose).
     this.vineDir = 0;
+    // Montée (-1) / descente (+1) le long de la liane (Z/↑, S/↓).
+    this.vineClimb = 0;
     this.vineLook = 0;
     this.vineSwingPose = false;
     // Le pendule avance au rythme FIXE de la physique (60 Hz), pas à celui de
@@ -1506,7 +1480,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // instantanées : pierre, papillon).
     this.skillHitboxId = null;
     this.lastSkillId = null;
-    FORMS.monkey = manifestFormConfig(scene, 'singe', 'jump');
+    // Singe et papillon : feuilles calibrées sur la surface visible de l'idle
+    // (cf. agaricaSheetScale, `method: 'area'`) -- même « masse » apparente
+    // qu'Agarica, une échelle par image source (singe.png / singe_p2.png).
+    FORMS.monkey = agaricaSheetPoseConfig(scene, 'singe', 'jump', { method: 'area' });
     // Papillon : art `forme_papillon` (centré, face à DROITE) s'il existe,
     // sinon placeholder dessiné par code ; hitbox au gabarit humain (comme
     // le singe) pour que les collisions ne changent pas pendant le dash.
@@ -1515,7 +1492,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     ensureButterflyPlaceholder(scene);
     this.butterflyArt = hasManifestArt(scene, 'forme_papillon');
     if (this.butterflyArt) {
-      FORMS.butterfly = manifestFormConfig(scene, 'forme_papillon', 'dash');
+      FORMS.butterfly = agaricaSheetPoseConfig(scene, 'forme_papillon', 'dash', { method: 'area' });
     } else {
       const { w, h } = BUTTERFLY_PH_SIZE;
       FORMS.butterfly = { texture: `${BUTTERFLY_PH_KEY}-0`, scale: 1, frameWidth: w, frameHeight: h, body: transfoBodyConfig(w, h, 1) };
@@ -1558,13 +1535,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         if (!scene.anims.exists(this.monkeyTransfoReverseKey)) {
           scene.anims.create({ key: this.monkeyTransfoReverseKey, frames: fwdFrames.slice().reverse(), frameRate: rate, repeat: 0 });
         }
-        // 1re frame = Agarica encore humaine : ramenée à la hauteur de l'idle
-        // (l'art la dessine ~109 px de haut à l'échelle du manifest, d'où un
-        // sursaut de taille au début de la transfo) ; la dernière frame, le
-        // singe, tombe alors à ~67 px, proche du singe au repos (~64 px).
-        const tcfg = manifestFormConfig(scene, 'transfo_singe', tAnim);
-        const tScale = scaleMatchingHumanHeight(scene, tcfg.texture, tcfg.scale);
-        this.monkeyTransfoCfg = { ...tcfg, scale: tScale, body: transfoBodyConfig(tcfg.frameWidth, tcfg.frameHeight, tScale) };
+        // Feuille calibrée (cf. agaricaSheetScale) : l'art dessine la 1re
+        // frame (Agarica accroupie dans les feuilles) bien plus grande que
+        // l'idle à l'échelle du manifest, d'où un sursaut de taille au début.
+        this.monkeyTransfoCfg = agaricaSheetPoseConfig(scene, 'transfo_singe', tAnim);
       }
     }
     // Triche Ctrl+Shift+D (écouteur principal dans LevelKit, qui ignore le
@@ -1851,10 +1825,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     // Lianes (forme singe, cf. Liane.js) : accroche automatique en l'air,
-    // balancement pendulaire (gauche/droite pompe l'élan), Saut = lâcher
-    // avec l'élan, S = se laisser tomber. Sans singe actif (forme humaine,
-    // aigle, loup) : pur décor, traversé sans rebond ni accroche -- partout,
-    // arène de Kainati comprise (décision utilisateur).
+    // balancement pendulaire (Q/D ou gauche/droite pompe l'élan), Z/↑ monte et
+    // S/↓ descend le long de la liane (S tout en bas = se laisser tomber),
+    // Saut = lâcher avec l'élan (le saut du singe : compte comme le double
+    // saut, cf. releaseVine). Sans singe actif (forme humaine, aigle, loup) :
+    // pur décor, traversé sans rebond ni accroche -- partout, arène de
+    // Kainati comprise (décision utilisateur).
     const airForm = this.getActiveAirForm();
     const monkeyActive = !swimming && airForm === 'monkey';
     let jumpConsumed = false;
@@ -1863,12 +1839,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       if (jumpJustPressed) {
         this.releaseVine(true, now);
         jumpConsumed = true;
-      } else if (downHeld) {
+      } else if (downHeld && this.vine.atBottom()) {
         this.releaseVine(false, now);
       } else {
         // Le mouvement lui-même est imposé à chaque pas de physique (cf.
-        // stepVinePhysics) : ici on ne fait que transmettre la direction.
+        // stepVinePhysics) : ici on ne fait que transmettre la direction et
+        // la montée (-1) / descente (+1).
         this.vineDir = dir;
+        this.vineClimb = upHeld && !downHeld ? -1 : downHeld && !upHeld ? 1 : 0;
         this.setAcceleration(0, 0);
         this.setDrag(0, 0);
         this.body.maxVelocity.set(VINE_BODY_MAX_SPEED, VINE_BODY_MAX_SPEED);
@@ -2288,7 +2266,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         if (this.vine) {
           this.applyVinePose();
         } else {
-          playManifestOn(this, 'singe', now < this.monkeyReleasePoseUntil ? 'release_flip' : 'jump');
+          const monkeyAnim = now < this.monkeyReleasePoseUntil ? 'release_flip' : 'jump';
+          playManifestOn(this, 'singe', monkeyAnim);
+          // `release_flip` est sur l'autre image source (singe_p2) : son échelle.
+          const mc = agaricaSheetPoseConfig(this.scene, 'singe', monkeyAnim, { method: 'area' });
+          this.applyBodyForScale(mc.scale, mc.body);
         }
       } else if (this.form === 'butterfly') {
         this.applyButterflyPose(now);
@@ -2675,7 +2657,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Mur dans le sens du balancement : renvoi (une fois, pas à chaque pas
     // de la même image -- `blocked` n'est remis à zéro qu'au 1er pas).
     if ((b.blocked.right && vine.omega > 0) || (b.blocked.left && vine.omega < 0)) vine.bounceOffWall();
-    const target = vine.stepSwing(this, this.vineDir, delta);
+    const target = vine.stepSwing(this, this.vineDir, delta, this.vineClimb || 0);
     // Pieds = bas-centre du corps (invariant de toutes les hitbox du joueur,
     // cf. FORMS et applyVineArtAnchor) ; `this.x/y` ne sont resynchronisés
     // sur le corps qu'en fin d'image.
@@ -2689,8 +2671,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (!vine) return;
     const v = vine.detach(this);
     this.vine = null;
+    this.vineClimb = 0;
     this.lastVine = vine;
     this.vineReleasedAt = now;
+    // Le lâcher EST le saut du singe : il compte comme le double saut -- plus
+    // aucun saut avant le sol ou la prochaine liane (qui recharge, cf. grabVine).
+    this.jumpsUsed = 2;
+    this.airJumpForm = 'monkey';
     let vx = v.vx;
     let vy = v.vy;
     if (withJump) {
@@ -2768,8 +2755,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // centré sur le buste (BUTTERFLY_CENTER_ABOVE_FEET) ; hitbox inchangée.
   applyButterflyPose(now) {
     const sc = this.scene;
+    // Transformation : échelle de SA feuille (transfo_papillon), calibrée
+    // comme les autres (cf. agaricaSheetPoseConfig).
+    let cfg = FORMS.butterfly;
     if (this.butterflyPhase === 'flap' && this.butterflyTransfoKey) {
       this.anims.play(this.butterflyTransfoKey, true);
+      cfg = agaricaSheetPoseConfig(sc, 'transfo_papillon', 'transform');
+      this.applyBodyForScale(cfg.scale, cfg.body);
     } else if (this.butterflyArt) {
       const want = this.butterflyPhase === 'flap' ? 'forme_papillon-flap' : 'forme_papillon-dash';
       if (sc.anims.exists(want)) this.anims.play(want, true);
@@ -2782,7 +2774,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const W = this.frame.realWidth;
     const H = this.frame.realHeight;
     this.setOrigin(0.5, 0.5 + BUTTERFLY_CENTER_ABOVE_FEET / (H * this.scaleY));
-    const b = FORMS.butterfly.body;
+    const b = cfg.body;
     this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
     // Remis à (0.5, 1) / rotation 0 en tête de l'image suivante (cf. resetVineArtAnchor).
     this.vineArtAnchored = true;
@@ -2921,19 +2913,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.setRotation(0);
   }
 
-  // Échelle + hitbox d'une rangée `agarica_extra` (mise en cache).
+  // Échelle + hitbox d'une rangée `agarica_extra` : échelle de SA FEUILLE
+  // Codex (cf. agaricaSheetScale -- 4 images dessinées à des échelles
+  // différentes : `death`/`sad` prennent celle de `talk`, debout, dessinés
+  // ensemble ; les sauts et `hurt`, sans pose debout, leur surface visible).
   extraPoseConfig(anim) {
-    this.extraPoseCfg = this.extraPoseCfg || {};
-    let cfg = this.extraPoseCfg[anim];
-    if (!cfg) {
-      cfg = manifestFormConfig(this.scene, 'agarica_extra', anim);
-      if (AGARICA_EXTRA_STANDING_ANIMS.includes(anim)) {
-        const scale = scaleMatchingHumanHeight(this.scene, cfg.texture, cfg.scale);
-        cfg = { ...cfg, scale, body: transfoBodyConfig(cfg.frameWidth, cfg.frameHeight, scale) };
-      }
-      this.extraPoseCfg[anim] = cfg;
-    }
-    return cfg;
+    return agaricaSheetPoseConfig(this.scene, 'agarica_extra', anim);
   }
 
   applyAgaricaExtraPose(anim) {
@@ -2950,18 +2935,26 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     return t >= SLASH_WINDUP_MS && t < SLASH_WINDUP_MS + SLASH_ACTIVE_MS;
   }
 
-  // Échelle commune du corps ET de l'arc (art Codex) : la pose debout de
-  // côté (frame 0) ramenée à la hauteur de l'idle (~85 px), jamais plus que
-  // l'échelle du manifest -- l'arc, dessiné à la même échelle que le corps
+  // Échelle commune du corps ET de l'arc (art Codex) : feuille `agarica_slash`
+  // calibrée sur l'idle (cf. agaricaSheetScale). Aucune frame n'y est debout
+  // neutre (fentes, bras levé) : c'est la surface visible qui est alignée --
+  // l'ancien calage sur la HAUTEUR de la fente (frame 0, accroupie) agrandissait
+  // tout le coup de ~20 % (retour utilisateur : « l'attaque est plus grosse
+  // que la taille de base »). L'arc, dessiné à la même échelle que le corps
   // sur la planche, suit le même rapport.
   slashArtScale() {
     if (this.slashScaleCache) return this.slashScaleCache;
-    const sc = this.scene;
     const def = getAssetManifest().agarica_slash || {};
-    const ref = manifestFrameKey('agarica_slash', 'side', 0);
-    const scale = sc.textures.exists(ref) ? scaleMatchingHumanHeight(sc, ref, def.scale || 0.34) : (def.scale || 0.34);
+    const scale = agaricaSheetScale(this.scene, 'agarica_slash', 'side', def.scale || 0.34);
     this.slashScaleCache = scale;
     return scale;
+  }
+
+  // Facteur appliqué aux positions d'arc (SLASH_ARCS, réglées avec l'art à
+  // SLASH_ARCS_ART_SCALE) : l'arc reste collé à la dague quand la pose change
+  // d'échelle. 1 sans l'art (croissant dessiné par code).
+  slashArcFactor(dir = this.slashDir) {
+    return hasManifestArt(this.scene, 'vfx_slash', dir) ? this.slashArtScale() / SLASH_ARCS_ART_SCALE : 1;
   }
 
   // Pixels visibles de l'arc `vfx_slash` d'une direction (union des images
@@ -2992,8 +2985,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // sinon le rectangle du croissant dessiné).
   getSlashRect(dir = this.slashDir, facing = this.slashFacing) {
     const a = SLASH_ARCS[dir] || SLASH_ARCS.side;
-    const cx = this.x + facing * a.cx;
-    const cy = this.y + a.cy;
+    const k = this.slashArcFactor(dir);
+    const cx = this.x + facing * a.cx * k;
+    const cy = this.y + a.cy * k;
     const art = this.slashArtBounds(dir);
     if (art) {
       const x0 = facing > 0 ? art.x0 : -art.x1;
@@ -3075,11 +3069,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const dir = this.slashDir;
     if (spr && hasManifestArt(this.scene, 'vfx_slash', dir)) {
       const a = SLASH_ARCS[dir];
+      const k = this.slashArcFactor(dir);
       const frame = after >= 0 ? 2 : (t - SLASH_WINDUP_MS < SLASH_ACTIVE_MS / 2 ? 0 : 1);
       const key = manifestFrameKey('vfx_slash', dir, frame);
       if (this.scene.textures.exists(key)) spr.setTexture(key);
       spr.setVisible(true).setScale(this.slashArtScale())
-        .setPosition(this.x + this.slashFacing * a.cx, this.y + a.cy)
+        .setPosition(this.x + this.slashFacing * a.cx * k, this.y + a.cy * k)
         .setFlipX(this.slashFacing < 0).setAlpha(alpha);
       return;
     }
