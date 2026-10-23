@@ -102,6 +102,38 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P1] Forme papillon d'Agarica (3e forme aérienne, 2026-10-23) : au 2e saut,
+  // un battement d'ailes depuis la position actuelle puis un dash en ligne
+  // droite en diagonale avant-haut. Grand papillon lumineux aux couleurs d'Agarica.
+  forme_papillon: {
+    dir: "assets/sprites/forme_papillon_frames", prefix: "forme_papillon",
+    anims: {
+      flap: { row: 0, frames: 4, fps: 16, repeat: 0 },
+      dash: { row: 1, frames: 4, fps: 18, repeat: -1 },
+      glide: { row: 2, frames: 4, fps: 10, repeat: -1 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 56, h: 48, color: 0x9fe8ff, label: "Papillon" },
+    sheets: [
+      { file: "assets/sprites/forme_papillon.png", rows: [0, 1, 2] },
+    ],
+    cut: "blob", align: "center",
+  },
+  // [P1] Transformation humaine -> papillon (et retour, joué à l'envers)
+  transfo_papillon: {
+    dir: "assets/sprites/transfo_papillon_frames", prefix: "transfo_papillon",
+    anims: {
+      transform: { row: 0, frames: 4, fps: 14, repeat: 0 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 40, h: 86, color: 0x9fe8ff, label: "Transfo papillon" },
+    sheets: [
+      { file: "assets/sprites/transfo_papillon.png", rows: [0] },
+    ],
+    cut: "blob", align: "center",
+  },
   // [P1] Xara - parole, excitation, indice Maexxna
   xara_extra: {
     dir: "assets/sprites/xara_extra_frames", prefix: "xara_extra",
@@ -720,6 +752,13 @@ const ITEM_MANIFEST = {
     path: "assets/items/form_icone/singe.png", scale: 0.1,
     placeholder: { w: 72, h: 72, color: 0xc0602a, label: "Singe" },
     src: { file: "assets/_codex_src/form_icone_singe.png" },
+    norm: { mode: "square", value: 724 },
+  },
+  // [P1] Icône de forme : papillon (médaillon bois/lierre comme les autres)
+  form_icone_papillon: {
+    path: "assets/items/form_icone/papillon.png", scale: 0.1,
+    placeholder: { w: 72, h: 72, color: 0x9fe8ff, label: "Papillon" },
+    src: { file: "assets/_codex_src/form_icone_papillon.png" },
     norm: { mode: "square", value: 724 },
   },
   // [P2] Icône de compétence : ours
