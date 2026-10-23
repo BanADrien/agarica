@@ -1,7 +1,7 @@
 """Usage : python tools/recolor_agarica_hair.py <png>...  (modifie les fichiers EN PLACE)
 
-Recolore les cheveux d'Agarica (rouge vif des images d'origine) en CHÂTAIN ROUX
-(#A85C34), choix de l'utilisateur du 2026-10-23 (cf. docs/production/
+Recolore les cheveux d'Agarica (rouge vif des images d'origine) en AUBURN CLAIR
+(#B5613A, proposition 7), choix définitif de l'utilisateur du 2026-10-23 (cf. docs/production/
 cheveux_agarica_propositions.png). À lancer sur les images d'ORIGINE (cheveux
 rouges) : relancer sur une image déjà recolorée ne fait rien (plus de rouge vif).
 
@@ -18,7 +18,7 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-TARGET = '#A85C34'
+TARGET = '#B5613A'
 ORIGIN_H, ORIGIN_S, ORIGIN_V = colorsys.rgb_to_hsv(189 / 255, 44 / 255, 27 / 255)
 
 
