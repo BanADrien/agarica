@@ -368,7 +368,7 @@ ZoneAquatique) restent intactes, accessibles depuis le menu titre « Zones de te
   `Player.recomputeTotemBonuses`).
 - Autres flags : `xaraMet` (FS1), `hasWolfForm` (totem FS2, sur la butte x 896,
   accessible sans loup), `planteVue` (trigger `plante`, FS2). Ravin de 5 cases
-  (x 1152-1472) : loup obligatoire ; ravin de 9 cases (x 2816-3392) :
+  (x 1280-1600, 3 cases plates d'élan avant) : loup obligatoire ; ravin de 9 cases (x 2816-3392) :
   `hiddenPlatforms` gx 46-48 et 51-52 (gy 6) révélées par le loup. Mare aux trois
   poissons dessinée par le script (pas de clé `water`). `levelHeight: 720` +
   `fall: {y: 620, mode: 'hurt'}` pour que les chutes se déclenchent.

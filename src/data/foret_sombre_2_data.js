@@ -5,10 +5,11 @@
 //
 // Plan (grille 64, surface du sol y=448 ; le monde descend à 720 sous l'écran
 // pour que les chutes dans les ravins se déclenchent) — de gauche à droite :
-//   x 0-1152     sentier de chasse (empreintes) ; butte du totem du loup
-//                (gx 12-15, surface y=320) : accessible SANS le loup
-//   x 1152-1472  ravin de 5 cases : infranchissable sans le sprint du loup
-//   x 1472-2816  sous-bois du loup sanguinaire ; la piste du loup commence
+//   x 0-1280     sentier de chasse (empreintes) ; butte du totem du loup
+//                (gx 12-15, surface y=320) : accessible SANS le loup ; 3 cases
+//                plates (x 1088-1280) d'élan avant le ravin
+//   x 1280-1600  ravin de 5 cases : infranchissable sans le sprint du loup
+//   x 1600-2816  sous-bois du loup sanguinaire ; la piste du loup commence
 //   x 2816-3392  ravin de 9 cases : deux plateformes cachées (révélées par
 //                le loup) + pistes
 //   x 3392-3968  clairière préservée : feu de camp (x 3430), mare aux trois poissons (pont de
@@ -36,13 +37,16 @@ const FORET_SOMBRE_2_DATA = {
   fall: { y: 620, mode: 'hurt' },
   groundCells: [
     // (groundRow : borne de fin exclue)
-    ...groundRow(0, 18, [7, 8]),     // sentier de chasse
+    // Sentier de chasse. Il continue 3 cases après la marche gx16 : piste
+    // d'appel plate pour le saut du loup lancé (avec une seule case, l'appel
+    // ne se faisait qu'entre x 1060 et 1152 : on tombait de la marche).
+    ...groundRow(0, 20, [7, 8]),
     ...groundRow(5, 7, [6]),         // tronc couché
     ...groundRow(10, 12, [6]),       // marche de la butte
     ...groundRow(12, 16, [5, 6]),    // butte du totem (surface y=320)
     ...groundRow(16, 17, [6]),       // marche côté ravin (pas de face de 2 cases depuis le sol)
-    // gx 18-22 : RAVIN DE 5 CASES
-    ...groundRow(23, 44, [7, 8]),    // sous-bois
+    // gx 20-24 : RAVIN DE 5 CASES (x 1280-1600)
+    ...groundRow(25, 44, [7, 8]),    // sous-bois
     ...groundRow(30, 31, [6]),       // rocher moussu, en escalier
     ...groundRow(31, 32, [5, 6]),
     ...groundRow(32, 33, [6]),
@@ -67,7 +71,7 @@ const FORET_SOMBRE_2_DATA = {
   ],
   tracks: [
     { x: 260, y: FORET_SOMBRE_2_SURFACE_Y, w: 800 },   // la bête est passée par le sentier
-    { x: 1500, y: FORET_SOMBRE_2_SURFACE_Y, w: 1300 }, // … puis file vers le grand ravin
+    { x: 1620, y: FORET_SOMBRE_2_SURFACE_Y, w: 1180 }, // … puis file vers le grand ravin
     { x: 2944, y: 384, w: 192 },
     { x: 3264, y: 384, w: 128 },
     { x: 3400, y: FORET_SOMBRE_2_SURFACE_Y, w: 240 },
@@ -83,13 +87,22 @@ const FORET_SOMBRE_2_DATA = {
     { type: 'poissons', x: 3536, y: 466, w: 224, h: 56 },
     { type: 'papillons', x: 3700, y: 150, count: 5, w: 120 },
   ],
+  // Décors de la forêt sombre (section `foret_sombre`) : jamais sur la butte du
+  // totem (le totem est dessiné derrière les décors) ni devant les sorties.
   props: [
-    { type: 'bosquet_mossy_rock', x: 520, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
-    { type: 'bosquet_tree_stump', x: 1060, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
-    { type: 'bosquet_mossy_rock', x: 1560, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.45 },
-    { type: 'bosquet_bush_round', x: 2600, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
-    { type: 'bosquet_bush_flowering', x: 3830, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
-    { type: 'bosquet_mossy_rock', x: 5420, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.5 },
+    { type: 'foret_sombre_arbre_moussu', x: 200, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.55 },
+    { type: 'foret_sombre_rocher_mousse', x: 520, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.3 },
+    { type: 'foret_sombre_fougere_sombre', x: 1180, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.28 }, // piste d'appel
+    { type: 'foret_sombre_racine_arche', x: 1760, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.4 },
+    { type: 'foret_sombre_souche_champignons', x: 2272, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.3 }, // sous la branche haute
+    { type: 'foret_sombre_buisson_epineux', x: 2560, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.3 },
+    { type: 'foret_sombre_champignons_lumineux', x: 2740, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.26 },
+    { type: 'foret_sombre_fougere_sombre', x: 3830, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.26 },
+    { type: 'foret_sombre_rocher_mousse', x: 4500, y: 192, scale: 0.28 },       // sur le surplomb
+    { type: 'foret_sombre_fougere_sombre', x: 4980, y: 192, scale: 0.26 },
+    { type: 'foret_sombre_pierre_runique', x: 4620, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.32 }, // la poche secrète
+    { type: 'foret_sombre_champignons_lumineux', x: 4900, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.26 },
+    { type: 'foret_sombre_racine_arche', x: 5580, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.45 }, // vers les racines
   ],
   enemies: [
     { type: 'loup', x: 2350, y: 400, patrolMinX: 2000, patrolMaxX: 2700 },
@@ -107,7 +120,7 @@ const FORET_SOMBRE_2_DATA = {
   mossWalls: [{ id: 'mur_repulsif_foret_sombre', x: 4384, y: 256 + (192 + GROUND_STAND_SINK) / 2, w: 128, h: 192 + GROUND_STAND_SINK }],
   triggers: [
     { id: 'empreintes', x: 380, w: 40, cutscene: 'fs2_empreintes' },
-    { id: 'ravin', x: 1088, y: 420, w: 128, h: 80, forbids: { hasWolfForm: true }, cutscene: 'fs2_ravin' },
+    { id: 'ravin', x: 1216, y: 420, w: 128, h: 80, forbids: { hasWolfForm: true }, cutscene: 'fs2_ravin' },
     { id: 'ravin_large', x: 2700, w: 40, cutscene: 'fs2_ravin_large' },
     { id: 'plante', x: 3470, w: 40, cutscene: 'fs2_plante' },
     { id: 'mur', x: 4250, w: 40, cutscene: 'fs2_mur' },

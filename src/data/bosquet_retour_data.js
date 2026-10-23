@@ -15,17 +15,23 @@ const BOSQUET_RETOUR_DATA = {
   groundCells: [...groundRow(0, 30, [7, 8])],
   avoidRanges: [[1450, 1680]],
   playerSpawn: { x: 110, y: 412 },
+  // Bâtiments du village d'abord (derrière les autres décors et les
+  // habitants), aux mêmes échelles que dans le bosquet de l'acte 1.
   props: [
-    { type: 'bosquet_lamp_post', x: 300, y: 448, scale: 0.35 },
-    { type: 'bosquet_fence', x: 470, y: 448, scale: 0.3 },
-    { type: 'bosquet_well', x: 760, y: 448, scale: 0.35 },
-    { type: 'bosquet_banner_tree', x: 1010, y: 448, scale: 0.4 },
-    { type: 'bosquet_bench', x: 1180, y: 448, scale: 0.3 },
+    { type: 'bosquet_hutte_mousse', x: 200, y: 448, scale: 0.7 },
+    { type: 'bosquet_hutte_paille', x: 610, y: 448, scale: 0.62 },
+    { type: 'bosquet_tente', x: 1100, y: 448, scale: 0.55 },
+    { type: 'bosquet_cottage', x: 1330, y: 448, scale: 0.8 },
+    { type: 'bosquet_lamp_post', x: 300, y: 448, scale: 0.5 },
+    { type: 'bosquet_fence', x: 470, y: 448, scale: 0.45 },
+    { type: 'bosquet_well', x: 760, y: 448, scale: 0.55 },
+    { type: 'bosquet_banner_tree', x: 1010, y: 448, scale: 0.55 },
+    { type: 'bosquet_bench', x: 1180, y: 448, scale: 0.5 },
     // L'autel de l'idole, le même qu'au sanctuaire du bosquet (l'idole est posée
     // sur son haut par le script, cf. a2DrawIdol) ; la pierre levée pointue
     // d'avant laissait l'idole flotter 50 px au-dessus de sa pointe.
     { type: 'bosquet_antler_totem', x: 1560, y: 448, scale: 0.55 },
-    { type: 'bosquet_lamp_post', x: 1760, y: 448, scale: 0.35 },
+    { type: 'bosquet_lamp_post', x: 1760, y: 448, scale: 0.5 },
   ],
   npcs: [
     { id: 'habitant_garde', x: 690, facing: 'left', talk: 'bosquet_retour_garde' },

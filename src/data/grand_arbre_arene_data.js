@@ -18,6 +18,9 @@ const GRAND_ARBRE_ARENE_DATA = {
   levelWidth: 1920,
   levelHeight: 540,
   zoneName: 'Grand arbre — la cime',
+  // Même écorce et même fond que les racines : on est dans les branches du grand arbre.
+  background: 'fond_grand_arbre',
+  tileset: 'tuiles_ecorce',
   groundCells: [
     // (groundRow : borne de fin exclue)
     ...groundRow(0, 30, [7, 8]), // grosse branche-plancher sur toute la largeur
@@ -29,6 +32,13 @@ const GRAND_ARBRE_ARENE_DATA = {
   avoidRanges: [[512, 1472]],
   playerSpawn: { x: 110, y: 412 },
   campfires: [{ x: 300, y: GRAND_ARBRE_ARENE_SURFACE_Y }],
+  // Décors (`grand_arbre`) hors de l'arène seulement : le combat (ombres de
+  // plongeon, ondes au sol, pierres) doit rester lisible entre x 512 et 1472.
+  props: [
+    { type: 'grand_arbre_statue_simien', x: 150, y: GRAND_ARBRE_ARENE_SURFACE_Y, scale: 0.36 },
+    { type: 'grand_arbre_tas_pierres', x: 430, y: GRAND_ARBRE_ARENE_SURFACE_Y, scale: 0.26 },
+    { type: 'grand_arbre_champignon_etagere', x: 1488, y: GRAND_ARBRE_ARENE_SURFACE_Y, scale: 0.28 },
+  ],
   // Lianes de l'arène (x, y = point d'attache en haut, length vers le bas).
   // Kainati s'y suspend et saute de l'une à l'autre ; pour Agarica, simple
   // décor tant qu'elle n'a pas la forme singe (aucun rebond, cf. boss_kainati.js).
@@ -61,6 +71,12 @@ const GRAND_ARBRE_ARENE_DATA = {
       { x: 1896, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_arbre' } },
     ],
   },
+  // Barrière douce (rejouable) : la route des hauteurs exige le singe (corniche
+  // de Geralt à +192 px, îles) -- sans la forme du monde spirituel, Xara
+  // ramène Agarica vers le passage du totem.
+  triggers: [
+    { id: 'sans_singe', x: 1850, w: 40, once: false, requires: { kainatiDefeated: true }, forbids: { hasMonkeyForm: true }, cutscene: 'arene_sans_singe' },
+  ],
   exits: [
     { x: 16, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_arene' } },
   ],

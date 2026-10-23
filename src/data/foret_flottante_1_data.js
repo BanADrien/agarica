@@ -7,11 +7,12 @@
 //   x 0-1600     grosse branche d'arrivée depuis le grand arbre + camp de Geralt
 //                (feu de camp, duel entre x 640 et 1600)
 //   x 1600-2176  fin de la branche ; corniche P1 (gy 4, +3 rangées) : il faut
-//                le double saut — Geralt, lui, n'y arrive pas
+//                le bond du singe (2e saut en l'air) — Geralt, lui, n'y arrive pas
 //   x 2240-3584  branches suspendues au-dessus du vide (chute = 1 cœur),
 //                corbeaux, courant d'air encore inutilisable, belvédère P5
 //                d'où l'on voit le jour, sortie vers les îles flottantes.
-// Sauts : simple ≈ 172 px (2 rangées), double de base ≈ 240 px (3 rangées).
+// Sauts : simple ≈ 172 px (2 rangées) ; le singe (obligatoire pour venir ici,
+// cf. barrière de l'arène) double jusqu'à ≈ 264 px (3 rangées).
 const FORET_FLOTTANTE_1_DATA = {
   zoneName: 'Le chemin des hauteurs',
   zoneSub: 'Forêt flottante',
@@ -35,12 +36,19 @@ const FORET_FLOTTANTE_1_DATA = {
   // Points de reprise (mort = retour ici, pas au tout début de la zone) :
   // sur la corniche de Geralt et à l'entrée du belvédère, après les corbeaux.
   checkpoints: [{ x: 2050, y: 256 }, { x: 3060, y: 128 }],
+  // Décors de la forêt flottante (`foret_flottante`) : le camp de Geralt (sa
+  // tente, son panneau couvert de notes, ses caisses et sa bûche), puis des
+  // fleurs en approchant de la lumière.
   props: [
-    { type: 'bosquet_signpost', x: 600, y: 448, scale: 0.35 },
+    { type: 'foret_flottante_arbre_jeune', x: 300, y: 448, scale: 0.45 },
+    { type: 'foret_flottante_panneau_geralt', x: 600, y: 448, scale: 0.36 },
     { type: 'bosquet_log_pile', x: 700, y: 448, scale: 0.35 },
-    { type: 'bosquet_crates', x: 1000, y: 448, scale: 0.3 },
+    { type: 'foret_flottante_tente_geralt', x: 1040, y: 448, scale: 0.42 },
+    { type: 'bosquet_crates', x: 1160, y: 448, scale: 0.3 },
     { type: 'bosquet_tree_stump', x: 1500, y: 448, scale: 0.35 },
-    { type: 'bosquet_standing_stone', x: 3400, y: 128, scale: 0.3 },
+    { type: 'foret_flottante_fleurs_hautes', x: 1700, y: 448, scale: 0.3 },
+    { type: 'foret_flottante_pissenlit_geant', x: 1840, y: 448, scale: 0.32 },
+    { type: 'foret_flottante_fleurs_hautes', x: 3430, y: 128, scale: 0.28 },       // le belvédère
   ],
   npcs: [
     // Avant le duel, Geralt n'a rien à dire (le script lance la rencontre).

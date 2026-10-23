@@ -34,13 +34,13 @@ const MONDE_SPIRITUEL_DATA = {
   ],
   playerSpawn: { x: 200, y: 412 },
   // Lianes (x, y = attache en haut) : bas à ~130-150 px au-dessus du sol de
-  // départ, ~70-100 px les unes des autres en hauteur pour garder l'élan.
+  // départ. Une sur deux retirée (demande utilisateur : écart doublé, ~390 px,
+  // il faut lâcher avec l'élan) : A et C au-dessus du 1er vide, D et F au-dessus
+  // du 2e (B et E retirées). Le guidage de l'esprit suit la même liste.
   vines: [
     { x: 770, y: 40, length: 270 },  // A
-    { x: 965, y: 20, length: 280 },  // B
     { x: 1160, y: 40, length: 270 }, // C
     { x: 1730, y: 10, length: 270 }, // D
-    { x: 1925, y: 0, length: 280 },  // E
     { x: 2115, y: 20, length: 270 }, // F
   ],
   checkpoints: [

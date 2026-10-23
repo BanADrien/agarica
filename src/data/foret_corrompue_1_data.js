@@ -34,11 +34,20 @@ const FORET_CORROMPUE_1_DATA = {
     { x: 1400, y: 448 },
     { x: 3700, y: 448 },
   ],
+  // Décors de la corruption (`foret_corrompue`) ; le campement abandonné de
+  // Geralt garde ses caisses et sa bûche. Rien sous la voûte basse ni contre
+  // l'amas, le tronc tombé ou le mur de mousse.
   props: [
+    { type: 'foret_corrompue_arbre_malade', x: 600, y: 448, scale: 0.5 },
+    { type: 'foret_corrompue_os_creature', x: 1080, y: 448, scale: 0.28 },        // sous la voûte (208 px libres)
     { type: 'bosquet_crates', x: 1560, y: 448, scale: 0.28 },
     { type: 'bosquet_log_pile', x: 1640, y: 448, scale: 0.3 },
-    { type: 'bosquet_mossy_rock', x: 2950, y: 448, scale: 0.35 },
-    { type: 'bosquet_mossy_rock', x: 3500, y: 448, scale: 0.3 },
+    { type: 'foret_corrompue_champignon_toxique', x: 2020, y: 448, scale: 0.3 },
+    { type: 'foret_corrompue_racine_tordue', x: 2680, y: 448, scale: 0.33 },
+    { type: 'foret_corrompue_rocher_fissure', x: 2960, y: 448, scale: 0.3 },
+    { type: 'foret_corrompue_pustule_mousse', x: 3060, y: 448, scale: 0.26 },
+    { type: 'foret_corrompue_souche_corrompue', x: 3500, y: 448, scale: 0.34 },
+    { type: 'foret_corrompue_pierre_symbole', x: 3960, y: 448, scale: 0.33 },     // à l'entrée de l'arène
   ],
   pickups: [
     { item: 'note_geralt', x: 1600, cutscene: 'fc1_note_geralt' },

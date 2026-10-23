@@ -20,6 +20,13 @@ const TROU_SOMBRE_DATA = {
     ...groundRow(16, 21, [1]),
   ],
   playerSpawn: { x: 200, y: 412 },
+  // Décors (`foret_corrompue`), à peine visibles dans le noir : ossements au
+  // fond du trou, champignons toxiques sous les corniches.
+  props: [
+    { type: 'foret_corrompue_os_creature', x: 330, y: 448, scale: 0.3 },
+    { type: 'foret_corrompue_champignon_toxique', x: 1130, y: 448, scale: 0.3 },
+    { type: 'foret_corrompue_souche_corrompue', x: 1190, y: 64, scale: 0.24 },
+  ],
   entries: [
     { id: 'from_arene', x: 200, y: 400, height: 128 },
   ],

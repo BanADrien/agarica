@@ -114,7 +114,7 @@ function a2PlaceAbove(scene, obj, ref) {
 }
 
 // Plafond au bord haut de l'écran : la caméra de ces zones ne défile pas
-// verticalement (pas de `tallLevel`), alors qu'un double saut ou l'aigle
+// verticalement (pas de `tallLevel`), alors que le bond du singe ou l'aigle
 // emmènerait Agarica jusqu'à 250-340 px plus haut, hors de l'écran. Le monde
 // physique garde sa largeur et son bas, seul son haut est ramené à y = 0.
 function a2Ceiling(scene) {
@@ -283,7 +283,7 @@ CUTSCENES.geralt_fin_duel = (scene) => {
     { set: { geraltMet: true } },
     { call: (sc) => a2Ff1EndDuel(sc) },
     { cameraFollow: true },
-    { toast: 'Double saut pour atteindre la corniche' },
+    { toast: 'Espace, puis encore Espace en l\'air : le bond du singe atteint la corniche' },
   ];
 };
 
@@ -612,11 +612,11 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: 'Amanite, attends !' },
     { who: 'agarica', text: '… Elle n\'était pas comme ça, avant. Elle voulait aider, elle aussi.', pose: 'sad' },
     { who: 'xara', text: 'Elle veut toujours sauver la forêt. C\'est bien ce qui m\'inquiète.' },
-    { who: 'xara', text: 'Plus haut, sur l\'île au-dessus de nous : un totem t\'attend. Un double saut devrait suffire.' },
+    { who: 'xara', text: 'Plus haut, sur l\'île au-dessus de nous : un totem t\'attend. Avec le bond du singe, tu devrais l\'atteindre.' },
   ],
   aigle_revele: [
     { who: 'agarica', text: 'Ce vent sous mes bras… Je me sens légère, comme une plume !' },
-    { who: 'xara', text: 'L\'aigle t\'a choisie. Fais un double saut : ses ailes s\'ouvriront, et tu planeras.' },
+    { who: 'xara', text: 'L\'aigle t\'a choisie. Saute, puis saute encore en l\'air : ses ailes s\'ouvriront, et tu planeras.' },
     { who: 'xara', text: 'Laisse-toi porter. S pour piquer, si tu es pressée de retrouver le sol.' },
     { who: 'xara', text: 'Essaie de rejoindre l\'île d\'en face. Si tu tombes, l\'îlot du dessous te rattrapera… et le courant d\'air te remontera.' },
   ],
@@ -624,7 +624,7 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: 'Xara, là, en contrebas ! Ce cercle vert, au milieu de la mousse…' },
     { who: 'xara', text: 'La plante que tu avais aperçue depuis la forêt sombre. La mousse n\'ose pas l\'approcher.' },
     { who: 'agarica', text: 'D\'en bas, je ne pouvais pas l\'atteindre. Mais d\'ici…' },
-    { who: 'xara', text: 'D\'ici, tu planes. Prends de l\'élan, double saut, et ne regarde pas le vide.' },
+    { who: 'xara', text: 'D\'ici, tu planes. Prends de l\'élan, saute, ouvre les ailes, et ne regarde pas le vide.' },
     { who: 'agarica', text: 'Ne pas regarder le vide. D\'accord. Facile.' },
   ],
 });
@@ -661,11 +661,11 @@ CUTSCENES.ff2_envol = [
   { camera: { x: 3800, y: 300, ms: 1000 } },
   { say: 'ff2_envol' },
   { cameraFollow: true },
-  { toast: 'Double saut depuis le bord : plane jusqu\'à la clairière →' },
+  { toast: 'Saute du bord, puis Espace en l\'air : plane jusqu\'à la clairière →' },
 ];
 CUTSCENES.aigle_revele = [
   { say: 'aigle_revele' },
-  { toast: 'Double saut : tu planes — S : piqué — les courants d\'air portent l\'aigle' },
+  { toast: 'Espace en l\'air : tu planes — S : piqué — les courants d\'air portent l\'aigle' },
 ];
 
 CUTSCENES.amanite_rencontre = (scene) => {
@@ -1059,7 +1059,7 @@ Object.assign(DIALOGUES, {
   ],
   crash_depart: [
     { who: 'agarica', text: 'Bon. La falaise. Le vide. Et la forêt malade, tout au bout.' },
-    { who: 'xara', text: 'Je me tiens à toi. Double saut, et vise le cœur sombre, droit devant.' },
+    { who: 'xara', text: 'Je me tiens à toi. Saute, ouvre les ailes, et vise le cœur sombre, droit devant.' },
     { who: 'agarica', text: 'Xara… et si je n\'y arrive pas ?' },
     { who: 'xara', text: 'Alors tu tomberas plus près qu\'en marchant. C\'est déjà ça.' },
   ],
@@ -1231,6 +1231,12 @@ CUTSCENES.crash = [
 function a2DrawHutte(scene, x) {
   // Bas des murs sur la surface de marche (comme les props), pas 10 px au-dessus.
   const y = storyStandY(scene, x, 448);
+  // Le décor Codex `hutte_morgat_hutte_morgat` (donnée de zone) remplace le
+  // dessin : on n'ajoute que la lueur chaude de ses fenêtres.
+  if ((scene.props || []).some((p) => p.propType === 'hutte_morgat_hutte_morgat')) {
+    a2Glow(scene, x, y - 70, 180, 0xffe9a0, 0.3, 3);
+    return;
+  }
   const g = scene.add.graphics({ x, y });
   // Murs de rondins
   g.fillStyle(0x6b4a36, 1);

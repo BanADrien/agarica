@@ -121,7 +121,7 @@ CUTSCENES.bosquet_aide_debut = [
     { who: 'habitant', name: 'Orme, le vieux druide', text: 'La mousse a encore gagné le chemin cette nuit. Aide-moi à gratter ces plaques avant qu\'elles ne prennent racine.' },
     { who: 'agarica', text: 'Compte sur moi !' },
   ] },
-  { toast: 'K (ou clic) : attaquer. Frappe les plaques de mousse pour les gratter.' },
+  { toast: { text: 'K (ou clic) : attaquer. Frappe les plaques de mousse pour les gratter.\nZ/↑ : frapper en haut — S/↓ en l\'air : frapper en bas (rebond)', ms: 4800 } },
 ];
 
 CUTSCENES.bosquet_barriere_aide = [
@@ -160,7 +160,7 @@ CUTSCENES.bosquet_mousse_revient = [
   { say: [
     { who: 'habitant', name: 'Orme, le vieux druide', text: 'Par les racines ! Quelque chose sort de l\'amas… Attention, Agarica !' },
   ] },
-  { toast: 'K : attaquer. Repousse la créature de mousse !' },
+  { toast: { text: 'K : attaquer. Repousse la créature de mousse !\nZ/↑ : frapper en haut — S/↓ en l\'air : frapper en bas (rebond)', ms: 4200 } },
 ];
 
 CUTSCENES.bosquet_aide_fin = [
@@ -214,9 +214,8 @@ DIALOGUES.bosquet_vol_supplier = [
 ];
 
 CUTSCENES.bosquet_vol = [
-  // Devant les décors (profondeur 1, comme Xara sur sa souche) : sur la marche
-  // de l'autel, la statue voisine la cachait.
-  { call: (scene) => { if (!scene.npcs.amanite) createStoryNpc(scene, { id: 'amanite', x: BOSQUET_IDOLE.x - 55, lookAtPlayer: false }).setDepth(1); } },
+  // (Devant les décors sans rien forcer : les PNJ reçoivent CHARACTER_DEPTH.)
+  { call: (scene) => { if (!scene.npcs.amanite) createStoryNpc(scene, { id: 'amanite', x: BOSQUET_IDOLE.x - 55, lookAtPlayer: false }); } },
   { camera: { x: 3360, y: 300, ms: 900 } },
   { say: [
     'Au sanctuaire, une silhouette rouge se penche sur l\'autel.',
@@ -530,7 +529,7 @@ CUTSCENES.fs1_creature = [
     { who: 'xara', text: 'C\'était un blaireau, avant. La mousse ne laisse pas grand-chose de ceux qu\'elle prend.' },
     { who: 'agarica', text: 'Pauvre petite chose… Pardon. Je dois passer.' },
   ] },
-  { toast: 'K (ou clic) : attaquer.' },
+  { toast: { text: 'K (ou clic) : attaquer.\nZ/↑ : frapper en haut — S/↓ en l\'air : frapper en bas (rebond)', ms: 4000 } },
 ];
 
 CUTSCENES.fs1_talisman = [
@@ -664,9 +663,6 @@ ZONE_SCRIPTS.foret_sombre_1 = {
   create(scene) {
     const st = { amasDone: !!storyGet('moss_foret_sombre_1_amas_racines'), nextRefill: 0 };
     scene.__acte1 = st;
-    // Xara assise SUR la souche décorative : les props sont ajoutés après les
-    // PNJ, la souche la masquait.
-    if (scene.npcs && scene.npcs.xara) scene.npcs.xara.setDepth(1);
     acte1DrawMossDecor(scene, [
       [2690, 70, 22], [2810, 170, 20], [2730, 240, 16],
       [2980, 448, 30], [3150, 448, 24], [3420, 448, 34], [3700, 448, 22],
@@ -723,7 +719,7 @@ CUTSCENES.fs2_ravin = [
   { playerFace: 'right' },
   { say: [
     { who: 'agarica', text: 'Oh non… Le sentier s\'arrête net.' },
-    { who: 'agarica', text: 'C\'est bien trop large pour sauter, même deux fois de suite.' },
+    { who: 'agarica', text: 'C\'est bien trop large pour sauter, même avec de l\'élan.' },
     { who: 'xara', text: 'Pour tes deux jambes, oui. Pas pour quatre pattes lancées au galop.' },
   ] },
   { camera: { x: FS2_TOTEM.x + 120, y: 270, ms: 900 } },

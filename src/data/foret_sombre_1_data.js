@@ -33,21 +33,34 @@ const FORET_SOMBRE_1_DATA = {
     ...groundRow(30, 31, [6]),
     ...groundRow(31, 32, [5, 6]),
     ...groundRow(32, 33, [6]),
-    ...groundRow(36, 38, [4]),       // branche haute (vue sur l'amas)
+    // Branche haute (vue sur l'amas), x 2176-2368 : à 2 cases du rocher
+    // (+128 px), atteignable au saut simple (en gx 36-37, à 4 cases, il
+    // fallait l'ancien double saut de base).
+    ...groundRow(34, 37, [4]),
     ...groundRow(42, 44, [0, 1, 2, 3]), // mur de racines : du haut de l'écran jusqu'à l'amas
     ...groundRow(41, 42, [0, 1]),    // départ des racines (silhouette moins carrée)
     ...groundRow(44, 45, [0, 1]),
     ...groundRow(50, 52, [6]),       // rocher de l'autre côté
   ],
   playerSpawn: { x: 140, y: 412 },
+  // Décors de la forêt sombre (section `foret_sombre`), posés sur la surface de
+  // marche ; les grands arbres d'abord (dessinés derrière les autres). Jamais
+  // sur une marche/plateforme voisine, ni devant une sortie (cf. rapport niveaux).
   props: [
+    { type: 'foret_sombre_arbre_moussu', x: 300, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.55 },
+    { type: 'foret_sombre_arbre_moussu', x: 3040, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.6 },
     { type: 'bosquet_fence', x: 60, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.5 },     // palissade du bosquet, derrière elle
-    { type: 'bosquet_mossy_rock', x: 420, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.45 },
-    { type: 'bosquet_tree_stump', x: 1344, y: 384, scale: 0.45 },
-    { type: 'bosquet_bush_round', x: 1820, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.45 },
-    { type: 'bosquet_mossy_rock', x: 2480, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.5 },
-    { type: 'bosquet_mossy_rock', x: 3300, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.55 },
-    { type: 'bosquet_log_pile', x: 3560, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.4 },
+    { type: 'foret_sombre_rocher_mousse', x: 450, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 },
+    { type: 'foret_sombre_fougere_sombre', x: 780, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 },
+    { type: 'foret_sombre_champignons_lumineux', x: 1060, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.28 },
+    { type: 'bosquet_tree_stump', x: 1344, y: 384, scale: 0.45 },   // la souche de Xara (onProp)
+    { type: 'foret_sombre_pierre_runique', x: 1500, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 },
+    { type: 'foret_sombre_buisson_epineux', x: 1810, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 },
+    { type: 'foret_sombre_souche_champignons', x: 2272, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 }, // sous la branche haute
+    { type: 'foret_sombre_tronc_couche', x: 2470, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.35 },
+    { type: 'foret_sombre_rocher_mousse', x: 3264, y: 384, scale: 0.3 },        // sur le rocher gx 50-51
+    { type: 'foret_sombre_toile_araignee', x: 3540, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.35 },
+    { type: 'foret_sombre_champignons_lumineux', x: 3690, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.26 },
   ],
   campfires: [{ x: 1640, y: FORET_SOMBRE_1_SURFACE_Y }],
   npcs: [

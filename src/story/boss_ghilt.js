@@ -424,6 +424,10 @@ ZONE_SCRIPTS.ghilt_arene = {
     };
     scene.registry.events.on('changedata-hearts', onHearts);
     scene.events.once('shutdown', () => scene.registry.events.off('changedata-hearts', onHearts));
+    // Signal direct de Player.hitByEnemy au dernier cœur : le tout premier
+    // `set('hearts')` du registre émet 'setdata', pas 'changedata-hearts'
+    // (cf. boss_kainati.js). Même verrou `playerDownFired` : un seul relancement.
+    ghOn(scene, 'player-depleted', () => onHearts(null, 0));
 
     const run = phase === 1 ? ghiltIntroPhase1 : ghiltIntroPhase2;
     run(scene, st).catch((e) => console.error('ghilt intro', e));

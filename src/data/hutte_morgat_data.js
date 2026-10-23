@@ -13,6 +13,7 @@ const HUTTE_MORGAT_DATA = {
   zoneName: 'La hutte de Morgat',
   zoneSub: 'Forêt flottante',
   background: 'fond_foret_flottante',
+  tileset: 'tuiles_flottantes',
   levelWidth: 4800,
   levelHeight: 540,
   groundCells: [
@@ -25,11 +26,19 @@ const HUTTE_MORGAT_DATA = {
   playerSpawn: { x: 110, y: 412 },
   fall: { y: 600, mode: 'hurt' },
   campfires: [{ x: 1500, y: 448 }],
+  // Décors (`hutte_morgat`) : la hutte elle-même (remplace l'ancien dessin du
+  // script, cf. a2DrawHutte), le chaudron où mijote l'antidote, l'atelier.
+  // Le panneau du sentier (x 420) reste celui du bosquet (interaction E).
   props: [
+    { type: 'hutte_morgat_hutte_morgat', x: 1000, y: 448, scale: 0.6 },
     { type: 'bosquet_signpost', x: 420, y: 448, scale: 0.35 },
-    { type: 'bosquet_bush_flowering', x: 640, y: 448, scale: 0.3 },
-    { type: 'bosquet_barrels', x: 1290, y: 448, scale: 0.3 },
-    { type: 'bosquet_bush_flowering', x: 1760, y: 448, scale: 0.3 },
+    { type: 'hutte_morgat_pot_fleurs', x: 640, y: 448, scale: 0.26 },
+    { type: 'hutte_morgat_table_herbes', x: 770, y: 448, scale: 0.3 },
+    { type: 'hutte_morgat_chaudron', x: 1290, y: 448, scale: 0.3 },
+    { type: 'hutte_morgat_lanterne_papillons', x: 1400, y: 448, scale: 0.24 },
+    { type: 'hutte_morgat_sechoir_plantes', x: 1660, y: 448, scale: 0.3 },
+    { type: 'hutte_morgat_panier_plantes', x: 1800, y: 448, scale: 0.24 },
+    { type: 'hutte_morgat_bocal_papillons', x: 2000, y: 384, scale: 0.22 },        // sur la 1re marche
   ],
   npcs: [
     {

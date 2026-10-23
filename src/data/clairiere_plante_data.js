@@ -12,6 +12,7 @@ const CLAIRIERE_PLANTE_DATA = {
   zoneName: 'La clairière préservée',
   zoneSub: 'Forêt flottante',
   background: 'fond_foret_flottante',
+  tileset: 'tuiles_flottantes',
   levelWidth: 2240,
   levelHeight: 540,
   groundCells: [
@@ -21,11 +22,15 @@ const CLAIRIERE_PLANTE_DATA = {
   ],
   avoidRanges: [[960, 1440]],
   playerSpawn: { x: 260, y: 412 },
+  // Décors (`foret_flottante`) : fleurs hautes dans le cercle sain autour de la
+  // plante, arbres et pissenlits en bordure.
   props: [
+    { type: 'foret_flottante_arbre_jeune', x: 330, y: 448, scale: 0.45 },
     { type: 'bosquet_mossy_rock', x: 560, y: 448, scale: 0.3 },
-    { type: 'bosquet_bush_flowering', x: 1080, y: 448, scale: 0.3 },
-    { type: 'bosquet_bush_flowering', x: 1330, y: 448, scale: 0.28 },
-    { type: 'bosquet_mossy_rock', x: 1900, y: 448, scale: 0.3 },
+    { type: 'foret_flottante_fleurs_hautes', x: 1060, y: 448, scale: 0.26 },
+    { type: 'foret_flottante_fleurs_hautes', x: 1350, y: 448, scale: 0.24 },
+    { type: 'foret_flottante_pissenlit_geant', x: 1960, y: 448, scale: 0.3 },
+    { type: 'foret_flottante_arbre_jeune', x: 2110, y: 448, scale: 0.4 },
   ],
   enemies: [
     // Les bêtes malades rôdent autour du cercle sans jamais y entrer.

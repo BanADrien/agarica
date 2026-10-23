@@ -15,8 +15,10 @@
 //     à droite   branche y=0 → GRANDE BRANCHE HAUTE (y=-192, x 2176-3200) :
 //                pierres qui tombent (ombres au sol), singe corrompu, puis
 //                montée vers la cime (arène de Kainati, bord droit).
-// Mesures : saut simple 172 px (128 = 2 cases, facile), double saut 245 px
-// (192 = 3 cases), portée ~175 px ; loup en sprint + double saut ~514 px.
+// Mesures : saut simple 172 px (128 = 2 cases, facile), portée ~180 px, loup
+// en sprint ~376 px ; le chemin jusqu'à la cime se fait au saut simple. Le
+// bond du singe (264 px, 192 = 3 cases) n'ouvre que la branche d'élan et les
+// lianes de l'épreuve.
 const RACINES_SURFACE_Y = 448;
 
 const GRAND_ARBRE_RACINES_DATA = {
@@ -33,6 +35,12 @@ const GRAND_ARBRE_RACINES_DATA = {
     // (groundRow : borne de fin exclue)
     ...groundRow(0, 50, [7, 8]),    // sol au pied de l'arbre, sur toute la largeur
     ...groundRow(4, 20, [3, 4]),    // plafond du tunnel = toit de racines (x 256-1280, y=192)
+    // Marche d'une case au bout du toit (x 1280-1344, y=256), hors de l'aplomb
+    // de la fourche : la butte est SOUS la fourche (dessous y≈112), qui
+    // coupait le saut simple butte → toit (1 essai sur 12 à pied). Butte →
+    // marche = +64 px, marche → toit = +64 px. Dessous : 144 px libres, comme
+    // le tunnel.
+    ...groundRow(20, 21, [4]),
     ...groundRow(9, 11, [6]),       // racine en travers du tunnel (petit saut)
     // Butte de racine (x 1408-1536, y=320) avec une marche d'une case de chaque
     // côté (y=384) : jamais de mur de 2 cases au ras du sol (on s'y coince
@@ -50,9 +58,10 @@ const GRAND_ARBRE_RACINES_DATA = {
   playerSpawn: { x: 110, y: 412 },
   // Lianes de l'épreuve : décor sans la forme singe (Xara le remarque).
   // (x, y = attache en haut ; bas à ~110 px au-dessus de la branche d'élan.)
+  // Une sur deux retirée (celle du milieu, x 665) : 370 px d'écart, il faut
+  // lâcher avec l'élan (demande utilisateur).
   vines: [
     { x: 850, y: -420, length: 180 },
-    { x: 665, y: -420, length: 190 },
     { x: 480, y: -420, length: 180 },
   ],
   enemies: [
@@ -64,11 +73,25 @@ const GRAND_ARBRE_RACINES_DATA = {
     { type: 'singe_corrompu', x: 2960, y: -240, patrolMinX: 2820, patrolMaxX: 3110 },
   ],
   campfires: [{ x: 1600, y: 64 }],
+  // Décors du grand arbre (`grand_arbre`) et de son tronc (`grand_arbre_tronc`,
+  // le long de la montée fourche → branche haute, devant le tronc dessiné ; le
+  // script les glisse derrière les branches). Petits dans le tunnel (144 px).
   props: [
-    { type: 'bosquet_mossy_rock', x: 200, y: RACINES_SURFACE_Y, scale: 0.45 },
-    { type: 'bosquet_tree_stump', x: 1260, y: RACINES_SURFACE_Y, scale: 0.4 },
-    { type: 'bosquet_mossy_rock', x: 1900, y: RACINES_SURFACE_Y, scale: 0.5 },
-    { type: 'bosquet_mossy_rock', x: 2600, y: RACINES_SURFACE_Y, scale: 0.4 },
+    { type: 'grand_arbre_racine_tunnel', x: 150, y: RACINES_SURFACE_Y, scale: 0.45 },  // le pied de l'arbre
+    { type: 'grand_arbre_morceaux_ecorce', x: 440, y: RACINES_SURFACE_Y, scale: 0.28 },
+    { type: 'grand_arbre_tas_pierres', x: 1000, y: RACINES_SURFACE_Y, scale: 0.26 },
+    { type: 'grand_arbre_champignon_etagere', x: 1472, y: 320, scale: 0.28 },        // sur la butte
+    { type: 'grand_arbre_nid_singe', x: 1440, y: 64, scale: 0.26 },                  // sur la fourche
+    { type: 'grand_arbre_tronc_paroi_noeud', x: 1680, y: 64, scale: 0.42 },
+    { type: 'grand_arbre_tronc_seve_corrompue', x: 1800, y: RACINES_SURFACE_Y, scale: 0.5 },
+    { type: 'grand_arbre_tronc_fenetre_lune', x: 1960, y: RACINES_SURFACE_Y, scale: 0.5 },
+    { type: 'grand_arbre_tronc_champignons_lumineux', x: 2240, y: -192, scale: 0.4 },
+    { type: 'grand_arbre_tas_pierres', x: 2520, y: -192, scale: 0.26 },
+    { type: 'grand_arbre_statue_simien', x: 3060, y: -192, scale: 0.32 },             // avant la cime
+    { type: 'grand_arbre_champignon_etagere', x: 2420, y: RACINES_SURFACE_Y, scale: 0.4 },
+    { type: 'grand_arbre_trou_tronc', x: 2880, y: RACINES_SURFACE_Y, scale: 0.4 },
+    { type: 'grand_arbre_nid_singe', x: 1090, y: -128, scale: 0.24 },                 // branche d'élan
+    { type: 'grand_arbre_statue_simien', x: 230, y: -128, scale: 0.28 },              // corniche de l'épreuve
   ],
   // Pierres qui tombent des branches supérieures (lu par le script de zone) :
   // une ombre grandit sur la branche (télégraphe), puis la pierre tombe.

@@ -167,7 +167,7 @@ CUTSCENES.racines_lianes = [
   { camera: { x: 660, y: -200, ms: 1400 } },
   { say: [
     { who: 'xara', text: 'Regarde, là-bas : des lianes au-dessus du vide. Elles mènent à une fente dans l\'écorce.' },
-    { who: 'agarica', text: 'Je pourrais atteindre la première… mais je ne tiendrai jamais jusqu\'au bout.' },
+    { who: 'agarica', text: 'Elles pendent bien trop loin du bord… Je ne pourrais jamais m\'y accrocher.' },
     { who: 'xara', text: 'Pas avec des mains de druidesse, non. Il faudrait celles d\'un singe.' },
     { who: 'xara', text: 'Garde cet endroit en tête. Les arbres ont la mémoire longue… et moi aussi.' },
   ] },
@@ -197,7 +197,7 @@ CUTSCENES.racines_cime = [
   { say: [
     { who: 'xara', text: 'Là-haut, la cime. Quelque chose de grand se balance dans les lianes… Je l\'entends respirer.' },
     { who: 'agarica', text: 'Le roi de l\'arbre. Je vais lui parler.' },
-    { who: 'xara', text: 'Parle-lui, si tu peux. Et s\'il ne t\'écoute pas… observe ses mouvements. Les lianes ne mentent pas.' },
+    { who: 'xara', text: 'Parle-lui, si tu peux. Et s\'il ne t\'écoute pas… observe ses mouvements. Quand il plonge, il retombe sonné : c\'est là qu\'il faut frapper.' },
   ] },
 ];
 
@@ -206,6 +206,10 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     const st = { cfg: (data && data.rockfall) || null, timer: 600 };
     scene.__arbre = st;
     arbreDrawTrunk(scene, 1540, 2120, -420, 448);
+    // Morceaux de tronc (décors `grand_arbre_tronc_*`) : devant le tronc
+    // dessiné mais derrière les branches (les décors sont sinon dessinés
+    // devant les tuiles).
+    sendBehindFrontGround(scene, (scene.props || []).filter((p) => p.propType && p.propType.startsWith('grand_arbre_tronc_')));
     // Bord droit, sous la grande branche : mur invisible (le monde physique
     // continue 200 px plus loin). Pas de pilier de tuiles : un mur de 2 cases
     // ou plus partant du sol coince Agarica contre l'angle des tuiles.
@@ -272,10 +276,22 @@ DIALOGUES.kainati_victoire = [
   { who: 'kainati', text: 'Tu aurais pu me jeter au bas de mon arbre. Tu ne l\'as pas fait.' },
   { who: 'agarica', text: 'Ce n\'était pas toi, c\'était la mousse. Je la combats, Kainati. Elle ronge toute la forêt.' },
   { who: 'kainati', text: 'Alors nous avons le même ennemi. Elle s\'était glissée en moi comme la sève dans le bois… et j\'ai pris une enfant des bois pour une ennemie.' },
-  { who: 'kainati', text: 'Pardonne au vieux roi. Tu as suivi mes lianes sans les connaître : tu as compris mon mouvement.' },
+  { who: 'kainati', text: 'Pardonne au vieux roi. Tu as lu mes bonds sans les connaître : tu as compris mon mouvement.' },
   { who: 'kainati', text: 'Derrière ma branche, l\'écorce s\'est ouverte. Là dort le totem de mon peuple : il te mènera dans l\'arbre d\'avant, où nos esprits t\'attendent.' },
   { who: 'kainati', text: 'Et quand tu seras prête, la route des hauteurs continue vers l\'est, au-delà de ma cime.' },
   { who: 'xara', text: 'Un totem qui ouvre sur le monde des esprits… Je ne pensais pas en revoir un un jour.' },
+];
+
+// Route des hauteurs sans la forme du singe : impossible au saut simple (la
+// corniche de Geralt est à +192 px) -- Xara renvoie vers le passage du totem.
+CUTSCENES.arene_sans_singe = [
+  { playerFace: 'left' },
+  { say: [
+    { who: 'xara', text: 'Attends. Là-haut, les branches s\'écartent de trois bonnes longueurs… Tes jambes n\'y suffiront pas.' },
+    { who: 'xara', text: 'Le passage du totem brille encore, sur la branche derrière nous. Son peuple t\'attend : va d\'abord le voir.' },
+  ] },
+  { playerMove: { toX: 1640 } },
+  { toast: 'Le passage du totem du singe : sur la branche haute, à gauche.' },
 ];
 
 // Kainati apaisé (revisites) : ses mots suivent la progression d'Agarica.
@@ -313,7 +329,8 @@ DIALOGUES.kainati_calme = [
 function mondeSpirituelGuidePath(scene) {
   const v = MONDE_SPIRITUEL_DATA.vines;
   const sol = (x, y) => ({ x, y: storyStandY(scene, x, y) });
-  return [v[0], v[1], v[2], sol(1470, 384), v[3], v[4], v[5], sol(2480, 448)];
+  // 2 lianes par vide (une sur deux retirée, cf. monde_spirituel_data.js).
+  return [v[0], v[1], sol(1470, 384), v[2], v[3], sol(2480, 448)];
 }
 
 CUTSCENES.esprit_arrivee = [
@@ -332,7 +349,7 @@ CUTSCENES.esprit_arrivee = [
     { who: 'kainati_esprit', text: 'En l\'air, approche-toi d\'une liane : tu t\'y accrocheras seule. Balance-toi, puis saute pour lâcher avec l\'élan.' },
     { who: 'kainati_esprit', text: 'Suis mes mouvements.' },
   ] },
-  { toast: { text: 'Forme du singe : en l\'air, accroche-toi aux lianes.\n← → : se balancer · Saut : lâcher avec l\'élan · S : se laisser tomber', ms: 5200 } },
+  { toast: { text: 'Forme du singe : en l\'air, accroche-toi aux lianes.\n← → : se balancer · Espace : lâcher avec l\'élan · S : se laisser tomber', ms: 5200 } },
 ];
 
 CUTSCENES.esprit_fin = [
@@ -382,13 +399,25 @@ ZONE_SCRIPTS.monde_spirituel = {
     scene.__story.interactables.push({ kind: 'npc', npc: sprite });
     if (done) return;
 
+    // Zone quittée pendant l'intro (menu pause → titre, sortie…) : la
+    // cinématique peut se terminer APRÈS la sortie, sur une scène éteinte dont
+    // le sol est détruit (storyStandY plantait sur `ground.children`). On
+    // vérifie la scène, la visite et l'esprit avant chaque étape.
+    const visit = scene.__storyVisit;
+    const alive = () => !!(scene.sys && scene.sys.isActive() && scene.__storyVisit === visit
+      && scene.__esprit === esprit && esprit.sprite && esprit.sprite.active
+      && scene.player && scene.ground && scene.ground.children);
     scene.time.delayedCall(300, async () => {
-      if (!scene.sys.isActive() || scene.__esprit !== esprit) return;
-      await runCutscene(scene, 'esprit_arrivee');
-      if (scene.__esprit !== esprit) return;
-      await esprit.guide(mondeSpirituelGuidePath(scene), { radius: 230, pauseMs: 300 });
-      // Arrivé au pied de l'arbre : il se retourne vers Agarica.
-      if (scene.__esprit === esprit && esprit.sprite.active) esprit.sprite.setFlipX(kainatiFlipFor('kainati_esprit', false));
+      try {
+        if (!alive()) return;
+        await runCutscene(scene, 'esprit_arrivee');
+        if (!alive()) return;
+        await esprit.guide(mondeSpirituelGuidePath(scene), { radius: 230, pauseMs: 300 });
+        // Arrivé au pied de l'arbre : il se retourne vers Agarica.
+        if (alive()) esprit.sprite.setFlipX(kainatiFlipFor('kainati_esprit', false));
+      } catch (e) {
+        if (alive()) console.warn('[monde spirituel] guidage interrompu :', e);
+      }
     });
   },
 };
@@ -399,18 +428,18 @@ ZONE_SCRIPTS.monde_spirituel = {
 CUTSCENES.epreuve_intro = [
   { say: [
     { who: 'kainati', name: 'Voix de Kainati', text: 'Tu es venue. Bien.' },
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Mon peuple grimpe ici depuis la première sève. Personne ne touche le sol.' },
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Monte jusqu\'à la lumière, tout là-haut. Le talisman de mon peuple t\'y attend.' },
+    { who: 'kainati', name: 'Voix de Kainati', text: 'Mon peuple grimpe ici depuis la première sève. Personne ne touche le sol… et en bas, la mousse attend ceux qui tombent.' },
+    { who: 'kainati', name: 'Voix de Kainati', text: 'Cinq passages, chacun plus rude que le précédent. Au bout des branches, la lumière : le talisman de mon peuple t\'y attend.' },
   ] },
-  { camera: { x: 200, y: -200, ms: 1700 } },
+  { camera: { x: 1250, y: 120, ms: 1700 } },
   { wait: 900 },
   { cameraFollow: true },
-  { toast: { text: 'Les lanternes sont des points de reprise : une chute te ramène à la dernière allumée.', ms: 3600 } },
+  { toast: { text: 'Une lanterne au début de chaque passage : une chute te ramène à la dernière allumée.\nPompe (← →) pour prendre de l\'élan, lâche (Espace) quand la liane monte.', ms: 5200 } },
 ];
 
 CUTSCENES.epreuve_sans_singe = [
   { say: [
-    { who: 'xara', text: 'Ces lianes montent jusqu\'au sommet… mais sans la forme du singe, elles ne te porteront pas.' },
+    { who: 'xara', text: 'Ces lianes filent jusqu\'au bout des branches… mais sans la forme du singe, elles ne te porteront pas.' },
     { who: 'xara', text: 'L\'esprit de Kainati pourrait t\'apprendre leurs secrets. Le passage de son totem est dans l\'arène.' },
   ] },
 ];
@@ -435,37 +464,140 @@ CUTSCENES.epreuve_talisman = [
     { who: 'agarica', text: 'Merci, Kainati. Merci à ton peuple.' },
   ] },
   { call: (scene) => epreuveOuvrirSommet(scene, false) },
-  { toast: { text: 'Lancer de pierre : il coûte un peu d\'énergie. La fente, à gauche, redescend vers les racines.', ms: 4000 } },
+  { toast: { text: 'Lancer de pierre : il coûte un peu d\'énergie. La fente, au bout du sommet, redescend vers les racines.', ms: 4000 } },
 ];
 
-// La fente du sommet (raccourci vers les racines) ne s'ouvre qu'une fois le
-// talisman pris : sinon l'élan de la dernière liane y jetterait Agarica.
-const EPREUVE_SINGE_SORTIE_SOMMET = { x: 16, y: -250, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
+// La fente du sommet (raccourci vers les racines, bord droit du sommet) ne
+// s'ouvre qu'une fois le talisman pris : sinon l'élan de la dernière liane y
+// jetterait Agarica.
+const EPREUVE_SINGE_SOMMET_X = 13000;
+const EPREUVE_SINGE_SORTIE_SOMMET = { x: 13168, y: -250, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
 
 function epreuveOuvrirSommet(scene, instant) {
   if (scene.__epreuveSommet) return;
   scene.__epreuveSommet = true;
   scene.__exits = scene.__exits || [];
   scene.__exits.push(EPREUVE_SINGE_SORTIE_SOMMET);
-  const p = arbreGlowPassage(scene, 34, -250, 110);
+  const p = arbreGlowPassage(scene, 13150, -250, 110);
   if (!instant) [p.glow, p.core].forEach((o) => { o.setScale(0.1); scene.tweens.add({ targets: o, scale: 1, duration: 900, ease: 'Back.Out' }); });
 }
 
+// Mousse toxique tout au fond (décor ; y tomber = `fall` de la donnée, retour
+// à la dernière lanterne) : nappe sombre, bulles vertes qui crèvent.
+function epreuveDrawToxicMoss(scene, x1, x2) {
+  const g = scene.add.graphics();
+  const rnd = new Phaser.Math.RandomDataGenerator(['mousse-toxique']);
+  g.fillStyle(0x16280f, 1).fillRect(x1, 486, x2 - x1, 80);
+  for (let x = x1; x < x2; x += 46) {
+    g.fillStyle(rnd.frac() < 0.5 ? 0x2f5a2a : 0x3e7a2c, 1);
+    g.fillEllipse(x + rnd.between(0, 20), 488 + rnd.between(-4, 6), rnd.between(50, 80), rnd.between(20, 34));
+  }
+  for (let x = x1; x < x2; x += 37) g.fillStyle(0x9bff5a, 0.65).fillCircle(x + rnd.between(0, 30), 486 + rnd.between(-6, 14), rnd.realInRange(1.5, 3.5));
+  storyPutBehindPlayer(scene, g);
+  for (let x = x1 + 120; x < x2; x += 260 + rnd.between(0, 160)) {
+    const b = scene.add.circle(x, 492, rnd.between(4, 8), 0x9bff5a, 0.55);
+    storyPutBehindPlayer(scene, b);
+    scene.tweens.add({
+      targets: b, y: 470, alpha: 0, scale: 1.6, duration: rnd.between(1300, 2200),
+      delay: rnd.between(0, 2000), repeat: -1, repeatDelay: rnd.between(300, 1500),
+    });
+  }
+  return g;
+}
+
+// Plateformes d'écorce qui s'effritent (donnée `crumble`) : ~0,6 s après
+// qu'Agarica s'y pose, elles tremblent puis cèdent, et repoussent 2,6 s plus tard.
+const EPREUVE_CRUMBLE_DELAY_MS = 600;
+const EPREUVE_CRUMBLE_RESPAWN_MS = 2600;
+const EPREUVE_CRUMBLE_H = 22;
+
+function epreuveCreateCrumbles(scene, list) {
+  return (list || []).map((c) => {
+    const w = c.w || 128;
+    const g = scene.add.graphics({ x: c.x, y: c.y });
+    g.fillStyle(0x4a3021, 1).fillRoundedRect(-w / 2, 0, w, EPREUVE_CRUMBLE_H, 7);
+    g.fillStyle(0x6b4a33, 1).fillRoundedRect(-w / 2 + 4, 2, w - 8, 8, 4);
+    g.fillStyle(0x3e7a2c, 1).fillRoundedRect(-w / 2 + 2, -3, w - 4, 7, 3);
+    g.lineStyle(2, 0x21140d, 1);
+    for (const dx of [-w * 0.28, w * 0.05, w * 0.3]) g.lineBetween(dx, 3, dx + 7, EPREUVE_CRUMBLE_H - 3);
+    storyPutBehindPlayer(scene, g);
+    const zone = scene.add.zone(c.x, c.y + EPREUVE_CRUMBLE_H / 2, w, EPREUVE_CRUMBLE_H);
+    scene.physics.add.existing(zone, true);
+    scene.physics.add.collider(scene.player, zone);
+    return { c, w, g, zone, state: 'ok', until: 0 };
+  });
+}
+
+function epreuveUpdateCrumbles(scene, list, now) {
+  const p = scene.player;
+  for (const k of list) {
+    const top = k.c.y;
+    if (k.state === 'ok') {
+      const on = p.body.blocked.down && Math.abs(p.body.bottom - top) < 4 && Math.abs(p.x - k.c.x) < k.w / 2 + 16;
+      if (on) { k.state = 'shake'; k.until = now + EPREUVE_CRUMBLE_DELAY_MS; }
+    } else if (k.state === 'shake') {
+      k.g.x = k.c.x + Phaser.Math.Between(-2, 2);
+      if (now >= k.until) {
+        k.state = 'gone';
+        k.until = now + EPREUVE_CRUMBLE_RESPAWN_MS;
+        k.zone.body.enable = false;
+        k.g.x = k.c.x;
+        if (typeof acte1Particles === 'function') acte1Particles(scene, k.c.x, top + 6, { count: 10, colors: [0x6b4a33, 0x3e7a2c], spread: k.w / 2, rise: -40 });
+        scene.tweens.add({ targets: k.g, y: top + 40, alpha: 0, duration: 380, ease: 'Quad.easeIn' });
+      }
+    } else if (k.state === 'gone' && now >= k.until) {
+      // Ne repousse pas sous les pieds d'Agarica (elle serait coincée dedans).
+      const inside = Math.abs(p.x - k.c.x) < k.w / 2 + 20 && p.body.bottom > top - 4 && p.body.top < top + EPREUVE_CRUMBLE_H + 4;
+      if (inside) continue;
+      k.state = 'ok';
+      k.zone.body.enable = true;
+      scene.tweens.killTweensOf(k.g);
+      k.g.setPosition(k.c.x, top).setAlpha(0);
+      scene.tweens.add({ targets: k.g, alpha: 1, duration: 300 });
+    }
+  }
+}
+
 ZONE_SCRIPTS.epreuve_singe = {
-  create(scene) {
+  create(scene, data) {
     scene.__epreuveSommet = false;
+    const sx = EPREUVE_SINGE_SOMMET_X;
     // Au sommet : un autel de pierre et un rai de lumière, visibles de loin.
-    // Socle posé sur la surface de marche du sommet (dessiné pour un sol en
-    // y -192, haut de l'image des tuiles : il flottait de 16 px).
-    const g = scene.add.graphics({ y: storyStandY(scene, 110, -192) + 192 });
+    // Socle posé sur la surface de marche du sommet (y -192).
+    const g = scene.add.graphics({ x: sx - 110, y: storyStandY(scene, sx, -192) + 192 });
     g.fillStyle(0xffe9a8, 0.08).fillRect(50, -400, 120, 210);
     g.fillStyle(0x4a4058, 1).fillRoundedRect(82, -220, 56, 28, 6);
     g.fillStyle(0x6d6480, 1).fillRoundedRect(90, -228, 40, 10, 4);
-    const beam = scene.add.rectangle(110, -320, 60, 200, 0xffe9a8, 0.12);
+    const beam = scene.add.rectangle(sx, -320, 60, 200, 0xffe9a8, 0.12);
     storyPutBehindPlayer(scene, beam);
     storyPutBehindPlayer(scene, g);
     scene.tweens.add({ targets: beam, alpha: 0.28, duration: 1300, yoyo: true, repeat: -1 });
-    arbreMotes(scene, 0, 1700, -380, 420, 16, [0xbfe8a0, 0xffe9a8, 0x9bff5a]);
+    const w = (data && data.levelWidth) || scene.levelWidth || 13184;
+    arbreMotes(scene, 0, w, -380, 420, 60, [0xbfe8a0, 0xffe9a8, 0x9bff5a]);
+    epreuveDrawToxicMoss(scene, 448, w);
+    scene.__epreuve = {
+      crumbles: epreuveCreateCrumbles(scene, data && data.crumble),
+      rockfalls: ((data && data.rockfalls) || []).map((r) => ({ ...r, timer: 600 })),
+    };
     if (storyGet('talismanSinge')) epreuveOuvrirSommet(scene, true);
   },
+
+  update(scene, time, delta) {
+    const st = scene.__epreuve;
+    const p = scene.player;
+    if (!st || !p || !p.body) return;
+    epreuveUpdateCrumbles(scene, st.crumbles, time);
+    // Pierres des guetteurs : seulement quand Agarica est sur l'îlot (ou juste
+    // au-dessus), comme sur la grande branche des racines.
+    for (const rf of st.rockfalls) {
+      const on = p.x > rf.x1 - 80 && p.x < rf.x2 + 80 && p.y < rf.surfaceY + 40 && p.y > rf.surfaceY - 260;
+      if (!on) { rf.timer = Math.min(rf.timer, 500); continue; }
+      rf.timer -= delta;
+      if (rf.timer > 0) continue;
+      rf.timer = rf.every;
+      const x = Phaser.Math.Clamp(p.x + Phaser.Math.Between(-30, 30), rf.x1, rf.x2);
+      arbreDropRock(scene, x, rf.surfaceY, rf.telegraph);
+    }
+  },
 };
+

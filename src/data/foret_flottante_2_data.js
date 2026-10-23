@@ -7,7 +7,8 @@
 //                       d'un ancien gardien (I3) : totem de poche cassé
 //   I4     x 1536-2176  grande île : Amanite (1re rencontre depuis le vol)
 //   T1     x 2240-2496  totem de l'aigle, +3 rangées depuis I4 : atteignable
-//                       au double saut de base (ou singe) AVANT d'avoir l'aigle
+//                       au bond du singe (seule forme aérienne avant l'aigle ;
+//                       saut simple 172 px < 192)
 //   T1→T2  x 2496-2880  6 cases de vide : impossible sans planer. Filet de
 //                       sécurité N (gy 8) dessous + courant d'air qui remonte
 //                       l'aigle au niveau de T2 ; marche S1 pour remonter à pied
@@ -37,13 +38,20 @@ const FORET_FLOTTANTE_2_DATA = {
   fall: { y: 600, mode: 'hurt' },
   // Points de reprise : ruines (I3), île d'Amanite (I4), rampe d'envol (T3).
   checkpoints: [{ x: 1120, y: 320 }, { x: 1600, y: 384 }, { x: 3240, y: 192 }],
+  // Décors des îles (`foret_flottante`) ; les ruines du gardien (I3) gardent
+  // leurs pierres du bosquet.
   props: [
+    { type: 'foret_flottante_fleurs_hautes', x: 250, y: 320, scale: 0.28 },
+    { type: 'foret_flottante_pissenlit_geant', x: 870, y: 256, scale: 0.28 },
     { type: 'bosquet_standing_stone', x: 1120, y: 320, scale: 0.3 },
     { type: 'bosquet_mossy_rock', x: 1310, y: 320, scale: 0.3 },
+    { type: 'foret_flottante_arbre_jeune', x: 2090, y: 384, scale: 0.42 },
+    { type: 'foret_flottante_fleurs_hautes', x: 1700, y: 384, scale: 0.26 },
+    { type: 'foret_flottante_arbre_jeune', x: 3010, y: 192, scale: 0.36 },
     { type: 'bosquet_antler_totem', x: 3390, y: 192, scale: 0.28 },
   ],
   totems: [
-    { x: 2400, y: 192, flag: 'hasEagleForm', message: "L'aigle t'a choisie.\nDouble saut : tu planes. S : piqué." },
+    { x: 2400, y: 192, flag: 'hasEagleForm', message: "L'aigle t'a choisie.\nEspace en l'air : tu planes. S : piqué." },
   ],
   pickups: [
     { item: 'totem_poche_casse', x: 1216, cutscene: 'ff2_totem_poche' },

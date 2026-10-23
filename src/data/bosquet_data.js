@@ -35,13 +35,26 @@ const BOSQUET_DATA = {
   ],
   playerSpawn: { x: 150, y: 412 },
   props: [
-    // Hutte d'Agarica : le grand arbre à lanternes + deux arbres (anciennement
-    // le prop unique `bosquet_grove`, dont les deux petits arbres flottaient,
-    // cf. tools/split_grove.py).
-    { type: 'bosquet_grand_arbre', x: 225, y: BOSQUET_SURFACE_Y, scale: 0.85 },
+    // Bâtiments du village d'abord (dessinés derrière les autres décors et
+    // toujours derrière les habitants) :
+    // la cabane-arbre d'Agarica, sa tente sur la marche du tuto, la hutte de
+    // paille de l'enclos (terrasse), la hutte moussue au bord du chemin de la
+    // source, le cottage du chef sur son seuil, la tour du sanctuaire et les
+    // portes de l'est (tour + porte de la muraille).
+    { type: 'bosquet_cabane_arbre', x: 220, y: BOSQUET_SURFACE_Y, scale: 0.8 },
+    { type: 'bosquet_tente', x: 640, y: 384, scale: 0.55 },
+    { type: 'bosquet_hutte_paille', x: 1056, y: 384, scale: 0.62 },
+    { type: 'bosquet_hutte_mousse', x: 2050, y: BOSQUET_SURFACE_Y, scale: 0.7 },
+    { type: 'bosquet_cottage', x: 2848, y: 384, scale: 0.8 },
+    { type: 'bosquet_tour', x: 3140, y: BOSQUET_SURFACE_Y, scale: 0.5 },
+    { type: 'bosquet_muraille_tour', x: 3700, y: BOSQUET_SURFACE_Y, scale: 0.6 },
+    { type: 'bosquet_muraille_porte', x: 3790, y: BOSQUET_SURFACE_Y, scale: 0.6 },
+    // Autour de la cabane : deux arbres (anciennement le prop unique
+    // `bosquet_grove`, dont les deux petits arbres flottaient, cf.
+    // tools/split_grove.py).
     { type: 'bosquet_arbre', x: 370, y: BOSQUET_SURFACE_Y, scale: 0.85 },
     { type: 'bosquet_arbre_2', x: 474, y: BOSQUET_SURFACE_Y, scale: 0.85 },
-    { type: 'bosquet_lamp_post', x: 560, y: BOSQUET_SURFACE_Y, scale: 0.55 },
+    { type: 'bosquet_lamp_post', x: 545, y: BOSQUET_SURFACE_Y, scale: 0.55 },
     { type: 'bosquet_bush_flowering', x: 60, y: BOSQUET_SURFACE_Y, scale: 0.5 },
     { type: 'bosquet_signpost', x: 760, y: BOSQUET_SURFACE_Y, scale: 0.5 },
     // La place
@@ -57,11 +70,9 @@ const BOSQUET_DATA = {
     { type: 'bosquet_mossy_rock', x: 1760, y: BOSQUET_SURFACE_Y, scale: 0.5 },
     { type: 'bosquet_well', x: 2290, y: BOSQUET_SURFACE_Y, scale: 0.6 },
     { type: 'bosquet_cart', x: 2470, y: BOSQUET_SURFACE_Y, scale: 0.5 },
-    // Hutte du chef : le grand arbre au sol, les deux petits sur le seuil
-    // (x 2752-2944), chacun posé sur la surface sous lui.
+    // Hutte du chef : le grand arbre au sol, le cottage (plus haut) sur le
+    // seuil x 2752-2944.
     { type: 'bosquet_grand_arbre', x: 2562, y: BOSQUET_SURFACE_Y, scale: 1.1 },
-    { type: 'bosquet_arbre', x: 2802, y: 384, scale: 1.1 },
-    { type: 'bosquet_arbre_2', x: 2906, y: 384, scale: 1.1 },
     { type: 'bosquet_banner_tree', x: 2980, y: BOSQUET_SURFACE_Y, scale: 0.6 },
     { type: 'bosquet_lamp_post', x: 3070, y: BOSQUET_SURFACE_Y, scale: 0.55 },
     // Sanctuaire de l'idole
@@ -72,9 +83,7 @@ const BOSQUET_DATA = {
     { type: 'bosquet_antler_totem', x: 3424, y: 320, scale: 0.55 },   // l'autel de l'idole
     { type: 'bosquet_statue_hooded', x: 3486, y: 320, scale: 0.6 },
     { type: 'bosquet_standing_stone', x: 3600, y: 384, scale: 0.55 },
-    // Portes de l'est
-    { type: 'bosquet_fence', x: 3790, y: BOSQUET_SURFACE_Y, scale: 0.55 },
-    { type: 'bosquet_lamp_post', x: 3700, y: BOSQUET_SURFACE_Y, scale: 0.55 },
+    // Portes de l'est : la muraille (en tête de liste).
   ],
   animals: [
     { type: 'cochons', x: 1056, y: 384, w: 200 },
@@ -103,7 +112,7 @@ const BOSQUET_DATA = {
   ],
   triggers: [
     { id: 'intro', x: 150, w: 200, cutscene: 'bosquet_intro' },
-    { id: 'tuto_saut', x: 520, w: 40, cutscene: [{ toast: 'Espace (ou Z / ↑) : sauter. Encore une fois en l\'air : double saut.' }] },
+    { id: 'tuto_saut', x: 520, w: 40, cutscene: [{ toast: 'Espace : sauter' }] },
     { id: 'tuto_parler', x: 760, w: 40, cutscene: [{ toast: 'E : parler aux habitants.' }] },
     { id: 'aide', x: 1760, w: 40, cutscene: 'bosquet_aide_debut' },
     // Barrières douces (rejouables) : on ne saute pas une étape de l'histoire.

@@ -14,6 +14,13 @@ const ARENE_GHILT_DATA = {
   // Voile verdâtre léger : on est au cœur de la corruption (géré par la Fondation).
   ambient: { tint: 0x1d3a12, darkness: 0.25 },
   groundCells: [...groundRow(0, 21, [7, 8])],
+  // Ruines de l'arène (`foret_corrompue`), en fond : piliers sur les côtés,
+  // arche au centre (Ghil't et Agarica passent devant). Pas devant les sorties.
+  props: [
+    { type: 'foret_corrompue_arche_arene', x: 672, y: 448, scale: 0.45 },
+    { type: 'foret_corrompue_pilier_arene', x: 190, y: 448, scale: 0.38 },
+    { type: 'foret_corrompue_pilier_arene', x: 1150, y: 448, scale: 0.38 },
+  ],
   playerSpawn: { x: 110, y: 412 },
   entries: [
     // Depuis la forêt corrompue (sortie droite de ForetCorrompue1Scene).
