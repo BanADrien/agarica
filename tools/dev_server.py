@@ -300,6 +300,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(REPO_ROOT), **kwargs)
 
+    # Pas de cache navigateur : après une modification du jeu, un rechargement
+    # simple doit reprendre TOUS les fichiers (sinon mélange d'anciens et de
+    # nouveaux scripts qui peut bloquer l'écran de chargement).
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store')
+        super().end_headers()
+
     def log_message(self, format, *args):  # noqa: A002 -- signature imposée par la classe parent
         if self.path != '/__save_zone':
             super().log_message(format, *args)
