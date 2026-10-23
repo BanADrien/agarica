@@ -1,0 +1,16 @@
+[singe] découpe de 2 image(s)
+  rangée 0 jump: 4 frame(s) [OK]
+  rangée 1 liane_hang: 3 frame(s) [OK]
+  rangée 2 liane_swing: 4 frame(s) [OK]
+  rangée 3 release_flip: 5 frame(s) [OK]
+  rangée 4 idle: 4 frame(s) [OK]
+  rangée 5 run: 5 frame(s) [OK]
+  canvas uniforme 287x299 -> assets/sprites/singe_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : singe
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 148 fichier(s) présent(s).

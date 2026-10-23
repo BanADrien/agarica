@@ -1,0 +1,19 @@
+[ghilt] découpe de 4 image(s)
+  rangée 0 idle: 3 frame(s) [OK]
+  rangée 1 walk: 3 frame(s) [OK]
+  rangée 2 charge: 3 frame(s) [OK]
+  rangée 3 toxic_breath: 3 frame(s) [OK]
+  rangée 4 spit: 3 frame(s) [OK]
+  rangée 5 roar: 3 frame(s) [OK]
+  rangée 6 hit: 3 frame(s) [OK]
+  rangée 7 weakened: 3 frame(s) [OK]
+  canvas uniforme 524x430 -> assets/sprites/ghilt_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : ghilt
+Déjà présents (10) : agarica_extra, singe, transfo_singe, xara_extra, pere_chef, amanite, geralt, morgat, kainati, kainati_esprit
+Source manquante (à générer) (67) : habitant_druide, habitant_porteur, habitant_garde, clak, papillon, cochon_bebe, poisson, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_impact_pierre, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+
+Aucun avertissement.
+
+asset_present.js : 212 fichier(s) présent(s).

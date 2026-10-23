@@ -1,0 +1,53 @@
+[
+  {
+    "source": "assets/sprites/crapaud_corrompu.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      84,
+      93
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          198,
+          203,
+          200,
+          200
+        ],
+        "horizontal_gaps": [
+          55,
+          63,
+          8
+        ]
+      },
+      {
+        "row": 1,
+        "count": 1,
+        "heights": [
+          201
+        ],
+        "horizontal_gaps": []
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          201,
+          209,
+          200,
+          204
+        ],
+        "horizontal_gaps": [
+          99,
+          87,
+          96
+        ]
+      }
+    ]
+  }
+]

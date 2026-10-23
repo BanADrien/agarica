@@ -1,0 +1,11 @@
+[transfo_singe] découpe de 1 image(s)
+  rangée 0 transform: 4 frame(s) [OK]
+  canvas uniforme 282x330 -> assets/sprites/transfo_singe_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : transfo_singe
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 152 fichier(s) présent(s).

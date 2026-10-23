@@ -1,0 +1,62 @@
+[
+  {
+    "source": "assets/sprites/mousse_creature.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      145,
+      148
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          139,
+          173,
+          136,
+          98
+        ],
+        "horizontal_gaps": [
+          136,
+          136,
+          100
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          160,
+          166,
+          143,
+          142
+        ],
+        "horizontal_gaps": [
+          114,
+          140,
+          152
+        ]
+      },
+      {
+        "row": 2,
+        "count": 5,
+        "heights": [
+          146,
+          122,
+          89,
+          63,
+          54
+        ],
+        "horizontal_gaps": [
+          80,
+          67,
+          50,
+          59
+        ]
+      }
+    ]
+  }
+]

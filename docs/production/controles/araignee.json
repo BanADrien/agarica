@@ -1,0 +1,60 @@
+[
+  {
+    "source": "assets/sprites/araignee.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      100,
+      101
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          174,
+          180,
+          176,
+          170
+        ],
+        "horizontal_gaps": [
+          105,
+          101,
+          108
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          184,
+          192,
+          195,
+          197
+        ],
+        "horizontal_gaps": [
+          97,
+          94,
+          74
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          230,
+          178,
+          182,
+          177
+        ],
+        "horizontal_gaps": [
+          121,
+          67,
+          92
+        ]
+      }
+    ]
+  }
+]

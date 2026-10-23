@@ -1,0 +1,106 @@
+[loup_sanguinaire] découpe de 1 image(s)
+  rangée 0 patrol: 4 frame(s) [OK]
+  rangée 1 charge: 4 frame(s) [OK]
+  rangée 2 bite: 4 frame(s) [OK]
+  canvas uniforme 328x170 -> assets/sprites/loup_sanguinaire_frames
+[araignee] découpe de 1 image(s)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 walk: 4 frame(s) [OK]
+  rangée 2 attack: 4 frame(s) [OK]
+  canvas uniforme 335x238 -> assets/sprites/araignee_frames
+[mousse_creature] découpe de 1 image(s)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 attack: 4 frame(s) [OK]
+  rangée 2 death: 5 frame(s) [OK]
+  canvas uniforme 301x181 -> assets/sprites/mousse_creature_frames
+[crapaud_corrompu] découpe de 1 image(s)
+  rangée 0 attack: 5 frame(s) [OK]
+  rangée 1 idle: 4 frame(s) [OK]
+  canvas uniforme 1434x237 -> assets/sprites/crapaud_corrompu_frames
+[singe_corrompu] découpe de 1 image(s)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 run: 5 frame(s) [OK]
+  rangée 2 throw: 4 frame(s) [OK]
+  canvas uniforme 247x210 -> assets/sprites/singe_corrompu_frames
+[vfx_soin_papillon] découpe de 1 image(s)
+  rangée 0 swirl: 4 frame(s) [OK]
+  rangée 1 burst: 4 frame(s) [OK]
+  canvas uniforme 380x359 -> assets/vfx/vfx_soin_papillon_frames
+[vfx_souffle_toxique] découpe de 1 image(s)
+  rangée 0 start: 3 frame(s) [OK]
+  rangée 1 idle: 3 frame(s) [OK]
+  canvas uniforme 500x421 -> assets/vfx/vfx_souffle_toxique_frames
+[vfx_flaque_mousse] découpe de 1 image(s)
+  rangée 0 spawn: 4 frame(s) [OK]
+  rangée 1 idle: 4 frame(s) [OK]
+  canvas uniforme 365x230 -> assets/vfx/vfx_flaque_mousse_frames
+[vfx_purification] découpe de 1 image(s)
+  rangée 0 burst: 4 frame(s) [OK]
+  rangée 1 fade: 4 frame(s) [OK]
+  canvas uniforme 281x308 -> assets/vfx/vfx_purification_frames
+[vfx_piste_loup] découpe de 1 image(s)
+  rangée 0 appear: 4 frame(s) [OK]
+  rangée 1 glow: 4 frame(s) [OK]
+  canvas uniforme 337x305 -> assets/vfx/vfx_piste_loup_frames
+[vfx_impact_pierre] découpe de 1 image(s)
+  rangée 0 idle: 5 frame(s) [OK]
+  canvas uniforme 278x326 -> assets/vfx/vfx_impact_pierre_frames
+[pierre] -> assets/items/objets/pierre.png (256x223)
+[idole] -> assets/items/objets/idole.png (152x256)
+[idole_fragment] -> assets/items/objets/idole_fragment.png (175x256)
+[talisman_ours] -> assets/items/objets/talisman_ours.png (256x242)
+[talisman_singe] -> assets/items/objets/talisman_singe.png (256x239)
+[totem_poche_casse] -> assets/items/objets/totem_poche_casse.png (252x256)
+[totem_poche_actif] -> assets/items/objets/totem_poche_actif.png (193x256)
+[bocal_antidote] -> assets/items/objets/bocal_antidote.png (216x256)
+[repulsif] -> assets/items/objets/repulsif.png (222x256)
+[fleur_resistante] -> assets/items/objets/fleur_resistante.png (205x256)
+[carte_geralt] -> assets/items/objets/carte_geralt.png (256x233)
+[lance_amanite] -> assets/items/objets/lance_amanite.png (256x83)
+[mousse_amas_intact] -> assets/items/objets/mousse_amas_intact.png (512x339)
+[mousse_amas_fissure] -> assets/items/objets/mousse_amas_fissure.png (512x339)
+[hud_coeur] -> assets/ui/hud_coeur.png (112x128)
+[hud_coeur_vide] -> assets/ui/hud_coeur_vide.png (111x128)
+[totem_monkey_dim] -> assets/items/totem_frames/totem_monkey_dim.png (241x754)
+[totem_monkey_lit] -> assets/items/totem_frames/totem_monkey_lit.png (241x754)
+[liane] -> assets/items/objets/liane.png (68x512)
+[mousse_mur] -> assets/items/objets/mousse_mur.png (508x768)
+[porte_mousse] -> assets/items/objets/porte_mousse.png (616x768)
+[courant_air] -> assets/items/objets/courant_air.png (217x768)
+[form_icone_singe] -> assets/items/form_icone/singe.png (724x724)
+[skill_icone_ours] -> assets/items/skill_icone/ours.png (724x724)
+[skill_icone_singe] -> assets/items/skill_icone/singe.png (724x724)
+[skill_icone_papillon] -> assets/items/skill_icone/papillon.png (724x724)
+[dialogue_box] -> assets/ui/dialogue_box.png (1692x624)
+[titre_logo] -> assets/ui/titre_logo.png (1024x670)
+[carte_parchemin] -> assets/ui/carte_parchemin.png (1485x993)
+[portrait_agarica] -> assets/ui/portraits/agarica.png (512x512)
+[portrait_xara] -> assets/ui/portraits/xara.png (512x512)
+[portrait_amanite] -> assets/ui/portraits/amanite.png (512x512)
+[portrait_pere_chef] -> assets/ui/portraits/pere_chef.png (512x512)
+[portrait_geralt] -> assets/ui/portraits/geralt.png (512x512)
+[portrait_morgat] -> assets/ui/portraits/morgat.png (512x512)
+[portrait_kainati] -> assets/ui/portraits/kainati.png (512x512)
+[portrait_ghilt] -> assets/ui/portraits/ghilt.png (512x512)
+[fond_bosquet] -> assets/decors/fonds/fond_bosquet.png (2079x756)
+[fond_foret_sombre] -> assets/decors/fonds/fond_foret_sombre.png (2079x756)
+[fond_grand_arbre] -> assets/decors/fonds/fond_grand_arbre.png (2079x756)
+[fond_foret_flottante] -> assets/decors/fonds/fond_foret_flottante.png (2079x756)
+[fond_foret_corrompue] -> assets/decors/fonds/fond_foret_corrompue.png (2079x756)
+[fond_monde_spirituel] -> assets/decors/fonds/fond_monde_spirituel.png (2079x756)
+[fond_trou_sombre] -> assets/decors/fonds/fond_trou_sombre.png (2079x756)
+[fond_arene_ghilt] -> assets/decors/fonds/fond_arene_ghilt.png (2079x756)
+[tuiles_ecorce]
+  21 tuile(s) -> assets/decors/tuiles_ecorce_frames
+[tuiles_flottantes]
+  21 tuile(s) -> assets/decors/tuiles_flottantes_frames
+[tuiles_corrompues]
+  21 tuile(s) -> assets/decors/tuiles_corrompues_frames
+
+================ RAPPORT ================
+Découpés maintenant (59) : loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_impact_pierre, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 487 fichier(s) présent(s).

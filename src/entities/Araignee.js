@@ -43,34 +43,42 @@ function ensureAraigneeTexture(scene) {
 // dague (GDD section 6).
 class Araignee extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
-    ensureAraigneeTexture(scene);
-    super(scene, x, y, ARAIGNEE_TEXTURE_KEY);
+    const useArt = enemyHasManifestArt(scene, 'araignee');
+    if (!useArt) ensureAraigneeTexture(scene);
+    super(scene, x, y, useArt ? manifestInitialTexture(scene, 'araignee', 'idle') : ARAIGNEE_TEXTURE_KEY);
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
     this.body.setAllowGravity(false);
     this.setImmovable(true);
-    this.setSize(ARAIGNEE_WIDTH - 10, ARAIGNEE_HEIGHT - 8);
-    this.setOffset(5, 6);
+    if (useArt) {
+      applyEnemyManifestArt(this, 'araignee', ARAIGNEE_WIDTH - 10, ARAIGNEE_HEIGHT - 8, 'center');
+      enemyPlayArt(this, 'idle');
+    } else {
+      this.setSize(ARAIGNEE_WIDTH - 10, ARAIGNEE_HEIGHT - 8);
+      this.setOffset(5, 6);
+    }
 
+    // Fixe et inoffensive au contact (cf. commentaire de classe) ;
+    // `noGravity` : LevelKit réapplique setAllowGravity(false) après group.add.
+    this.harmless = true;
+    this.noGravity = true;
     this.defeated = false;
   }
 
-  update() {
-    // Fixe : rien à faire tant qu'elle n'est pas vaincue.
+  update(player) {
+    // Fixe : seule l'anim change (menace quand Agarica s'approche, art seulement).
+    if (this.defeated || !this.useManifestArt || !player) return;
+    const near = Math.abs(player.x - this.x) < 120 && Math.abs(player.y - this.y) < 120;
+    enemyPlayArt(this, near ? 'attack' : 'idle');
   }
 
   defeat() {
-    if (this.defeated) return;
-    this.defeated = true;
-    this.body.enable = false;
-    this.scene.tweens.add({
-      targets: this,
-      alpha: 0,
-      scale: 0.6,
-      duration: 200,
-      onComplete: () => this.destroy(),
-    });
+    enemyFadeOutDefeat(this);
   }
+}
+
+if (typeof ENEMY_REGISTRY !== 'undefined') {
+  ENEMY_REGISTRY.araignee = (scene, e) => new Araignee(scene, e.x, e.y);
 }

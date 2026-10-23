@@ -171,6 +171,10 @@ function ensureTreeTexture(scene, width, height) {
 // premier plan devant le joueur — addProceduralGroundPlants/HangingPlants).
 const DECOR_SOURCE_HEIGHT = 724;
 const DECOR_FOREGROUND_DEPTH = 1000;
+// Profondeur commune des personnages (joueur, Xara, PNJ, ennemis, boss, animaux
+// terrestres) : devant les décors (props, totems, feux, 0 par défaut), derrière
+// les plantes de premier plan (DECOR_FOREGROUND_DEPTH).
+const CHARACTER_DEPTH = 10;
 
 // Forêt procédurale (plan3, assets/decors/arbres_frames/, découpés depuis
 // assets/decors/arbres.png par îlots de pixels connectés — voir
@@ -184,12 +188,14 @@ const ARBRE_TEXTURE_PREFIX = 'decor-arbre-';
 // 1.15 (pas 0.75) : les arbres paraissaient chétifs/trop bas par rapport au
 // sol une fois celui-ci agrandi (cf. GROUND_TILE_SIZE) — plus grands pour
 // dominer réellement le sol plutôt que de flotter au même gabarit qu'avant.
-const ARBRE_BASE_SCALE = 1.15;
+// Puis 1.35 (retour utilisateur : "les arbres au fond sont un peu trop bas
+// et petits", cf. aussi ARBRE_GROUND_CLEARANCE).
+const ARBRE_BASE_SCALE = 1.35;
 // Espacement élargi en conséquence : au même espacement qu'avant, des
 // arbres 53% plus grands se seraient chevauchés en un mur de feuillage
 // continu au lieu d'une forêt dispersée.
-const ARBRE_SPACING_MIN = 160;
-const ARBRE_SPACING_MAX = 280;
+const ARBRE_SPACING_MIN = 180;
+const ARBRE_SPACING_MAX = 320;
 // Marge de chaque côté d'une fosse/zone d'eau : un élément planté juste au
 // bord paraîtrait plaqué sur le vide plutôt que clairement dedans ou dehors.
 // Partagée par la forêt (plan3) et les plantes de sol (plan1).
@@ -220,7 +226,9 @@ const ARBRE_SINK = 6;
 // tronc derrière ce bloc bien plus haut qu'avant ("on ne voit que les
 // feuilles"). Remonte le pied de l'arbre d'à peu près la hauteur visible
 // du sol pour qu'il reparte de la ligne d'herbe plutôt que du bord d'écran.
-const ARBRE_GROUND_CLEARANCE = 70;
+// 75 : remontés en même temps que ARBRE_BASE_SCALE ("un peu trop bas" à 70),
+// puis redescendus ("un peu trop haut" à 100, "encore trop haut, un peu" à 85).
+const ARBRE_GROUND_CLEARANCE = 75;
 
 function addProceduralForest(scene, height, levelWidth, avoidRanges = []) {
   scatterAlongLevel(scene, levelWidth, avoidRanges, ARBRE_SPACING_MIN, ARBRE_SPACING_MAX, (x) => {
@@ -310,11 +318,16 @@ function addProceduralHangingPlants(scene, levelWidth) {
   });
 }
 
-function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = []) {
+// `background` (optionnel, clé de zone `background`) : id d'un fond de
+// ITEM_MANIFEST (texture `item-<id>`) qui remplace le ciel plan4 ; plan4 reste
+// le repli tant que l'image n'existe pas.
+function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null) {
   const coverWidth = Math.ceil(levelWidth * 1.4);
-  const scale = height / DECOR_SOURCE_HEIGHT;
+  const bgKey = background && scene.textures.exists(`item-${background}`) ? `item-${background}` : 'decor-plan4';
+  const sourceHeight = bgKey === 'decor-plan4' ? DECOR_SOURCE_HEIGHT : scene.textures.get(bgKey).getSourceImage().height;
+  const scale = height / sourceHeight;
 
-  scene.add.tileSprite(-100, 0, coverWidth, height, 'decor-plan4')
+  scene.add.tileSprite(-100, 0, coverWidth, height, bgKey)
     .setOrigin(0, 0)
     .setTileScale(scale, scale)
     .setScrollFactor(0.08);
@@ -618,6 +631,7 @@ function goToScene(scene, key, data) {
 // lumineux tant que la capacité n'est pas récupérée, éteint une fois
 // obtenue (au lieu de simplement disparaître).
 const TOTEM_TYPE_BY_FLAG = {
+  hasMonkeyForm: 'monkey',
   hasWolfForm: 'wolf',
   hasEagleForm: 'eagle',
   hasOctopusForm: 'octopus',
@@ -649,7 +663,53 @@ const TOTEM_SCALE = 0.35;
 // avant son initialisation.) Appliqué UNIQUEMENT au totem (cf.
 // addAbilityShrine), pas à `groundSurfaceYAt` elle-même (partagée avec les
 // props/le feu de camp, qui n'ont pas ce problème).
-const TOTEM_GROUND_SINK = 16;
+// Valeur désormais propre au jeu de tuiles (AUTOTILE_TILESETS[..].totemSink :
+// 16 pour 'floor', inchangé) : TOTEM_GROUND_SINK est déclaré plus bas, après
+// AUTOTILE_TILESETS (une `const` de haut niveau ne peut pas lire une `const`
+// déclarée après elle).
+
+// Plantes devant le socle de chaque totem (retour utilisateur : "mettre des
+// plantes devant les totems par défaut pour mieux les intégrer") -- mêmes
+// frames que le sous-bois (cf. addUndergrowth) : un buisson de chaque côté,
+// tourné vers l'extérieur, et une petite touffe au centre. Indices dans
+// assets/decors/sous_bois_frames/ : 1-5 = buissons/fougères (rangée 3 de
+// arbres.png), 6-13 = petites touffes (rangée 4).
+// Retour utilisateur suivant : "les plantes sont trop hautes autour des
+// totems, mets-les au même niveau que les autres" -- d'abord posées DEVANT
+// le sol principal (base entièrement visible, donc plus hautes que le
+// sous-bois voisin dont le pied passe derrière la frange d'herbe). Désormais
+// au même enfoncement (SOUS_BOIS_SINK) et sur le même plan que le sous-bois,
+// cf. sendBehindFrontGround : totem ET plantes passent juste derrière le sol
+// principal, les plantes restant devant le totem.
+const TOTEM_PLANT_SIDE_INDICES = [1, 2, 3, 4, 5];
+const TOTEM_PLANT_CENTER_INDICES = [6, 7, 8, 9, 11, 13];
+const TOTEM_PLANT_SIDE_SCALE = 0.34;
+const TOTEM_PLANT_CENTER_SCALE = 0.38;
+// Écart horizontal des buissons latéraux, en fraction de la largeur affichée
+// du totem (depuis son centre).
+const TOTEM_PLANT_SIDE_OFFSET = 0.5;
+
+// `surfaceY` : haut visuel de la case de sol sous le totem (cf.
+// groundSurfaceYAt), pas le bas du totem déjà enfoncé.
+function addTotemPlants(scene, x, surfaceY, totemWidth) {
+  const y = surfaceY + SOUS_BOIS_SINK;
+  const jitter = () => Phaser.Math.FloatBetween(0.9, 1.1);
+  const offset = totemWidth * TOTEM_PLANT_SIDE_OFFSET;
+  return [
+    addUndergrowthImage(scene, x - offset, y, pickUndergrowthVariant(scene, TOTEM_PLANT_SIDE_INDICES, x - offset, y), TOTEM_PLANT_SIDE_SCALE * jitter(), true),
+    addUndergrowthImage(scene, x + offset, y, pickUndergrowthVariant(scene, TOTEM_PLANT_SIDE_INDICES, x + offset, y), TOTEM_PLANT_SIDE_SCALE * jitter(), false),
+    addUndergrowthImage(scene, x, y, pickUndergrowthVariant(scene, TOTEM_PLANT_CENTER_INDICES, x, y), TOTEM_PLANT_CENTER_SCALE * jitter(), Math.random() < 0.5),
+  ];
+}
+
+// Place les objets donnés juste derrière le sol principal (dans l'ordre :
+// le premier reste le plus en arrière), sans toucher à leur profondeur --
+// cf. `scene.__frontGroundFirstImage`, posé par buildLevelFromData.
+function sendBehindFrontGround(scene, objects) {
+  const anchor = scene.__frontGroundFirstImage;
+  if (!anchor) return;
+  for (const obj of objects) scene.children.moveBelow(obj, anchor);
+}
 
 // Bannière "transformation débloquée" : popup plein écran bref au premier
 // déblocage, en plus du texte flottant déjà présent sur le totem. Retour
@@ -688,6 +748,7 @@ const UNLOCK_POPUP_TEXT_OFFSET_Y = 600 - 1086 / 2;
 // images) -- nom de la forme + le geste qui la déclenche, même vocabulaire
 // que les commentaires de Player.js (sprint/double-saut/nage auto).
 const FORM_UNLOCK_LABEL = {
+  monkey: 'Forme Singe\nAccroche aux lianes',
   wolf: 'Forme Loup\nSprint (Shift ou double-tap)',
   eagle: 'Forme Aigle\nDouble-saut',
   octopus: 'Forme Pieuvre\nNage automatique',
@@ -716,10 +777,13 @@ function showFormUnlockPopup(scene, totemType) {
   // Icône + texte : posés dès maintenant (mêmes coordonnées écran fixes que
   // la pancarte, jamais recalculées) mais invisibles (alpha 0) jusqu'à ce
   // que la pousse soit terminée -- cf. onComplete de l'anim plus bas.
+  // Forme sans icône historique (singe) : icône du manifest ou placeholder.
+  const iconKey = scene.textures.exists(`form-icon-${totemType}`) ? `form-icon-${totemType}`
+    : (scene.textures.exists('item-form_icone_singe') && totemType === 'monkey' ? 'item-form_icone_singe' : manifestPlaceholderKey(scene, 'form_icone_singe'));
   const icon = scene.add.image(
     banner.x,
     banner.y + UNLOCK_POPUP_MEDALLION_OFFSET_Y * targetScale,
-    `form-icon-${totemType}`,
+    iconKey,
   ).setScrollFactor(0).setDepth(UNLOCK_POPUP_DEPTH + 1).setAlpha(0);
   icon.setScale((UNLOCK_POPUP_MEDALLION_DIAMETER * targetScale) / icon.width);
 
@@ -793,23 +857,171 @@ function showFormUnlockPopup(scene, totemType) {
 // pour ELLE (un personnage qui marche dedans), mais pas pour un décor
 // statique qui doit rester posé sur le sommet visuel de l'herbe, ~16px plus
 // haut).
+//
+// Seules les tuiles À DÉCOUVERT comptent (cf. openGroundTilesAt) : la case
+// de sol cachée sous une marche ou un rocher en escalier pouvait être « la
+// plus proche » de `referenceY` -- le décor se retrouvait alors enfoncé de
+// toute la hauteur de la marche, dessiné sur sa face.
 function groundSurfaceYAt(scene, x, referenceY) {
-  const groundGroup = scene.ground;
-  if (!groundGroup) return null;
   let best = null;
   let bestDist = Infinity;
-  groundGroup.children.iterate((tile) => {
-    if (!tile || !tile.active) return;
-    const half = tile.displayWidth / 2;
-    if (x < tile.x - half || x > tile.x + half) return;
+  for (const tile of openGroundTilesAt(scene, x)) {
     const surfaceY = tile.y - tile.displayHeight / 2;
     const dist = Math.abs(surfaceY - referenceY);
     if (best === null || dist < bestDist) {
       best = surfaceY;
       bestDist = dist;
     }
-  });
+  }
   return best;
+}
+
+// Tuiles de sol sous `x` dont le dessus est à l'air libre (aucune autre tuile
+// posée directement dessus) : les seules surfaces sur lesquelles on peut
+// poser quelque chose.
+function openGroundTilesAt(scene, x) {
+  const groundGroup = scene.ground;
+  if (!groundGroup) return [];
+  const column = [];
+  groundGroup.children.iterate((tile) => {
+    if (!tile || !tile.active) return;
+    const half = tile.displayWidth / 2;
+    if (x >= tile.x - half && x <= tile.x + half) column.push(tile);
+  });
+  const covered = (t) => column.some((o) => o !== t
+    && Math.abs(o.y + o.displayHeight / 2 - (t.y - t.displayHeight / 2)) < 2);
+  return column.filter((t) => !covered(t));
+}
+
+// Comme groundSurfaceYAt, mais renvoie le haut de la HITBOX de la tuile (la
+// ligne où les pieds d'Agarica se posent) plutôt que le haut de son image.
+function groundStandYAt(scene, x, referenceY) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const tile of openGroundTilesAt(scene, x)) {
+    const visualTop = tile.y - tile.displayHeight / 2;
+    const standY = tile.body ? tile.body.top : visualTop;
+    const dist = Math.abs(visualTop - referenceY);
+    if (best === null || dist < bestDist) {
+      best = standY;
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+// Pixels VISIBLES d'une image (et non son cadre, qui a des marges
+// transparentes et un sommet irrégulier) : canal alpha de la frame, lu une
+// fois sur un canvas puis mis en cache. Null si la lecture est interdite
+// (page ouverte en file:// : canvas « tainted ») -- les appelants retombent
+// alors sur le cadre de l'image.
+const FRAME_ALPHA_CACHE = new Map();
+const VISIBLE_ALPHA_MIN = 40;
+
+function frameAlphaMap(frame) {
+  const key = `${frame.texture.key}#${frame.name}`;
+  if (FRAME_ALPHA_CACHE.has(key)) return FRAME_ALPHA_CACHE.get(key);
+  let map = null;
+  try {
+    const w = frame.cutWidth;
+    const h = frame.cutHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(frame.source.image, frame.cutX, frame.cutY, w, h, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h).data;
+    const alpha = new Uint8Array(w * h);
+    for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3];
+    map = { w, h, alpha };
+  } catch (e) {
+    map = null;
+  }
+  FRAME_ALPHA_CACHE.set(key, map);
+  return map;
+}
+
+// Coin haut-gauche monde d'une image/sprite non tourné (origine quelconque).
+function objectFrameTopLeft(obj) {
+  return {
+    left: obj.x - obj.displayOriginX * Math.abs(obj.scaleX),
+    top: obj.y - obj.displayOriginY * Math.abs(obj.scaleY),
+  };
+}
+
+// Haut visible (1er pixel opaque) de la colonne monde `x` d'un objet non
+// retourné verticalement (les décors ne le sont jamais), ou null si `x` est
+// hors de l'objet ou tombe sur une colonne vide.
+function visibleTopYAt(obj, x) {
+  const f = obj.frame;
+  const sx = Math.abs(obj.scaleX);
+  const sy = Math.abs(obj.scaleY);
+  const { left, top } = objectFrameTopLeft(obj);
+  let col = Math.floor((x - left) / sx);
+  if (col < 0 || col >= f.cutWidth) return null;
+  if (obj.flipX) col = f.cutWidth - 1 - col;
+  const map = frameAlphaMap(f);
+  if (!map) return top;
+  for (let row = 0; row < map.h; row++) {
+    if (map.alpha[row * map.w + col] > VISIBLE_ALPHA_MIN) return top + row * sy;
+  }
+  return null;
+}
+
+// 1re et dernière rangées contenant un pixel opaque (mises en cache sur la carte).
+function opaqueRowRange(map) {
+  if (map.rows) return map.rows;
+  const rowHas = (row) => {
+    for (let col = 0; col < map.w; col++) if (map.alpha[row * map.w + col] > VISIBLE_ALPHA_MIN) return true;
+    return false;
+  };
+  let first = 0;
+  while (first < map.h && !rowHas(first)) first++;
+  let last = map.h - 1;
+  while (last > first && !rowHas(last)) last--;
+  map.rows = first < map.h ? { first, last } : { first: 0, last: map.h - 1 };
+  return map.rows;
+}
+
+// Bas visible (sous la dernière rangée opaque) d'un objet, en coordonnées monde.
+function visibleBottomY(obj) {
+  const f = obj.frame;
+  const sy = Math.abs(obj.scaleY);
+  const { top } = objectFrameTopLeft(obj);
+  const map = frameAlphaMap(f);
+  if (!map) return top + f.cutHeight * sy;
+  const { first, last } = opaqueRowRange(map);
+  // Retourné verticalement : c'est la 1re rangée opaque qui se retrouve en bas.
+  return top + (obj.flipY ? map.h - first : last + 1) * sy;
+}
+
+// Déplace `obj` verticalement pour que le bas de ses pixels visibles soit en `y`.
+function setVisibleBottomY(obj, y) {
+  obj.y += y - visibleBottomY(obj);
+  return obj;
+}
+
+// Haut visible du décor (`scene.props`, cf. buildLevelFromData) sous `x` : le
+// plus haut si plusieurs se recouvrent ; `type` restreint à un type de prop.
+// Null si aucun décor n'est sous `x`.
+function propTopYAt(scene, x, type = null) {
+  let best = null;
+  for (const img of scene.props || []) {
+    if (!img.active || (type && img.propType !== type)) continue;
+    const y = visibleTopYAt(img, x);
+    if (y != null && (best === null || y < best)) best = y;
+  }
+  return best;
+}
+
+// Totem sans art historique (singe) : image du manifest `totem_<type>_<état>`
+// (ou son placeholder) à la place de `totem-<type>-<état>`.
+function totemTextureKey(scene, totemType, state) {
+  const key = `totem-${totemType}-${state}`;
+  if (scene.textures.exists(key)) return key;
+  const itemId = `totem_${totemType}_${state}`;
+  if (scene.textures.exists(`item-${itemId}`)) return `item-${itemId}`;
+  return manifestPlaceholderKey(scene, itemId);
 }
 
 // Idempotent : le flag protège contre un second déclenchement. Vérifié à
@@ -818,7 +1030,7 @@ function groundSurfaceYAt(scene, x, referenceY) {
 function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   const totemType = TOTEM_TYPE_BY_FLAG[flagName] || 'wolf';
   const alreadyHas = !!scene.registry.get(flagName);
-  const textureKey = `totem-${totemType}-${alreadyHas ? 'dim' : 'lit'}`;
+  const textureKey = totemTextureKey(scene, totemType, alreadyHas ? 'dim' : 'lit');
 
   // Cf. TOTEM_GROUND_SINK : `y` (déjà calé sur la limite de grille par
   // l'appelant) est légèrement enfoncé pour que le socle touche vraiment
@@ -828,6 +1040,8 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   marker.setOrigin(0.5, 1);
   marker.setScale(scale);
   marker.body.updateFromGameObject();
+  const plants = addTotemPlants(scene, x, y - TOTEM_GROUND_SINK, marker.displayWidth);
+  sendBehindFrontGround(scene, [marker, ...plants]);
 
   const prompt = scene.add.text(x, y - marker.displayHeight - 14, 'Appuie sur E', {
     fontFamily: 'sans-serif',
@@ -844,7 +1058,7 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     // `marker`/`scene.player` d'une visite précédente, potentiellement déjà
     // détruits, après un retour dans cette même zone.
     if (scene !== currentLevelScene) return;
-    if (scene.registry.get(flagName)) {
+    if (scene.registry.get(flagName) || isWorldFrozen(scene)) {
       prompt.setVisible(false);
       return;
     }
@@ -875,7 +1089,8 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     }
     // Éteint plutôt que détruit : le totem reste planté là, juste sans
     // lueur, comme une capacité déjà récupérée.
-    marker.setTexture(`totem-${totemType}-dim`);
+    marker.setTexture(totemTextureKey(scene, totemType, 'dim'));
+    if (isStoryScene(scene)) saveGame(scene, { silent: true });
     prompt.setVisible(false);
     showFormUnlockPopup(scene, totemType);
 
@@ -906,9 +1121,6 @@ const CAMPFIRE_FRAME_COUNT = 4;
 const CAMPFIRE_TEXTURE_PREFIX = 'decor-campfire-';
 const ANIM_CAMPFIRE_BURN_KEY = 'campfire-burn';
 const CAMPFIRE_SCALE = 0.15;
-// Les bûches débordent sous le cadre découpé (marge de crop) : sans ça, le
-// feu paraît posé juste au-dessus du sol plutôt que planté dedans.
-const CAMPFIRE_SINK = 14;
 
 function ensureCampfireAnimation(scene) {
   if (scene.anims.exists(ANIM_CAMPFIRE_BURN_KEY)) return;
@@ -935,7 +1147,11 @@ const CAMPFIRE_INTERACT_RANGE = 70;
 // (retour utilisateur : "fais un vrai menu propre... glisser déposer").
 function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
   ensureCampfireAnimation(scene);
-  scene.add.sprite(x, y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`)
+  // Bûches posées sur la surface de marche (haut de la hitbox, comme les
+  // props et les pieds d'Agarica) ; l'ancien enfoncement fixe de 14 px sous
+  // le haut de l'image de tuile laissait le feu 3 px au-dessus d'elle.
+  const footY = groundStandYAt(scene, x, y) ?? y;
+  scene.add.sprite(x, footY, `${CAMPFIRE_TEXTURE_PREFIX}0`)
     .setOrigin(0.5, 1)
     .setScale(scale)
     .play(ANIM_CAMPFIRE_BURN_KEY);
@@ -956,7 +1172,7 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     // propre fermeture E/Échap) : le prompt "Appuie sur E" (texte MONDE,
     // pas écran) resterait sinon affiché par-dessus, inchangé depuis juste
     // avant l'ouverture.
-    if (scene.scene.isActive('CampfireMenuScene')) {
+    if (isWorldFrozen(scene)) {
       prompt.setVisible(false);
       return;
     }
@@ -971,6 +1187,15 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     // pendant que les touches de direction, elles, ne font plus rien.
     scene.player.setVelocity(0, 0);
     scene.scene.launch('CampfireMenuScene', { player: scene.player });
+    // Les zones de l'histoire sont déclarées APRÈS le menu dans main.js : sans
+    // ça le menu serait dessiné sous la zone.
+    scene.scene.bringToTop('CampfireMenuScene');
+    // Sauvegarde à chaque feu de camp (zones de l'histoire seulement : les
+    // zones de test ne doivent pas écraser la progression).
+    if (isStoryScene(scene)) {
+      saveGame(scene);
+      scene.scene.get('CampfireMenuScene').events.once('shutdown', () => saveGame(scene, { silent: true }));
+    }
   });
 }
 
@@ -989,6 +1214,59 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
 // vertical exposé sur le côté plutôt que tourné vers le ciel) a été retirée
 // de l'éditeur quand floor.png est passé à une planche terre uniquement,
 // plutôt que de réutiliser les mêmes tuiles sous un faux choix "Roche".
+// DEUX jeux de tuiles de terrain interchangeables : basculer de l'un à
+// l'autre = changer AUTOTILE_TILESET ci-dessous et rien d'autre.
+//   'floor'  -- le jeu d'origine, généré par IA puis découpé de
+//               assets/decors/floor.png par tools/crop_autotile.py.
+//               Grosses images (283 à 1254 px) réduites à l'affichage :
+//               terre brune, bancs de rochers gris sur les bords exposés,
+//               canopée de mousse et champignons sur le dessus.
+//   'tuiles' -- le pixel art dessiné à la main, généré par
+//               tools/cut_tuiles.py depuis assets/decors/tuiles.png.
+//               Tuiles de 24 px agrandies à l'affichage, donc filtre au
+//               plus proche voisin obligatoire (`pixelArt` ci-dessous, cf.
+//               BootScene) : en filtrage linéaire — le défaut de Phaser,
+//               correct pour tout le reste des assets, qui sont dessinés
+//               en grand puis RÉDUITS — un caillou de 3 px devient une
+//               bouillie floue.
+// Les deux jeux n'ont PLUS la même disposition (refonte de 'tuiles', 2026-10) :
+//   layout 'blob'  ('floor') -- les 21 fichiers dirt_*.png, choisis par
+//                  autotilePositionKey (9-slice + coins intérieurs +
+//                  plateformes), herbe DESSINÉE dans les tuiles du haut avec
+//                  du ciel transparent au-dessus, d'où une hitbox aux 3/4
+//                  (grassHitboxFraction 0.75) et les boosts de hauteur.
+//   layout 'atlas' ('tuiles') -- l'atlas en cases nommées découpé par
+//                  tools/cut_tuiles.py (A1..A9, B, C1..C7, D1..D6 + herbes
+//                  séparées, cf. son en-tête et atlasTileFor) : chaque case
+//                  est PLEINE, le haut de la case de surface est la ligne où
+//                  l'on marche et l'herbe est une image à part posée
+//                  par-dessus, sans hitbox -> grassHitboxFraction 1.
+// Basculer de l'un à l'autre reste un seul mot (AUTOTILE_TILESET) : tout ce
+// qui dépend de la hauteur de marche passe par GROUND_STAND_SINK (dérivé de
+// grassHitboxFraction) au lieu d'un « +16 » écrit en dur.
+// Les jeux des biomes (clé de zone `tileset`, TILESET_MANIFEST) sont TOUJOURS
+// au format 'blob' : une zone qui en a un complet est rendue en 'blob' quel
+// que soit le jeu par défaut, avec la ligne de marche du jeu par défaut (cf.
+// autotileLayoutFor et AUTOTILE_BLOB_ART_STAND_SINK).
+// `totemSink` : enfoncement du socle du totem sous le haut VISUEL de la case
+// (cf. TOTEM_GROUND_SINK) -- pour 'floor', la valeur historique réglée à l'œil.
+// `undersideTrim` : px retirés du BAS de la hitbox d'une case sans voisin au
+// sud (dessous d'une plateforme, plafond d'un tunnel), cf.
+// AUTOTILE_UNDERSIDE_TRIM.
+const AUTOTILE_TILESET = 'tuiles';
+const AUTOTILE_TILESETS = {
+  floor: {
+    dir: 'assets/decors/autotile_frames', pixelArt: false, layout: 'blob',
+    grassHitboxFraction: 0.75, totemSink: 16, undersideTrim: 0,
+  },
+  tuiles: {
+    dir: 'assets/decors/tuiles_frames', pixelArt: true, layout: 'atlas',
+    grassHitboxFraction: 1, totemSink: 3, undersideTrim: 16,
+  },
+};
+const AUTOTILE_TILESET_DIR = AUTOTILE_TILESETS[AUTOTILE_TILESET].dir;
+const AUTOTILE_LAYOUT = AUTOTILE_TILESETS[AUTOTILE_TILESET].layout;
+
 const AUTOTILE_POSITIONS = ['tl', 't', 'tr', 'l', 'c', 'r', 'bl', 'b', 'br'];
 const AUTOTILE_PREFIX = { dirt: 'autotile-dirt-' };
 // Les 3 positions du haut (tl/t/tr) ont une haute touffe d'herbe dessinée
@@ -1027,8 +1305,46 @@ const AUTOTILE_PLATFORM_HEIGHT_BOOST = { 'autotile-dirt-platform2': 1.05 };
 // continue en dessous et ne dessine donc rien pour fermer le dessous.
 const AUTOTILE_PLATFORM_VARIANT_COUNT = 3;
 // Part SOLIDE de la case (pas la part retirée) : 0.75 = les 3/4 du bas
-// restent solides, seul le dernier 1/4 du haut ne l'est plus.
-const AUTOTILE_GRASS_HITBOX_FRACTION = 0.75;
+// restent solides, seul le dernier 1/4 du haut ne l'est plus. Propriété du
+// jeu de tuiles (cf. AUTOTILE_TILESETS) : 1 pour 'tuiles' (case pleine).
+const AUTOTILE_GRASS_HITBOX_FRACTION = AUTOTILE_TILESETS[AUTOTILE_TILESET].grassHitboxFraction;
+// Écart entre le haut VISUEL d'une case de surface (multiple de 64, ex. 448)
+// et la ligne où l'on MARCHE (haut de sa hitbox) : 16 px pour 'floor', 0 pour
+// 'tuiles'. SEULE source de vérité pour tout ce qui doit se poser à hauteur
+// des pieds d'Agarica (PNJ, arènes de boss, décors, constantes des
+// src/data/*.js et src/story/*.js) -- ne jamais réécrire « 448 + 16 » / 464.
+const GROUND_STAND_SINK = GROUND_TILE_SIZE * (1 - AUTOTILE_GRASS_HITBOX_FRACTION);
+// Les décors (props) sont posés sur la surface de marche, cf.
+// groundStandYAt ; l'éditeur décale son aperçu d'autant.
+const PROP_GROUND_SINK = GROUND_STAND_SINK;
+// Passer de 'floor' à 'tuiles' remonte la ligne de marche de 16 px (cases
+// pleines) sans bouger le dessous des cases : toutes les hauteurs libres sous
+// une plateforme ou un plafond perdaient 16 px. Les niveaux sont pleins de
+// plateformes posées une rangée au-dessus du sol (64 px libres + 16 = 80 avec
+// 'floor') : à 64 px, Agarica (corps de ~67 px) restait bloquée dessous
+// (vérifié : Zone1, carrefour de la forêt corrompue). On retire donc ces
+// mêmes 16 px du BAS de la hitbox des cases sans voisin au sud : toutes les
+// distances verticales du jeu (sauts, passages, plafonds) redeviennent
+// identiques au pixel près à celles réglées avec 'floor'. Effet visuel : la
+// tête peut mordre de quelques px (16 au plus, en se cognant) dans le dessous
+// de la case -- à réduire ici si ça se voit trop (garder ≥ 4 px pour
+// qu'Agarica humaine passe encore sous une plateforme à une rangée du sol).
+const AUTOTILE_UNDERSIDE_TRIM = AUTOTILE_TILESETS[AUTOTILE_TILESET].undersideTrim;
+// Cf. son commentaire d'origine plus haut (addAbilityShrine). 'tuiles' : le
+// dessus de l'herbe est un trait plein à la hauteur de marche, un enfoncement
+// de 3 px suffit à planter le socle dedans. (Le feu de camp, lui, se pose
+// directement sur la surface de marche, cf. addCampfire.)
+const TOTEM_GROUND_SINK = AUTOTILE_TILESETS[AUTOTILE_TILESET].totemSink;
+// Art au format 'blob' ('floor' ET jeux Codex des biomes, cf.
+// tools/import_codex_assets.py) : la ligne d'herbe où l'on marche y est
+// dessinée au 1er quart de la case (hitbox d'herbe aux 3/4, 16 px). Quand le
+// jeu par défaut marche plus haut (GROUND_STAND_SINK 0 avec 'tuiles'), le
+// rendu 'blob' d'une zone remonte TOUTES ses images de la différence
+// (AUTOTILE_BLOB_VISUAL_LIFT) : l'herbe dessinée retombe sur la ligne de
+// marche commune, et le dessous des masses sur le dessous de leur hitbox
+// (raccourci d'AUTOTILE_UNDERSIDE_TRIM, la même valeur).
+const AUTOTILE_BLOB_ART_STAND_SINK = 16;
+const AUTOTILE_BLOB_VISUAL_LIFT = AUTOTILE_BLOB_ART_STAND_SINK - GROUND_STAND_SINK;
 // Coin INTÉRIEUR (concave) : les 4 voisins orthogonaux sont pleins (donc
 // pas d'arête exposée, cf. autotilePositionKey) mais un voisin EN DIAGONALE
 // manque — cas d'un escalier en blocs carrés (ex: une marche qui monte en
@@ -1078,12 +1394,52 @@ const DIRT_CENTER_VARIANT_COUNT = 6;
 // `PROP_TYPES` (dérivé, `${section}_${item}`) est gardé tel quel pour ne
 // pas retoucher tout le reste du fichier qui boucle dessus (chargement
 // BootScene, sélection dans l'éditeur).
+// `grove` (3 arbres sur une image, les 2 petits flottaient : leur base est
+// dessinée plus haut que celle du grand) est découpé par tools/split_grove.py
+// en `grand_arbre` / `arbre` / `arbre_2`, à utiliser à sa place ; `grove`
+// reste déclaré pour ne pas casser d'anciens brouillons d'éditeur.
+// Planches Codex (une section par planche, ordre de la planche) : découpées
+// ET nommées par `python tools/crop_deco_items.py --named` (table PLANCHES,
+// à garder synchro avec ces listes), base de chaque image au ras du bas.
 const DECOR_SECTIONS = {
   bosquet: [
+    'grand_arbre', 'arbre', 'arbre_2',
     'grove', 'statue_hooded', 'standing_stone', 'lamp_post', 'banner_tree',
     'bush_round', 'bush_flowering', 'mossy_rock', 'signpost', 'fence',
     'cart', 'crates', 'well', 'antler_totem', 'tree_stump', 'log_pile',
     'bench', 'barrels',
+    // bâtiments de la 1re rangée de la planche (crop_deco_items.py --named bosquet)
+    'cabane_arbre', 'hutte_mousse', 'hutte_paille', 'cottage', 'tour', 'tente',
+    'muraille_tour', 'muraille_pan', 'muraille_pan_2', 'muraille_tour_2', 'muraille_porte',
+  ],
+  foret_sombre: [
+    'arbre_moussu', 'souche_champignons', 'rocher_mousse', 'champignons_lumineux',
+    'racine_arche', 'buisson_epineux', 'tronc_couche', 'fougere_sombre',
+    'toile_araignee', 'mare_bord', 'pierre_runique', 'fleur_corniche',
+  ],
+  grand_arbre: [
+    'racine_tunnel', 'champignon_etagere', 'nid_singe', 'tas_pierres',
+    'morceaux_ecorce', 'lanterne_lucioles', 'statue_simien', 'rideau_lianes',
+    'trou_tronc', 'autel_singe',
+  ],
+  grand_arbre_tronc: [
+    'paroi_ecorce', 'paroi_noeud', 'branche_courte', 'branche_longue', 'escalier_racines',
+    'fenetre_lune', 'lianes_hautes', 'champignons_lumineux', 'seve_corrompue', 'corniche_mousse',
+  ],
+  foret_flottante: [
+    'ile_petite', 'ile_moyenne', 'rocher_flottant', 'nuage',
+    'arbre_jeune', 'pont_corde', 'tente_geralt', 'panneau_geralt',
+    'pissenlit_geant', 'fleurs_hautes',
+  ],
+  foret_corrompue: [
+    'arbre_malade', 'souche_corrompue', 'pustule_mousse', 'racine_tordue',
+    'os_creature', 'cocon_mousse', 'champignon_toxique', 'rocher_fissure',
+    'pilier_arene', 'arche_arene', 'pierre_symbole',
+  ],
+  hutte_morgat: [
+    'hutte_morgat', 'chaudron', 'etagere_bocaux', 'table_herbes',
+    'sechoir_plantes', 'lanterne_papillons', 'panier_plantes', 'tapis_rond',
+    'pot_fleurs', 'bocal_papillons',
   ],
 };
 const PROP_PREFIX = 'prop-';
@@ -1166,10 +1522,38 @@ const AUTOTILE_BACKLAYER_ALPHA = 1;
 // teinte/alpha assombries. Retourne la liste des images créées, pour que
 // l'éditeur puisse les détruire et redessiner à chaque coup de pinceau sans
 // tout reconstruire.
+// [clé de texture, nom de fichier] des 21 cases d'un jeu au format 'blob'
+// (« 9-slice » de terre + plateformes + variantes de centre + coins
+// intérieurs, cf. tools/crop_autotile.py / tools/import_codex_assets.py) :
+// 'floor' et les jeux des biomes (chargés sous `<id>:<clé>`, cf. BootScene).
+// dirt_t2/tl2/tr2 existent encore sur disque mais ne sont plus utilisées
+// (retour utilisateur) : ne pas les rebrancher sans qu'il le redemande.
+function autotileBlobFiles() {
+  const files = AUTOTILE_POSITIONS.map((pos) => [`autotile-dirt-${pos}`, `dirt_${pos}.png`]);
+  for (let i = 0; i < AUTOTILE_PLATFORM_VARIANT_COUNT; i++) files.push([`autotile-dirt-platform${i}`, `dirt_platform${i}.png`]);
+  for (let i = 0; i < DIRT_CENTER_VARIANT_COUNT; i++) files.push([`autotile-dirt-c-var${i}`, `dirt_c_var${i}.png`]);
+  files.push(['autotile-dirt-angle', 'dirt_angle.png'], ['autotile-dirt-coin', 'coin.png']);
+  files.push(['autotile-dirt-column', 'dirt_column.png']);
+  return files;
+}
+
+// Disposition d'un rendu : un jeu de biome (`tileset`, toujours 'blob') dont
+// les 21 cases sont chargées l'emporte ; sinon celle du jeu par défaut. Avec
+// le défaut 'floor' (déjà 'blob'), un jeu incomplet garde son ancien repli
+// case par case sur le défaut ; avec 'tuiles' ('atlas'), il n'y a pas de case
+// 'blob' de repli : la zone reste en 'atlas'.
+function autotileLayoutFor(scene, tileset) {
+  if (!tileset || AUTOTILE_LAYOUT === 'blob') return AUTOTILE_LAYOUT;
+  const complete = autotileBlobFiles().every(([key]) => scene.textures.exists(`${tileset}:${key}`));
+  return complete ? 'blob' : AUTOTILE_LAYOUT;
+}
+
 function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
+  if (autotileLayoutFor(scene, options.tileset) === 'atlas') return renderAtlasAutotileGrid(scene, groundGroup, cells, options);
   const isBackLayer = !!options.back;
   const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
   const images = [];
+  const tileBodies = []; // corps créés, cf. arêtes internes en fin de fonction
   for (const [gx, gy, material] of cells) {
     const hasNorth = solid.has(gridCellKey(gx, gy - 1));
     const hasSouth = solid.has(gridCellKey(gx, gy + 1));
@@ -1230,6 +1614,10 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       isPlatform = true;
     } else if (pos === 'c') {
       textureKey = `autotile-dirt-c-var${Phaser.Math.Between(0, DIRT_CENTER_VARIANT_COUNT - 1)}`;
+    } else if (pos === 'l' && !hasEast) {
+      // Milieu d'une colonne d'une case de large (exposée des DEUX côtés) :
+      // 'l' laissait le flanc droit coupé net.
+      textureKey = 'autotile-dirt-column';
     } else {
       // `material` peut valoir 'rock' sur d'anciennes données de niveau
       // exportées avant le retrait de cette option (cf. AUTOTILE_PREFIX,
@@ -1238,6 +1626,11 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       const prefix = AUTOTILE_PREFIX[material] || AUTOTILE_PREFIX.dirt;
       textureKey = `${prefix}${pos}`;
     }
+    // Jeu de tuiles alternatif de la zone (clé `tileset`, cf. TILESET_MANIFEST
+    // et BootScene) : mêmes noms de cases, préfixés `<id>:` ; case absente →
+    // jeu par défaut. Les boosts de hauteur restent indexés sur la clé d'origine.
+    const visualKey = options.tileset && scene.textures.exists(`${options.tileset}:${textureKey}`)
+      ? `${options.tileset}:${textureKey}` : textureKey;
     const { x: cx, y: cy } = gridToWorld(gx, gy);
 
     // tl/tr (retour utilisateur : "c'est plutôt tr et tl qui sont trop bas,
@@ -1252,13 +1645,19 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
     // bouger. Calculé ici (avant le bloc hitbox juste en dessous, pas
     // seulement au moment de créer l'image) : la hitbox en a maintenant
     // besoin aussi, cf. son commentaire.
-    const heightBoost = isPlatform
+    // Jeux des biomes : cases déjà à leur proportion naturelle (en-tête de
+    // champignons compris, cf. tools/import_codex_assets.py), jamais étirées.
+    const zoneFrame = visualKey !== textureKey ? scene.textures.getFrame(visualKey) : null;
+    let heightBoost = isPlatform
       ? (AUTOTILE_PLATFORM_HEIGHT_BOOST[textureKey] || 1)
       : (AUTOTILE_CORNER_HEIGHT_BOOST[pos] || 1);
+    if (zoneFrame) heightBoost = zoneFrame.realHeight / zoneFrame.realWidth;
     const baseSize = GROUND_TILE_SIZE + AUTOTILE_OVERLAP * 2;
 
     if (groundGroup && !isBackLayer) {
       const tile = groundGroup.create(cx, cy, GROUND_HITBOX_KEY).setVisible(false);
+      tile.__cell = { gx, gy };
+      tileBodies.push(tile);
       if (AUTOTILE_GRASS_TOP_POSITIONS.has(pos)) {
         // Retour utilisateur : deux essais précédents ici (un rectangle
         // uniformément rehaussé du même `heightBoost` que l'image, puis un
@@ -1274,13 +1673,23 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
         // est la part SOLIDE de la case (les 3/4 du bas), pas la part
         // retirée — inversé une première fois (retour utilisateur : "tu
         // l'as mise à 1/4 au lieu de 3/4").
+        // Avec le défaut 'tuiles' (zone en jeu de biome), fraction 1 : la
+        // hitbox reste pleine et ce sont les images qui remontent, cf.
+        // AUTOTILE_BLOB_VISUAL_LIFT.
         const solidHeight = GROUND_TILE_SIZE * AUTOTILE_GRASS_HITBOX_FRACTION;
         tile.body.setSize(GROUND_TILE_SIZE, solidHeight);
         tile.body.setOffset(0, GROUND_TILE_SIZE - solidHeight);
       }
+      // Dessous raccourci (cf. AUTOTILE_UNDERSIDE_TRIM, 0 avec 'floor') : il
+      // suit le dessous des images, remontées d'autant.
+      if (AUTOTILE_UNDERSIDE_TRIM && !hasSouth) {
+        const top = tile.body.offset.y;
+        tile.body.setSize(GROUND_TILE_SIZE, GROUND_TILE_SIZE - top - AUTOTILE_UNDERSIDE_TRIM);
+        tile.body.setOffset(0, top);
+      }
     }
     const displayHeight = baseSize * heightBoost;
-    const tileCenterY = cy - (displayHeight - baseSize) / 2;
+    const tileCenterY = cy - (displayHeight - baseSize) / 2 - AUTOTILE_BLOB_VISUAL_LIFT;
     // Retour utilisateur : "les tuiles terre arriere plan ne doivent pas
     // etre transparant du tout" -- AUTOTILE_BACKLAYER_ALPHA=1 ci-dessous
     // (déjà réglé par un retour précédent) ne peut que RÉDUIRE
@@ -1311,9 +1720,9 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
     // second (leur vrai fond, jamais un aplat gris, doit se voir au
     // travers dans les deux cas).
     if (isBackLayer && !AUTOTILE_GRASS_TOP_POSITIONS.has(pos)) {
-      images.push(scene.add.rectangle(cx, cy, GROUND_TILE_SIZE, GROUND_TILE_SIZE, AUTOTILE_BACKLAYER_TINT, 1));
+      images.push(scene.add.rectangle(cx, cy - AUTOTILE_BLOB_VISUAL_LIFT, GROUND_TILE_SIZE, GROUND_TILE_SIZE, AUTOTILE_BACKLAYER_TINT, 1));
     }
-    const img = scene.add.image(cx, tileCenterY, textureKey)
+    const img = scene.add.image(cx, tileCenterY, visualKey)
       .setDisplaySize(baseSize, displayHeight)
       .setFlipX(flipAngleX)
       .setFlipY(flipAngleY);
@@ -1325,8 +1734,345 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
   // sans ce refresh, la case restait solide sur toute sa hauteur d'origine
   // (le joueur tombait au travers de la partie "retirée" comme si de rien
   // n'était, ou pire, traversait toute la plateforme).
-  if (groundGroup && !isBackLayer) groundGroup.refresh();
+  if (groundGroup && !isBackLayer) {
+    groundGroup.refresh();
+    disableInternalGroundFaces(tileBodies, solid);
+  }
   return images;
+}
+
+// Arêtes INTERNES (correctif "paroi qui coince") : une face collée à une
+// autre case pleine ne doit jamais repousser un corps. Sans ça, avec le jeu
+// 'floor', la case pleine SOUS un mur (hitbox entière, haut à y) dépasse de
+// 16 px la case d'herbe voisine (hitbox aux 3/4) : la séparation Arcade en Y
+// (passe en premier, tolère overlapBias = 20 px) la traitait comme une marche
+// et perchait Agarica 16 px plus haut contre le mur. Le petit bout de face
+// latérale ainsi désactivé est toujours couvert par la case du mur au-dessus
+// (corps du joueur bien plus haut que 16 px). Gardé aussi pour 'atlas' (cases
+// toutes pleines) : une face interne n'a jamais à arrêter quoi que ce soit, et
+// ça évite qu'un corps accroche la jointure entre deux cases d'un même sol.
+function disableInternalGroundFaces(tileBodies, solid) {
+  for (const tile of tileBodies) {
+    const { gx, gy } = tile.__cell;
+    const cc = tile.body.checkCollision;
+    cc.up = !solid.has(gridCellKey(gx, gy - 1));
+    cc.down = !solid.has(gridCellKey(gx, gy + 1));
+    cc.left = !solid.has(gridCellKey(gx - 1, gy));
+    cc.right = !solid.has(gridCellKey(gx + 1, gy));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Disposition 'atlas' (jeu 'tuiles', cf. AUTOTILE_TILESETS et l'en-tête de
+// tools/cut_tuiles.py pour la carte des cases de assets/decors/tuiles.png).
+// ---------------------------------------------------------------------------
+// Clé de texture d'une case de l'atlas : `autotile-atlas-A1`, `…-grass_mid`…
+const AUTOTILE_ATLAS_PREFIX = 'autotile-atlas-';
+const AUTOTILE_ATLAS_TILES = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9',
+  'B', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7',
+  'D1', 'D2', 'D3', 'D4', 'D5', 'D6',
+];
+// Taille d'une case dans l'atlas (px source) : facteur d'agrandissement
+// GROUND_TILE_SIZE / 24, le MÊME pour les cases et les herbes (l'herbe garde
+// sa taille naturelle, elle n'est jamais étirée pour remplir la case).
+const AUTOTILE_ATLAS_SOURCE_TILE = 24;
+// Herbes posées par-dessus les cases de surface, SANS hitbox, à leur taille
+// naturelle : `dx` = décalage (px source) du bord gauche de l'image par
+// rapport au bord gauche de la case -- elles DÉPASSENT du bord exposé
+// (demande utilisateur : « laisser l'herbe dépasser, c'est pour pas que ça
+// fasse trop plat »). Le haut de l'image = le haut de la case = la ligne où
+// l'on marche. Mêmes valeurs que GRASS_SPECS dans tools/cut_tuiles.py.
+const AUTOTILE_ATLAS_GRASS = {
+  mid: { file: 'grass_mid', dx: 0 },      // H1 : voisins des deux côtés
+  left: { file: 'grass_left', dx: -2 },   // H3 : pas de voisin à l'ouest
+  right: { file: 'grass_right', dx: 0 },  // H4 : pas de voisin à l'est
+  single: { file: 'grass_single', dx: -2 }, // H3+H4 : aucun voisin latéral
+};
+
+// Choix de la case de l'atlas pour (gx, gy), d'après `solid` (Set de
+// gridCellKey = l'ensemble S des cases pleines). Règles de l'utilisateur
+// (« une couche de B avant la logique des A en dessous » ; les D sont les
+// coins INTÉRIEURS, les C les variantes « minces » du 9-slice) :
+//  1. Case de surface (pas de voisin N dans S) AVEC un voisin S dans S ET au
+//     moins un voisin E ou O dans S -> B (les « cases B »).
+//  2. Région R = S privé des cases B (les surfaces minces -- plateforme sans
+//     dessous, haut de colonne -- restent donc dans R). Une case de R n'a
+//     pour voisins QUE des cases de R : tout ce qui est hors de R (case B
+//     comprise) compte comme EXPOSÉ. Avec n/s/e/o/no/ne/so/se = voisin ∈ R :
+//       !n && !s : !o && !e -> C4 ; !o -> C1 ; !e -> C3 ; sinon C2
+//       sinon !o && !e : !n -> C5 ; !s -> C7 ; sinon C6
+//       !n && !o -> A1 ; !n && !e -> A3 ; !s && !o -> A7 ; !s && !e -> A9
+//       !n -> A2
+//       !s -> !no -> D1 ; !ne -> D2 ; sinon A8
+//       !o -> A4 ; !e -> A6
+//       intérieur : !no -> D6 ; !ne -> D5 ; !so -> D4 ; !se -> D3 ; sinon A5
+//  3. Herbe sur TOUTE case sans voisin N dans S : H3 (grass_left) sans voisin
+//     O dans S, H4 (grass_right) sans voisin E dans S, les deux
+//     (grass_single) si aucun des deux, sinon H1 (grass_mid).
+// Le petit bout d'herbe H2 de l'atlas n'est pas utilisé (rôle non précisé).
+// Retourne { tile, grass } (`grass` : clé de AUTOTILE_ATLAS_GRASS ou null).
+function atlasTileFor(solid, gx, gy) {
+  const inS = (x, y) => solid.has(gridCellKey(x, y));
+  const isB = (x, y) => inS(x, y) && !inS(x, y - 1) && inS(x, y + 1) && (inS(x - 1, y) || inS(x + 1, y));
+  let grass = null;
+  if (!inS(gx, gy - 1)) {
+    const w = inS(gx - 1, gy);
+    const e = inS(gx + 1, gy);
+    grass = !w && !e ? 'single' : !w ? 'left' : !e ? 'right' : 'mid';
+  }
+  if (isB(gx, gy)) return { tile: 'B', grass };
+  const inR = (x, y) => inS(x, y) && !isB(x, y);
+  const n = inR(gx, gy - 1);
+  const s = inR(gx, gy + 1);
+  const e = inR(gx + 1, gy);
+  const o = inR(gx - 1, gy);
+  let tile;
+  if (!n && !s) tile = !o && !e ? 'C4' : !o ? 'C1' : !e ? 'C3' : 'C2';
+  else if (!o && !e) tile = !n ? 'C5' : !s ? 'C7' : 'C6';
+  else if (!n && !o) tile = 'A1';
+  else if (!n && !e) tile = 'A3';
+  else if (!s && !o) tile = 'A7';
+  else if (!s && !e) tile = 'A9';
+  else if (!n) tile = 'A2';
+  else if (!s) tile = !inR(gx - 1, gy - 1) ? 'D1' : !inR(gx + 1, gy - 1) ? 'D2' : 'A8';
+  else if (!o) tile = 'A4';
+  else if (!e) tile = 'A6';
+  else if (!inR(gx - 1, gy - 1)) tile = 'D6';
+  else if (!inR(gx + 1, gy - 1)) tile = 'D5';
+  else if (!inR(gx - 1, gy + 1)) tile = 'D4';
+  else if (!inR(gx + 1, gy + 1)) tile = 'D3';
+  else tile = 'A5';
+  return { tile, grass };
+}
+
+// Équivalent de renderAutotileGrid pour la disposition 'atlas' (mêmes
+// paramètres, même valeur de retour, même hitbox d'une case par cellule et
+// mêmes faces internes désactivées). Différences : hitbox dont le haut est
+// le haut de la case (grassHitboxFraction 1 ; dessous raccourci de
+// AUTOTILE_UNDERSIDE_TRIM s'il n'y a rien en dessous), cases affichées à
+// EXACTEMENT GROUND_TILE_SIZE (pas d'AUTOTILE_OVERLAP : textures séparées en
+// filtre NEAREST, positions entières sur la grille de 64 -> les bords se
+// touchent pile, et un débord de 0,5 px décalerait la grille de pixels d'une
+// case à l'autre), aucun boost de
+// hauteur, et l'herbe ajoutée en images séparées APRÈS toutes les cases (pour
+// passer devant les cases voisines qu'elle déborde). Un jeu de biome complet
+// (`options.tileset`, format 'blob') passe par renderAutotileGrid en 'blob'
+// (cf. autotileLayoutFor) ; incomplet, il est ignoré ici.
+function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
+  const isBackLayer = !!options.back;
+  const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
+  const scale = GROUND_TILE_SIZE / AUTOTILE_ATLAS_SOURCE_TILE;
+  const images = [];
+  const grassCells = [];
+  const tileBodies = [];
+  for (const [gx, gy] of cells) {
+    const { tile, grass } = atlasTileFor(solid, gx, gy);
+    const { x: cx, y: cy } = gridToWorld(gx, gy);
+    if (groundGroup && !isBackLayer) {
+      const body = groundGroup.create(cx, cy, GROUND_HITBOX_KEY).setVisible(false);
+      body.__cell = { gx, gy };
+      // Haut de la hitbox = haut de la case (ligne de marche) ; dessous
+      // raccourci si rien en dessous, cf. AUTOTILE_UNDERSIDE_TRIM.
+      if (AUTOTILE_UNDERSIDE_TRIM && !solid.has(gridCellKey(gx, gy + 1))) {
+        body.body.setSize(GROUND_TILE_SIZE, GROUND_TILE_SIZE - AUTOTILE_UNDERSIDE_TRIM);
+        body.body.setOffset(0, 0);
+      }
+      tileBodies.push(body);
+    }
+    const img = scene.add.image(cx, cy, `${AUTOTILE_ATLAS_PREFIX}${tile}`)
+      .setDisplaySize(GROUND_TILE_SIZE, GROUND_TILE_SIZE);
+    if (isBackLayer) img.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
+    images.push(img);
+    if (grass) grassCells.push([gx, gy, grass]);
+  }
+  // Herbes créées APRÈS toutes les cases de ce rendu (ordre d'affichage =
+  // ordre de création) : un débord latéral passerait sinon sous la case
+  // voisine créée après lui.
+  for (const [gx, gy, grass] of grassCells) {
+    const spec = AUTOTILE_ATLAS_GRASS[grass];
+    const g = scene.add.image(gx * GROUND_TILE_SIZE + spec.dx * scale, gy * GROUND_TILE_SIZE, `${AUTOTILE_ATLAS_PREFIX}${spec.file}`)
+      .setOrigin(0, 0).setScale(scale);
+    if (isBackLayer) g.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
+    images.push(g);
+  }
+  if (groundGroup && !isBackLayer) {
+    groundGroup.refresh();
+    disableInternalGroundFaces(tileBodies, solid);
+  }
+  return images;
+}
+
+// Sous-bois (assets/decors/sous_bois_frames/, découpés depuis les 2
+// DERNIÈRES rangées de assets/decors/arbres.png -- buissons, fougères,
+// champignons -- voir tools/crop_sous_bois.py) : dispersés au hasard comme la
+// forêt du plan3 (essence, échelle, miroir, espacement variable, cf.
+// addProceduralForest), mais sur un plan intermédiaire -- devant le sol de
+// fond (groundBackCells), derrière le sol principal (groundCells), cf. ordre
+// de rendu dans buildLevelFromData -- et sans parallaxe (scrollFactor par
+// défaut, 1) : ils défilent avec le sol réel sur lequel ils sont posés, leur
+// pied caché derrière la frange d'herbe du sol principal.
+const SOUS_BOIS_COUNT = 14;
+const SOUS_BOIS_TEXTURE_PREFIX = 'decor-sous-bois-';
+const SOUS_BOIS_BASE_SCALE = 0.45;
+// Retour utilisateur : "y en a pas assez sur les longues lignes" -- resserré
+// depuis 90-220 (environ 1 élément toutes les 2-3 tuiles au lieu de 4-5).
+const SOUS_BOIS_SPACING_MIN = 45;
+const SOUS_BOIS_SPACING_MAX = 110;
+// Bas du cadre enfoncé sous le HAUT de la case de surface : la ligne d'herbe
+// dessinée sur dirt_t/tl/tr tombe vers le 1er quart de la case (cf.
+// AUTOTILE_GRASS_HITBOX_FRACTION), sa frange de mousse descend plus bas --
+// assez pour que les rochers/l'herbe de la base passent derrière elle
+// plutôt que de flotter au-dessus du sol.
+const SOUS_BOIS_SINK = 24;
+// Retrait minimal entre le bord d'un élément et le bout de son tronçon de
+// sol : les tuiles de coin (tl/tr) arrondissent déjà le bord, un élément
+// calé pile dessus déborderait visuellement au-dessus du vide.
+const SOUS_BOIS_EDGE_INSET = 8;
+// Un tronçon court ne peut pas accueillir les plus larges éléments : quelques
+// tirages de variante avant d'abandonner cet emplacement, pour qu'un petit
+// élément (rangée du bas de la planche) ait sa chance plutôt que rien.
+const SOUS_BOIS_FIT_ATTEMPTS = 4;
+// Retour utilisateur : "au moins une plante par étage de plateforme qui fait
+// au moins 3 tuiles et 1 chance sur deux pour les lignes de 2 tuiles" -- la
+// dispersion à espacement aléatoire seule pouvait laisser un tronçon entier
+// vide (premier pas tiré au-delà de son bout, ou variantes trop larges).
+const SOUS_BOIS_GUARANTEED_RUN_TILES = 3;
+const SOUS_BOIS_SHORT_RUN_TILES = 2;
+const SOUS_BOIS_SHORT_RUN_CHANCE = 0.5;
+// Retour utilisateur : "fais en sorte que des plantes identiques ne puissent
+// pas être à côté" -- une variante déjà posée à moins de cette distance
+// (centre à centre, même hauteur de sol) est exclue du tirage. Au-delà du
+// pas de dispersion maximal, pour couvrir aussi les voisins immédiats les
+// plus espacés. Partagé avec les plantes des totems (cf. addTotemPlants).
+const SOUS_BOIS_SAME_VARIANT_MIN_DISTANCE = 160;
+
+// `scene.__undergrowthPlants` (remis à zéro par buildLevelFromData) : toutes
+// les plantes posées dans la zone, pour pickUndergrowthVariant.
+function isUndergrowthVariantNearby(scene, variant, x, baseY) {
+  return (scene.__undergrowthPlants || []).some((p) => p.variant === variant
+    && Math.abs(p.x - x) < SOUS_BOIS_SAME_VARIANT_MIN_DISTANCE
+    && Math.abs(p.baseY - baseY) < GROUND_TILE_SIZE);
+}
+
+function pickUndergrowthVariant(scene, candidates, x, baseY) {
+  const allowed = candidates.filter((variant) => !isUndergrowthVariantNearby(scene, variant, x, baseY));
+  // Repli sur la liste complète seulement si TOUTES les candidates sont déjà
+  // prises autour (jamais avec les 14 du sous-bois, possible en théorie pour
+  // une petite liste comme celles des totems).
+  return Phaser.Utils.Array.GetRandom(allowed.length ? allowed : candidates);
+}
+
+function addUndergrowthImage(scene, x, baseY, variant, scale, flipX) {
+  if (!scene.__undergrowthPlants) scene.__undergrowthPlants = [];
+  scene.__undergrowthPlants.push({ x, baseY, variant });
+  return scene.add.image(x, baseY, `${SOUS_BOIS_TEXTURE_PREFIX}${variant}`)
+    .setOrigin(0.5, 1)
+    .setScale(scale)
+    .setFlipX(flipX);
+}
+
+// Uniquement sur le SOL PRINCIPAL (groundCells), jamais au-dessus d'un vide :
+// une case de sol "de surface" est une case de sol principal sans autre case
+// de sol principal au-dessus -- plateformes d'une seule case d'épaisseur
+// comprises. Le sol de fond (groundBackCells) ne compte PAS comme obstacle
+// (retour utilisateur : "quand y a un sol de fond ça apparaît pas ou
+// derrière" -- la 1re version excluait toute surface avec du sol de fond
+// au-dessus) : ce plan est justement dessiné devant lui. Les cases de
+// surface contiguës d'une même rangée forment un tronçon ; chaque élément
+// doit tenir en entier sur son tronçon (jamais à cheval sur une fosse),
+// avoir la place en hauteur (pas enfoncé dans un plafond de sol principal)
+// et rester hors de l'eau.
+function addUndergrowth(scene, data) {
+  const front = new Set((data.groundCells || []).map(([gx, gy]) => gridCellKey(gx, gy)));
+  const isOpen = (gx, gy) => !front.has(gridCellKey(gx, gy));
+  const water = (data.water || []).map((w) => new Phaser.Geom.Rectangle(w.x, w.y, w.width, w.height));
+
+  const surfaceRows = new Map();
+  for (const [gx, gy] of data.groundCells || []) {
+    if (!isOpen(gx, gy - 1)) continue;
+    if (!surfaceRows.has(gy)) surfaceRows.set(gy, new Set());
+    surfaceRows.get(gy).add(gx);
+  }
+
+  for (const [gy, gxSet] of surfaceRows) {
+    const gxs = [...gxSet].sort((a, b) => a - b);
+    let runStart = 0;
+    for (let i = 1; i <= gxs.length; i++) {
+      if (i < gxs.length && gxs[i] === gxs[i - 1] + 1) continue;
+      scatterUndergrowthOnRun(scene, gxs[runStart], gxs[i - 1], gy, isOpen, water);
+      runStart = i;
+    }
+  }
+}
+
+function scatterUndergrowthOnRun(scene, gxStart, gxEnd, gy, isOpen, water) {
+  const left = gxStart * GROUND_TILE_SIZE + SOUS_BOIS_EDGE_INSET;
+  const right = (gxEnd + 1) * GROUND_TILE_SIZE - SOUS_BOIS_EDGE_INSET;
+  const baseY = gy * GROUND_TILE_SIZE + SOUS_BOIS_SINK;
+
+  const fits = (x, width, height) => {
+    if (x - width / 2 < left || x + width / 2 > right) return false;
+    const rect = new Phaser.Geom.Rectangle(x - width / 2, baseY - height, width, height);
+    if (water.some((w) => Phaser.Geom.Intersects.RectangleToRectangle(rect, w))) return false;
+    const gxFrom = Math.floor(rect.left / GROUND_TILE_SIZE);
+    const gxTo = Math.floor((rect.right - 1) / GROUND_TILE_SIZE);
+    const gyTop = Math.floor(rect.top / GROUND_TILE_SIZE);
+    for (let cgx = gxFrom; cgx <= gxTo; cgx++) {
+      for (let cgy = gyTop; cgy < gy; cgy++) {
+        if (!isOpen(cgx, cgy)) return false;
+      }
+    }
+    return true;
+  };
+
+  const frameOf = (variant) => scene.textures.getFrame(`${SOUS_BOIS_TEXTURE_PREFIX}${variant}`);
+  const place = (x, variant, scale) => addUndergrowthImage(scene, x, baseY, variant, scale, Math.random() < 0.5);
+
+  // Placement "garanti" : toutes les variantes dans un ordre aléatoire, à une
+  // position libre tirée au hasard sur le tronçon, plutôt qu'à la position
+  // imposée par le pas de dispersion -- ne renonce que si AUCUNE variante ne
+  // tient nulle part (plafond trop bas, eau, voisine identique...).
+  const placeAnywhere = () => {
+    const variants = Phaser.Utils.Array.Shuffle([...Array(SOUS_BOIS_COUNT).keys()]);
+    for (const variant of variants) {
+      const frame = frameOf(variant);
+      const scale = SOUS_BOIS_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.15);
+      const width = frame.width * scale;
+      if (width > right - left) continue;
+      for (let attempt = 0; attempt < SOUS_BOIS_FIT_ATTEMPTS; attempt++) {
+        const x = Phaser.Math.FloatBetween(left + width / 2, right - width / 2);
+        if (isUndergrowthVariantNearby(scene, variant, x, baseY)) continue;
+        if (!fits(x, width, frame.height * scale)) continue;
+        place(x, variant, scale);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const runTiles = gxEnd - gxStart + 1;
+  if (runTiles < SOUS_BOIS_SHORT_RUN_TILES) return;
+  if (runTiles < SOUS_BOIS_GUARANTEED_RUN_TILES) {
+    if (Math.random() < SOUS_BOIS_SHORT_RUN_CHANCE) placeAnywhere();
+    return;
+  }
+
+  let placedCount = 0;
+  let x = left + Phaser.Math.Between(0, SOUS_BOIS_SPACING_MIN);
+  while (x < right) {
+    for (let attempt = 0; attempt < SOUS_BOIS_FIT_ATTEMPTS; attempt++) {
+      const variant = pickUndergrowthVariant(scene, [...Array(SOUS_BOIS_COUNT).keys()], x, baseY);
+      const frame = frameOf(variant);
+      const scale = SOUS_BOIS_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.15);
+      if (!fits(x, frame.width * scale, frame.height * scale)) continue;
+      place(x, variant, scale);
+      placedCount++;
+      break;
+    }
+    x += Phaser.Math.Between(SOUS_BOIS_SPACING_MIN, SOUS_BOIS_SPACING_MAX);
+  }
+  if (placedCount === 0) placeAnywhere();
 }
 
 function gridToWorld(gx, gy) {
@@ -1482,6 +2228,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // zone), pour n'empêcher que les déclenchements multiples PENDANT un même
   // passage, jamais les passages suivants.
   scene.__transitioningAway = false;
+  // État « histoire » (PNJ, déclencheurs, verrous de cinématique...) remis à
+  // zéro à chaque visite, cf. StoryKit.js.
+  resetStoryState(scene, data);
 
   const { width, height } = scene.scale;
   const levelWidth = data.levelWidth || width;
@@ -1512,7 +2261,7 @@ function buildLevelFromData(scene, data, sceneData) {
   const levelRightPad = 200;
 
   if (data.decor !== false) {
-    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || []);
+    addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], data.background);
     addCaveCeiling(scene, levelWidth);
   }
   setupDebugToggle(scene);
@@ -1522,9 +2271,18 @@ function buildLevelFromData(scene, data, sceneData) {
   // dans l'éditeur (outil 'ground-back', jamais automatique), rendu AVANT
   // le sol normal pour rester derrière lui -- purement visuel, aucun corps
   // physique (cf. `options.back` dans renderAutotileGrid).
-  renderAutotileGrid(scene, null, data.groundBackCells || [], { back: true });
+  renderAutotileGrid(scene, null, data.groundBackCells || [], { back: true, tileset: data.tileset });
+  // Entre les deux sols : devant le fond, derrière le sol principal (cf.
+  // addUndergrowth). Même condition que le reste du décor générique.
+  // Réutilisée d'une visite à l'autre (même instance de scène, cf.
+  // __transitioningAway plus haut) : repartir d'une liste vide.
+  scene.__undergrowthPlants = [];
+  if (data.decor !== false) addUndergrowth(scene, data);
   scene.ground = scene.physics.add.staticGroup();
-  renderAutotileGrid(scene, scene.ground, data.groundCells || []);
+  // Premier visuel du sol principal : repère pour glisser juste derrière lui
+  // des objets créés plus tard (totems et leurs plantes, cf.
+  // sendBehindFrontGround).
+  scene.__frontGroundFirstImage = renderAutotileGrid(scene, scene.ground, data.groundCells || [], { tileset: data.tileset })[0];
 
   // `scene.water` gardé (comme scene.ground/scene.enemies) : l'overlap qui
   // arme `player.inWater` (cf. Player.js, forme Pieuvre automatique) doit
@@ -1603,8 +2361,19 @@ function buildLevelFromData(scene, data, sceneData) {
   // (donc forcément une frame fantôme d'une zone quittée) est ignorée sans
   // toucher à aucun objet potentiellement détruit.
   currentLevelScene = scene;
+  // `scene.restart()` / sortie de zone : sans ça, update() tournerait sur
+  // l'ancien joueur détruit tant que la nouvelle visite n'a pas fini de se
+  // construire (resolveZoneData est asynchrone).
+  scene.events.once('shutdown', () => {
+    hideBossBar(scene);
+    scene.player = null;
+    scene.xara = null;
+    if (currentLevelScene === scene) currentLevelScene = null;
+  });
   scene.player = new Player(scene, spawn.x, spawn.y);
-  scene.xara = new Xara(scene, scene.player);
+  // Xara peut être absente (`xara: false`, ou zone de l'histoire avant sa
+  // rencontre) : cf. shouldSpawnXara dans StoryKit.js pour la règle.
+  scene.xara = shouldSpawnXara(scene, data) ? new Xara(scene, scene.player) : null;
   scene.physics.add.collider(scene.player, scene.ground);
   scene.cameras.main.startFollow(scene.player, true, 1, 1);
 
@@ -1620,43 +2389,44 @@ function buildLevelFromData(scene, data, sceneData) {
     scene.physics.add.overlap(scene.player, scene.webs, () => { scene.player.inWeb = true; });
   }
 
-  scene.enemies = scene.physics.add.group();
+  // Personnages devant les décors (cf. CHARACTER_DEPTH) : profondeur posée à
+  // l'AJOUT dans le groupe, donc aussi pour les ennemis qu'un script ajoute
+  // plus tard (renforts, mousses invoquées par Ghil't, boss) ; leurs
+  // projectiles/effets créés ensuite à `this.depth + 1` suivent.
+  scene.enemies = scene.physics.add.group({
+    createCallback: (enemy) => { if (enemy && enemy.setDepth) enemy.setDepth(CHARACTER_DEPTH); },
+  });
   for (const e of data.enemies || []) {
-    const patrolMinX = e.patrolMinX ?? e.x - 150;
-    const patrolMaxX = e.patrolMaxX ?? e.x + 150;
-    let enemy = null;
-    if (e.type === 'araignee') enemy = new Araignee(scene, e.x, e.y);
-    else if (e.type === 'loup') enemy = new LoupSanguinaire(scene, e.x, e.y, patrolMinX, patrolMaxX);
-    else if (e.type === 'loupAlpha') enemy = new LoupAlpha(scene, e.x, e.y, patrolMinX, patrolMaxX);
-    else if (e.type === 'corbeau') enemy = new Corbeau(scene, e.x, e.y, patrolMinX, patrolMaxX, e.diveDepth ?? 220);
-    else if (e.type === 'crapaud') enemy = new Crapaud(scene, e.x, e.y);
-    if (enemy) {
-      // `group.add()` réinitialise `body.allowGravity` à `true`, écrasant le
-      // `setAllowGravity(false)` posé dans le constructeur de ces deux
-      // ennemis (fixe/volant) — sans ce rattrapage ils tombent hors du
-      // niveau dès l'ajout au groupe (vérifié : chute mesurée en jeu).
-      scene.enemies.add(enemy);
-      if (e.type === 'araignee' || e.type === 'corbeau') enemy.body.setAllowGravity(false);
-      // L'araignée fixe n'attaque pas au contact (seule sa toile est un
-      // obstacle, cf. Web.js/Zone3Scene d'origine) : sans ce marqueur, le
-      // contact simple avec elle blesserait le joueur comme n'importe quel
-      // autre ennemi via l'overlap générique ci-dessous.
-      if (e.type === 'araignee') enemy.harmless = true;
+    // Registre data-driven (cf. ENEMY_REGISTRY dans StoryKit.js, chaque
+    // fichier d'entité peut s'y enregistrer) à la place de l'ancienne chaîne
+    // if/else par type.
+    const factory = ENEMY_REGISTRY[e.type];
+    if (!factory) {
+      console.warn(`buildLevelFromData : type d'ennemi inconnu "${e.type}"`);
+      continue;
     }
+    const enemy = factory(scene, {
+      ...e,
+      patrolMinX: e.patrolMinX ?? e.x - 150,
+      patrolMaxX: e.patrolMaxX ?? e.x + 150,
+    });
+    if (!enemy) continue;
+    // `group.add()` réinitialise `body.allowGravity` à `true`, écrasant le
+    // `setAllowGravity(false)` posé dans le constructeur des ennemis fixes/
+    // volants — sans ce rattrapage ils tombent hors du niveau dès l'ajout.
+    scene.enemies.add(enemy);
+    if (enemy.noGravity || e.type === 'araignee' || e.type === 'corbeau') enemy.body.setAllowGravity(false);
+    // L'araignée fixe n'attaque pas au contact (seule sa toile gêne).
+    if (e.type === 'araignee' && enemy.harmless === undefined) enemy.harmless = true;
   }
   scene.physics.add.collider(scene.enemies, scene.ground);
+  // Contact des corps : dégâts subis, sauf si la portée de l'attaque couvre
+  // l'ennemi (le coup lui-même est porté par tryPlayerMeleeHit, aussi testé
+  // chaque frame SANS contact dans updateLevelFromData).
   scene.physics.add.overlap(scene.player, scene.enemies, (player, enemy) => {
-    if (player.isInvulnerable || enemy.defeated) return;
-    const hitbox = player.getAttackHitbox();
-    if (hitbox && Phaser.Geom.Intersects.RectangleToRectangle(hitbox, enemy.getBounds())) {
-      enemy.defeat();
-      // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT dans
-      // Player.js) — même règle que le tir de plume (cf. Feather.js), donc
-      // factorisée dans gainEnergy() plutôt que dupliquée ici et là.
-      player.gainEnergy(ENERGY_PER_HIT);
-    } else if (!enemy.harmless) {
-      player.hitByEnemy();
-    }
+    if (player.isInvulnerable || enemy.defeated || isWorldFrozen(scene)) return;
+    if (tryPlayerMeleeHit(scene, player, enemy)) return;
+    if (!enemy.harmless) player.hitByEnemy();
   });
 
   for (const t of data.totems || []) {
@@ -1664,9 +2434,19 @@ function buildLevelFromData(scene, data, sceneData) {
     addAbilityShrine(scene, t.x, y, t.flag, t.message || '', t.scale || TOTEM_SCALE);
   }
 
+  // Gardés dans `scene.props` : un PNJ ou un objet posé SUR un décor (Xara sur
+  // sa souche, l'idole sur son autel) se cale sur le haut visible de l'image
+  // (cf. propTopYAt) plutôt que sur un y écrit à la main.
+  scene.props = [];
   for (const p of data.props || []) {
-    const y = groundSurfaceYAt(scene, p.x, p.y) ?? p.y;
-    scene.add.image(p.x, y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
+    // Surface où l'on MARCHE (haut de la hitbox, cf. GROUND_STAND_SINK :
+    // 16 px sous le haut visuel des tuiles d'herbe avec 'floor', le haut de la
+    // case avec 'tuiles'), pas le haut de l'image de tuile -- sinon, avec
+    // 'floor', les décors flottaient au-dessus de l'herbe.
+    const y = groundStandYAt(scene, p.x, p.y) ?? p.y;
+    const img = scene.add.image(p.x, y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
+    img.propType = p.type;
+    scene.props.push(img);
   }
 
   // Retour utilisateur : "rajoute le feu de camp dans les element
@@ -1691,6 +2471,45 @@ function buildLevelFromData(scene, data, sceneData) {
   scene.__exits = data.exits || (data.exit ? [data.exit] : []);
 
   createHud(scene);
+
+  // Clés de données additionnelles (PNJ, déclencheurs, mousse, script de
+  // zone...) : cf. LEVEL_DATA_HANDLERS dans StoryKit.js / PLAN_DEV.md.
+  runLevelDataHandlers(scene, data);
+  storyOnZoneEnter(scene, data, sceneData);
+}
+
+// Mêlée / piqué de l'aigle contre UN ennemi : vrai si la portée de l'attaque
+// (player.getAttackHitbox) recouvre ses bounds -- qu'il y ait ou non contact
+// des corps (correctif : avant, le coup n'était testé que dans l'overlap des
+// corps, donc la lame d'Agarica ne touchait qu'au corps à corps). Un coup =
+// un seul dégât, même si la fenêtre d'attaque couvre plusieurs frames (token,
+// cf. damageEnemy) ; le piqué de l'aigle frappe au plus toutes les 400 ms.
+function tryPlayerMeleeHit(scene, player, enemy) {
+  if (!enemy || enemy.defeated || !enemy.active) return false;
+  const hitbox = player.getAttackHitbox();
+  if (!hitbox || !Phaser.Geom.Intersects.RectangleToRectangle(hitbox, enemy.getBounds())) return false;
+  const token = player.isAttacking ? `melee-${player.attackEndTime}` : `dive-${Math.floor(scene.time.now / 400)}`;
+  if (damageEnemy(scene, enemy, { kind: player.isAttacking ? 'melee' : 'dive', player, token })) {
+    // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT).
+    player.gainEnergy(ENERGY_PER_HIT);
+  }
+  return true;
+}
+
+// Inflige un coup à un ennemi : `takeHit(source)` s'il existe (ennemis à
+// plusieurs PV, boss), sinon `defeat()`. `source.token` identifie l'attaque
+// (mêlée, plume, compétence) : un même token ne touche qu'une fois le même
+// ennemi -- corrige le Loup Alpha (hp 3) tué en un seul coup, quand la
+// fenêtre de mêlée touchait sur plusieurs frames. Vrai si le coup a porté.
+function damageEnemy(scene, enemy, source = {}) {
+  if (!enemy || enemy.defeated || !enemy.active) return false;
+  if (source.token != null) {
+    if (enemy.__lastHitToken === source.token) return false;
+    enemy.__lastHitToken = source.token;
+  }
+  if (typeof enemy.takeHit === 'function') enemy.takeHit(source);
+  else enemy.defeat();
+  return true;
 }
 
 // Cœurs (cf. HEART_MAX dans Player.js) + barre d'énergie (cf. ENERGY_MAX) :
@@ -1753,6 +2572,9 @@ function createHud(scene) {
 function drawHud(scene) {
   const g = scene.hudGraphics;
   g.clear();
+  // Art Codex (cœurs hud_coeur*, icônes skill_icone_*) : posé en images par
+  // storyDrawHudArt (StoryKit.js, agent UI) ; ici seulement le repli dessiné.
+  const art = typeof storyDrawHudArt === 'function' ? storyDrawHudArt(scene) : null;
   // Construit du HAUT vers le BAS : les cœurs collent au bord haut de
   // l'écran, la barre d'énergie juste en dessous.
   const baseY = HUD_MARGIN;
@@ -1761,7 +2583,7 @@ function drawHud(scene) {
   // ENERGY_MAX) : inclut les bonus de totems équipés (cf.
   // recomputeTotemBonuses dans Player.js), donc la barre/les cœurs
   // s'allongent tout seuls quand un totem "vie"/"énergie" est équipé.
-  for (let i = 0; i < scene.player.maxHearts; i++) {
+  for (let i = 0; !(art && art.hearts) && i < scene.player.maxHearts; i++) {
     const cx = HUD_MARGIN + HUD_HEART_SIZE / 2 + i * (HUD_HEART_SIZE + HUD_HEART_GAP);
     const cy = baseY + HUD_HEART_SIZE / 2;
     const filled = i < scene.player.hearts;
@@ -1783,6 +2605,7 @@ function drawHud(scene) {
   const player = scene.player;
   const now = scene.time.now;
   HUD_SKILL_LABELS.forEach((label, i) => {
+    if (art && art.skills[i]) return; // icône Codex (storyDrawHudArt)
     const cx = HUD_MARGIN + HUD_SKILL_SIZE / 2 + i * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
     const skillId = player.skillSlots[i];
     const def = skillId ? SKILL_DEFS[skillId] : null;
@@ -1817,35 +2640,60 @@ function updateLevelFromData(scene, time, delta) {
   // encore (scene.player/ground/enemies tous undefined). Sans ce retour
   // anticipé, la toute première frame plantait presque à coup sûr sur
   // `scene.player.update()` un peu plus bas.
-  if (!scene.player) return;
-  // CampfireMenuScene active (cf. addCampfire, lancée EN PARALLÈLE plutôt
-  // qu'un flag sur cette scène) : monde entièrement gelé (aucun mouvement
-  // joueur/Xara/ennemi, aucune sortie de zone) tant qu'elle ne s'est pas
-  // arrêtée elle-même (cf. sa propre update()) -- seul le HUD continue
-  // d'être dessiné ici, le menu se dessine lui-même dans sa propre scène.
-  if (!scene.scene.isActive('CampfireMenuScene')) {
+  if (!scene.player || !scene.player.active || !scene.player.body) return;
+  // Monde gelé (cf. isWorldFrozen dans StoryKit.js : menu du feu de camp,
+  // dialogue, inventaire, carte, cinématique) : aucun mouvement joueur/Xara/
+  // ennemi, aucune sortie de zone -- seul le HUD continue d'être dessiné ici,
+  // les overlays se dessinent eux-mêmes dans leur propre scène.
+  if (isWorldFrozen(scene)) {
+    freezeWorldBodies(scene);
+  } else {
     scene.player.update();
-    scene.xara.update(time, delta);
+    if (scene.xara) scene.xara.update(time, delta);
     scene.enemies.children.iterate((enemy) => enemy && enemy.update(scene.player));
+    // Portée de la mêlée testée contre TOUS les ennemis, pas seulement ceux
+    // dont le corps touche Agarica (cf. tryPlayerMeleeHit).
+    if (scene.player.getAttackHitbox()) {
+      scene.enemies.getChildren().slice().forEach((enemy) => tryPlayerMeleeHit(scene, scene.player, enemy));
+    }
 
     // Zone de dégâts d'une compétence active (cf. getSkillHitbox/SKILL_DEFS
     // dans Player.js) : vérifiée manuellement contre TOUS les ennemis, pas
-    // via un `physics.add.overlap` comme l'attaque de mêlée habituelle
-    // ci-dessus — cette zone est bien plus large que le corps d'Agarica
-    // (touche des deux côtés), un ennemi dedans ne serait pas forcément en
-    // contact physique avec elle. `enemy.defeat()` protège déjà contre un
-    // second appel (cf. `this.defeated`), mais le check `!enemy.defeated`
-    // ici évite en plus de créditer de l'énergie plusieurs fois pour le même
-    // ennemi pendant les quelques frames où la fenêtre reste active.
+    // via un `physics.add.overlap` comme l'attaque de mêlée -- cette zone est
+    // bien plus large que le corps d'Agarica. Un seul coup par activation et
+    // par ennemi (token, cf. damageEnemy). La compétence `papillon` soigne
+    // les ennemis corrompus (`heal()`) au lieu de frapper.
     const skillHitbox = scene.player.getSkillHitbox();
     if (skillHitbox) {
+      const skillId = scene.player.activeSkillId;
+      const token = `skill-${skillId}-${scene.player.skillActiveUntil}`;
+      if (scene.__lastSkillEventToken !== token) {
+        scene.__lastSkillEventToken = token;
+        // Pour les boss/scripts hors du groupe `enemies` (Kainati, Ghil't...).
+        scene.events.emit('player-skill', { skillId, rect: skillHitbox, token });
+      }
+      const def = typeof SKILL_DEFS !== 'undefined' ? SKILL_DEFS[skillId] : null;
+      const heals = skillId === 'papillon' || (def && def.heals);
       scene.enemies.children.iterate((enemy) => {
         if (!enemy || enemy.defeated) return;
-        if (Phaser.Geom.Intersects.RectangleToRectangle(skillHitbox, enemy.getBounds())) {
-          enemy.defeat();
+        if (!Phaser.Geom.Intersects.RectangleToRectangle(skillHitbox, enemy.getBounds())) return;
+        if (heals) {
+          if (enemy.corrupted && typeof enemy.heal === 'function' && enemy.__lastHitToken !== token) {
+            enemy.__lastHitToken = token;
+            enemy.heal({ kind: 'skill', skillId, player: scene.player, token });
+          }
+          return;
+        }
+        if (damageEnemy(scene, enemy, { kind: 'skill', skillId, player: scene.player, token })) {
           scene.player.gainEnergy(ENERGY_PER_HIT);
         }
       });
+    }
+
+    // Clés de zone dynamiques (cf. LEVEL_UPDATE_HOOKS, StoryKit.js).
+    for (const hook of LEVEL_UPDATE_HOOKS) {
+      hook(scene, time, delta);
+      if (scene.__transitioningAway) break;
     }
 
     // Plusieurs sorties possibles désormais (cf. scene.__exits) : déclenche
@@ -1902,4 +2750,21 @@ function updateLevelFromData(scene, time, delta) {
   // disparaître au Shift+A/Shift+J pendant que le menu est ouvert.
   drawCombatDebugOverlays(scene);
   drawHud(scene);
+}
+
+// Pendant un gel, la physique continue (gravité) : on coupe l'élan horizontal
+// du joueur (sauf s'il est piloté par une cinématique, cf. playerMove) et
+// celui des ennemis, sinon ils glisseraient sur leur dernière vitesse.
+function freezeWorldBodies(scene) {
+  const player = scene.player;
+  if (player.body && !scene.__playerScripted) player.setVelocityX(0);
+  // L'accélération de course (Player.update) restait appliquée pendant le
+  // gel : Agarica glissait (~30 px/s) pendant un dialogue, jusqu'à tomber
+  // d'un bord de ravin. Player.update la repose à chaque frame une fois dégelé.
+  if (player.body) player.setAccelerationX(0);
+  scene.enemies.children.iterate((enemy) => {
+    if (!enemy || !enemy.body || !enemy.body.enable) return;
+    enemy.body.setVelocityX(0);
+    if (!enemy.body.allowGravity) enemy.body.setVelocityY(0);
+  });
 }

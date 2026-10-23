@@ -1,0 +1,13 @@
+[loup_sanguinaire] découpe de 1 image(s)
+  rangée 0 patrol: 4 frame(s) [OK]
+  rangée 1 charge: 4 frame(s) [OK]
+  rangée 2 bite: 4 frame(s) [OK]
+  canvas uniforme 417x208 -> assets/sprites/loup_sanguinaire_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : loup_sanguinaire
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 292 fichier(s) présent(s).

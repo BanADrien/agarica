@@ -59,6 +59,10 @@ const config = {
     EndScreenScene,
     EditorScene, PlaytestScene,
     CampfireMenuScene,
+    DialogueScene, InventoryScene, MapScene, TitleScene,
+    OptionsScene, ControlsScene, CreditsScene, PauseScene,
+    BosquetScene, ForetSombre1Scene, ForetSombre2Scene, GrandArbreRacinesScene, GrandArbreAreneScene, MondeSpirituelScene, EpreuveSingeScene, ForetFlottante1Scene,
+    ForetFlottante2Scene, ClairierePlanteScene, HutteMorgatScene, ForetCorrompue1Scene, AreneGhiltScene, TrouSombreScene, BosquetRetourScene,
   ],
 };
 

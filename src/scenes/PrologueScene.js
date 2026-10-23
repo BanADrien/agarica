@@ -1,10 +1,12 @@
-// Texte d'intro : brouillon ajustable librement, même traitement que le
-// message de fin (cf. EndScreenScene.js).
+// Prologue de la démo (Nouvelle partie) : le bosquet d'Émeraude face à la
+// mousse toxique, puis BosquetScene. Les lignes apparaissent une à une ;
+// une touche affiche la suivante, puis lance la partie. Texte ajustable.
 const PROLOGUE_LINES = [
-  "La forêt occidentale se meurt sous une lune qui ne se lève plus qu'à moitié.",
-  'Agarica, druidesse du Cercle de la Lune, sent l\'appel des bêtes liées à son âme.',
-  'Xara, sa fidèle compagne, ne la quitte jamais.',
-  "Ensemble, elles partent réveiller les esprits endormis de la forêt...",
+  "Au cœur de la forêt d'Émeraude, un bosquet de druides veille sur les arbres depuis des générations.",
+  'Agarica, jeune druidesse du Cercle de la Lune, y a grandi auprès de son père, le chef du bosquet.',
+  'Mais depuis quelques lunes, une mousse toxique ronge la forêt. On la gratte, on la brûle… elle revient toujours.',
+  'Et les bêtes, autrefois paisibles, deviennent agressives.',
+  'Cette nuit encore, tout le bosquet lutte contre la mousse…',
 ];
 
 class PrologueScene extends Phaser.Scene {
@@ -14,39 +16,46 @@ class PrologueScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-
+    this.__transitioningAway = false;
     fadeInScene(this);
-    addMoonlitDecor(this, width, height, width);
+    addMoonlitDecor(this, width, height, width, [], 'fond_bosquet');
     addCaveCeiling(this, width);
+    this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.6).setOrigin(0);
 
-    this.add.text(width / 2, 90, 'Legend of Agarica', {
-      fontFamily: 'sans-serif',
-      fontSize: '36px',
-      fontStyle: 'bold',
-      color: '#ff9fc9',
-    }).setOrigin(0.5);
+    this.add.text(width / 2, 64, 'Le bosquet d\'Émeraude', {
+      fontFamily: STORY_UI.serif, fontSize: '32px', fontStyle: 'bold', color: '#ffe9f5',
+      stroke: '#15101f', strokeThickness: 6, padding: { x: 20, y: 16 },
+    }).setOrigin(0.5).setShadow(0, 0, '#ff9fc9', 14, true, true);
 
-    this.add.text(width / 2, height / 2 - 20, PROLOGUE_LINES.join('\n\n'), {
-      fontFamily: 'sans-serif',
-      fontSize: '18px',
-      color: '#e8d9ff',
-      align: 'center',
-      lineSpacing: 12,
-      wordWrap: { width: width - 200 },
-    }).setOrigin(0.5, 0.5);
+    this.lineTexts = PROLOGUE_LINES.map((line, i) => this.add.text(width / 2, 130 + i * 62, line, {
+      fontFamily: STORY_UI.serif, fontSize: '19px', color: '#e8d9ff', align: 'center',
+      wordWrap: { width: width - 220 }, lineSpacing: 6,
+    }).setOrigin(0.5, 0).setAlpha(0));
+    this.shownCount = 0;
 
-    const prompt = this.add.text(width / 2, height - 40, 'Appuie sur une touche pour commencer', {
-      fontFamily: 'sans-serif',
-      fontSize: '16px',
-      color: '#a99bd6',
-    }).setOrigin(0.5);
-    this.tweens.add({ targets: prompt, alpha: 0.4, duration: 900, yoyo: true, repeat: -1 });
+    this.prompt = this.add.text(width / 2, height - 30, 'Appuie sur une touche', {
+      fontFamily: 'sans-serif', fontSize: '14px', color: STORY_UI.textSoft,
+    }).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({ targets: this.prompt, alpha: 0.9, duration: 900, yoyo: true, repeat: -1, delay: 800 });
 
-    // Petit délai avant d'écouter le clavier, comme EndScreenScene : évite
-    // qu'une touche encore enfoncée (celle qui a quitté le BootScene) ne
-    // saute le prologue instantanément.
-    this.time.delayedCall(500, () => {
-      this.input.keyboard.once('keydown', () => goToScene(this, 'Zone1Scene'));
-    });
+    this.revealNext();
+    // Défilement automatique doux ; une touche accélère.
+    this.autoTimer = this.time.addEvent({ delay: 2600, loop: true, callback: () => this.revealNext() });
+    // Petit délai avant d'écouter le clavier : la touche qui a validé
+    // « Nouvelle partie » ne doit pas sauter le prologue.
+    this.time.delayedCall(500, () => this.input.keyboard.on('keydown', (e) => { if (!e.repeat) this.advance(); }));
+  }
+
+  revealNext() {
+    if (this.shownCount >= this.lineTexts.length) return false;
+    this.tweens.add({ targets: this.lineTexts[this.shownCount], alpha: 1, duration: 700 });
+    this.shownCount += 1;
+    return true;
+  }
+
+  advance() {
+    if (this.revealNext()) return;
+    this.autoTimer.remove();
+    goToScene(this, 'BosquetScene');
   }
 }

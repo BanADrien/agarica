@@ -1,0 +1,13 @@
+[clak] découpe de 1 image(s)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 scuttle: 4 frame(s) [OK]
+  rangée 2 snap: 4 frame(s) [OK]
+  canvas uniforme 342x246 -> assets/sprites/clak_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : clak
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 264 fichier(s) présent(s).

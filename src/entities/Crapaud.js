@@ -76,7 +76,9 @@ function ensureCrapaudAnimations(scene) {
 // automatiquement rétrécir la hitbox en sens inverse sans code dédié.
 function getCrapaudFrameIndex(sprite) {
   const key = sprite.anims.currentFrame && sprite.anims.currentFrame.textureKey;
-  const match = /crapaud-(\d)/.exec(key || '');
+  // Suffixe numérique final : marche aussi pour les frames du manifest
+  // (`crapaud_corrompu-attack-3`, cf. CrapaudCorrompu.js).
+  const match = /-(\d+)$/.exec(key || '');
   return match ? Number(match[1]) : 0;
 }
 
@@ -107,6 +109,11 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
     ensureCrapaudAnimations(scene);
     super(scene, x, y, 'crapaud-0');
+    // Clés de texture/anims en champs d'instance : CrapaudCorrompu les
+    // remplace par celles de son art (même découpe 5 frames) s'il existe.
+    this.idleTextureKey = 'crapaud-0';
+    this.extendAnimKey = ANIM_CRAPAUD_EXTEND_KEY;
+    this.retractAnimKey = ANIM_CRAPAUD_RETRACT_KEY;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -138,7 +145,7 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
     const now = this.scene.time.now;
 
     if (this.state === 'idle') {
-      this.setTexture('crapaud-0');
+      this.setTexture(this.idleTextureKey);
       this.applyReachBody(0);
       const dx = player.x - this.x;
       // Toujours face à droite (cf. commentaire sur la classe) : n'attaque
@@ -149,7 +156,7 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
         && Math.abs(player.y - this.y) < CRAPAUD_DETECTION_RANGE_Y;
       if (inRange && now - this.lastAttackEndTime > CRAPAUD_ATTACK_COOLDOWN) {
         this.state = 'extending';
-        this.anims.play(ANIM_CRAPAUD_EXTEND_KEY, true);
+        this.anims.play(this.extendAnimKey, true);
       }
       return;
     }
@@ -157,7 +164,7 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
     if (this.state === 'extending') {
       this.applyReachBody(getCrapaudFrameIndex(this));
       const animDone = this.anims.currentAnim
-        && this.anims.currentAnim.key === ANIM_CRAPAUD_EXTEND_KEY
+        && this.anims.currentAnim.key === this.extendAnimKey
         && !this.anims.isPlaying;
       if (animDone) {
         this.state = 'holding';
@@ -170,7 +177,7 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
       this.applyReachBody(CRAPAUD_FRAME_COUNT - 1);
       if (now >= this.stateEndTime) {
         this.state = 'retracting';
-        this.anims.play(ANIM_CRAPAUD_RETRACT_KEY, true);
+        this.anims.play(this.retractAnimKey, true);
       }
       return;
     }
@@ -178,7 +185,7 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
     if (this.state === 'retracting') {
       this.applyReachBody(getCrapaudFrameIndex(this));
       const animDone = this.anims.currentAnim
-        && this.anims.currentAnim.key === ANIM_CRAPAUD_RETRACT_KEY
+        && this.anims.currentAnim.key === this.retractAnimKey
         && !this.anims.isPlaying;
       if (animDone) {
         this.state = 'idle';
@@ -201,6 +208,10 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
       onComplete: () => this.destroy(),
     });
   }
+}
+
+if (typeof ENEMY_REGISTRY !== 'undefined') {
+  ENEMY_REGISTRY.crapaud = (scene, e) => new Crapaud(scene, e.x, e.y);
 }
 
 // Compétence Crapaud, réutilisant les MÊMES frames/anims que l'ennemi

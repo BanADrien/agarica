@@ -18,7 +18,7 @@ Le totem permet a Agarica d'utiliser la forme de deplacement du singe. Cette for
 
 Agarica peut ensuite continuer l'histoire ou revenir faire l'epreuve du singe. Cette course verticale lui demande de maitriser les lianes et la forme du singe. En reussissant, elle obtient le talisman du singe, qui debloque une competence propre au singe. La forme vient du totem ; la competence vient du talisman.
 
-Apres le grand arbre, Agarica rencontre Galter, un ranger halfelin qui cherche l'origine de la mousse. Il lui donne une carte incomplete de la foret et lui indique que la corruption monte vers les hauteurs. Son crabe totem, Clak, apporte une touche comique a leurs rencontres. Galter ne peut pas atteindre les plateformes superieures car il ne saute pas assez haut, ce qui oblige Agarica a poursuivre seule.
+Apres le grand arbre, Agarica rencontre Geralt, un ranger halfelin qui cherche l'origine de la mousse. Il lui donne une carte incomplete de la foret et lui indique que la corruption monte vers les hauteurs. Son crabe totem, Clak, apporte une touche comique a leurs rencontres. Geralt ne peut pas atteindre les plateformes superieures car il ne saute pas assez haut, ce qui oblige Agarica a poursuivre seule.
 
 Dans la foret flottante, Agarica retrouve Amanite. Les deux anciennes amies veulent toujours sauver la foret, mais leurs methodes commencent a diverger. Agarica cherche a comprendre et a soigner, tandis qu'Amanite devient plus radicale et pense que les creatures corrompues doivent etre detruites.
 
@@ -32,7 +32,7 @@ Les papillons lui apportent un bocal contenant l'antidote. Xara lui conseille de
 
 Agarica retourne dans l'arene et utilise la competence du papillon sur Ghil't. La mousse se retire de son corps et le gardien retrouve sa forme. Mais au moment ou Agarica vient de le sauver, Amanite arrive et l'acheve d'un coup de lance. Elle pense avoir elimine une menace, mais elle detruit aussi la preuve qu'une creature corrompue pouvait etre guerie.
 
-Galter arrive peu apres et retourne au bosquet avec Agarica. Il explique au chef qu'Agarica a sauve Ghil't et a trouve un moyen de lutter contre la mousse. Le bosquet comprend alors qu'Amanite n'a pas sauve la foret : elle a seulement acheve la creature apres sa guerison.
+Geralt arrive peu apres et retourne au bosquet avec Agarica. Il explique au chef qu'Agarica a sauve Ghil't et a trouve un moyen de lutter contre la mousse. Le bosquet comprend alors qu'Amanite n'a pas sauve la foret : elle a seulement acheve la creature apres sa guerison.
 
 Furieuse de perdre cette reconnaissance et de voir sa methode condamnee, Amanite quitte le bosquet. Elle devient une future antagoniste, meme si elle pense toujours agir pour proteger la foret. La demo se termine sur cette rupture et sur la revelation que Ghil't n'etait pas la source definitive de la mousse, mais seulement une victime ou un relais d'une corruption plus profonde.
 

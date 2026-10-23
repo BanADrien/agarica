@@ -1,0 +1,12 @@
+[kainati_esprit] découpe de 1 image(s)
+  rangée 0 idle: 4 frame(s) [OK]
+  rangée 1 swing: 4 frame(s) [OK]
+  canvas uniforme 431x397 -> assets/sprites/kainati_esprit_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : kainati_esprit
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 188 fichier(s) présent(s).

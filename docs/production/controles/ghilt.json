@@ -1,0 +1,154 @@
+[
+  {
+    "source": "assets/sprites/ghilt.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      134
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 3,
+        "heights": [
+          322,
+          342,
+          332
+        ],
+        "horizontal_gaps": [
+          73,
+          58
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          327,
+          326,
+          331
+        ],
+        "horizontal_gaps": [
+          67,
+          48
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/ghilt_p2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      132
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 3,
+        "heights": [
+          286,
+          298,
+          287
+        ],
+        "horizontal_gaps": [
+          83,
+          57
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          354,
+          277,
+          270
+        ],
+        "horizontal_gaps": [
+          78,
+          41
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/ghilt_p3.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      79
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 3,
+        "heights": [
+          281,
+          287,
+          268
+        ],
+        "horizontal_gaps": [
+          62,
+          40
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          398,
+          422,
+          283
+        ],
+        "horizontal_gaps": [
+          121,
+          91
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/ghilt_p4.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      221
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 3,
+        "heights": [
+          287,
+          283,
+          283
+        ],
+        "horizontal_gaps": [
+          107,
+          92
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          209,
+          208,
+          210
+        ],
+        "horizontal_gaps": [
+          65,
+          67
+        ]
+      }
+    ]
+  }
+]

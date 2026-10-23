@@ -18,6 +18,12 @@ le bouton "Télécharger pour le projet") et les câble dans index.html/
 main.js -- l'équivalent du téléchargement + copier-coller à la main, fait
 automatiquement à chaque sauvegarde.
 
+Garde-fous (zones de l'histoire écrites à la main) : la scène n'est créée
+que si elle n'existe pas encore (jamais réécrite) ; un fichier de données
+existant est d'abord copié dans src/data/_backup/ (horodaté), la sauvegarde
+est refusée si une de ses clés de premier niveau manque dans les données
+envoyées, et seule l'instruction `const NOM_DATA = {...};` est remplacée.
+
 Usage (à la place de `python -m http.server`) :
 
     python tools/dev_server.py [port, défaut 8791]
@@ -39,6 +45,7 @@ import http.server
 import json
 import re
 import sys
+import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -46,6 +53,12 @@ INDEX_HTML = REPO_ROOT / 'index.html'
 MAIN_JS = REPO_ROOT / 'src' / 'main.js'
 DATA_DIR = REPO_ROOT / 'src' / 'data'
 SCENES_DIR = REPO_ROOT / 'src' / 'scenes'
+# Copies de sécurité des fichiers de données AVANT chaque écrasement (cf.
+# write_data_file) -- les zones de l'histoire sont écrites à la main
+# (commentaires, helpers groundRow...) et l'éditeur ne sait réécrire que du
+# JSON : on ne perd jamais l'original. Les N plus récentes par zone sont gardées.
+BACKUP_DIR = DATA_DIR / '_backup'
+BACKUPS_KEPT_PER_ZONE = 20
 
 
 def sanitize_level_name(raw):
@@ -80,6 +93,167 @@ def build_zone_files(safe_name, data):
         f"  update(time, delta) {{\n    updateLevelFromData(this, time, delta);\n  }}\n}}\n"
     )
     return const_name, scene_class, data_content, scene_content
+
+
+def _skip_string_or_comment(src, i):
+    """Si `src[i]` ouvre une chaîne ('"`) ou un commentaire (// /*), renvoie
+    l'index juste après sa fin ; sinon None. Suffisant pour les fichiers de
+    zone (pas de regex littérales dans ces fichiers)."""
+    c = src[i]
+    if c in '\'"`':
+        j = i + 1
+        while j < len(src):
+            if src[j] == '\\':
+                j += 2
+                continue
+            if src[j] == c:
+                return j + 1
+            j += 1
+        return len(src)
+    if src.startswith('//', i):
+        j = src.find('\n', i)
+        return len(src) if j < 0 else j + 1
+    if src.startswith('/*', i):
+        j = src.find('*/', i + 2)
+        return len(src) if j < 0 else j + 2
+    return None
+
+
+def find_const_object_span(src, const_name):
+    """(début, fin) de l'instruction `const NOM = { ... };` dans un fichier
+    de zone (fin = après le `;` éventuel), ou None si introuvable."""
+    m = re.search(rf'(^|\n)\s*const\s+{re.escape(const_name)}\s*=\s*', src)
+    if not m:
+        return None
+    start = m.start() if m.group(1) == '' else m.start() + 1
+    i = m.end()
+    if i >= len(src) or src[i] != '{':
+        return None
+    depth = 0
+    while i < len(src):
+        skipped = _skip_string_or_comment(src, i)
+        if skipped is not None:
+            i = skipped
+            continue
+        c = src[i]
+        if c in '{[(':
+            depth += 1
+        elif c in '}])':
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                k = end
+                while k < len(src) and src[k] in ' \t':
+                    k += 1
+                if k < len(src) and src[k] == ';':
+                    end = k + 1
+                return start, end
+        i += 1
+    return None
+
+
+def top_level_keys(src, span):
+    """Clés de premier niveau de l'objet littéral `src[span]` (identifiants
+    ou chaînes suivis de ':' , ou raccourcis `{ a, b }`). Sert de garde-fou :
+    une sauvegarde ne doit jamais faire disparaître une clé du fichier."""
+    start, end = span
+    i = src.index('{', start)
+    keys = []
+    depth = 0
+    prev_sig = ''
+    while i < end:
+        skipped = _skip_string_or_comment(src, i)
+        if skipped is not None:
+            if depth == 1 and prev_sig in '{,' and src[i] in '\'"':
+                # Clé entre guillemets : 'nom': ...
+                k = skipped
+                while k < end and src[k] in ' \t\r\n':
+                    k += 1
+                if k < end and src[k] == ':':
+                    keys.append(src[i + 1:skipped - 1])
+            if src[i] in '\'"`':
+                prev_sig = 's'
+            i = skipped
+            continue
+        c = src[i]
+        if c in ' \t\r\n':
+            i += 1
+            continue
+        if c in '{[(':
+            depth += 1
+            prev_sig = c
+            i += 1
+            continue
+        if c in '}])':
+            depth -= 1
+            prev_sig = c
+            i += 1
+            continue
+        if depth == 1 and prev_sig in '{,' and (c.isalpha() or c in '_$'):
+            j = i
+            while j < end and (src[j].isalnum() or src[j] in '_$'):
+                j += 1
+            k = j
+            while k < end and src[k] in ' \t\r\n':
+                k += 1
+            if k < end and src[k] in ':,}':
+                keys.append(src[i:j])
+            prev_sig = 'i'
+            i = j
+            continue
+        prev_sig = c
+        i += 1
+    return keys
+
+
+def backup_file(path, safe_name):
+    """Copie `path` dans src/data/_backup/<nom>_data.<horodatage>.js.bak et
+    ne garde que les BACKUPS_KEPT_PER_ZONE plus récentes de cette zone."""
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    dest = BACKUP_DIR / f'{safe_name}_data.{stamp}.js.bak'
+    n = 1
+    while dest.exists():
+        n += 1
+        dest = BACKUP_DIR / f'{safe_name}_data.{stamp}-{n}.js.bak'
+    dest.write_bytes(path.read_bytes())
+    olds = sorted(BACKUP_DIR.glob(f'{safe_name}_data.*.js.bak'), key=lambda p: p.stat().st_mtime)
+    for old in olds[:-BACKUPS_KEPT_PER_ZONE]:
+        old.unlink()
+    return dest
+
+
+def write_data_file(path, safe_name, const_name, data, force=False):
+    """Écrit le fichier de données de la zone en toute sécurité :
+    - fichier absent : créé (format JSON de l'éditeur) ;
+    - fichier présent : refus si une clé de premier niveau du fichier manque
+      dans `data` (sauf `force`), copie de sécurité horodatée, puis SEULE
+      l'instruction `const NOM_DATA = {...};` est remplacée -- commentaires
+      d'en-tête et constantes annexes (ex. ZONE3_SURFACE_Y) restent en place.
+    Renvoie (écrit: bool, chemin_backup | None)."""
+    json_literal = json.dumps(data, indent=2, ensure_ascii=False)
+    statement = f'const {const_name} = {json_literal};'
+    if not path.exists():
+        path.write_text(statement + '\n', encoding='utf-8')
+        return True, None
+    original = path.read_text(encoding='utf-8')
+    span = find_const_object_span(original, const_name)
+    if span is not None:
+        # `exit` (ancien format singulier) est converti en `exits` par l'éditeur.
+        missing = [k for k in top_level_keys(original, span)
+                   if k not in data and not (k == 'exit' and 'exits' in data)]
+        if missing and not force:
+            raise RuntimeError(
+                f'Sauvegarde refusée : ces clés de {path.name} manquent dans les données envoyées '
+                f'(elles seraient perdues) : {", ".join(missing)}')
+        updated = original[:span[0]] + statement + original[span[1]:]
+    else:
+        updated = statement + '\n'
+    if updated == original:
+        return False, None
+    backup = backup_file(path, safe_name)
+    path.write_text(updated, encoding='utf-8')
+    return True, backup
 
 
 def insert_after_last_match(html, pattern, insertion):
@@ -140,19 +314,36 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             safe_name = sanitize_level_name(payload['name'])
             data = payload['data']
 
-            const_name, scene_class, data_content, scene_content = build_zone_files(safe_name, data)
+            if not isinstance(data, dict):
+                raise RuntimeError('données de zone invalides (objet attendu)')
+
+            const_name, scene_class, _data_content, scene_content = build_zone_files(safe_name, data)
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             SCENES_DIR.mkdir(parents=True, exist_ok=True)
             data_rel = f'src/data/{safe_name}_data.js'
             scene_rel = f'src/scenes/{scene_class}.js'
-            (REPO_ROOT / data_rel).write_text(data_content, encoding='utf-8')
-            (REPO_ROOT / scene_rel).write_text(scene_content, encoding='utf-8')
+            data_written, backup = write_data_file(
+                REPO_ROOT / data_rel, safe_name, const_name, data, force=bool(payload.get('force')))
+            # Scène : créée SEULEMENT si absente -- une scène existante peut
+            # contenir une logique spécifique (Zone4Scene, Zone2Scene...) que
+            # le gabarit générique effacerait.
+            scene_path = REPO_ROOT / scene_rel
+            scene_created = not scene_path.exists()
+            if scene_created:
+                scene_path.write_text(scene_content, encoding='utf-8')
 
             newly_wired = ensure_script_tags(data_rel, scene_rel)
             newly_wired = ensure_scene_registered(scene_class) or newly_wired
 
-            print(f'[dev_server] wrote {data_rel} + {scene_rel}' + (' (newly wired, reload the page once)' if newly_wired else ''))
-            body = json.dumps({'ok': True, 'sceneClass': scene_class, 'newlyWired': newly_wired}).encode('utf-8')
+            backup_rel = backup.relative_to(REPO_ROOT).as_posix() if backup else None
+            print(f'[dev_server] {data_rel}: ' + ('écrit' if data_written else 'inchangé')
+                  + (f' (copie de sécurité : {backup_rel})' if backup_rel else '')
+                  + (f' ; scène créée : {scene_rel}' if scene_created else '')
+                  + (' (nouvelle zone câblée, recharger la page une fois)' if newly_wired else ''))
+            body = json.dumps({
+                'ok': True, 'sceneClass': scene_class, 'newlyWired': newly_wired,
+                'dataWritten': data_written, 'backup': backup_rel, 'sceneCreated': scene_created,
+            }).encode('utf-8')
         except Exception as e:  # noqa: BLE001 -- renvoyer l'erreur au client plutôt que planter le serveur
             print(f'[dev_server] /__save_zone failed: {e}')
             body = json.dumps({'ok': False, 'error': str(e)}).encode('utf-8')

@@ -48,11 +48,20 @@ const EDITOR_TOTEM_TYPES = [
   { value: 'hasEagleForm', label: 'Aigle' },
   { value: 'hasOctopusForm', label: 'Pieuvre' },
 ];
+// Tous les types de ENEMY_REGISTRY (cf. PLAN_DEV.md) : couleur/lettre du
+// marqueur, `patrol` = reçoit patrolMinX/patrolMaxX (x±150) à la pose.
 const EDITOR_ENEMY_TYPES = [
-  { value: 'araignee', label: 'Araignée (fixe)' },
-  { value: 'loup', label: 'Loup sanguinaire (patrouille)' },
-  { value: 'corbeau', label: 'Corbeau (patrouille + piqué)' },
+  { value: 'araignee', label: 'Araignée (fixe)', color: 0xcc4477, letter: 'A' },
+  { value: 'loup', label: 'Loup sanguinaire (patrouille)', color: 0x8888ff, letter: 'L', patrol: true },
+  { value: 'loupAlpha', label: 'Loup alpha (boss, 3 PV)', color: 0x4455dd, letter: 'Lα', patrol: true },
+  { value: 'corbeau', label: 'Corbeau (patrouille + piqué)', color: 0x6644aa, letter: 'C', patrol: true },
+  { value: 'crapaud', label: 'Crapaud (fixe, langue)', color: 0x55aa55, letter: 'Cr' },
+  { value: 'mousse_creature', label: 'Créature de mousse (corrompue)', color: 0x7fdc3a, letter: 'M', patrol: true },
+  { value: 'singe_corrompu', label: 'Singe corrompu (lance des pierres)', color: 0xc9a040, letter: 'S', patrol: true },
+  { value: 'crapaud_corrompu', label: 'Crapaud corrompu', color: 0x9bff5a, letter: 'Cc' },
+  { value: 'ghilt', label: "Ghil't (boss)", color: 0xff5533, letter: 'G' },
 ];
+const EDITOR_ENEMY_BY_TYPE = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t) => [t.value, t]));
 const EDITOR_DEFAULT_TOTEM_MESSAGE = "Une nouvelle capacité s'éveille en toi.";
 const EDITOR_ENEMY_PATROL_HALF_WIDTH = 150;
 const EDITOR_MARKER_HIT_RADIUS = 26;
@@ -68,8 +77,256 @@ const EDITOR_GROUND_SNAPPED_KINDS = new Set(['totem', 'campfire', 'prop']);
 const EDITOR_SCALE_STEP = 0.03;
 const EDITOR_MIN_SCALE = 0.08;
 const EDITOR_MAX_SCALE = 2.5;
-const EDITOR_ENEMY_MARKER_COLORS = { araignee: 0xcc4477, loup: 0x8888ff, corbeau: 0x6644aa };
-const EDITOR_ENEMY_MARKER_LABELS = { araignee: 'A', loup: 'L', corbeau: 'C' };
+const EDITOR_ENEMY_MARKER_COLORS = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t) => [t.value, t.color]));
+const EDITOR_ENEMY_MARKER_LABELS = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t) => [t.value, t.letter]));
+
+// PNJ proposés par l'outil PNJ (ids du manifest, cf. asset_manifest.js) ;
+// EDITOR_NPC_DEFAULTS : champs posés à la place de `{id}` pour un sprite
+// dont l'id de PNJ diffère (Xara = PNJ `xara`, remplacé par le vrai
+// compagnon par l'étape {xaraJoin}).
+const EDITOR_NPC_IDS = [
+  'xara_extra', 'pere_chef', 'amanite', 'habitant_druide', 'habitant_porteur', 'habitant_garde',
+  'geralt', 'clak', 'morgat', 'kainati', 'kainati_esprit', 'ghilt', 'ghilt_gueri',
+];
+const EDITOR_NPC_DEFAULTS = { xara_extra: { id: 'xara', sprite: 'xara_extra' } };
+// Objets d'ITEM_MANIFEST qui ne sont pas des objets ramassables (UI, fonds...).
+const EDITOR_NON_PICKUP_ITEM = /^(hud_|fond_|portrait_|skill_icone|form_icone|dialogue_box|titre_logo|carte_parchemin|totem_monkey|liane$|mousse_|porte_mousse|courant_air)/;
+const EDITOR_ANIMAL_TYPES = [
+  { value: 'cochons', label: 'Bébés cochons (x3, au sol)' },
+  { value: 'poissons', label: 'Poissons (x3, rectangle d\'eau)' },
+  { value: 'papillons', label: 'Papillons (nuée)' },
+];
+// Clés de zone éditées par le panneau « Propriétés de la zone » (cf.
+// syncZonePropsUI) -- toutes les autres clés inconnues de l'éditeur sont
+// conservées telles quelles (Object.assign dans applyLevelData) et listées.
+const EDITOR_ZONE_PROP_KEYS = ['zoneName', 'background', 'tileset', 'xara', 'script', 'tallLevel'];
+const EDITOR_MIN_RECT = 16;
+
+// Éléments de l'histoire (clés de PLAN_DEV.md), tous gérés par le même code
+// générique : pose (point / rectangle glissé / ligne horizontale / liane),
+// marqueur (couleur + étiquette), sélection, déplacement (outil Modifier),
+// molette (taille), suppression, round-trip. Chaque définition :
+//   key     : tableau de la donnée de zone ;
+//   shape   : 'point' (clic), 'rect' (glisser), 'hline' (glisser horizontal),
+//             'vine' (clic = attache, glisser vers le bas = longueur) ;
+//   create(ed, geom, subtype) -> entrée (ou null si annulé) ;
+//   draw(ed, entry) -> objets Phaser (le 1er sert au test de clic/contour) ;
+//   anchor(ed, entry) -> {x, y} ; move(ed, entry, x, y) ; wheel?(entry, sign).
+// Conventions de coordonnées : cf. PLAN_DEV.md (centre pour triggers/
+// mousse, coin haut-gauche pour windCurrents/poissons, grille pour
+// hiddenPlatforms, y absent = posé au sol au runtime).
+// Pieds d'un PNJ dans l'aperçu : `onProp` -> haut visible du décor sous lui,
+// comme au runtime (cf. storyNpcFootY dans StoryKit.js) ; sinon y ou le sol.
+function editorNpcFootY(ed, e) {
+  if (e.onProp) {
+    const props = ed.markers.filter((m) => m.kind === 'prop').map((m) => Object.assign(m.obj[0], { propType: m.entry.type }));
+    const top = propTopYAt({ props }, e.x, e.onProp === true ? null : e.onProp);
+    if (top != null) return top;
+  }
+  return e.y != null ? e.y : ed.groundYOr(e.x, 400);
+}
+
+const EDITOR_STORY_KINDS = {
+  npc: {
+    key: 'npcs', shape: 'point', label: 'PNJ',
+    create(ed, g, subtype) {
+      const base = { ...(EDITOR_NPC_DEFAULTS[subtype] || { id: subtype }) };
+      const sameId = (ed.data.npcs || []).filter((n) => (n.key || n.id) === base.id || n.id === base.id).length;
+      if (sameId) base.key = `${base.id}_${sameId + 1}`;
+      const talk = window.prompt(`Dialogue/cinématique du PNJ "${base.id}" (id de DIALOGUES ou CUTSCENES, vide = aucun) :`, '');
+      const entry = { ...base, x: Math.round(g.x), y: ed.snapY(g.x, g.y) };
+      if (talk && talk.trim()) entry.talk = talk.trim();
+      return entry;
+    },
+    draw(ed, e) {
+      const y = editorNpcFootY(ed, e);
+      const sprite = addManifestSprite(ed, e.x, y, e.sprite || e.id, e.anim || 'idle');
+      if (e.facing === 'left') sprite.setFlipX(true);
+      const talk = typeof e.talk === 'string' ? e.talk : (e.talk ? '(conditionnel)' : '—');
+      return [sprite, ed.markerLabel(e.x, y - sprite.displayHeight - 10, `PNJ ${e.key || e.id} : ${talk}`, '#ffe08a')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: editorNpcFootY(ed, e) }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = ed.snapY(x, y); },
+  },
+  trigger: {
+    defaultSize: { w: 128, h: 192 },
+    key: 'triggers', shape: 'rect', label: 'Déclencheur',
+    create(ed, g) {
+      const n = (ed.data.triggers || []).length + 1;
+      const cutscene = window.prompt('Cinématique lancée (id de CUTSCENES) :', '');
+      if (cutscene === null) return null;
+      return {
+        id: `t${n}`, x: Math.round(g.x + g.w / 2), y: Math.round(g.y + g.h / 2), w: Math.round(g.w), h: Math.round(g.h), cutscene: cutscene.trim(),
+      };
+    },
+    draw(ed, e) {
+      const full = e.y == null || e.h == null;
+      const w = e.w || 64;
+      const h = full ? EDITOR_WORLD_BOTTOM - EDITOR_WORLD_TOP : e.h;
+      const cy = full ? (EDITOR_WORLD_TOP + EDITOR_WORLD_BOTTOM) / 2 : e.y;
+      const rect = ed.add.rectangle(e.x, cy, w, h, 0xff9933, 0.18).setStrokeStyle(2, 0xffb366, 0.9);
+      const label = `Déclencheur ${e.id != null ? e.id : ''} → ${e.cutscene || '?'}${e.once === false ? ' (rejouable)' : ''}`;
+      return [rect, ed.markerLabel(e.x, (full ? 60 : cy - h / 2) - 10, label, '#ffb366')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: e.y != null && e.h != null ? e.y : 270 }),
+    move(ed, e, x, y) { e.x = Math.round(x); if (e.y != null && e.h != null) e.y = Math.round(y); },
+  },
+  pickup: {
+    key: 'pickups', shape: 'point', label: 'Objet',
+    create: (ed, g, subtype) => ({ item: subtype, x: Math.round(g.x), y: Math.round(g.y) }),
+    draw(ed, e) {
+      const y = e.y != null ? e.y : ed.groundYOr(e.x, 400) - 30;
+      const icon = addItemIcon(ed, e.x, y, e.item, 34);
+      const ring = ed.add.circle(e.x, y, 20, 0xffe066, 0.15).setStrokeStyle(1, 0xffe066, 0.8);
+      return [icon, ring, ed.markerLabel(e.x, y - 30, `Objet : ${e.item}`, '#ffe066')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: e.y != null ? e.y : ed.groundYOr(e.x, 400) - 30 }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = Math.round(y); },
+  },
+  mossBlock: {
+    defaultSize: { w: 96, h: 96 },
+    key: 'mossBlocks', shape: 'rect', label: 'Amas de mousse',
+    create: (ed, g) => ({ x: Math.round(g.x + g.w / 2), y: ed.mossClickY(g), w: Math.round(g.w), h: Math.round(g.h) }),
+    draw: (ed, e) => ed.drawMossMarker(e, 96, 0x3e7a2c, `Amas de mousse${e.id != null ? ` ${e.id}` : ''} (ours)`),
+    anchor: (ed, e) => ed.mossCenter(e, 96),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = Math.round(y); },
+  },
+  mossWall: {
+    defaultSize: { w: 96, h: 192 },
+    key: 'mossWalls', shape: 'rect', label: 'Mur de mousse',
+    create(ed, g) {
+      const n = (ed.data.mossWalls || []).length + 1;
+      const id = window.prompt('Identifiant du mur de mousse (flag mosswall_<zone>_<id>) :', `mur${n}`);
+      if (id === null) return null;
+      return {
+        id: id.trim() || `mur${n}`, x: Math.round(g.x + g.w / 2), y: ed.mossClickY(g), w: Math.round(g.w), h: Math.round(g.h),
+      };
+    },
+    draw: (ed, e) => ed.drawMossMarker(e, 192, 0x2a5a24, `Mur de mousse ${e.id || ''} (répulsif)`),
+    anchor: (ed, e) => ed.mossCenter(e, 192),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = Math.round(y); },
+  },
+  checkpoint: {
+    key: 'checkpoints', shape: 'point', label: 'Checkpoint',
+    create: (ed, g) => ({ x: Math.round(g.x), y: ed.snapY(g.x, g.y) }),
+    draw(ed, e) {
+      const y = e.y != null ? e.y : ed.groundYOr(e.x, 400);
+      const post = ed.add.rectangle(e.x, y - 15, 18, 30, 0x2b2440, 1).setStrokeStyle(2, 0x9bffd0, 0.9);
+      return [post, ed.markerLabel(e.x, y - 40, 'Checkpoint', '#9bffd0')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: (e.y != null ? e.y : ed.groundYOr(e.x, 400)) - 15 }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = ed.snapY(x, y + 15); },
+  },
+  vine: {
+    key: 'vines', shape: 'vine', label: 'Liane',
+    create: (ed, g) => ({ x: Math.round(g.x), y: Math.round(g.y), length: Math.round(g.length) }),
+    draw(ed, e) {
+      const len = e.length || 200;
+      const line = ed.add.rectangle(e.x, e.y + len / 2, 6, len, 0x5fae3a, 0.85).setStrokeStyle(1, 0xb6f08a, 0.9);
+      const knot = ed.add.circle(e.x, e.y, 6, 0xb6f08a, 1);
+      return [line, knot, ed.markerLabel(e.x, e.y - 12, `Liane ${len}px`, '#b6f08a')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: e.y }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = Math.round(y); },
+    wheel(e, sign) { e.length = Math.max(32, (e.length || 200) + sign * 16); },
+  },
+  track: {
+    defaultSize: { w: 192, h: 0 },
+    key: 'tracks', shape: 'hline', label: 'Piste de loup',
+    create: (ed, g) => ({ x: Math.round(g.x), y: ed.snapY(g.x + g.w / 2, g.y), w: Math.round(g.w) }),
+    draw(ed, e) {
+      const w = e.w || 200;
+      const rect = ed.add.rectangle(e.x + w / 2, e.y - 4, w, 8, 0xc08850, 0.6).setStrokeStyle(1, 0xffd0a0, 0.9);
+      return [rect, ed.markerLabel(e.x + w / 2, e.y - 18, 'Piste (loup)', '#ffd0a0')];
+    },
+    anchor: (ed, e) => ({ x: e.x + (e.w || 200) / 2, y: e.y - 4 }),
+    move(ed, e, x, y) { const w = e.w || 200; e.x = Math.round(x - w / 2); e.y = ed.snapY(x, y + 4); },
+    wheel(e, sign) { e.w = Math.max(32, (e.w || 200) + sign * 32); },
+  },
+  hiddenPlatform: {
+    defaultSize: { w: 192, h: 0 },
+    key: 'hiddenPlatforms', shape: 'hline', label: 'Plateforme cachée',
+    create(ed, g) {
+      const a = worldToGrid(g.x, g.y);
+      const b = worldToGrid(g.x + g.w, g.y);
+      return { gx: a.gx, gy: a.gy, w: Math.max(1, b.gx - a.gx + 1) };
+    },
+    draw(ed, e) {
+      const T = GROUND_TILE_SIZE;
+      const w = (e.w || 1) * T;
+      const rect = ed.add.rectangle(e.gx * T + w / 2, e.gy * T + T / 2, w, T, 0x8a6a3a, 0.25).setStrokeStyle(2, 0xd9b27a, 0.8);
+      return [rect, ed.markerLabel(e.gx * T + w / 2, e.gy * T - 10, `Plateforme cachée (${e.w} case(s), loup)`, '#d9b27a')];
+    },
+    anchor: (ed, e) => ({ x: e.gx * GROUND_TILE_SIZE + ((e.w || 1) * GROUND_TILE_SIZE) / 2, y: e.gy * GROUND_TILE_SIZE + GROUND_TILE_SIZE / 2 }),
+    move(ed, e, x, y) {
+      const left = x - ((e.w || 1) * GROUND_TILE_SIZE) / 2;
+      e.gx = Math.round(left / GROUND_TILE_SIZE);
+      e.gy = Math.floor(y / GROUND_TILE_SIZE);
+    },
+    wheel(e, sign) { e.w = Math.max(1, (e.w || 1) + sign); },
+  },
+  windCurrent: {
+    defaultSize: { w: 160, h: 320 },
+    key: 'windCurrents', shape: 'rect', label: "Courant d'air",
+    create: (ed, g) => ({ x: Math.round(g.x), y: Math.round(g.y), w: Math.round(g.w), h: Math.round(g.h), force: 320 }),
+    draw(ed, e) {
+      const rect = ed.add.rectangle(e.x + e.w / 2, e.y + e.h / 2, e.w, e.h, 0x88ddff, 0.15).setStrokeStyle(2, 0xbff0ff, 0.8);
+      return [rect, ed.markerLabel(e.x + e.w / 2, e.y - 10, `Courant d'air ↑ ${e.force || 320}`, '#bff0ff')];
+    },
+    anchor: (ed, e) => ({ x: e.x + e.w / 2, y: e.y + e.h / 2 }),
+    move(ed, e, x, y) { e.x = Math.round(x - e.w / 2); e.y = Math.round(y - e.h / 2); },
+  },
+  animal: {
+    key: 'animals', shape: 'point', label: 'Animaux',
+    create(ed, g, subtype) {
+      if (subtype === 'poissons') return { type: 'poissons', x: Math.round(g.x), y: Math.round(g.y), w: 200, h: 60 };
+      if (subtype === 'papillons') return { type: 'papillons', x: Math.round(g.x), y: Math.round(g.y), count: 6, w: 80 };
+      return { type: 'cochons', x: Math.round(g.x), y: ed.snapY(g.x, g.y), w: 180 };
+    },
+    draw(ed, e) {
+      if (e.type === 'poissons') {
+        const w = e.w || 200;
+        const h = e.h || 60;
+        const rect = ed.add.rectangle(e.x + w / 2, e.y + h / 2, w, h, 0x3399cc, 0.2).setStrokeStyle(1, 0x99ddff, 0.9);
+        return [rect, ed.markerLabel(e.x + w / 2, e.y - 10, 'Poissons x3', '#99ddff')];
+      }
+      if (e.type === 'papillons') {
+        const w = e.w || 80;
+        const c = ed.add.circle(e.x, e.y, w / 2, 0xffaaee, 0.15).setStrokeStyle(1, 0xffccf4, 0.9);
+        return [c, ed.markerLabel(e.x, e.y - w / 2 - 10, `Papillons x${e.count || 6}`, '#ffccf4')];
+      }
+      const w = e.w || 180;
+      const y = e.y != null ? e.y : ed.groundYOr(e.x, 400);
+      const rect = ed.add.rectangle(e.x, y - 12, w, 24, 0xf0a0a0, 0.25).setStrokeStyle(1, 0xffc8c8, 0.9);
+      return [rect, ed.markerLabel(e.x, y - 34, `Cochons x3 (${e.type})`, '#ffc8c8')];
+    },
+    anchor(ed, e) {
+      if (e.type === 'poissons') return { x: e.x + (e.w || 200) / 2, y: e.y + (e.h || 60) / 2 };
+      if (e.type === 'papillons') return { x: e.x, y: e.y };
+      return { x: e.x, y: (e.y != null ? e.y : ed.groundYOr(e.x, 400)) - 12 };
+    },
+    move(ed, e, x, y) {
+      if (e.type === 'poissons') { e.x = Math.round(x - (e.w || 200) / 2); e.y = Math.round(y - (e.h || 60) / 2); return; }
+      if (e.type === 'papillons') { e.x = Math.round(x); e.y = Math.round(y); return; }
+      e.x = Math.round(x); e.y = ed.snapY(x, y + 12);
+    },
+    wheel(e, sign) {
+      if (e.type === 'papillons') e.count = Math.max(1, (e.count || 6) + sign);
+      else e.w = Math.max(40, (e.w || 180) + sign * 20);
+    },
+  },
+  web: {
+    key: 'webs', shape: 'point', label: 'Toile',
+    create: (ed, g) => ({ x: Math.round(g.x), y: ed.snapY(g.x, g.y) - 11 }),
+    draw(ed, e) {
+      const rect = ed.add.rectangle(e.x, e.y, 70, 22, 0xe8e8ff, 0.35).setStrokeStyle(1, 0xffffff, 0.9);
+      return [rect, ed.markerLabel(e.x, e.y - 20, 'Toile', '#e8e8ff')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: e.y }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = ed.snapY(x, y + 11) - 11; },
+  },
+};
+const EDITOR_STORY_KIND_BY_KEY = Object.fromEntries(Object.entries(EDITOR_STORY_KINDS).map(([k, d]) => [d.key, k]));
 
 // Outils qui posent un point d'un coup de clic (pas de peinture/glisser).
 // 'portal' (cf. plus bas, outil clic-glisser -- pose une ligne verticale
@@ -267,9 +524,7 @@ class EditorScene extends Phaser.Scene {
       return;
     }
     const snapshot = JSON.parse(this.undoStack.pop());
-    const remaining = this.undoStack;
-    this.applyLevelData(snapshot);
-    this.undoStack = remaining;
+    this.rebuildFromData(snapshot);
     EditorScene.setStatus(`Action annulée (${this.undoStack.length} encore possible(s)).`);
   }
 
@@ -346,6 +601,12 @@ class EditorScene extends Phaser.Scene {
       this.portalDragStart = { x: p.x, y: p.y };
       return;
     }
+    const storyDef = EDITOR_STORY_KINDS[this.tool];
+    if (storyDef) {
+      if (storyDef.shape === 'point') this.placeStoryElement(this.tool, { x: p.x, y: p.y });
+      else this.shapeDragStart = { x: p.x, y: p.y };
+      return;
+    }
     if (this.tool === 'delete') {
       // Retour utilisateur : "ne peux pas etre maintenu pour supprimer tout
       // ce que je touche" -- un seul snapshot pour tout le glisser (même
@@ -361,7 +622,8 @@ class EditorScene extends Phaser.Scene {
       const marker = this.findMarkerNear(p.x, p.y);
       this.selectMarker(marker);
       if (marker) {
-        this.modifyDragOffset = { x: p.x - marker.entry.x, y: p.y - marker.entry.y };
+        const a = this.markerAnchor(marker);
+        this.modifyDragOffset = { x: p.x - a.x, y: p.y - a.y };
         this.modifyDragPushed = false;
       }
       return;
@@ -383,6 +645,8 @@ class EditorScene extends Phaser.Scene {
       this.updateWaterPreview(p.x, p.y);
     } else if (this.tool === 'portal' && this.portalDragStart) {
       this.updatePortalPreview(p.x, p.y);
+    } else if (this.shapeDragStart && EDITOR_STORY_KINDS[this.tool]) {
+      this.updateShapePreview(p.x, p.y);
     } else if (this.tool === 'delete') {
       this.deleteNear(p.x, p.y);
     } else if (this.tool === 'modify' && this.selectedMarker && this.modifyDragOffset) {
@@ -404,6 +668,11 @@ class EditorScene extends Phaser.Scene {
       const p = this.worldPointFromPointer(pointer);
       this.finishPortalDrag(p.x, p.y);
     }
+    if (this.shapeDragStart && EDITOR_STORY_KINDS[this.tool]) {
+      const p = this.worldPointFromPointer(pointer);
+      this.finishShapeDrag(p.x, p.y);
+    }
+    this.shapeDragStart = null;
     this.modifyDragOffset = null;
     this.waterDragStart = null;
     this.portalDragStart = null;
@@ -464,8 +733,11 @@ class EditorScene extends Phaser.Scene {
 
   redrawGround() {
     for (const img of this.groundImages) img.destroy();
-    const backImages = renderAutotileGrid(this, null, this.data.groundBackCells, { back: true });
-    const frontImages = renderAutotileGrid(this, null, this.data.groundCells);
+    // Même jeu de tuiles que dans le jeu (clé de zone `tileset`, cf.
+    // autotileLayoutFor) : un jeu de biome change le rendu ET sa disposition.
+    const tileset = this.data.tileset;
+    const backImages = renderAutotileGrid(this, null, this.data.groundBackCells, { back: true, tileset });
+    const frontImages = renderAutotileGrid(this, null, this.data.groundCells, { tileset });
     this.groundImages = [...backImages, ...frontImages];
     EditorScene.setStatus(`${this.data.groundCells.length} case(s) de sol, ${this.data.groundBackCells.length} arrière-plan`);
   }
@@ -665,10 +937,10 @@ class EditorScene extends Phaser.Scene {
       // statique pour l'aperçu éditeur -- l'animation de flammes en
       // continu (ensureCampfireAnimation) n'est posée qu'au runtime par
       // addCampfire, pas ici (l'éditeur n'affiche jamais d'animation).
-      // + CAMPFIRE_SINK : même enfoncement que addCampfire (les bûches
-      // débordent sous le cadre découpé), pour que l'aperçu ne mente pas --
+      // + PROP_GROUND_SINK : addCampfire pose les bûches sur la surface de
+      // marche (haut de la hitbox), comme les props -- l'aperçu ne ment pas,
       // même raison que TOTEM_GROUND_SINK pour l'outil Totem juste au-dessus.
-      const obj = this.add.image(worldX, y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE);
+      const obj = this.add.image(worldX, y + PROP_GROUND_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE);
       this.markers.push({ kind: 'campfire', entry, obj: [obj], sourceArray: this.data.campfires });
       return;
     }
@@ -689,7 +961,7 @@ class EditorScene extends Phaser.Scene {
     if (this.tool === 'enemy') {
       const type = this.subtype;
       const entry = { type, x: worldX, y: worldY };
-      if (type !== 'araignee') {
+      if (EDITOR_ENEMY_BY_TYPE[type] && EDITOR_ENEMY_BY_TYPE[type].patrol) {
         entry.patrolMinX = worldX - EDITOR_ENEMY_PATROL_HALF_WIDTH;
         entry.patrolMaxX = worldX + EDITOR_ENEMY_PATROL_HALF_WIDTH;
       }
@@ -708,9 +980,129 @@ class EditorScene extends Phaser.Scene {
       const y = this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY;
       const entry = { type, x: worldX, y, scale: PROP_SCALE };
       this.data.props.push(entry);
-      const obj = this.add.image(worldX, y, `${PROP_PREFIX}${type}`).setOrigin(0.5, 1).setScale(PROP_SCALE);
+      const obj = this.add.image(worldX, y + PROP_GROUND_SINK, `${PROP_PREFIX}${type}`).setOrigin(0.5, 1).setScale(PROP_SCALE);
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
+  }
+
+  // --- Éléments de l'histoire (cf. EDITOR_STORY_KINDS) ---
+
+  // Géométrie d'un glisser selon la forme de l'outil ; un simple clic (glisser
+  // négligeable) prend la taille par défaut de l'outil.
+  shapeGeometry(kind, x1, y1) {
+    const def = EDITOR_STORY_KINDS[kind];
+    const s = this.shapeDragStart;
+    if (!Number.isFinite(x1) || !Number.isFinite(y1)) { x1 = s.x; y1 = s.y; }
+    if (def.shape === 'vine') {
+      const dy = y1 - s.y;
+      return { x: s.x, y: s.y, length: dy < EDITOR_MIN_RECT ? 200 : dy };
+    }
+    const size = def.defaultSize || { w: 96, h: 96 };
+    let x = Math.min(s.x, x1);
+    let y = Math.min(s.y, y1);
+    let w = Math.abs(x1 - s.x);
+    let h = Math.abs(y1 - s.y);
+    if (def.shape === 'hline') {
+      if (w < EDITOR_MIN_RECT) { x = s.x; w = size.w; }
+      return { x, y: s.y, w, h: 0 };
+    }
+    if (w < EDITOR_MIN_RECT || h < EDITOR_MIN_RECT) {
+      w = size.w; h = size.h; x = s.x - w / 2; y = s.y - h / 2;
+      return { x, y, w, h, clicked: true };
+    }
+    return { x, y, w, h };
+  }
+
+  updateShapePreview(worldX, worldY) {
+    if (this.shapePreview) this.shapePreview.destroy();
+    const g = this.shapeGeometry(this.tool, worldX, worldY);
+    if (EDITOR_STORY_KINDS[this.tool].shape === 'vine') {
+      this.shapePreview = this.add.rectangle(g.x, g.y + g.length / 2, 6, g.length, 0x5fae3a, 0.5);
+    } else {
+      this.shapePreview = this.add.rectangle(g.x + g.w / 2, g.y + g.h / 2, g.w, Math.max(g.h, 6), 0xffffff, 0.15)
+        .setStrokeStyle(1, 0xffffff, 0.8);
+    }
+  }
+
+  finishShapeDrag(worldX, worldY) {
+    if (this.shapePreview) { this.shapePreview.destroy(); this.shapePreview = null; }
+    this.placeStoryElement(this.tool, this.shapeGeometry(this.tool, worldX, worldY));
+  }
+
+  // Crée l'entrée (cf. def.create, qui peut demander un champ via prompt()
+  // et renvoyer null = annulé), l'ajoute au tableau de la donnée (créé au
+  // besoin) et pose son marqueur.
+  placeStoryElement(kind, geom) {
+    const def = EDITOR_STORY_KINDS[kind];
+    const snapshot = JSON.stringify(this.data);
+    const entry = def.create(this, geom, this.subtype);
+    if (!entry) return null;
+    this.undoStack.push(snapshot);
+    if (this.undoStack.length > EDITOR_UNDO_MAX) this.undoStack.shift();
+    if (!Array.isArray(this.data[def.key])) this.data[def.key] = [];
+    this.data[def.key].push(entry);
+    const marker = this.addStoryMarker(kind, entry);
+    EditorScene.setStatus(`${def.label} ajouté(e) (${def.key}).`);
+    return marker;
+  }
+
+  addStoryMarker(kind, entry) {
+    const def = EDITOR_STORY_KINDS[kind];
+    const marker = { kind, entry, obj: def.draw(this, entry), sourceArray: this.data[def.key] };
+    this.markers.push(marker);
+    return marker;
+  }
+
+  // Redessine un marqueur après modification de son entrée (déplacement,
+  // molette, propriétés) -- plus simple et plus sûr que de recaler chaque
+  // objet un à un.
+  redrawMarker(m) {
+    for (const o of m.obj) o.destroy();
+    const def = EDITOR_STORY_KINDS[m.kind];
+    if (def) m.obj = def.draw(this, m.entry);
+  }
+
+  // Point de référence d'un marqueur (test de clic, glisser de l'outil Modifier).
+  markerAnchor(m) {
+    const def = EDITOR_STORY_KINDS[m.kind];
+    if (def) return def.anchor(this, m.entry);
+    if (m.kind === 'water') return { x: m.entry.x + m.entry.width / 2, y: m.entry.y + m.entry.height / 2 };
+    return { x: m.entry.x, y: m.entry.y != null ? m.entry.y : (m.displayY ?? 0) };
+  }
+
+  snapY(x, y) {
+    return Math.round(this.groundSurfaceYAtGrid(x, y) ?? y);
+  }
+
+  groundYOr(x, fallback) {
+    return this.groundSurfaceYAtGrid(x, fallback) ?? fallback;
+  }
+
+  markerLabel(x, y, text, color) {
+    return this.add.text(x, y, text, {
+      fontFamily: 'sans-serif', fontSize: '11px', color, backgroundColor: 'rgba(13,11,26,0.6)', padding: { x: 3, y: 1 },
+    }).setOrigin(0.5, 1).setDepth(500);
+  }
+
+  // Mousse : x, y = CENTRE ; y absent = posée sur le sol (cf. mossRect dans StoryKit).
+  mossCenter(e, defaultH) {
+    const h = e.h || defaultH;
+    return { x: e.x, y: e.y != null ? e.y : this.groundYOr(e.x, 400) - h / 2 };
+  }
+
+  // Centre vertical d'une mousse posée : un simple clic la pose SUR le sol
+  // sous le point cliqué (au lieu de la centrer sur le clic, à moitié enterrée).
+  mossClickY(g) {
+    const cy = g.y + g.h / 2;
+    return g.clicked ? Math.round(this.snapY(g.x + g.w / 2, cy) - g.h / 2) : Math.round(cy);
+  }
+
+  drawMossMarker(e, defaultH, color, label) {
+    const w = e.w || 96;
+    const h = e.h || defaultH;
+    const c = this.mossCenter(e, defaultH);
+    const rect = this.add.rectangle(c.x, c.y, w, h, color, 0.55).setStrokeStyle(2, 0x9bff5a, 0.8);
+    return [rect, this.markerLabel(c.x, c.y - h / 2 - 4, label, '#9bff5a')];
   }
 
   addMarkerVisual(x, y, color, label) {
@@ -745,8 +1137,7 @@ class EditorScene extends Phaser.Scene {
     for (const m of this.markers) {
       // Sortie : plus une ligne verticale (cf. placeAt), un point comme
       // les autres -- même calcul de proximité, plus de cas particulier.
-      const p = m.kind === 'water' ? { x: m.entry.x + m.entry.width / 2, y: m.entry.y + m.entry.height / 2 }
-        : { x: m.entry.x, y: m.entry.y };
+      const p = this.markerAnchor(m);
       const d = Phaser.Math.Distance.Between(worldX, worldY, p.x, p.y);
       const primary = m.obj[0];
       const hitsBounds = primary && primary.getBounds ? primary.getBounds().contains(worldX, worldY) : false;
@@ -787,6 +1178,7 @@ class EditorScene extends Phaser.Scene {
   selectMarker(marker) {
     this.selectedMarker = marker || null;
     this.updateSelectionVisual();
+    EditorScene.syncSelectionUI(this);
   }
 
   // Rectangle en pointillés jaunes autour des bounds RÉELS de l'image
@@ -809,6 +1201,32 @@ class EditorScene extends Phaser.Scene {
     const m = this.selectedMarker;
     if (!m) return;
     const entry = m.entry;
+    const storyDef = EDITOR_STORY_KINDS[m.kind];
+    if (storyDef) {
+      storyDef.move(this, entry, worldX, worldY);
+      this.redrawMarker(m);
+      this.updateSelectionVisual();
+      return;
+    }
+    if (m.kind === 'water') {
+      entry.x = Math.round(worldX - entry.width / 2);
+      entry.y = Math.round(worldY - entry.height / 2);
+      m.obj[0].setPosition(entry.x + entry.width / 2, entry.y + entry.height / 2);
+      this.updateSelectionVisual();
+      return;
+    }
+    if (m.kind === 'portal' || m.kind === 'exit' || m.kind === 'entry') {
+      // Portail : la sortie ET son entrée jumelle bougent ensemble, étiquette comprise.
+      entry.x = Math.round(worldX);
+      entry.y = Math.round(worldY);
+      if (m.pairEntry) { m.pairEntry.x = entry.x; m.pairEntry.y = entry.y; }
+      for (const o of m.obj) o.destroy();
+      const build = m.kind === 'portal' ? EditorScene.buildPortalVisual : m.kind === 'exit' ? EditorScene.buildExitVisual : EditorScene.buildEntryVisual;
+      const { obj, label } = build(this, entry);
+      m.obj = [obj, label];
+      this.updateSelectionVisual();
+      return;
+    }
     entry.x = worldX;
     entry.y = EDITOR_GROUND_SNAPPED_KINDS.has(m.kind)
       ? (this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY)
@@ -817,7 +1235,10 @@ class EditorScene extends Phaser.Scene {
     if (m.kind === 'totem') {
       m.obj[0].setPosition(entry.x, entry.y + TOTEM_GROUND_SINK);
     } else if (m.kind === 'campfire') {
-      m.obj[0].setPosition(entry.x, entry.y + CAMPFIRE_SINK);
+      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK);
+    } else if (m.kind === 'prop') {
+      // Même surface que dans le jeu (cf. groundStandYAt / PROP_GROUND_SINK).
+      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK);
     } else if (m.kind === 'enemy') {
       m.obj[0].setPosition(entry.x, entry.y);
       // obj[1] (s'il existe) : bande de patrouille, recentrée avec lui pour
@@ -841,7 +1262,21 @@ class EditorScene extends Phaser.Scene {
   // n'en fournit pas de fiable).
   handleModifyWheel(deltaY) {
     const m = this.selectedMarker;
-    if (this.tool !== 'modify' || !m || !EDITOR_RESIZABLE_KINDS.has(m.kind)) return;
+    if (this.tool !== 'modify' || !m) return;
+    // Éléments de l'histoire : molette = longueur/largeur/nombre (cf. def.wheel).
+    const storyDef = EDITOR_STORY_KINDS[m.kind];
+    if (storyDef) {
+      if (!storyDef.wheel) return;
+      if (!this.modifyResizePushed) { this.pushUndo(); this.modifyResizePushed = true; }
+      clearTimeout(this.modifyResizeTimer);
+      this.modifyResizeTimer = setTimeout(() => { this.modifyResizePushed = false; }, 600);
+      storyDef.wheel(m.entry, -Math.sign(deltaY));
+      this.redrawMarker(m);
+      this.updateSelectionVisual();
+      EditorScene.syncSelectionUI(this);
+      return;
+    }
+    if (!EDITOR_RESIZABLE_KINDS.has(m.kind)) return;
     if (!this.modifyResizePushed) {
       this.pushUndo();
       this.modifyResizePushed = true;
@@ -861,9 +1296,57 @@ class EditorScene extends Phaser.Scene {
     this.updateSelectionVisual();
   }
 
+  // Bouton « Propriétés… » (outil Modifier) : le champ principal de
+  // l'élément via prompt() (talk d'un PNJ, cinématique d'un déclencheur,
+  // id d'un mur de mousse, force d'un courant d'air...) ; sinon JSON complet.
+  editSelectedProperties() {
+    const m = this.selectedMarker;
+    if (!m) return;
+    const field = {
+      npc: 'talk', trigger: 'cutscene', mossWall: 'id', mossBlock: 'id', windCurrent: 'force', pickup: 'item', vine: 'length',
+    }[m.kind];
+    if (!field || (field === 'talk' && m.entry.talk && typeof m.entry.talk !== 'string')) {
+      this.editSelectedJSON();
+      return;
+    }
+    const current = m.entry[field] != null ? String(m.entry[field]) : '';
+    const answer = window.prompt(`${field} (vide = retirer le champ) :`, current);
+    if (answer === null) return;
+    this.pushUndo();
+    const v = answer.trim();
+    if (!v) delete m.entry[field];
+    else m.entry[field] = (field === 'force' || field === 'length') && Number.isFinite(Number(v)) ? Number(v) : v;
+    this.rebuildFromData(this.data, m.entry);
+  }
+
+  // Édition libre de l'entrée sélectionnée en JSON (requires/forbids, once,
+  // anim, facing, hp...) -- les champs absents de l'UI restent éditables.
+  editSelectedJSON() {
+    const m = this.selectedMarker;
+    if (!m) return;
+    const answer = window.prompt('Propriétés (JSON) :', JSON.stringify(m.entry));
+    if (answer === null) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(answer);
+    } catch (e) {
+      EditorScene.setStatus('JSON invalide, rien modifié.');
+      return;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      EditorScene.setStatus('Un objet JSON est attendu, rien modifié.');
+      return;
+    }
+    this.pushUndo();
+    for (const k of Object.keys(m.entry)) delete m.entry[k];
+    Object.assign(m.entry, parsed);
+    this.rebuildFromData(this.data, m.entry);
+  }
+
   setTool(tool) {
     this.tool = tool;
     this.lastPaintedCell = null;
+    this.shapeDragStart = null;
     // Changer d'outil quitte le mode Modifier : le contour de sélection ne
     // doit pas rester affiché pendant qu'un autre outil est utilisé.
     if (tool !== 'modify') this.selectMarker(null);
@@ -879,7 +1362,12 @@ class EditorScene extends Phaser.Scene {
     for (const img of this.groundImages) img.destroy();
     for (const m of this.markers) { for (const o of m.obj) o.destroy(); }
     if (this.waterPreview) this.waterPreview.destroy();
+    if (this.shapePreview) { this.shapePreview.destroy(); this.shapePreview = null; }
     this.groundImages = [];
+    // Clés présentes dans la donnée chargée (cf. applyLevelData /
+    // serializeLevelData) : null = niveau neuf, toutes les clés par défaut gardées.
+    this.originalKeys = null;
+    this.loadedUnsafePaths = [];
     this.markers = [];
     // `this.markers` vient d'être vidé (tous les objets détruits) : une
     // sélection en cours (outil 'modify') pointerait sinon vers un marqueur
@@ -916,7 +1404,15 @@ class EditorScene extends Phaser.Scene {
   // navigateur (jamais de sélecteur de dossier), pas une écriture directe.
   async exportLevel() {
     const safeName = EditorScene.sanitizeLevelName(EditorScene.getLevelNameInput());
-    const snapshot = JSON.parse(JSON.stringify(this.data));
+    // Garde-fou : une zone écrite à la main peut contenir des fonctions
+    // (ex. `talk` conditionnel) qu'une copie JSON perdrait -- ni brouillon
+    // (il masquerait le fichier au runtime) ni écriture disque dans ce cas.
+    const unsafe = [...(this.loadedUnsafePaths || []), ...EditorScene.unsafePathsForZone(safeName)];
+    if (unsafe.length) {
+      EditorScene.setStatus(`Enregistrement refusé : la zone contient des valeurs non-JSON (${[...new Set(unsafe)].join(', ')}) que l'éditeur perdrait. Modifie ce fichier à la main.`);
+      return;
+    }
+    const snapshot = this.serializeLevelData();
     try {
       await EditorScene.idbPutZone(safeName, snapshot);
     } catch (e) {
@@ -925,12 +1421,19 @@ class EditorScene extends Phaser.Scene {
     }
     const result = await EditorScene.syncZoneToProjectServer(safeName, snapshot);
     if (result && result.ok) {
+      const backup = result.backup ? ` Ancienne version copiée dans ${result.backup}.` : '';
       EditorScene.setStatus(result.newlyWired
-        ? `Enregistré ET écrit dans le projet : "${safeName}" (${result.sceneClass}). Nouvelle zone : rafraîchis la page une fois pour la voir en mode de base.`
-        : `Enregistré ET mis à jour dans le projet : "${safeName}" (${result.sceneClass}).`);
+        ? `Enregistré ET écrit dans le projet : "${safeName}" (${result.sceneClass}).${backup} Nouvelle zone : rafraîchis la page une fois pour la voir en mode de base.`
+        : `Enregistré ET mis à jour dans le projet : "${safeName}" (${result.sceneClass}).${backup}`);
+      EditorScene.refreshZoneQuickSelect(safeName);
+      return;
+    }
+    if (result && result.error) {
+      EditorScene.setStatus(`Brouillon enregistré, mais le fichier du projet n'a PAS été écrit : ${result.error}`);
       return;
     }
     EditorScene.setStatus(`Enregistré : "${safeName}" (ouvre "Zones" pour la voir/la télécharger pour le projet).`);
+    EditorScene.refreshZoneQuickSelect(safeName);
   }
 
   // Retour utilisateur : "pourtant pour les sol ça se met bien a jour dans
@@ -961,6 +1464,17 @@ class EditorScene extends Phaser.Scene {
     } catch (e) {
       return null;
     }
+  }
+
+  // Écrit une zone modifiée HORS de l'éditeur (écran Zones : connexion/
+  // déconnexion de portails) : mêmes garde-fous que exportLevel.
+  static async saveZoneSafely(name, data) {
+    const unsafe = EditorScene.unsafePathsForZone(name);
+    if (unsafe.length) throw new Error(`"${name}" contient des valeurs non-JSON (${unsafe.join(', ')}), modifie-la à la main`);
+    await EditorScene.idbPutZone(name, data);
+    const result = await EditorScene.syncZoneToProjectServer(name, data);
+    if (result && result.ok === false) throw new Error(`fichier non écrit : ${result.error}`);
+    return result;
   }
 
   // "zone2" -> "Zone2" ; "sous_grotte" -> "SousGrotte" -- pour nommer la
@@ -1008,6 +1522,19 @@ class EditorScene extends Phaser.Scene {
     });
   }
 
+  // « Oublier le brouillon » (écran Zones) : un brouillon IndexedDB masque
+  // le fichier de la zone au runtime (resolveZoneData) -- à supprimer quand
+  // le fichier écrit à la main doit reprendre la main.
+  static async idbDeleteZone(name) {
+    const db = await EditorScene.openEditorDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(EDITOR_IDB_ZONES_STORE, 'readwrite');
+      tx.objectStore(EDITOR_IDB_ZONES_STORE).delete(name);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
   static async idbGetAllZoneNames() {
     const db = await EditorScene.openEditorDB();
     return new Promise((resolve, reject) => {
@@ -1021,9 +1548,15 @@ class EditorScene extends Phaser.Scene {
   // dans LA PAGE ACTUELLE, cf. index.html) -- lu directement sur le DOM de
   // la page en cours, jamais sur le disque : aucun accès fichier requis
   // pour savoir qu'elles existent.
+  // Seuls les fichiers `*_data.js` sont des zones (pas asset_manifest.js...) ;
+  // les zones de l'histoire (DEMO_ZONES, StoryKit) sont toujours incluses.
   static listKnownRealZoneNames() {
-    return Array.from(document.querySelectorAll('script[src^="src/data/"]'))
-      .map((s) => s.getAttribute('src').replace('src/data/', '').replace(/_data\.js$/, ''));
+    const fromScripts = Array.from(document.querySelectorAll('script[src^="src/data/"]'))
+      .map((s) => s.getAttribute('src').replace('src/data/', ''))
+      .filter((f) => /_data\.js$/.test(f))
+      .map((f) => f.replace(/_data\.js$/, ''));
+    const story = typeof DEMO_ZONES !== 'undefined' ? DEMO_ZONES.map((z) => z.zone) : [];
+    return [...new Set([...story, ...fromScripts])];
   }
 
   // Génère le contenu des deux fichiers (données + scène) pour une zone --
@@ -1078,7 +1611,9 @@ class EditorScene extends Phaser.Scene {
     try {
       const parsed = await this.fetchZoneData(name);
       this.applyLevelData(parsed);
-      EditorScene.setStatus(`Chargé : ${name}.`);
+      this.loadedUnsafePaths = EditorScene.unsafePathsForZone(name);
+      const extra = EditorScene.unmanagedKeys(this.data);
+      EditorScene.setStatus(`Chargé : ${name}.${extra.length ? ` Clés conservées sans édition : ${extra.join(', ')}.` : ''}${this.loadedUnsafePaths.length ? ' ATTENTION : valeurs non-JSON, enregistrement désactivé.' : ''}`);
       const nameInput = document.getElementById('level-name-input');
       if (nameInput) nameInput.value = name;
     } catch (e) {
@@ -1199,11 +1734,15 @@ class EditorScene extends Phaser.Scene {
   // chaîne à re-parser).
   applyLevelData(parsed) {
     this.newLevel();
+    // Object.assign : TOUTES les clés de `parsed` sont gardées, y compris
+    // celles que l'éditeur ne sait pas afficher (script, kainatiArena,
+    // ambient, fall...) -- elles repartent telles quelles à la sauvegarde.
     this.data = Object.assign(EditorScene.emptyLevelData(), parsed);
+    this.originalKeys = new Set(Object.keys(parsed));
     // Zones plus anciennes (jamais retouchées depuis l'éditeur, cf.
     // buildLevelFromData dans LevelKit.js pour la même normalisation côté
     // jeu) : `exit` singulier -> `exits` tableau d'un seul élément.
-    if (!parsed.exits && parsed.exit) this.data.exits = [parsed.exit];
+    if (!parsed.exits && parsed.exit) { this.data.exits = [parsed.exit]; this.originalKeys.add('exits'); }
     delete this.data.exit;
     this.refreshWorldBounds();
     this.redrawGround();
@@ -1226,12 +1765,12 @@ class EditorScene extends Phaser.Scene {
       this.markers.push({ kind: 'enemy', entry, obj: extras, sourceArray: this.data.enemies });
     }
     for (const entry of this.data.props) {
-      const obj = this.add.image(entry.x, entry.y, `${PROP_PREFIX}${entry.type}`).setOrigin(0.5, 1).setScale(entry.scale || PROP_SCALE);
+      const obj = this.add.image(entry.x, entry.y + PROP_GROUND_SINK, `${PROP_PREFIX}${entry.type}`).setOrigin(0.5, 1).setScale(entry.scale || PROP_SCALE);
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
     for (const entry of this.data.campfires) {
       // `entry.scale` : cf. le commentaire équivalent sur les totems ci-dessus.
-      const obj = this.add.image(entry.x, entry.y + CAMPFIRE_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(entry.scale || CAMPFIRE_SCALE);
+      const obj = this.add.image(entry.x, entry.y + PROP_GROUND_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(entry.scale || CAMPFIRE_SCALE);
       this.markers.push({ kind: 'campfire', entry, obj: [obj], sourceArray: this.data.campfires });
     }
     for (const entry of this.data.water) {
@@ -1253,19 +1792,21 @@ class EditorScene extends Phaser.Scene {
     const claimedEntryIds = new Set();
     for (const entry of this.data.exits) {
       // Anciennes sorties (format `exit` singulier, jamais de `y`/`height`
-      // stockés -- cf. normalisation plus haut) : retombe sur le sol réel
-      // sous ce x, hauteur par défaut.
-      if (entry.y == null) entry.y = this.groundSurfaceYAtGrid(entry.x, 400) ?? 400;
+      // stockés -- cf. normalisation plus haut) : AFFICHÉES sur le sol réel
+      // sous ce x, sans écrire ce `y` dans la donnée (round-trip exact ;
+      // sans `height`, la sortie reste une colonne pleine hauteur en jeu).
+      const displayY = entry.y != null ? entry.y : (this.groundSurfaceYAtGrid(entry.x, 400) ?? 400);
+      const shown = entry.y != null ? entry : { ...entry, y: displayY };
       const pairEntry = entry.portalId ? this.data.entries.find((e) => e.id === entry.portalId) : null;
       if (pairEntry) {
         claimedEntryIds.add(pairEntry.id);
-        const { obj, label } = EditorScene.buildPortalVisual(this, entry);
+        const { obj, label } = EditorScene.buildPortalVisual(this, shown);
         this.markers.push({
-          kind: 'portal', entry, pairEntry, obj: [obj, label], sourceArray: this.data.exits,
+          kind: 'portal', entry, pairEntry, displayY, obj: [obj, label], sourceArray: this.data.exits,
         });
       } else {
-        const { obj, label } = EditorScene.buildExitVisual(this, entry);
-        this.markers.push({ kind: 'exit', entry, obj: [obj, label], sourceArray: this.data.exits });
+        const { obj, label } = EditorScene.buildExitVisual(this, shown);
+        this.markers.push({ kind: 'exit', entry, displayY, obj: [obj, label], sourceArray: this.data.exits });
       }
     }
     for (const entry of this.data.entries) {
@@ -1273,7 +1814,73 @@ class EditorScene extends Phaser.Scene {
       const { obj, label } = EditorScene.buildEntryVisual(this, entry);
       this.markers.push({ kind: 'entry', entry, obj: [obj, label], sourceArray: this.data.entries });
     }
+    // Éléments de l'histoire (npcs, triggers, pickups, mousse, lianes...).
+    // Une entrée illisible (champ manquant, sprite inconnu) ne doit jamais
+    // empêcher de charger la zone : elle reste dans la donnée, juste sans marqueur.
+    for (const [kind, def] of Object.entries(EDITOR_STORY_KINDS)) {
+      const list = this.data[def.key];
+      if (!Array.isArray(list)) continue;
+      for (const entry of list) {
+        if (!entry || typeof entry !== 'object') continue;
+        try {
+          this.addStoryMarker(kind, entry);
+        } catch (e) {
+          console.warn(`Éditeur : marqueur ${def.key} illisible`, entry, e);
+        }
+      }
+    }
     EditorScene.syncUIFromScene(this);
+  }
+
+  // Reconstruit tous les marqueurs depuis `this.data` sans perdre
+  // l'historique d'annulation ni les clés d'origine (annuler, édition de
+  // propriétés) ; resélectionne l'entrée `keepEntry` si fournie.
+  rebuildFromData(data, keepEntry = null) {
+    const remaining = this.undoStack;
+    const originalKeys = this.originalKeys;
+    const unsafe = this.loadedUnsafePaths;
+    this.applyLevelData(data);
+    this.undoStack = remaining;
+    this.originalKeys = originalKeys;
+    this.loadedUnsafePaths = unsafe;
+    if (keepEntry) this.selectMarker(this.markers.find((m) => m.entry === keepEntry) || null);
+  }
+
+  // Donnée prête à sauvegarder : copie JSON de `this.data`, sans les clés
+  // par défaut de l'éditeur restées vides qui n'existaient pas dans la zone
+  // chargée (pas de `water: []`, `helpText: ''`... ajoutés à une zone écrite
+  // à la main). Toutes les autres clés, connues ou non, sont conservées.
+  serializeLevelData() {
+    const out = JSON.parse(JSON.stringify(this.data));
+    if (!this.originalKeys) return out;
+    const defaults = EditorScene.emptyLevelData();
+    for (const k of Object.keys(defaults)) {
+      if (this.originalKeys.has(k)) continue;
+      const v = out[k];
+      if (v === null || v === '' || (Array.isArray(v) && v.length === 0)) delete out[k];
+    }
+    for (const [k, v] of Object.entries(out)) {
+      if (!this.originalKeys.has(k) && Array.isArray(v) && v.length === 0 && EDITOR_STORY_KIND_BY_KEY[k]) delete out[k];
+    }
+    return out;
+  }
+
+  // Chemins des valeurs qu'une copie JSON perdrait ou altérerait (fonctions,
+  // NaN/Infinity) -- ex. `talk: (scene, npc) => ...` d'un PNJ écrit à la main.
+  // Sauvegarder une telle zone depuis l'éditeur la casserait : refusé.
+  static nonJsonPaths(value, path = '', out = []) {
+    if (typeof value === 'function') out.push(path || '(racine)');
+    else if (typeof value === 'number' && !Number.isFinite(value)) out.push(path);
+    else if (value && typeof value === 'object') {
+      for (const [k, v] of Object.entries(value)) EditorScene.nonJsonPaths(v, path ? `${path}.${k}` : k, out);
+    }
+    return out;
+  }
+
+  // Valeurs non-JSON de la VRAIE zone `name` (const chargée par <script>).
+  static unsafePathsForZone(name) {
+    const existing = EditorScene.readGlobalConst(`${name.toUpperCase()}_DATA`);
+    return existing === undefined ? [] : EditorScene.nonJsonPaths(existing);
   }
 
   startPlaytest() {
@@ -1350,6 +1957,18 @@ class EditorScene extends Phaser.Scene {
     let labelText = '';
     if (tool === 'totem') { options = EDITOR_TOTEM_TYPES; labelText = 'Forme'; }
     else if (tool === 'enemy') { options = EDITOR_ENEMY_TYPES; labelText = 'Ennemi'; }
+    else if (tool === 'npc') {
+      const manifest = typeof ASSET_MANIFEST !== 'undefined' ? ASSET_MANIFEST : {};
+      options = EDITOR_NPC_IDS.filter((id) => manifest[id]).map((id) => ({ value: id, label: (EDITOR_NPC_DEFAULTS[id] || {}).id || id }));
+      labelText = 'PNJ (sprite du manifest)';
+    } else if (tool === 'pickup') {
+      const ids = new Set([
+        ...Object.keys(typeof ITEM_INFO !== 'undefined' ? ITEM_INFO : {}),
+        ...Object.keys(typeof ITEM_MANIFEST !== 'undefined' ? ITEM_MANIFEST : {}).filter((id) => !EDITOR_NON_PICKUP_ITEM.test(id)),
+      ]);
+      options = [...ids].map((id) => ({ value: id, label: typeof itemInfo === 'function' && itemInfo(id).name !== id ? `${itemInfo(id).name} (${id})` : id }));
+      labelText = 'Objet';
+    } else if (tool === 'animal') { options = EDITOR_ANIMAL_TYPES; labelText = 'Animaux'; }
 
     if (!options) {
       section.style.display = 'none';
@@ -1371,6 +1990,117 @@ class EditorScene extends Phaser.Scene {
     const heightInput = document.getElementById('level-height-input');
     if (widthInput) widthInput.value = scene.data.levelWidth;
     if (heightInput) heightInput.value = scene.data.levelHeight;
+    EditorScene.syncZonePropsUI(scene);
+    EditorScene.syncSelectionUI(scene);
+  }
+
+  // Clés de la zone que l'éditeur ne sait ni afficher ni éditer (ambient,
+  // fall, kainatiArena...) : conservées telles quelles, juste listées.
+  static unmanagedKeys(data) {
+    const managed = new Set([
+      ...Object.keys(EditorScene.emptyLevelData()),
+      ...Object.values(EDITOR_STORY_KINDS).map((d) => d.key),
+      ...EDITOR_ZONE_PROP_KEYS,
+    ]);
+    return Object.keys(data).filter((k) => !managed.has(k));
+  }
+
+  static syncZonePropsUI(scene) {
+    const d = scene.data;
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('zone-name-input', d.zoneName || '');
+    set('zone-script-input', d.script || '');
+    set('zone-xara-select', d.xara === false ? 'false' : d.xara === true ? 'true' : '');
+    for (const [id, key] of [['zone-background-select', 'background'], ['zone-tileset-select', 'tileset']]) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      // Valeur inconnue de la liste (écrite à la main) : ajoutée pour ne pas l'écraser.
+      if (d[key] && ![...el.options].some((o) => o.value === d[key])) {
+        const o = document.createElement('option');
+        o.value = d[key];
+        o.textContent = `${d[key]} (?)`;
+        el.appendChild(o);
+      }
+      el.value = d[key] || '';
+    }
+    const tall = document.getElementById('zone-tall-input');
+    if (tall) tall.checked = !!d.tallLevel;
+    const extra = document.getElementById('zone-extra-keys');
+    if (extra) {
+      const keys = EditorScene.unmanagedKeys(d);
+      extra.textContent = keys.length ? `Conservées sans édition : ${keys.join(', ')}` : '';
+    }
+  }
+
+  // Écrit un champ du panneau de zone dans la donnée ; valeur vide = clé retirée.
+  static setZoneProp(key, value) {
+    const editor = EditorScene.getEditor();
+    if (!editor) return;
+    const current = editor.data[key];
+    if (value === undefined ? current === undefined : current === value) return;
+    editor.pushUndo();
+    if (value === undefined) delete editor.data[key];
+    else editor.data[key] = value;
+    EditorScene.syncZonePropsUI(editor);
+    if (key === 'tileset') editor.redrawGround();
+  }
+
+  static syncSelectionUI(scene) {
+    const section = document.getElementById('selection-section');
+    if (!section) return;
+    const m = scene.selectedMarker;
+    section.style.display = m ? '' : 'none';
+    if (!m) return;
+    const def = EDITOR_STORY_KINDS[m.kind];
+    const info = document.getElementById('selection-info');
+    if (info) info.textContent = `${def ? def.label : m.kind} : ${JSON.stringify(m.entry).slice(0, 160)}`;
+  }
+
+  static async refreshZoneQuickSelect(selected) {
+    const select = document.getElementById('zone-quick-select');
+    if (!select) return;
+    const real = EditorScene.listKnownRealZoneNames();
+    const drafts = await EditorScene.idbGetAllZoneNames().catch(() => []);
+    const story = typeof DEMO_ZONES !== 'undefined' ? DEMO_ZONES : [];
+    const storyIds = new Set(story.map((z) => z.zone));
+    select.innerHTML = '<option value="">— Charger une zone —</option>';
+    const addGroup = (label, items) => {
+      if (!items.length) return;
+      const g = document.createElement('optgroup');
+      g.label = label;
+      for (const [value, text] of items) {
+        const o = document.createElement('option');
+        o.value = value;
+        o.textContent = text + (drafts.includes(value) ? ' *' : '');
+        g.appendChild(o);
+      }
+      select.appendChild(g);
+    };
+    addGroup('Histoire (démo)', story.map((z) => [z.zone, `${z.zone} — ${z.name}`]));
+    addGroup('Anciennes zones', real.filter((n) => !storyIds.has(n)).map((n) => [n, n]));
+    addGroup('Brouillons seuls', drafts.filter((n) => !real.includes(n)).sort().map((n) => [n, n]));
+    if (selected) select.value = selected;
+  }
+
+  // Active un outil (bouton de la grille OU menu « Plus d'outils »).
+  static activateTool(tool) {
+    document.querySelectorAll('#editor-ui [data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+    const more = document.getElementById('tool-more-select');
+    if (more) more.value = EDITOR_STORY_KINDS[tool] ? tool : '';
+    EditorScene.getEditor().setTool(tool);
+    document.getElementById('material-section').style.display = (tool === 'ground' || tool === 'ground-back') ? '' : 'none';
+    EditorScene.populateSubtypeOptions(tool);
+    const hint = {
+      trigger: 'Glisser un rectangle (cinématique demandée au lâcher).',
+      mossBlock: 'Glisser un rectangle (clic = 96x96).',
+      mossWall: 'Glisser un rectangle (clic = 96x192), id demandé.',
+      windCurrent: 'Glisser un rectangle (clic = 160x320).',
+      vine: 'Clic = point d\'attache, glisser vers le bas = longueur (molette en mode Modifier).',
+      track: 'Glisser horizontalement le long du sol.',
+      hiddenPlatform: 'Glisser horizontalement sur les cases.',
+      npc: 'Clic au sol (dialogue demandé).',
+    }[tool];
+    if (hint) EditorScene.setStatus(hint);
   }
 
   static wireUI() {
@@ -1401,15 +2131,82 @@ class EditorScene extends Phaser.Scene {
     });
 
     document.querySelectorAll('#editor-ui [data-tool]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('#editor-ui [data-tool]').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        const tool = btn.dataset.tool;
-        EditorScene.getEditor().setTool(tool);
-        document.getElementById('material-section').style.display = (tool === 'ground' || tool === 'ground-back') ? '' : 'none';
-        EditorScene.populateSubtypeOptions(tool);
-      });
+      btn.addEventListener('click', () => EditorScene.activateTool(btn.dataset.tool));
     });
+    // Menu « Plus d'outils » (éléments de l'histoire) : options générées
+    // depuis EDITOR_STORY_KINDS. blur() après choix : sinon le <select>
+    // garde le focus et ZQSD ne déplace plus la caméra (cf. handleCameraPan).
+    const more = document.getElementById('tool-more-select');
+    if (more) {
+      const groups = {
+        Histoire: ['npc', 'trigger', 'pickup', 'checkpoint'],
+        Obstacles: ['mossBlock', 'mossWall', 'web'],
+        'Formes (singe, loup, aigle)': ['vine', 'track', 'hiddenPlatform', 'windCurrent'],
+        Faune: ['animal'],
+      };
+      for (const [label, kinds] of Object.entries(groups)) {
+        const g = document.createElement('optgroup');
+        g.label = label;
+        for (const k of kinds) {
+          const o = document.createElement('option');
+          o.value = k;
+          o.textContent = EDITOR_STORY_KINDS[k].label;
+          g.appendChild(o);
+        }
+        more.appendChild(g);
+      }
+      more.addEventListener('change', (e) => {
+        if (e.target.value) EditorScene.activateTool(e.target.value);
+        e.target.blur();
+      });
+    }
+    const quick = document.getElementById('zone-quick-select');
+    if (quick) {
+      quick.addEventListener('change', (e) => {
+        const name = e.target.value;
+        e.target.blur();
+        if (!name) return;
+        if (confirm(`Charger "${name}" ? Les modifications non enregistrées du niveau en cours seront perdues.`)) {
+          EditorScene.getEditor().loadZone(name);
+        } else {
+          e.target.value = '';
+        }
+      });
+      EditorScene.refreshZoneQuickSelect();
+    }
+    // Panneau « Propriétés de la zone ».
+    const bg = document.getElementById('zone-background-select');
+    if (bg) {
+      const items = typeof ITEM_MANIFEST !== 'undefined' ? Object.keys(ITEM_MANIFEST).filter((k) => k.startsWith('fond_')) : [];
+      bg.innerHTML = '<option value="">(ciel par défaut)</option>' + items.map((k) => `<option value="${k}">${k}</option>`).join('');
+      bg.addEventListener('change', (e) => { EditorScene.setZoneProp('background', e.target.value || undefined); e.target.blur(); });
+    }
+    const ts = document.getElementById('zone-tileset-select');
+    if (ts) {
+      const items = typeof TILESET_MANIFEST !== 'undefined' ? Object.keys(TILESET_MANIFEST) : [];
+      ts.innerHTML = '<option value="">(tuiles par défaut)</option>' + items.map((k) => `<option value="${k}">${k}</option>`).join('');
+      ts.addEventListener('change', (e) => { EditorScene.setZoneProp('tileset', e.target.value || undefined); e.target.blur(); });
+    }
+    const textProp = (id, key) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', (e) => EditorScene.setZoneProp(key, e.target.value.trim() || undefined));
+    };
+    textProp('zone-name-input', 'zoneName');
+    textProp('zone-script-input', 'script');
+    const xara = document.getElementById('zone-xara-select');
+    if (xara) {
+      xara.addEventListener('change', (e) => {
+        const v = e.target.value;
+        EditorScene.setZoneProp('xara', v === 'false' ? false : v === 'true' ? true : undefined);
+        e.target.blur();
+      });
+    }
+    const tall = document.getElementById('zone-tall-input');
+    if (tall) tall.addEventListener('change', (e) => EditorScene.setZoneProp('tallLevel', e.target.checked ? true : undefined));
+    const propsBtn = document.getElementById('btn-selection-props');
+    if (propsBtn) propsBtn.addEventListener('click', () => EditorScene.getEditor().editSelectedProperties());
+    const jsonBtn = document.getElementById('btn-selection-json');
+    if (jsonBtn) jsonBtn.addEventListener('click', () => EditorScene.getEditor().editSelectedJSON());
 
     document.getElementById('material-select').addEventListener('change', (e) => {
       EditorScene.getEditor().material = e.target.value;
@@ -1473,6 +2270,7 @@ class EditorScene extends Phaser.Scene {
     try {
       const realNames = EditorScene.listKnownRealZoneNames();
       const draftNames = await EditorScene.idbGetAllZoneNames().catch(() => []);
+      EditorScene._draftNames = new Set(draftNames);
       const names = [...new Set([...realNames, ...draftNames])].sort();
       const dataByName = {};
       for (const name of names) {
@@ -1573,6 +2371,22 @@ class EditorScene extends Phaser.Scene {
       card.appendChild(label);
       card.appendChild(loadBtn);
       card.appendChild(downloadBtn);
+      // Brouillon IndexedDB d'une zone qui a aussi un vrai fichier : il
+      // masque ce fichier au runtime (resolveZoneData) -- bouton pour le jeter.
+      if (EditorScene._draftNames && EditorScene._draftNames.has(name) && EditorScene.readGlobalConst(`${name.toUpperCase()}_DATA`) !== undefined) {
+        const forgetBtn = document.createElement('button');
+        forgetBtn.textContent = 'Oublier le brouillon';
+        forgetBtn.title = 'Le jeu relira le fichier src/data/ de cette zone';
+        forgetBtn.style.marginTop = '4px';
+        forgetBtn.addEventListener('click', async () => {
+          if (!confirm(`Supprimer le brouillon de "${name}" ? Le jeu et l'éditeur reliront le fichier src/data/${name}_data.js.`)) return;
+          await EditorScene.idbDeleteZone(name);
+          EditorScene.setStatus(`Brouillon de "${name}" supprimé.`);
+          await editor.openZonesOverview();
+          EditorScene.refreshZoneQuickSelect();
+        });
+        card.appendChild(forgetBtn);
+      }
       card.appendChild(connector);
       canvasArea.appendChild(card);
       EditorScene.makeZoneCardDraggable(card, name, positions, dataByName);
@@ -1985,13 +2799,15 @@ class EditorScene extends Phaser.Scene {
       targetData.exits = targetExits;
       delete targetData.exit;
 
-      await EditorScene.idbPutZone(sourceName, sourceData);
-      await EditorScene.idbPutZone(targetName, targetData);
       // Cf. syncZoneToProjectServer : sans ça, la connexion restait bloquée
       // dans IndexedDB pour de bon, jamais vue par le jeu "de base" même
-      // avec tools/dev_server.py lancé.
-      await EditorScene.syncZoneToProjectServer(sourceName, sourceData);
-      await EditorScene.syncZoneToProjectServer(targetName, targetData);
+      // avec tools/dev_server.py lancé. Vérifie les deux avant d'écrire.
+      for (const n of [sourceName, targetName]) {
+        const unsafe = EditorScene.unsafePathsForZone(n);
+        if (unsafe.length) throw new Error(`"${n}" contient des valeurs non-JSON (${unsafe.join(', ')})`);
+      }
+      await EditorScene.saveZoneSafely(sourceName, sourceData);
+      await EditorScene.saveZoneSafely(targetName, targetData);
 
       EditorScene.setStatus(`Portail relié : "${sourceName}" <-> "${targetName}" (aller-retour).`);
       await EditorScene.getEditor().openZonesOverview();
@@ -2014,8 +2830,7 @@ class EditorScene extends Phaser.Scene {
       exits[exitIndex] = { ...exits[exitIndex], targetScene: null };
       data.exits = exits;
       delete data.exit;
-      await EditorScene.idbPutZone(name, data);
-      await EditorScene.syncZoneToProjectServer(name, data);
+      await EditorScene.saveZoneSafely(name, data);
       EditorScene.setStatus(`Sortie déconnectée : "${name}".`);
       await EditorScene.getEditor().openZonesOverview();
     } catch (e) {

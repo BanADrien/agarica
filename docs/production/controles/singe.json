@@ -1,0 +1,120 @@
+[
+  {
+    "source": "assets/sprites/singe.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      114,
+      67
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          153,
+          154,
+          164,
+          160
+        ],
+        "horizontal_gaps": [
+          226,
+          202,
+          210
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          291,
+          264,
+          267
+        ],
+        "horizontal_gaps": [
+          271,
+          279
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          226,
+          223,
+          194,
+          260
+        ],
+        "horizontal_gaps": [
+          154,
+          169,
+          108
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/singe_p2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      126,
+      122
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 5,
+        "heights": [
+          211,
+          137,
+          192,
+          150,
+          186
+        ],
+        "horizontal_gaps": [
+          105,
+          130,
+          113,
+          99
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          189,
+          182,
+          154,
+          166
+        ],
+        "horizontal_gaps": [
+          142,
+          154,
+          126
+        ]
+      },
+      {
+        "row": 2,
+        "count": 5,
+        "heights": [
+          159,
+          165,
+          141,
+          152,
+          106
+        ],
+        "horizontal_gaps": [
+          71,
+          92,
+          83,
+          89
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,195 @@
+[
+  {
+    "source": "assets/sprites/agarica_extra.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      117,
+      85
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 3,
+        "heights": [
+          181,
+          221,
+          192
+        ],
+        "horizontal_gaps": [
+          268,
+          276
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          229,
+          221,
+          222
+        ],
+        "horizontal_gaps": [
+          253,
+          261
+        ]
+      },
+      {
+        "row": 2,
+        "count": 3,
+        "heights": [
+          211,
+          207,
+          184
+        ],
+        "horizontal_gaps": [
+          259,
+          252
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/agarica_extra_p2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      59,
+      103
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          244,
+          200,
+          142,
+          123
+        ],
+        "horizontal_gaps": [
+          153,
+          116,
+          70
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          291,
+          284,
+          288,
+          287
+        ],
+        "horizontal_gaps": [
+          170,
+          180,
+          169
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          212,
+          209,
+          212,
+          201
+        ],
+        "horizontal_gaps": [
+          126,
+          132,
+          148
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/agarica_extra_p3.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      86,
+      68
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 3,
+        "heights": [
+          252,
+          243,
+          248
+        ],
+        "horizontal_gaps": [
+          135,
+          154
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          225,
+          236,
+          230,
+          244
+        ],
+        "horizontal_gaps": [
+          168,
+          155,
+          109
+        ]
+      },
+      {
+        "row": 2,
+        "count": 5,
+        "heights": [
+          237,
+          238,
+          250,
+          250,
+          238
+        ],
+        "horizontal_gaps": [
+          124,
+          90,
+          100,
+          102
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/agarica_extra_p4.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          330,
+          330,
+          338,
+          329
+        ],
+        "horizontal_gaps": [
+          85,
+          120,
+          142
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,151 @@
+[
+  {
+    "source": "assets/sprites/kainati.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      104
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          348,
+          349,
+          364,
+          311
+        ],
+        "horizontal_gaps": [
+          61,
+          69,
+          63
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          359,
+          388,
+          335,
+          342
+        ],
+        "horizontal_gaps": [
+          68,
+          23,
+          8
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/kainati_p2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      135
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          366,
+          375,
+          348,
+          382
+        ],
+        "horizontal_gaps": [
+          169,
+          113,
+          80
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          226,
+          325,
+          271,
+          315
+        ],
+        "horizontal_gaps": [
+          77,
+          68,
+          109
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/kainati_p3.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      145
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          307,
+          266,
+          368,
+          312
+        ],
+        "horizontal_gaps": [
+          57,
+          78,
+          69
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          317,
+          323,
+          297
+        ],
+        "horizontal_gaps": [
+          97,
+          67
+        ]
+      }
+    ]
+  },
+  {
+    "source": "assets/sprites/kainati_p4.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          310,
+          312,
+          342,
+          335
+        ],
+        "horizontal_gaps": [
+          45,
+          48,
+          52
+        ]
+      }
+    ]
+  }
+]

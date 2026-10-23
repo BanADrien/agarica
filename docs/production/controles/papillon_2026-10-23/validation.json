@@ -1,0 +1,45 @@
+{
+  "forme_papillon": {
+    "connected_components_per_frame": [
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "size": [
+      1536,
+      1024
+    ]
+  },
+  "transfo_papillon": {
+    "connected_components_per_frame": [
+      [
+        1,
+        1,
+        1,
+        1
+      ]
+    ],
+    "size": [
+      1536,
+      1024
+    ]
+  },
+  "src_changes": [
+    "src\\data\\asset_present.js"
+  ]
+}

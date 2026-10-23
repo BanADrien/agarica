@@ -1,0 +1,60 @@
+[
+  {
+    "source": "assets/sprites/agarica_slash.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      60,
+      60
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          249,
+          256,
+          247,
+          251
+        ],
+        "horizontal_gaps": [
+          114,
+          79,
+          118
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          228,
+          283,
+          302,
+          250
+        ],
+        "horizontal_gaps": [
+          150,
+          155,
+          159
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          199,
+          207,
+          255,
+          203
+        ],
+        "horizontal_gaps": [
+          164,
+          169,
+          177
+        ]
+      }
+    ]
+  }
+]

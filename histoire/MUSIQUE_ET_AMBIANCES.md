@@ -54,7 +54,7 @@ Ils peuvent etre associes a la musique de la clairiere preservee ou a une courte
 
 - theme de Xara ;
 - theme d'Amanite ;
-- theme de Galter ;
+- theme de Geralt ;
 - musique de l'epreuve du singe ;
 - musique du totem de l'aigle et du premier vol ;
 - musique de la scene des papillons ;
@@ -237,9 +237,9 @@ Une variation peut s'intensifier lorsque Agarica approche de l'arrivee ou rate u
 
 Courte resolution musicale. Elle confirme que la competence du singe est maintenant acquise definitivement.
 
-## 3.4 Transition et Galter
+## 3.4 Transition et Geralt
 
-### Theme de Galter
+### Theme de Geralt
 
 Theme legerement comique et aventureux. Il doit accompagner un personnage qui veut paraitre competent mais dont les plans echouent souvent.
 
@@ -527,7 +527,7 @@ Voix plus seche, fiere et nerveuse. Ses sons peuvent devenir plus durs apres son
 
 Vocalisations calmes et etranges, avec une diction ou un rythme qui peut sembler ancien. Il faut garder une marge pour modifier son traitement lorsque son identite de Maexxna sera revelee.
 
-#### Galter
+#### Geralt
 
 Vocalisations plus graves et tres expressives. Ses reactions peuvent etre exagerement heroiques, puis se terminer par un son de panique ou de gene.
 
@@ -599,7 +599,7 @@ Si la demo s'arrete au boss singe, produire en priorite :
 Ajouter ensuite :
 
 1. theme de la foret flottante ;
-2. theme de Galter ;
+2. theme de Geralt ;
 3. musique de la rencontre avec Amanite ;
 4. musique du totem de l'aigle ;
 5. musique du premier vol ;

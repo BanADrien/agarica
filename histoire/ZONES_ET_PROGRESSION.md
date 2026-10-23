@@ -165,7 +165,7 @@ Le combat peut se terminer sans mort. Le singe reconnait Agarica et lui indique 
 
 Apres le boss, le joueur peut choisir entre deux directions :
 
-- continuer l'histoire principale vers Galter et les hauteurs ;
+- continuer l'histoire principale vers Geralt et les hauteurs ;
 - revenir au totem du singe et commencer son epreuve.
 
 L'epreuve est optionnelle pour la progression principale, mais elle offre une recompense importante. Elle est construite comme une course verticale dans les branches de l'arbre : lianes, plateformes, sauts entre troncs et obstacles qui demandent de garder son elan.
@@ -228,49 +228,49 @@ Le talisman du singe doit etre utilise rapidement apres l'epreuve :
 - un raccourci permet de redescendre plus vite de l'arbre ;
 - un passage optionnel revele un secret ou un fragment de carte ;
 - une zone secondaire de la foret devient explorables ;
-- Galter peut marquer sur sa carte plusieurs endroits atteignables avec cette capacite.
+- Geralt peut marquer sur sa carte plusieurs endroits atteignables avec cette capacite.
 
 Le boss montre donc au joueur que l'exploration possede plusieurs niveaux. Les capacites obtenues apres les combats peuvent ouvrir des raccourcis, des secrets, des ressources ou des zones secondaires, meme si elles ne sont pas toujours necessaires pour continuer l'histoire principale.
 
 Cette logique doit rester lisible pour les prochains boss : chaque boss important doit offrir une recompense avec une utilite concrete, visible peu apres le combat. La recompense peut etre un talisman, une forme, un objet-cle ou un acces, mais elle doit donner envie au joueur de chercher les autres gardiens.
 
-## 6. Rencontre avec Galter, le ranger
+## 6. Rencontre avec Geralt, le ranger
 
 ### Role du personnage
 
-Galter est un ranger qui cherche l'origine de la mousse. Il parcourt la foret depuis longtemps et collecte des indices, mais il n'a pas encore reussi a atteindre la source de la corruption.
+Geralt est un ranger qui cherche l'origine de la mousse. Il parcourt la foret depuis longtemps et collecte des indices, mais il n'a pas encore reussi a atteindre la source de la corruption.
 
 Il peut servir de miroir a Agarica :
 
 - Agarica veut sauver la foret pour pouvoir rentrer chez elle ;
-- Galter veut comprendre la mousse et resoudre le probleme ;
+- Geralt veut comprendre la mousse et resoudre le probleme ;
 - tous les deux ont des informations incompletes ;
 - ils sont obliges de collaborer malgre leurs methodes differentes.
 
 ### Le combat ridicule
 
-La premiere rencontre peut commencer par un malentendu. Galter croit qu'Agarica est liee a la propagation de la mousse ou qu'elle vient voler ses recherches. Il exige un duel pour verifier ses intentions.
+La premiere rencontre peut commencer par un malentendu. Geralt croit qu'Agarica est liee a la propagation de la mousse ou qu'elle vient voler ses recherches. Il exige un duel pour verifier ses intentions.
 
 Le combat doit etre comique et court :
 
-- Galter annonce des techniques impressionnantes mais rate ses attaques ;
+- Geralt annonce des techniques impressionnantes mais rate ses attaques ;
 - son crabe totem lui bloque parfois le chemin ;
 - le crabe attrape ses fleches ou son sac ;
-- Galter tombe dans ses propres pieges ;
+- Geralt tombe dans ses propres pieges ;
 - Agarica peut gagner sans blesser gravement le ranger ;
 - Xara commente calmement la scene et comprend avant eux qu'ils poursuivent le meme objectif.
 
-Le combat peut etre un tutoriel de combat leger plutot qu'un vrai boss. Galter devient ensuite un allie ou un rival recurrent.
+Le combat peut etre un tutoriel de combat leger plutot qu'un vrai boss. Geralt devient ensuite un allie ou un rival recurrent.
 
-### La carte de Galter
+### La carte de Geralt
 
-Apres le combat, Galter donne a Agarica sa carte de la foret. Elle est incomplete, couverte de notes, de fleches contradictoires et de zones marquees comme dangereuses. Il l'a dessinee a partir de ses propres expeditions, mais il admet qu'il s'est parfois perdu ou qu'il a du rebrousser chemin.
+Apres le combat, Geralt donne a Agarica sa carte de la foret. Elle est incomplete, couverte de notes, de fleches contradictoires et de zones marquees comme dangereuses. Il l'a dessinee a partir de ses propres expeditions, mais il admet qu'il s'est parfois perdu ou qu'il a du rebrousser chemin.
 
-La carte peut devenir un element d'interface simple : chaque rencontre avec Galter ajoute une nouvelle zone, un indice ou un point d'interet. Galter ne connait pas toutes les reponses, mais il aide le joueur a comprendre ou aller ensuite.
+La carte peut devenir un element d'interface simple : chaque rencontre avec Geralt ajoute une nouvelle zone, un indice ou un point d'interet. Geralt ne connait pas toutes les reponses, mais il aide le joueur a comprendre ou aller ensuite.
 
 ### Les rencontres recurrentes
 
-Galter peut etre retrouve dans chaque grande zone. Il n'est pas toujours installe au meilleur endroit : il choisit un emplacement qu'il croit strategique, puis decouvre qu'il est bloque par une capacite qu'il ne possede pas.
+Geralt peut etre retrouve dans chaque grande zone. Il n'est pas toujours installe au meilleur endroit : il choisit un emplacement qu'il croit strategique, puis decouvre qu'il est bloque par une capacite qu'il ne possede pas.
 
 Chaque rencontre doit avoir trois fonctions :
 
@@ -278,17 +278,17 @@ Chaque rencontre doit avoir trois fonctions :
 - donner un indice sur la prochaine zone ou le prochain danger ;
 - offrir une courte scene comique qui montre les limites du ranger.
 
-Cette recurrence permet de guider le joueur sans faire de Galter un simple narrateur. Agarica progresse grace a ses capacites, tandis que Galter progresse surtout dans sa comprehension de la mousse.
+Cette recurrence permet de guider le joueur sans faire de Geralt un simple narrateur. Agarica progresse grace a ses capacites, tandis que Geralt progresse surtout dans sa comprehension de la mousse.
 
-### Direction visuelle de Galter
+### Direction visuelle de Geralt
 
-Galter peut etre un hafling ranger avec des tatouages tribaux, un style de chasseur fatigue et un crabe comme animal totem. Pour garder une identite propre, il vaut mieux eviter de reproduire directement le visage, la coiffure ou les signes distinctifs de Geralt de Rive.
+Geralt peut etre un hafling ranger avec des tatouages tribaux, un style de chasseur fatigue et un crabe comme animal totem. Pour garder une identite propre, il vaut mieux eviter de reproduire directement le visage, la coiffure ou les signes distinctifs de Geralt de Rive.
 
 La reference peut rester generale : un ranger rude, marque par les voyages, avec une presence de chasseur de monstres. Son visage, ses vetements, ses proportions et ses tatouages doivent etre originaux. Cela permet de conserver l'intention du personnage sans en faire une copie reconnaissable.
 
 ### Fonction dans la progression
 
-Galter peut fournir :
+Geralt peut fournir :
 
 - des informations sur la mousse ;
 - une carte incomplete mais evolutive de la foret ;

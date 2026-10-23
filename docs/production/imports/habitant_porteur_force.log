@@ -1,0 +1,12 @@
+[habitant_porteur] découpe de 1 image(s)
+  rangée 0 walk_carry: 5 frame(s) [OK]
+  rangée 1 idle: 4 frame(s) [OK]
+  canvas uniforme 277x311 -> assets/sprites/habitant_porteur_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : habitant_porteur
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 239 fichier(s) présent(s).

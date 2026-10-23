@@ -9,10 +9,9 @@
 // 3 catégories, chacune avec DEUX façons d'équiper (demande explicite :
 // "je veux pouvoir glisser deposer et cliquer sur un choix puis sur
 // l'emplacement") :
-// - Formes de déplacement (Aigle/Loup/Pieuvre) : doivent être ÉQUIPÉES
-//   pour fonctionner en jeu, pas juste débloquées (cf. Player.formEquipped
-//   -- vrai choix fonctionnel, demande explicite de l'utilisateur).
-// - Compétences (cf. SKILL_DEFS dans Player.js).
+// - Formes de déplacement : 3 emplacements typés (sol/aérien/eau, cf.
+//   FORM_INFO) ; doivent être ÉQUIPÉES pour fonctionner en jeu.
+// - Compétences (cf. SKILL_DEFS dans Player.js / Crapaud.js / Projectiles.js).
 // - Totem : UN SEUL {head, body} (pas plusieurs emplacements -- revenu sur
 //   l'idée de cumul entre plusieurs totems, demande explicite : "un seul
 //   totem au total"), cf. Player.equippedTotem.
@@ -23,12 +22,32 @@
 // -- ça gère gratuitement le "retour à sa place" d'un geste refusé/annulé
 // (glisser OU clic) : si l'état du joueur n'a pas changé, rebuildUI()
 // replace chaque carte exactement là où elle était avant.
+// Emplacements de formes (démo histoire) : SOL = loup, AÉRIEN = singe OU
+// aigle OU papillon (exclusifs), EAU = pieuvre. L'équipement passe par
+// Player.equipForm/unequipForm (qui tiennent `equippedForms` + `airForm`).
 const FORM_INFO = {
-  eagle: { flag: 'hasEagleForm', label: 'Aigle\n(Vol)' },
-  wolf: { flag: 'hasWolfForm', label: 'Loup\n(Course)' },
-  octopus: { flag: 'hasOctopusForm', label: 'Pieuvre\n(Nage)' },
+  wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), perçoit les pistes cachées.' },
+  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court), s\'accroche aux lianes (gauche/droite pour se balancer, Espace pour lâcher, S pour tomber).' },
+  eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : donne le double saut (plus haut) puis le plané, porté par les courants d\'air (S = piqué).' },
+  butterfly: { flag: 'hasButterflyForm', label: 'Papillon', slot: 'air', icon: ['form-icon-butterfly', 'item-form_icone_papillon'], desc: "Papillon (aérien) : 2e appui sur Espace en l'air = battement d'ailes puis élan en diagonale vers l'avant et le haut (un par saut)." },
+  octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
 };
 const FORM_IDS = Object.keys(FORM_INFO);
+const FORM_SLOTS = [
+  { slot: 'ground', label: 'Sol', x: 330 },
+  { slot: 'air', label: 'Aérien', x: 480 },
+  { slot: 'water', label: 'Eau', x: 630 },
+];
+// Icônes ITEM_MANIFEST (textures `item-<id>`) ; repli : pastille colorée.
+const SKILL_ICON_ITEM = {
+  ours: 'skill_icone_ours', pierre: 'skill_icone_singe', papillon: 'skill_icone_papillon',
+};
+const SKILL_INFO_DESC = {
+  ours: 'Ours : fracas au sol, brise les amas de mousse.',
+  pierre: 'Pierre : lancer en cloche (talisman du singe).',
+  papillon: 'Papillons : soigne les créatures corrompues, sans les blesser.',
+  crapaud: 'Crapaud : coup de langue devant soi.',
+};
 
 const CARD_COLORS = {
   form: 0x3a5a8c,
@@ -51,38 +70,25 @@ class CampfireMenuScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
     this.add.rectangle(480, 270, 960, 540, 0x0d0b1a, 0.82);
+    // Panneau peint (ITEM_MANIFEST `ui_feu_camp`, assets/items/firecamp_menu/
+    // interface.png) s'il est chargé ; sinon le voile sombre seul.
+    if (this.textures.exists('item-ui_feu_camp')) {
+      this.add.image(480, 270, 'item-ui_feu_camp').setDisplaySize(950, 534).setAlpha(0.95);
+    }
 
-    this.add.text(480, 16, 'Feu de camp', {
+    this.add.text(480, 12, 'Feu de camp', {
       fontFamily: 'sans-serif', fontSize: '20px', color: '#ffe9f5', fontStyle: 'bold',
     }).setOrigin(0.5, 0);
-    this.add.text(480, 42, 'Vie et énergie restaurées — glisse une carte, ou clique dessus puis sur l\'emplacement', {
-      fontFamily: 'sans-serif', fontSize: '12px', color: '#a99bd6',
+    this.add.text(480, 38, 'Vie et énergie restaurées — glisse une carte sur un emplacement, ou clique-la puis clique l\'emplacement. Remets-la en bas pour la retirer.', {
+      fontFamily: 'sans-serif', fontSize: '11px', color: '#a99bd6',
     }).setOrigin(0.5, 0);
 
-    // Liste dynamique : tout ce que rebuildUI() détruit/recrée à chaque
-    // passage (cartes de pool + occupants de slot). Les rectangles de
-    // SLOT eux-mêmes (les zones de dépôt) sont créés une seule fois dans
-    // buildStaticSlots() -- seuls leurs OCCUPANTS (les cartes dessus) sont
-    // dynamiques. Un simple TABLEAU (pas un Container) : un Container
-    // imbriqué a un souci de zone de clic sur ses ENFANTS interactifs
-    // (bug réel rencontré ici, cf. makeCard -- le clic/glisser ne
-    // touchait jamais la carte alors qu'elle s'affichait au bon endroit),
-    // donc chaque carte reste un objet de premier niveau de la scène.
+    // Cf. historique : un simple TABLEAU de cartes de premier niveau (un
+    // Container imbriqué cassait la zone de clic de ses enfants).
     this.dynamicCards = [];
     this.dropZones = [];
-    // Carte actuellement sélectionnée par CLIC (mode alternatif au
-    // glisser, cf. en-tête du fichier) -- null si aucune. Surlignée en
-    // jaune (cf. setCardHighlight) tant qu'elle est sélectionnée.
     this.selectedCard = null;
-
-    // Phaser démarre un glisser dès le moindre micro-mouvement après
-    // 'pointerdown' (seuil par défaut = 0 px) -- un simple clic immobile
-    // (mode 2, clic-puis-clic) déclenchait quand même un 'dragstart' à
-    // distance quasi nulle, ce qui absorbait le 'pointerup' dans
-    // 'dragend' au lieu de 'gameobjectup' : la sélection par clic ne se
-    // déclenchait alors jamais (bug réel rencontré ici). Un vrai seuil
-    // laisse les glissers intentionnels fonctionner tout en rendant le
-    // clic-puis-clic fiable.
+    // Seuil de glisser : un clic immobile ne doit pas devenir un 'dragstart'.
     this.input.dragDistanceThreshold = 6;
 
     this.buildStaticSlots();
@@ -92,13 +98,9 @@ class CampfireMenuScene extends Phaser.Scene {
     this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
   }
 
-  // Rectangles de fond + contour pour chaque emplacement (formes/
-  // compétences/totem), créés une fois pour toutes -- servent aussi de
-  // zones de dépôt (`setInteractive({ dropZone: true })`) ET de cibles de
-  // clic (cf. wireInputEvents), identifiées par `kind`/`slotIndex` en
-  // data. Une zone de dépôt par POOL (par catégorie) en plus des
-  // emplacements : y déposer/cliquer une carte issue d'un emplacement la
-  // déséquipe (slotIndex `'pool'`, cf. applyDrop).
+  // Rectangles d'emplacement, créés une fois : zones de dépôt ET cibles de
+  // clic (`kind`/`slotIndex` en data). Une zone « pool » par catégorie pour
+  // déséquiper (slotIndex 'pool').
   buildStaticSlots() {
     const drawSlotBox = (x, y, w, h, kind, slotIndex) => {
       const box = this.add.rectangle(x, y, w, h, SLOT_EMPTY_COLOR, 1)
@@ -109,114 +111,151 @@ class CampfireMenuScene extends Phaser.Scene {
       this.dropZones.push(box);
       return box;
     };
-
-    // -- Formes : 3 emplacements en haut, pool juste dessous.
-    this.add.text(40, 68, 'Formes de déplacement (doivent être équipées pour agir en jeu)', {
+    const label = (x, y, text) => this.add.text(x, y, text, {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
     });
-    this.formSlotBoxes = [0, 1, 2].map((i) => drawSlotBox(340 + i * 100, 112, 90, 34, 'form', i));
-    this.formPoolZone = drawSlotBox(480, 156, 900, 34, 'form', 'pool');
-    this.formPoolZone.setFillStyle(0x0d0b1a, 0.001); // quasi invisible, juste une zone
+    const small = { fontFamily: 'sans-serif', fontSize: '11px', color: '#a99bd6' };
+
+    // -- Formes : 3 emplacements typés.
+    label(40, 60, 'Formes');
+    this.formSlotBoxes = {};
+    for (const fs of FORM_SLOTS) {
+      this.formSlotBoxes[fs.slot] = drawSlotBox(fs.x, 104, 130, 50, 'form', fs.slot);
+      const sub = fs.slot === 'air' ? 'Aérien (une seule forme)' : fs.label;
+      this.add.text(fs.x, 72, sub, small).setOrigin(0.5);
+    }
+    this.formPoolZone = drawSlotBox(480, 158, 900, 40, 'form', 'pool');
+    this.formPoolZone.setFillStyle(0x0d0b1a, 0.001);
 
     // -- Compétences.
-    this.add.text(40, 182, 'Compétences (A/F/R en jeu)', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
+    label(40, 184, 'Compétences (touches A / F / R)');
+    this.skillSlotBoxes = [0, 1, 2].map((i) => drawSlotBox(350 + i * 130, 222, 110, 40, 'skill', i));
+    ['A', 'F', 'R'].forEach((k, i) => {
+      this.add.text(350 + i * 130 - 65, 222, k, { fontFamily: 'sans-serif', fontSize: '12px', color: '#ffe066', fontStyle: 'bold' }).setOrigin(0.5);
     });
-    this.skillSlotBoxes = [0, 1, 2].map((i) => drawSlotBox(340 + i * 100, 226, 90, 34, 'skill', i));
-    this.skillPoolZone = drawSlotBox(480, 270, 900, 34, 'skill', 'pool');
+    this.skillPoolZone = drawSlotBox(480, 268, 900, 36, 'skill', 'pool');
     this.skillPoolZone.setFillStyle(0x0d0b1a, 0.001);
 
-    // -- Totem : UN SEUL emplacement tête + UN SEUL emplacement corps
-    // (demande explicite, revenu sur l'idée de plusieurs totems cumulables
-    // évoquée plus tôt dans la session).
-    this.add.text(40, 296, 'Totem (une tête + un corps)', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
-    });
-    this.totemHeadSlot = drawSlotBox(420, 332, 100, 50, 'totemHead', 'equipped');
-    this.totemBodySlot = drawSlotBox(540, 332, 100, 50, 'totemBody', 'equipped');
-
-    // Têtes (9, cf. TOTEM_HEADS) et corps (3) sur leur propre ligne pleine
-    // largeur -- 9 items ne tiennent pas à côté de 3 sur une simple moitié
-    // d'écran (bug réel rencontré ici avant de les séparer en 2 lignes).
-    this.totemHeadPoolZone = drawSlotBox(480, 384, 900, 36, 'totemHead', 'pool');
+    // -- Totem : une tête + un corps.
+    label(40, 294, 'Totem (une tête + un corps)');
+    this.totemHeadSlot = drawSlotBox(420, 326, 100, 40, 'totemHead', 'equipped');
+    this.totemBodySlot = drawSlotBox(540, 326, 100, 40, 'totemBody', 'equipped');
+    this.totemHeadPoolZone = drawSlotBox(480, 372, 900, 34, 'totemHead', 'pool');
     this.totemHeadPoolZone.setFillStyle(0x0d0b1a, 0.001);
-    this.totemBodyPoolZone = drawSlotBox(480, 424, 900, 36, 'totemBody', 'pool');
+    this.totemBodyPoolZone = drawSlotBox(480, 410, 900, 34, 'totemBody', 'pool');
     this.totemBodyPoolZone.setFillStyle(0x0d0b1a, 0.001);
-    this.add.text(30, 384, 'Têtes', { fontFamily: 'sans-serif', fontSize: '11px', color: '#a99bd6' }).setOrigin(0, 0.5);
-    this.add.text(30, 424, 'Corps', { fontFamily: 'sans-serif', fontSize: '11px', color: '#a99bd6' }).setOrigin(0, 0.5);
+    this.add.text(30, 372, 'Têtes', small).setOrigin(0, 0.5);
+    this.add.text(30, 410, 'Corps', small).setOrigin(0, 0.5);
 
-    this.bonusText = this.add.text(480, 460, '', {
+    // Description de la carte survolée/sélectionnée (aide contextuelle).
+    this.descText = this.add.text(480, 444, '', {
+      fontFamily: 'sans-serif', fontSize: '12px', color: '#ffe9f5', align: 'center', wordWrap: { width: 860 },
+    }).setOrigin(0.5);
+    this.bonusText = this.add.text(480, 472, '', {
       fontFamily: 'sans-serif', fontSize: '12px', color: '#8fe3b8', align: 'center',
     }).setOrigin(0.5);
-    this.add.text(480, 484, 'E ou Échap pour fermer', {
+    this.add.text(480, 500, 'E ou Échap pour fermer', {
       fontFamily: 'sans-serif', fontSize: '12px', color: '#ffe9f5',
     }).setOrigin(0.5);
   }
 
-  // Une seule carte (glissable ET cliquable -- Container = fond + texte),
-  // `kind`/`id` toujours renseignés ; `slotIndex` seulement si elle
-  // représente l'OCCUPANT d'un emplacement (permet de le vider en cas de
-  // déplacement) -- `'equipped'` pour le totem (un seul emplacement, pas
-  // besoin d'index numérique), un vrai index pour formes/compétences.
-  makeCard(x, y, w, h, label, kind, id, slotIndex) {
+  // Icône d'une carte : 1re texture existante parmi `keys`, sinon pastille
+  // colorée avec l'initiale (placeholder tant que l'art n'existe pas).
+  addCardIcon(card, keys, size, fallbackColor, letter) {
+    const key = (keys || []).find((k) => this.textures.exists(k));
+    const ix = -card.width / 2 + size / 2 + 5;
+    if (key) {
+      const img = this.add.image(ix, 0, key);
+      img.setScale(size / Math.max(img.width, img.height));
+      card.add(img);
+    } else {
+      card.add(this.add.circle(ix, 0, size / 2, fallbackColor, 1).setStrokeStyle(1, 0xffe9f5, 0.7));
+      card.add(this.add.text(ix, 0, letter, { fontFamily: 'sans-serif', fontSize: '12px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5));
+    }
+    return size + 8;
+  }
+
+  // Une carte glissable ET cliquable (Container = fond + icône + texte).
+  // `slotIndex` seulement si elle occupe un emplacement.
+  makeCard(x, y, w, h, label, kind, id, slotIndex, { iconKeys = null, iconColor = 0x555555, desc = '' } = {}) {
     const card = this.add.container(x, y);
-    const bg = this.add.rectangle(0, 0, w, h, CARD_COLORS[kind], 1).setStrokeStyle(1, 0xffe9f5, 0.5);
-    const txt = this.add.text(0, 0, label, {
-      fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe9f5', align: 'center',
-      wordWrap: { width: w - 8 },
-    }).setOrigin(0.5);
-    card.add([bg, txt]);
     card.setSize(w, h);
+    const bg = this.add.rectangle(0, 0, w, h, CARD_COLORS[kind], 1).setStrokeStyle(1, 0xffe9f5, 0.5);
+    card.add(bg);
+    let textX = 0;
+    let textW = w - 8;
+    if (iconKeys) {
+      const used = this.addCardIcon(card, iconKeys, Math.min(h - 8, 32), iconColor, label.charAt(0));
+      textX = used / 2;
+      textW = w - used - 6;
+    }
+    const txt = this.add.text(textX, 0, label, {
+      fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe9f5', align: 'center',
+      wordWrap: { width: textW },
+    }).setOrigin(0.5);
+    // Libellé long à côté d'une icône (« Ours — Fracas au sol ») : plus petit
+    // plutôt que de déborder de la carte.
+    if (txt.height > h - 2) txt.setFontSize(9).setLineSpacing(-2);
+    card.add(txt);
     card.setData('kind', kind);
     card.setData('id', id);
     card.setData('slotIndex', slotIndex ?? null);
-    card.setData('bg', bg); // pour le surlignage de sélection, cf. setCardHighlight
-    // Un Container n'a pas de texture propre : contrairement à une
-    // Image/un Sprite, `setInteractive()` sans forme explicite ne lui
-    // génère PAS de zone de clic automatique à partir de setSize() --
-    // sans ce rectangle (centré sur l'origine locale du container, pas
-    // top-left), la carte entière était invisible aux clics/au glisser
-    // (bug réel rencontré : le drop ne se produisait jamais, silencieusement).
-    card.setInteractive(
-      new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
-      Phaser.Geom.Rectangle.Contains,
-    );
+    card.setData('bg', bg);
+    card.setData('desc', desc);
+    // Zone de clic explicite (un Container n'en génère pas tout seul).
+    card.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
     this.input.setDraggable(card);
-    if (card === this.selectedCardRef) this.setCardHighlight(card, true);
+    card.on('pointerover', () => { if (desc) this.descText.setText(desc); });
     this.dynamicCards.push(card);
     return card;
   }
 
-  // Détruit toutes les cartes dynamiques et les recrée depuis l'état RÉEL
-  // du joueur -- slots occupés en priorité (par-dessus leur rectangle de
-  // fond), puis le reste des éléments disponibles en pool.
+  formIsEquipped(id) {
+    const player = this.player;
+    if (FORM_INFO[id].slot === 'air') return player.airForm === id;
+    return player.equippedForms.includes(id);
+  }
+
+  // Détruit et recrée toutes les cartes depuis l'état RÉEL du joueur.
   rebuildUI() {
     this.dynamicCards.forEach((c) => c.destroy());
     this.dynamicCards = [];
     const player = this.player;
 
-    // Formes.
-    FORM_IDS.forEach((id) => {
-      const slotIdx = player.equippedForms.indexOf(id);
-      if (slotIdx !== -1) {
-        const box = this.formSlotBoxes[slotIdx];
-        this.makeCard(box.x, box.y, box.width, box.height, FORM_INFO[id].label, 'form', id, slotIdx);
+    // Formes : occupants des emplacements, puis formes débloquées libres.
+    const unlocked = FORM_IDS.filter((id) => player[FORM_INFO[id].flag]);
+    const pool = [];
+    for (const id of unlocked) {
+      const info = FORM_INFO[id];
+      const opts = { iconKeys: info.icon, iconColor: CARD_COLORS.form, desc: info.desc };
+      if (this.formIsEquipped(id)) {
+        const box = this.formSlotBoxes[info.slot];
+        this.makeCard(box.x, box.y, box.width - 6, box.height - 6, info.label, 'form', id, info.slot, opts);
+      } else {
+        pool.push([id, opts]);
       }
-    });
-    const unequippedForms = FORM_IDS.filter((id) => player[FORM_INFO[id].flag] && !player.equippedForms.includes(id));
-    unequippedForms.forEach((id, i) => {
-      this.makeCard(80 + i * 100, 156, 90, 30, FORM_INFO[id].label, 'form', id, null);
+    }
+    const formStep = 120;
+    const formStartX = 480 - ((pool.length - 1) * formStep) / 2;
+    pool.forEach(([id, opts], i) => {
+      this.makeCard(formStartX + i * formStep, 158, 110, 36, FORM_INFO[id].label, 'form', id, null, opts);
     });
 
     // Compétences.
-    player.skillSlots.forEach((id, slotIdx) => {
-      if (!id) return;
-      const box = this.skillSlotBoxes[slotIdx];
-      this.makeCard(box.x, box.y, box.width, box.height, SKILL_DEFS[id].label, 'skill', id, slotIdx);
+    const skillOpts = (id) => ({
+      iconKeys: [`item-${SKILL_ICON_ITEM[id] || `skill_icone_${id}`}`], iconColor: SKILL_DEFS[id].hudColor || CARD_COLORS.skill,
+      desc: SKILL_INFO_DESC[id] || SKILL_DEFS[id].label,
     });
-    const unequippedSkills = [...player.unlockedSkills].filter((id) => !player.skillSlots.includes(id));
+    player.skillSlots.forEach((id, slotIdx) => {
+      if (!id || !SKILL_DEFS[id]) return;
+      const box = this.skillSlotBoxes[slotIdx];
+      this.makeCard(box.x, box.y, box.width - 6, box.height - 6, SKILL_DEFS[id].label, 'skill', id, slotIdx, skillOpts(id));
+    });
+    const unequippedSkills = [...player.unlockedSkills].filter((id) => SKILL_DEFS[id] && !player.skillSlots.includes(id));
+    const skillStep = 125;
+    const skillStartX = 480 - ((unequippedSkills.length - 1) * skillStep) / 2;
     unequippedSkills.forEach((id, i) => {
-      this.makeCard(80 + i * 100, 270, 90, 30, SKILL_DEFS[id].label, 'skill', id, null);
+      this.makeCard(skillStartX + i * skillStep, 268, 115, 32, SKILL_DEFS[id].label, 'skill', id, null, skillOpts(id));
     });
 
     // Totem : un seul {head, body}.
@@ -229,31 +268,31 @@ class CampfireMenuScene extends Phaser.Scene {
       const bodyId = player.equippedTotem.body;
       this.makeCard(box.x, box.y, box.width, box.height, TOTEM_BODIES[bodyId].label, 'totemBody', bodyId, 'equipped');
     }
-    // Têtes/corps toujours disponibles en pool (pas de notion de stock
-    // limité, cf. Player.js) -- répétées même si déjà utilisées.
+    // Têtes/corps toujours disponibles en pool (pas de stock limité).
     const headStep = 80;
     const headStartX = 480 - ((TOTEM_HEADS.length - 1) * headStep) / 2;
     TOTEM_HEADS.forEach((id, i) => {
-      this.makeCard(headStartX + i * headStep, 384, 70, 28, id, 'totemHead', id, null);
+      this.makeCard(headStartX + i * headStep, 372, 70, 28, id, 'totemHead', id, null);
     });
     const bodyEntries = Object.entries(TOTEM_BODIES);
     const bodyStep = 160;
     const bodyStartX = 480 - ((bodyEntries.length - 1) * bodyStep) / 2;
     bodyEntries.forEach(([id, def], i) => {
-      this.makeCard(bodyStartX + i * bodyStep, 424, 140, 28, def.label, 'totemBody', id, null);
+      this.makeCard(bodyStartX + i * bodyStep, 410, 140, 28, def.label, 'totemBody', id, null);
     });
 
     this.bonusText.setText(
       `Bonus actuels : +${player.maxHearts - HEART_MAX} cœur(s)  •  +${player.maxEnergy - ENERGY_MAX} énergie  •  x${player.skillSizeMultiplier.toFixed(2)} taille de compétence`,
     );
-
-    // La sélection par clic ne survit pas à une reconstruction (l'objet
-    // sélectionné vient d'être détruit) -- jamais de référence pendante.
+    if (!this.descText.text) {
+      // Rappel (règle de saut) : seule une forme aérienne équipée donne le double saut.
+      this.descText.setText(unlocked.length
+        ? 'Survole une carte pour voir ce qu\'elle fait. Sans forme aérienne équipée : un seul saut.'
+        : 'Aucune forme débloquée pour l\'instant.');
+    }
     this.selectedCard = null;
   }
 
-  // Éclaire/éteint le contour d'une carte pour montrer qu'elle est
-  // sélectionnée (mode clic-puis-clic, cf. en-tête du fichier).
   setCardHighlight(card, on) {
     const bg = card.getData('bg');
     bg.setStrokeStyle(on ? 3 : 1, on ? SELECT_HIGHLIGHT_COLOR : 0xffe9f5, on ? 1 : 0.5);
@@ -261,7 +300,6 @@ class CampfireMenuScene extends Phaser.Scene {
 
   selectCard(card) {
     if (this.selectedCard === card) {
-      // Cliquer à nouveau sur la carte déjà sélectionnée l'annule.
       this.setCardHighlight(card, false);
       this.selectedCard = null;
       return;
@@ -269,50 +307,31 @@ class CampfireMenuScene extends Phaser.Scene {
     if (this.selectedCard) this.setCardHighlight(this.selectedCard, false);
     this.selectedCard = card;
     this.setCardHighlight(card, true);
+    if (card.getData('desc')) this.descText.setText(card.getData('desc'));
   }
 
   wireInputEvents() {
-    // -- Glisser-déposer (mode 1).
+    // -- Glisser-déposer.
     this.input.on('drag', (pointer, gameObject, dragX, dragY) => {
       gameObject.x = dragX;
       gameObject.y = dragY;
     });
     this.input.on('dragstart', (pointer, gameObject) => {
       gameObject.setDepth(10);
-      // Marque le geste comme un glisser réel : le 'pointerup' qui suivra
-      // la relâche ne doit alors PAS être traité comme un clic de
-      // sélection (cf. plus bas) -- sans ce garde-fou, chaque glisser
-      // terminait aussi par une (re)sélection fantôme de la carte.
+      // Le 'pointerup' qui suit ne doit pas compter comme un clic de sélection.
       gameObject.setData('wasDragged', true);
     });
     this.input.on('drop', (pointer, gameObject, dropZone) => {
       this.applyDrop(gameObject, dropZone);
     });
-    // Dans TOUS les cas (déposée sur une zone valide, une invalide qui n'a
-    // pas donné lieu à un changement, ou nulle part) : reconstruit depuis
-    // l'état réel, ce qui remet chaque carte pile à sa place si rien n'a
-    // changé -- pas besoin de gérer le "retour en arrière" séparément.
+    // Reconstruit dans tous les cas : remet chaque carte à sa place si rien
+    // n'a changé.
     this.input.on('dragend', () => {
       this.rebuildUI();
     });
 
-    // -- Clic-puis-clic (mode 2, demande explicite) : cliquer une carte la
-    // sélectionne (surlignée), cliquer ensuite un emplacement/une zone de
-    // pool compatible l'y place -- exactement le même applyDrop() que le
-    // glisser, juste déclenché différemment.
-    //
-    // Tout passe par UN SEUL événement ('gameobjectup', déclenché au
-    // relâchement) plutôt que de répartir "sélectionner" sur 'up' et
-    // "placer" sur 'down' : un clic de placement fait apparaître (via
-    // rebuildUI) une nouvelle carte pile sous le pointeur, donc scinder
-    // la logique entre deux événements différents du MÊME clic ouvre une
-    // course -- le 'up' peut retomber tantôt sur la nouvelle carte,
-    // tantôt sur la zone statique en dessous, et un drapeau de
-    // suppression partagé entre les deux finit désynchronisé (bug réel
-    // rencontré ici : un clic de placement sur une zone laissait le
-    // drapeau bloqué à `true`, ce qui avalait silencieusement la
-    // sélection suivante). En ne décidant qu'au 'up', et seulement une
-    // fois, ce problème disparaît structurellement.
+    // -- Clic-puis-clic : tout décidé au relâchement ('gameobjectup'), une
+    // seule fois (cf. historique : scinder down/up créait une course).
     this.input.on('gameobjectup', (pointer, gameObject) => {
       if (this.dynamicCards.includes(gameObject)) {
         if (gameObject.getData('wasDragged')) {
@@ -332,19 +351,20 @@ class CampfireMenuScene extends Phaser.Scene {
 
   applyDrop(card, dropZone) {
     const kind = card.getData('kind');
-    if (dropZone.getData('kind') !== kind) return; // mauvaise catégorie, ignoré (rebuildUI la remet en place)
+    if (dropZone.getData('kind') !== kind) return; // mauvaise catégorie : rebuildUI la remet en place
     const zoneSlot = dropZone.getData('slotIndex');
     const sourceSlot = card.getData('slotIndex');
     const id = card.getData('id');
     const player = this.player;
 
     if (kind === 'form') {
-      if (sourceSlot !== null) player.equippedForms[sourceSlot] = null;
-      if (zoneSlot !== 'pool') player.equippedForms[zoneSlot] = id;
-      this.registry.set('equippedForms', player.equippedForms);
+      // Déposée sur N'IMPORTE QUEL emplacement de forme : rangée dans le sien
+      // (le singe remplace l'aigle et inversement, cf. Player.equipForm).
+      if (zoneSlot === 'pool') player.unequipForm(id);
+      else player.equipForm(id);
     } else if (kind === 'skill') {
       if (sourceSlot !== null) player.skillSlots[sourceSlot] = null;
-      if (zoneSlot !== 'pool') player.skillSlots[zoneSlot] = id;
+      if (zoneSlot !== 'pool') player.skillSlots[zoneSlot] = id; // l'ancien occupant retourne au pool
       this.registry.set('skillSlots', player.skillSlots);
     } else if (kind === 'totemHead' || kind === 'totemBody') {
       const field = kind === 'totemHead' ? 'head' : 'body';

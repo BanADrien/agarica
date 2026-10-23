@@ -1,0 +1,60 @@
+[
+  {
+    "source": "assets/sprites/xara_extra.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      73,
+      85
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          209,
+          208,
+          211,
+          209
+        ],
+        "horizontal_gaps": [
+          104,
+          66,
+          87
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          195,
+          226,
+          203,
+          198
+        ],
+        "horizontal_gaps": [
+          106,
+          75,
+          78
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          210,
+          240,
+          263,
+          210
+        ],
+        "horizontal_gaps": [
+          71,
+          82,
+          72
+        ]
+      }
+    ]
+  }
+]

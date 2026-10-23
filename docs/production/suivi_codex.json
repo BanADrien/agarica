@@ -1,0 +1,418 @@
+{
+  "pere_chef": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "amanite": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "geralt": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "morgat": {
+    "status": "fait",
+    "note": "Déclaré terminé par l’utilisateur le 6 octobre ; conservé sans modification."
+  },
+  "agarica_extra": {
+    "status": "à refaire",
+    "note": "p1/p2 sources conservées. p3 validée : 3/4/5 frames, bandes 86/68 px. p4 importée mais trop grande : 329-338 px au lieu de ~250. 37 frames présentes. p2 conservée sur demande malgré une bande de 59 px.",
+    "log": "imports/agarica_extra_force.log"
+  },
+  "xara_extra": {
+    "status": "fait",
+    "note": "12 frames contrôlées visuellement, aucune vide ou coupée. Bandes 73 et 85 px ; écarts horizontaux au moins 66 px. Import sans avertissement.",
+    "log": "imports/xara_extra.log"
+  },
+  "kainati": {
+    "status": "à refaire",
+    "note": "27 frames présentes, import sans avertissement et contrôle visuel sans vide/coupe. p2/p3/p4 marges conformes. p1 lancer : écarts de 23 et 8 px insuffisants. Échelle à harmoniser.",
+    "log": "imports/kainati_force.log"
+  },
+  "singe": {
+    "status": "fait",
+    "note": "25 frames, six animations ; import ciblé sans avertissement. Contrôle visuel : aucune frame vide ou coupée. Marges mesurées : >=67 px entre rangées, >=71 px horizontalement. Référence du singe brun utilisée.",
+    "log": "imports/singe.log"
+  },
+  "transfo_singe": {
+    "status": "à refaire",
+    "note": "4 silhouettes brunes, feuilles attachées, import sans avertissement. Écarts >=76 px. Première pose humaine trop grande : 322 px au lieu de ~250.",
+    "log": "imports/transfo_singe_force.log"
+  },
+  "kainati_esprit": {
+    "status": "fait",
+    "note": "8 frames contrôlées sans vide/coupe. Bande 89 px, écarts >=49 px. Import sans avertissement.",
+    "log": "imports/kainati_esprit_force.log"
+  },
+  "ghilt": {
+    "status": "à refaire",
+    "note": "24 frames importées sans avertissement, aucune vide/coupée. Marges conformes : bandes >=79 px, écarts >=40 px. Variation de taille entre planches : harmonisation requise.",
+    "log": "imports/ghilt_force.log"
+  },
+  "ghilt_gueri": {
+    "status": "à refaire",
+    "note": "6 frames importées sans avertissement, aucune vide/coupée. Bande 186 px, écarts >=53 px. Échelle des poses collapse à harmoniser avec idle.",
+    "log": "imports/ghilt_gueri_force.log"
+  },
+  "habitant_druide": {
+    "status": "fait",
+    "note": "12 frames, import sans avertissement ; contrôle visuel sans frame vide ou coupée. Bandes 84/77 px, écarts horizontaux >=101 px.",
+    "log": "imports/habitant_druide.log"
+  },
+  "habitant_porteur": {
+    "status": "fait",
+    "note": "9 frames, import sans avertissement ; contrôle visuel sans frame vide ou coupée. Bande 166 px, écarts horizontaux >=51 px. Seaux reliés au joug.",
+    "log": "imports/habitant_porteur.log"
+  },
+  "habitant_garde": {
+    "status": "fait",
+    "note": "13 frames contrôlées, sans vide ni coupe ; import sans avertissement. Bandes 82/67 px et écarts horizontaux >=59 px.",
+    "log": "imports/habitant_garde.log"
+  },
+  "clak": {
+    "status": "fait",
+    "note": "12 frames contrôlées sans vide ni coupe ; flèches connectées aux pinces. Bandes >=90 px et intervalles >=49 px. Import sans avertissement.",
+    "log": "imports/clak.log"
+  },
+  "papillon": {
+    "status": "à refaire",
+    "note": "4 frames importées sans avertissement, aucune vide/coupée. Écarts >=166 px. Largeur proche de 200 px au lieu de ~150 : réduction encore nécessaire.",
+    "log": "imports/papillon_force.log"
+  },
+  "cochon_bebe": {
+    "status": "fait",
+    "note": "8 frames contrôlées sans vide/coupe ni traits détachés. Bande 254 px, écarts >=132 px. Hauteurs 146-197 px selon pose ; trottinement 171-183 px. Import sans avertissement.",
+    "log": "imports/cochon_bebe_force.log"
+  },
+  "poisson": {
+    "status": "à refaire",
+    "note": "4 frames importées sans avertissement et sans vide/coupe. Écarts >=67 px. Échelle encore supérieure aux 260x120 px : largeur proche de 310 px, hauteur avec nageoires 170-199 px.",
+    "log": "imports/poisson_force.log"
+  },
+  "loup_sanguinaire": {
+    "status": "à refaire",
+    "note": "12 frames, bandes >=120 px et écarts >=76 px. Encore trop bas : 135-162 px selon pose au lieu de ~220 ; correction de hauteur à terminer.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "araignee": {
+    "status": "à refaire",
+    "note": "12 frames, bandes >=100 px et écarts >=67 px. Hauteur 170-197 px en repos/marche, 230 px en cabrage : échelle de l’attaque à harmoniser avec ~170 px.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "mousse_creature": {
+    "status": "à refaire",
+    "note": "13 frames, bandes >=145 px et écarts >=50 px. Hauteur <=173 px, mais largeur maximale 293 px hors padding au lieu de ~220 ; réduire les extensions.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "crapaud_corrompu": {
+    "status": "à refaire",
+    "note": "Disposition 4/1/4 conservée ; 5 attaques +4 repos sur canvas 1434x237. Corps ~200 px, bandes >=84 px. Écart de 8 px entre deux poses de la première rangée au lieu de >=40 : à reprendre.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "singe_corrompu": {
+    "status": "fait",
+    "note": "13 frames, singe brun de référence avec mousse toxique et yeux malades. Bandes >=124 px, écarts >=68 px ; hauteur 157-202 px selon pose ; contrôle visuel sans coupe ni frame vide.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "vfx_soin_papillon": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "vfx_souffle_toxique": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "vfx_flaque_mousse": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "vfx_purification": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "vfx_piste_loup": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "vfx_impact_pierre": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "pierre": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "idole": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "idole_fragment": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "talisman_ours": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "talisman_singe": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "totem_poche_casse": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "totem_poche_actif": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "bocal_antidote": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "repulsif": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fleur_resistante": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "carte_geralt": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "lance_amanite": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "mousse_amas_intact": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "mousse_amas_fissure": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "hud_coeur": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "hud_coeur_vide": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "totem_monkey_dim": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "totem_monkey_lit": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "liane": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "mousse_mur": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "porte_mousse": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "courant_air": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "form_icone_singe": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "skill_icone_ours": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "skill_icone_singe": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "skill_icone_papillon": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "dialogue_box": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "titre_logo": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "carte_parchemin": {
+    "status": "fait",
+    "note": "Lot du 22 octobre 2026 : source générée avec image_gen intégré, import contrôlé sans avertissement et contrôle visuel de la planche.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_agarica": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/agarica_extra.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_xara": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/xara_extra.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_amanite": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/amanite.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_pere_chef": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/pere_chef.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_geralt": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/geralt.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_morgat": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/morgat.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_kainati": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/kainati.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "portrait_ghilt": {
+    "status": "fait",
+    "note": "Portrait généré avec référence assets/sprites/ghilt.png ; visage et palette comparés visuellement ; sortie 512x512.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_bosquet": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_foret_sombre": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_grand_arbre": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_foret_flottante": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_foret_corrompue": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_monde_spirituel": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_trou_sombre": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "fond_arene_ghilt": {
+    "status": "fait",
+    "note": "Bords corrigés ; source et sortie importée collées chacune à elle-même. Contrôle visuel des montages et mesures dans controles/lot_2026-10-22/. Sortie 2079x756.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "tuiles_ecorce": {
+    "status": "fait",
+    "note": "Trois sources, disposition sol 4x4 + plateformes 1x3 + spéciaux 1x3 vérifiée visuellement ; 21 sorties importées sans avertissement.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "tuiles_flottantes": {
+    "status": "fait",
+    "note": "Trois sources, disposition sol 4x4 + plateformes 1x3 + spéciaux 1x3 vérifiée visuellement ; 21 sorties importées sans avertissement.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "tuiles_corrompues": {
+    "status": "fait",
+    "note": "Trois sources, disposition sol 4x4 + plateformes 1x3 + spéciaux 1x3 vérifiée visuellement ; 21 sorties importées sans avertissement.",
+    "log": "imports/lot_2026-10-22_validation.log"
+  },
+  "décor grand_arbre": {
+    "status": "à refaire",
+    "note": "Planche entière enregistrée au chemin demandé, aucune découpe. Deux passes de génération ; bases visuellement rapprochées mais bas des cases régulières pas strictement respecté et certaines silhouettes débordent de leur bande. Repositionnement encore nécessaire.",
+    "log": "controles/lot_2026-10-22/audit.json"
+  },
+  "grand_arbre_tronc` (planche décor)": {
+    "status": "à refaire",
+    "note": "Planche entière enregistrée au chemin demandé, aucune découpe. Deux passes de génération ; bases visuellement rapprochées mais bas des cases régulières pas strictement respecté et certaines silhouettes débordent de leur bande. Repositionnement encore nécessaire.",
+    "log": "controles/lot_2026-10-22/audit.json"
+  },
+  "décor foret_sombre": {
+    "status": "à refaire",
+    "note": "Planche entière enregistrée au chemin demandé, aucune découpe. Deux passes de génération ; bases visuellement rapprochées mais bas des cases régulières pas strictement respecté et certaines silhouettes débordent de leur bande. Repositionnement encore nécessaire.",
+    "log": "controles/lot_2026-10-22/audit.json"
+  },
+  "décor foret_flottante": {
+    "status": "à refaire",
+    "note": "Planche entière enregistrée au chemin demandé, aucune découpe. Deux passes de génération ; bases visuellement rapprochées mais bas des cases régulières pas strictement respecté et certaines silhouettes débordent de leur bande. Repositionnement encore nécessaire.",
+    "log": "controles/lot_2026-10-22/audit.json"
+  },
+  "décor foret_corrompue": {
+    "status": "à refaire",
+    "note": "Planche entière enregistrée au chemin demandé, aucune découpe. Deux passes de génération ; bases visuellement rapprochées mais bas des cases régulières pas strictement respecté et certaines silhouettes débordent de leur bande. Repositionnement encore nécessaire.",
+    "log": "controles/lot_2026-10-22/audit.json"
+  },
+  "décor hutte_morgat": {
+    "status": "à refaire",
+    "note": "Planche entière enregistrée au chemin demandé, aucune découpe. Deux passes de génération ; bases visuellement rapprochées mais bas des cases régulières pas strictement respecté et certaines silhouettes débordent de leur bande. Repositionnement encore nécessaire.",
+    "log": "controles/lot_2026-10-22/audit.json"
+  }
+}

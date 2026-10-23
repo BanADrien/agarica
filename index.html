@@ -92,6 +92,25 @@
       min-height: 32px;
       line-height: 1.4;
     }
+    #editor-ui details summary {
+      cursor: pointer;
+      color: #a99bd6;
+      margin-bottom: 6px;
+    }
+    #editor-ui details label {
+      margin-top: 6px;
+    }
+    #editor-ui label.inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #selection-info, #zone-extra-keys {
+      font-size: 11px;
+      color: #a99bd6;
+      word-break: break-all;
+      margin-top: 4px;
+    }
     body.editor-mode #game-container {
       width: calc(100vw - 240px);
     }
@@ -320,6 +339,7 @@
 
     <div class="editor-section">
       <button id="btn-zones-overview">Zones</button>
+      <select id="zone-quick-select" style="margin-top:4px"></select>
     </div>
 
     <div class="editor-section">
@@ -338,6 +358,20 @@
         <button data-tool="campfire">Feu de camp</button>
         <button data-tool="delete">Supprimer</button>
         <button data-tool="modify">Modifier</button>
+      </div>
+      <!-- Éléments de l'histoire (PNJ, déclencheurs, mousse, lianes...) :
+           options remplies par EditorScene.wireUI (EDITOR_STORY_KINDS). -->
+      <select id="tool-more-select" style="margin-top:4px">
+        <option value="">Plus d'outils (histoire)…</option>
+      </select>
+    </div>
+
+    <div class="editor-section" id="selection-section" style="display:none">
+      <label>Élément sélectionné</label>
+      <div id="selection-info"></div>
+      <div class="row" style="margin-top:4px">
+        <button id="btn-selection-props">Propriétés…</button>
+        <button id="btn-selection-json">JSON…</button>
       </div>
     </div>
 
@@ -361,6 +395,25 @@
       </div>
       <button id="apply-size-btn" style="margin-top:4px">Appliquer</button>
     </div>
+
+    <details class="editor-section" id="zone-props-section">
+      <summary>Propriétés de la zone</summary>
+      <label>Nom affiché (zoneName)</label>
+      <input id="zone-name-input" type="text" placeholder="ex: Forêt sombre" />
+      <label>Fond (background)</label>
+      <select id="zone-background-select"></select>
+      <label>Tuiles (tileset)</label>
+      <select id="zone-tileset-select"></select>
+      <label>Xara</label>
+      <select id="zone-xara-select">
+        <option value="">Défaut (si rencontrée)</option>
+        <option value="false">Absente (xara: false)</option>
+      </select>
+      <label>Script de zone (ZONE_SCRIPTS)</label>
+      <input id="zone-script-input" type="text" placeholder="ex: kainati_arene" />
+      <label class="inline"><input id="zone-tall-input" type="checkbox" /> Niveau haut (tallLevel)</label>
+      <div id="zone-extra-keys"></div>
+    </details>
 
     <div class="editor-section">
       <label>Nom du niveau à enregistrer</label>
@@ -395,6 +448,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="src/utils/LevelKit.js"></script>
+  <script src="src/data/asset_present.js"></script>
+  <script src="src/data/asset_manifest.js"></script>
+  <script src="src/utils/StoryKit.js"></script>
   <script src="src/data/zone1_data.js"></script>
   <script src="src/data/zonetest_data.js"></script>
   <script src="src/data/zone2_data.js"></script>
@@ -403,6 +459,21 @@
   <script src="src/data/zone5_data.js"></script>
   <script src="src/data/zone_aquatique_data.js"></script>
   <script src="src/data/sous_grotte_data.js"></script>
+  <script src="src/data/bosquet_data.js"></script>
+  <script src="src/data/foret_sombre_1_data.js"></script>
+  <script src="src/data/foret_sombre_2_data.js"></script>
+  <script src="src/data/grand_arbre_racines_data.js"></script>
+  <script src="src/data/grand_arbre_arene_data.js"></script>
+  <script src="src/data/monde_spirituel_data.js"></script>
+  <script src="src/data/epreuve_singe_data.js"></script>
+  <script src="src/data/foret_flottante_1_data.js"></script>
+  <script src="src/data/foret_flottante_2_data.js"></script>
+  <script src="src/data/clairiere_plante_data.js"></script>
+  <script src="src/data/hutte_morgat_data.js"></script>
+  <script src="src/data/foret_corrompue_1_data.js"></script>
+  <script src="src/data/arene_ghilt_data.js"></script>
+  <script src="src/data/trou_sombre_data.js"></script>
+  <script src="src/data/bosquet_retour_data.js"></script>
   <script src="src/entities/Player.js"></script>
   <script src="src/entities/Xara.js"></script>
   <script src="src/entities/LoupSanguinaire.js"></script>
@@ -412,6 +483,21 @@
   <script src="src/entities/Corbeau.js"></script>
   <script src="src/entities/LoupAlpha.js"></script>
   <script src="src/entities/Crapaud.js"></script>
+  <script src="src/entities/Liane.js"></script>
+  <script src="src/entities/Piste.js"></script>
+  <script src="src/entities/CourantAir.js"></script>
+  <script src="src/entities/Projectiles.js"></script>
+  <script src="src/entities/Kainati.js"></script>
+  <script src="src/entities/Ghilt.js"></script>
+  <script src="src/entities/MousseCreature.js"></script>
+  <script src="src/entities/SingeCorrompu.js"></script>
+  <script src="src/entities/CrapaudCorrompu.js"></script>
+  <script src="src/entities/Animaux.js"></script>
+  <script src="src/story/boss_kainati.js"></script>
+  <script src="src/story/boss_ghilt.js"></script>
+  <script src="src/story/acte1.js"></script>
+  <script src="src/story/acte1_arbre.js"></script>
+  <script src="src/story/acte2.js"></script>
   <script src="src/scenes/BootScene.js"></script>
   <script src="src/scenes/PrologueScene.js"></script>
   <script src="src/scenes/Zone1Scene.js"></script>
@@ -425,6 +511,30 @@
   <script src="src/scenes/EndScreenScene.js"></script>
   <script src="src/scenes/EditorScene.js"></script>
   <script src="src/scenes/CampfireMenuScene.js"></script>
+  <script src="src/scenes/DialogueScene.js"></script>
+  <script src="src/scenes/InventoryScene.js"></script>
+  <script src="src/scenes/MapScene.js"></script>
+  <script src="src/scenes/MenuKit.js"></script>
+  <script src="src/scenes/OptionsScene.js"></script>
+  <script src="src/scenes/ControlsScene.js"></script>
+  <script src="src/scenes/CreditsScene.js"></script>
+  <script src="src/scenes/PauseScene.js"></script>
+  <script src="src/scenes/TitleScene.js"></script>
+  <script src="src/scenes/BosquetScene.js"></script>
+  <script src="src/scenes/ForetSombre1Scene.js"></script>
+  <script src="src/scenes/ForetSombre2Scene.js"></script>
+  <script src="src/scenes/GrandArbreRacinesScene.js"></script>
+  <script src="src/scenes/GrandArbreAreneScene.js"></script>
+  <script src="src/scenes/MondeSpirituelScene.js"></script>
+  <script src="src/scenes/EpreuveSingeScene.js"></script>
+  <script src="src/scenes/ForetFlottante1Scene.js"></script>
+  <script src="src/scenes/ForetFlottante2Scene.js"></script>
+  <script src="src/scenes/ClairierePlanteScene.js"></script>
+  <script src="src/scenes/HutteMorgatScene.js"></script>
+  <script src="src/scenes/ForetCorrompue1Scene.js"></script>
+  <script src="src/scenes/AreneGhiltScene.js"></script>
+  <script src="src/scenes/TrouSombreScene.js"></script>
+  <script src="src/scenes/BosquetRetourScene.js"></script>
   <script src="src/main.js"></script>
 </body>
 </html>

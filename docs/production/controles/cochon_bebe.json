@@ -1,0 +1,44 @@
+[
+  {
+    "source": "assets/sprites/cochon_bebe.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      254
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          146,
+          197,
+          176,
+          181
+        ],
+        "horizontal_gaps": [
+          158,
+          166,
+          173
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          180,
+          183,
+          181,
+          171
+        ],
+        "horizontal_gaps": [
+          152,
+          149,
+          132
+        ]
+      }
+    ]
+  }
+]

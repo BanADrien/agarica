@@ -1,0 +1,27 @@
+[
+  {
+    "source": "assets/sprites/poisson.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          199,
+          170,
+          181,
+          183
+        ],
+        "horizontal_gaps": [
+          68,
+          72,
+          67
+        ]
+      }
+    ]
+  }
+]

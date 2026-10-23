@@ -19,6 +19,15 @@ existants (cf. LevelKit.js).
 
 Usage:
     python crop_deco_items.py <section_dir> [--min-area N] [--pad N]
+    python crop_deco_items.py --named [section ...]   (planches de PLANCHES)
+
+Mode --named (planches Codex de CODEX_SPRITES_A_GENERER.md, « Planches de
+décor ») : découpe ET nomme directement chaque item d'après la table
+PLANCHES (noms dans l'ordre de lecture de la grille de la planche), rogné au
+contenu avec la base AU RAS DU BAS de l'image (le jeu pose le bas de l'image
+sur la ligne de marche). Déterministe : relançable sans risque, n'écrit que
+les noms de la table (les props déjà triés à la main ne sont pas touchés).
+Les avertissements ci-dessous ne concernent que le mode historique.
 
 Écrit dans assets/decors/deco_item_frames/<section>/<section>_NN.png, dans
 un ordre de lecture (rangée du haut vers le bas, gauche vers droite au sein
@@ -114,14 +123,199 @@ def crop_section(section_dir: Path, min_area: int, pad: int):
     print(f'\n{count} item(s) written to {out_dir}')
 
 
+# ---------------------------------------------------------------------------
+# Mode --named. Pour chaque planche : fichier source (dans 'déco item/'),
+# grille (colonnes, rangées) demandée à Codex, noms dans l'ordre de lecture
+# (sans le préfixe de section) -- à garder synchro avec DECOR_SECTIONS
+# (src/utils/LevelKit.js). `rows_max_y` : ne garder que les items dont le bas
+# est au-dessus de ce y (1re rangée de la planche du bosquet). `cuts` : x de
+# découpe verticale d'un groupe d'items qui se touchent (bâtiments du bosquet,
+# coupés aux creux de la silhouette).
+PLANCHES = {
+    'foret_sombre': {
+        'file': 'foret_sombre/foret_sombre_planche.png', 'grid': (4, 3),
+        'names': ['arbre_moussu', 'souche_champignons', 'rocher_mousse', 'champignons_lumineux',
+                  'racine_arche', 'buisson_epineux', 'tronc_couche', 'fougere_sombre',
+                  'toile_araignee', 'mare_bord', 'pierre_runique', 'fleur_corniche'],
+    },
+    'grand_arbre': {
+        'file': 'grand_arbre/grand_arbre_planche.png', 'grid': (4, 3),
+        'names': ['racine_tunnel', 'champignon_etagere', 'nid_singe', 'tas_pierres',
+                  'morceaux_ecorce', 'lanterne_lucioles', 'statue_simien', 'rideau_lianes',
+                  'trou_tronc', 'autel_singe'],
+    },
+    'grand_arbre_tronc': {
+        'file': 'grand_arbre_tronc/grand_arbre_tronc_planche.png', 'grid': (5, 2),
+        'names': ['paroi_ecorce', 'paroi_noeud', 'branche_courte', 'branche_longue', 'escalier_racines',
+                  'fenetre_lune', 'lianes_hautes', 'champignons_lumineux', 'seve_corrompue', 'corniche_mousse'],
+    },
+    'foret_flottante': {
+        'file': 'foret_flottante/foret_flottante_planche.png', 'grid': (4, 3),
+        'names': ['ile_petite', 'ile_moyenne', 'rocher_flottant', 'nuage',
+                  'arbre_jeune', 'pont_corde', 'tente_geralt', 'panneau_geralt',
+                  'pissenlit_geant', 'fleurs_hautes'],
+    },
+    'foret_corrompue': {
+        'file': 'foret_corrompue/foret_corrompue_planche.png', 'grid': (4, 3),
+        'names': ['arbre_malade', 'souche_corrompue', 'pustule_mousse', 'racine_tordue',
+                  'os_creature', 'cocon_mousse', 'champignon_toxique', 'rocher_fissure',
+                  'pilier_arene', 'arche_arene', 'pierre_symbole'],
+    },
+    'hutte_morgat': {
+        'file': 'hutte_morgat/hutte_morgat_planche.png', 'grid': (4, 3),
+        'names': ['hutte_morgat', 'chaudron', 'etagere_bocaux', 'table_herbes',
+                  'sechoir_plantes', 'lanterne_papillons', 'panier_plantes', 'tapis_rond',
+                  'pot_fleurs', 'bocal_papillons'],
+    },
+    # Bâtiments de la 1re rangée de la planche du bosquet (les autres items
+    # de cette planche sont déjà découpés et renommés à la main).
+    'bosquet': {
+        'file': 'bosquet/bosquet componant.png', 'grid': (1, 1), 'rows_max_y': 490,
+        'cuts': [408, 558, 738, 847],
+        'names': ['cabane_arbre', 'hutte_mousse', 'hutte_paille', 'cottage', 'tour', 'tente',
+                  'muraille_tour', 'muraille_pan', 'muraille_pan_2', 'muraille_tour_2', 'muraille_porte'],
+    },
+}
+ITEM_MIN_AREA = 5000   # en dessous : morceau détaché (graine, goutte) rattaché à l'item le plus proche
+ATTACH_DIST = 80       # px : au-delà, morceau isolé = bruit, ignoré
+
+
+def _bbox(mask):
+    ys, xs = np.nonzero(mask)
+    return xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
+
+
+def _seam(content, cx, half=24):
+    """x de coupe par rangée (de haut en bas, pas de ±1 px par rangée, dans
+    [cx-half, cx+half]) qui traverse le moins de pixels opaques."""
+    h = content.shape[0]
+    x0 = cx - half
+    cost = content[:, x0:cx + half + 1].astype(np.int32)
+    acc = cost.copy()
+    for y in range(1, h):
+        prev = acc[y - 1]
+        best = np.minimum(prev, np.minimum(np.roll(prev, 1), np.roll(prev, -1)))
+        best[0] = min(prev[0], prev[1])
+        best[-1] = min(prev[-1], prev[-2])
+        acc[y] += best
+    seam = np.zeros(h, dtype=np.int64)
+    x = int(np.argmin(acc[-1]))
+    for y in range(h - 1, -1, -1):
+        seam[y] = x0 + x
+        if y:
+            lo, hi = max(0, x - 1), min(acc.shape[1], x + 2)
+            x = lo + int(np.argmin(acc[y - 1, lo:hi]))
+    return seam
+
+
+def _gap(a, b):
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    dx = max(0, max(ax0, bx0) - min(ax1, bx1))
+    dy = max(0, max(ay0, by0) - min(ay1, by1))
+    return max(dx, dy)
+
+
+def crop_named(section, spec, pad=2):
+    arr = np.array(Image.open(SOURCE_DIR / spec['file']).convert('RGBA'))
+    h = arr.shape[0]
+    labeled, n = ndimage.label(arr[:, :, 3] > 30, structure=np.ones((3, 3), dtype=int))
+    masks = [labeled == i for i in range(1, n + 1)]
+    if spec.get('rows_max_y'):
+        masks = [m for m in masks if _bbox(m)[3] <= spec['rows_max_y']]
+    # Groupe d'items qui se touchent : coupé autour des x donnés, le long d'un
+    # tracé vertical qui traverse le moins de pixels opaques possible (une
+    # coupe droite tranchait le bout de toit d'un voisin).
+    for cx in spec.get('cuts', []):
+        content = arr[:, :, 3] > 30
+        if spec.get('rows_max_y'):
+            content[spec['rows_max_y']:] = False
+        seam = _seam(content, cx)
+        cols = np.arange(arr.shape[1])[None, :]
+        left_of = cols < seam[:, None]
+        out = []
+        for m in masks:
+            x0, _, x1, _ = _bbox(m)
+            if x0 < cx < x1:
+                out += [m & left_of, m & ~left_of]
+            else:
+                out.append(m)
+        masks = out
+    if spec.get('cuts'):
+        # Un bout de toit coupé du mauvais côté devient un petit morceau à part,
+        # rattaché plus bas à l'item le plus proche (le sien, collé à la coupe).
+        split = []
+        for m in masks:
+            lab, k = ndimage.label(m, structure=np.ones((3, 3), dtype=int))
+            split += [lab == i for i in range(1, k + 1)]
+        masks = split
+    big = [m for m in masks if m.sum() >= ITEM_MIN_AREA]
+    for m in masks:
+        if m.sum() >= ITEM_MIN_AREA:
+            continue
+        bb = _bbox(m)
+        best = min(big, key=lambda b: _gap(_bbox(b), bb), default=None)
+        if best is not None and _gap(_bbox(best), bb) <= ATTACH_DIST:
+            best |= m
+    cols, rows = spec['grid']
+    band = h / rows
+    names = spec['names']
+
+    def row_of(m):
+        _, y0, _, y1 = _bbox(m)
+        return int(((y0 + y1) / 2) // band)
+
+    def spans(m):
+        _, y0, _, y1 = _bbox(m)
+        return int((y1 - 1) // band) - int(y0 // band)
+
+    # Item à cheval sur deux rangées de la grille (deux props qui se touchent,
+    # ex. souche + cocon suspendu) : coupé au bas des autres items de sa rangée.
+    while len(big) < len(names) and rows > 1:
+        cand = max(big, key=lambda m: (spans(m), _bbox(m)[3] - _bbox(m)[1]))
+        if spans(cand) < 1:
+            break
+        row = int(_bbox(cand)[1] // band)
+        bottoms = [_bbox(m)[3] for m in big if m is not cand and row_of(m) == row]
+        cut = max(bottoms) if bottoms else int((row + 1) * band)
+        top, bottom = cand.copy(), cand.copy()
+        top[cut:] = False
+        bottom[:cut] = False
+        big = [m for m in big if m is not cand]
+        big += [top, bottom]
+    if len(big) != len(names):
+        print(f'[{section}] {len(big)} items trouvés, {len(names)} attendus : rien écrit')
+        return 0
+    big.sort(key=lambda m: (row_of(m), _bbox(m)[0]))
+    out_dir = OUTPUT_ROOT / section
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for name, m in zip(names, big):
+        x0, y0, x1, y1 = _bbox(m)
+        crop = arr[y0:y1, x0:x1].copy()
+        crop[~m[y0:y1, x0:x1]] = 0
+        # Marge en haut et sur les côtés seulement : la base reste au ras du bas.
+        im = Image.new('RGBA', (x1 - x0 + 2 * pad, y1 - y0 + pad), (0, 0, 0, 0))
+        im.paste(Image.fromarray(crop, 'RGBA'), (pad, pad))
+        im.save(out_dir / f'{section}_{name}.png')
+        print(f'{section}_{name}.png  {im.width}x{im.height}  (planche {x0},{y0}-{x1},{y1})')
+    return len(names)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('section', help='Section folder name under "assets/decors/déco item/"')
+    parser.add_argument('section', nargs='*', help='Section folder name under "assets/decors/déco item/"')
+    parser.add_argument('--named', action='store_true', help='planches de PLANCHES : découpe + noms définitifs')
     parser.add_argument('--min-area', type=int, default=200)
     parser.add_argument('--pad', type=int, default=4)
     args = parser.parse_args()
 
-    section_dir = SOURCE_DIR / args.section
+    if args.named:
+        for section in (args.section or list(PLANCHES)):
+            crop_named(section, PLANCHES[section])
+        return
+    if len(args.section) != 1:
+        raise SystemExit('Une section (mode historique) ou --named [sections]')
+    section_dir = SOURCE_DIR / args.section[0]
     if not section_dir.is_dir():
         raise SystemExit(f'No such section folder: {section_dir}')
     crop_section(section_dir, args.min_area, args.pad)

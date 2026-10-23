@@ -1,0 +1,60 @@
+[
+  {
+    "source": "assets/sprites/clak.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      143,
+      90
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          188,
+          192,
+          161,
+          152
+        ],
+        "horizontal_gaps": [
+          103,
+          105,
+          126
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          172,
+          168,
+          173,
+          172
+        ],
+        "horizontal_gaps": [
+          101,
+          73,
+          102
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          183,
+          150,
+          150,
+          238
+        ],
+        "horizontal_gaps": [
+          87,
+          94,
+          49
+        ]
+      }
+    ]
+  }
+]

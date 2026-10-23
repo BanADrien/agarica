@@ -1,0 +1,60 @@
+[
+  {
+    "source": "assets/sprites/habitant_druide.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      84,
+      77
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          258,
+          258,
+          257,
+          257
+        ],
+        "horizontal_gaps": [
+          209,
+          190,
+          194
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          263,
+          251,
+          213,
+          264
+        ],
+        "horizontal_gaps": [
+          163,
+          141,
+          156
+        ]
+      },
+      {
+        "row": 2,
+        "count": 4,
+        "heights": [
+          250,
+          238,
+          244,
+          257
+        ],
+        "horizontal_gaps": [
+          101,
+          116,
+          109
+        ]
+      }
+    ]
+  }
+]

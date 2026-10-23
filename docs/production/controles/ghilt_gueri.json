@@ -1,0 +1,40 @@
+[
+  {
+    "source": "assets/sprites/ghilt_gueri.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      186
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 3,
+        "heights": [
+          334,
+          333,
+          333
+        ],
+        "horizontal_gaps": [
+          59,
+          53
+        ]
+      },
+      {
+        "row": 1,
+        "count": 3,
+        "heights": [
+          295,
+          265,
+          191
+        ],
+        "horizontal_gaps": [
+          107,
+          97
+        ]
+      }
+    ]
+  }
+]

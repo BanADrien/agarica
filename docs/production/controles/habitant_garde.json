@@ -1,0 +1,62 @@
+[
+  {
+    "source": "assets/sprites/habitant_garde.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "row_gaps": [
+      82,
+      67
+    ],
+    "frames": [
+      {
+        "row": 0,
+        "count": 4,
+        "heights": [
+          288,
+          290,
+          289,
+          288
+        ],
+        "horizontal_gaps": [
+          185,
+          181,
+          179
+        ]
+      },
+      {
+        "row": 1,
+        "count": 4,
+        "heights": [
+          248,
+          244,
+          235,
+          251
+        ],
+        "horizontal_gaps": [
+          113,
+          66,
+          85
+        ]
+      },
+      {
+        "row": 2,
+        "count": 5,
+        "heights": [
+          275,
+          276,
+          275,
+          270,
+          275
+        ],
+        "horizontal_gaps": [
+          61,
+          59,
+          70,
+          61
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,461 @@
+[
+  {
+    "path": "assets/sprites/agarica_extra.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "bc203aebf72786ce13287147b5eb49b19b748570fa94b55a071fed39c1b3606d"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_p2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "b0ff22e29add32d239228c9a440d902afe2d4c300e6083455ea538295a1a3a32"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_p3.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "b3ea6a854c20436e1cec7bfab07c584b3db60a405c4c50ee640773a2b971df9d"
+  },
+  {
+    "path": "assets/sprites/agarica_extra_p4.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "2e84053a1132194cca4e90d7aca41ed2a15dcc5e6b84bf0ccf915a85e3f7e98e"
+  },
+  {
+    "path": "assets/sprites/transfo_singe.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "394f9cf2ca6096563f1a7fe6e21394196884a548f1f1bdfd82ede133893cbf31"
+  },
+  {
+    "path": "assets/_codex_src/portrait_agarica.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "mode": "RGBA",
+    "sha256": "b70e148b05420fd1f97a7231d7e5cbe38dc2c4e4ec666fd22e2ea3b7ee173221"
+  },
+  {
+    "path": "assets/sprites/agarica_attack.png",
+    "size": [
+      2172,
+      724
+    ],
+    "mode": "RGBA",
+    "sha256": "f68f265a6ced166ab355509dc66dc9101e196b1af27f1b1bfdf1e49429afbabe"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_ours.png",
+    "size": [
+      2171,
+      724
+    ],
+    "mode": "RGBA",
+    "sha256": "e2aebac970a3c0b3291188ac09d04103334b903edb48a3812d1ba529226efc09"
+  },
+  {
+    "path": "assets/_codex_src/titre_logo.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "547f89223539e97771172e3a44cb9c7b5e8815aa8a57dd33331a66dcda3ba8ac"
+  },
+  {
+    "path": "assets/sprites/geralt.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "2ce709c1ad01e2cfa3b3b870cf7a29e8f1240159f42ca9c7c9d25f1a7a8b6daa"
+  },
+  {
+    "path": "assets/sprites/geralt_p2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "b52b5d9d193e8267d8e2851a5c6e43c4fe19b513f66214169b86b0527d12dbed"
+  },
+  {
+    "path": "assets/_codex_src/portrait_geralt.png",
+    "size": [
+      1254,
+      1254
+    ],
+    "mode": "RGBA",
+    "sha256": "de554b6cb673b186ad2edfa1f9b68ebbdfadb6ac5ca21a00b7e4e1673f5b1157"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row0_0.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "061239b9657ae4812b4a9c8a54ce03a00b4fff3434956bffc88b8c1af1bbaed3"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row0_1.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "1942a12dd89fc54751d26c9318b70567c53bae26ad698ac67d6ffd0863c92ef5"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row0_2.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "059c556674326dc9f64c9e178c2053ed7ff422fa650d720e3c7ab28a556f8ab9"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row0_3.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "f13fd355b90450a320c27e30f94fc5c98fa13a215711327cfa54c87fd89c48df"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row0_4.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "6b51021134de24934e498a9a0ae44f380e4ec4719c575e52fdf204a02c53b721"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row0_5.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "ceec1c42841de4b11eb3913ec73df3d5d7c84664be3e6333a625646d0ca6a3ae"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row1_0.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "894f5bfe13759f58a5226712a8d3e16219d352c78d4d3f66a09f89811f3d7f16"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row1_1.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "dce73ec087497a3b695a4bc0535dae77610f3253cdc60db40f29119ee97b1acf"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row1_2.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "583d59d0ebb849c5951bbf6ea50291352832cb7771bfa226e6f627d16382db6f"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row1_3.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "a5f0b8cd6f110114f9fbfab1353f2288bd176fa7b0874ab996a6a6e77e89ccdf"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row1_4.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "862c8f1ebe791cee64258da43a9765f666e4e5f1b785a671479cd0fad8367173"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row2_0.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "8cf8e38cd280bb53ca1b7781b630a383ca7652fc644fafdc603240649f77f88b"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row2_1.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "f3d061ad545158a8e191b5017657e5043035ef3a449bee069b1889a26b777838"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row2_2.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "db2f5c0d1645142108ed9fa5a5e7c5eddd5293d1d2663dfe28e3f0cfadf50dda"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row2_3.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "44069e878618442d3d1b100af5ff3b39c8d7f0319651f2b67b5f351d28accfdc"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row2_4.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "3cbff322086711a8cdb3c61f1fd84dccc5c01144cb7bdb17b8b1e9ddb5065e34"
+  },
+  {
+    "path": "assets/sprites/agarica_frames/agarica_row2_5.png",
+    "size": [
+      232,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "e32687d651d123d853db978545fa1a8cad77c273f60caf12fe186261a9c5fa83"
+  },
+  {
+    "path": "assets/sprites/agarica_walk_frames/agarica_walk_0.png",
+    "size": [
+      261,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "c71ea1a9361f7926f622d08ce08c4e9604074f7c79bb9c1ed43bc81a03b03f48"
+  },
+  {
+    "path": "assets/sprites/agarica_walk_frames/agarica_walk_1.png",
+    "size": [
+      261,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "c483fa1c3856fe16487a6391a6a6f2bf6d9358f8ac2727df30b3408f98c0d70c"
+  },
+  {
+    "path": "assets/sprites/agarica_walk_frames/agarica_walk_2.png",
+    "size": [
+      261,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "432998e9c3d5bd5b4a6b05d2b1ee19278d79b5c3ba77133d01eef49f83cfc0a3"
+  },
+  {
+    "path": "assets/sprites/agarica_walk_frames/agarica_walk_3.png",
+    "size": [
+      261,
+      357
+    ],
+    "mode": "RGBA",
+    "sha256": "cdf25c836fab78a7a3a7b4aafc669774c8bcb53153733b10a0f1757c4b8aed9f"
+  },
+  {
+    "path": "assets/sprites/agarica_attack_frames/agarica_attack_0.png",
+    "size": [
+      1424,
+      366
+    ],
+    "mode": "RGBA",
+    "sha256": "2b787e3fffd9d8c1918207d6a66c14001fb22f5457cb5d5d105f062f6dca7a2b"
+  },
+  {
+    "path": "assets/sprites/agarica_attack_frames/agarica_attack_1.png",
+    "size": [
+      1424,
+      366
+    ],
+    "mode": "RGBA",
+    "sha256": "0bcd4a03328a169379cbdd9f203b3bfaee53eb2f9c9b7e1c1995c1ce37dd1b97"
+  },
+  {
+    "path": "assets/sprites/agarica_attack_frames/agarica_attack_2.png",
+    "size": [
+      1424,
+      366
+    ],
+    "mode": "RGBA",
+    "sha256": "bfe753cf0ecb54e91bad4d7cd11c3a8507db2b4c5d2e4ae9dc2e5ce985fb4afa"
+  },
+  {
+    "path": "assets/sprites/agarica_attack_frames/agarica_attack_3.png",
+    "size": [
+      1424,
+      366
+    ],
+    "mode": "RGBA",
+    "sha256": "f92bf6a6cc27882b2edd2514a03b3764ed3f09a46c9fd92c265e6e33a33ca836"
+  },
+  {
+    "path": "assets/sprites/agarica_attack_frames/agarica_attack_4.png",
+    "size": [
+      487,
+      354
+    ],
+    "mode": "RGBA",
+    "sha256": "7d155c1764908653c929fc0d07759ecb28043bf1a8961eb4c860545543e37878"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_frames/transfo_row0_1.png",
+    "size": [
+      308,
+      266
+    ],
+    "mode": "RGBA",
+    "sha256": "a07d97ac826ce78743e82822bd5aefee73f8147d3a298827accde15aba03e171"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_frames/transfo_row0_2.png",
+    "size": [
+      308,
+      266
+    ],
+    "mode": "RGBA",
+    "sha256": "143ea3d7242241cf01e3f6a2ae2230b97476a3c9ac4fab29559d30115efcf477"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_frames/transfo_row1_1.png",
+    "size": [
+      308,
+      266
+    ],
+    "mode": "RGBA",
+    "sha256": "eb95722f72946c7c5fa36314ac0dc1b2d9a649c98d5445c6894dd72d447a7aa1"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_loup_frames/transfoloup_1.png",
+    "size": [
+      1503,
+      1046
+    ],
+    "mode": "RGBA",
+    "sha256": "26324817f89fac9ec8bf69275a0a0a00e6ae3018dc38e732dec21c1a49e80ae0"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_loup_frames/transfoloup_2.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "65c99f6400a0f795af26ef98f4acdf6af07d6f658a07554274af52c8a46e4827"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_loup_piaf_frames/transfoloup_piaf_0.png",
+    "size": [
+      1453,
+      1024
+    ],
+    "mode": "RGBA",
+    "sha256": "19a55c4a549fc663092174613c9a2dd6974f313fb8d6b2b38d21ea817310f7ad"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_ours_frames/transfo_ours_row0_0.png",
+    "size": [
+      738,
+      493
+    ],
+    "mode": "RGBA",
+    "sha256": "c31020197c61ffbb3e800a5e27df5f8ad8ba9449ec98f43d28f80d32b2dce4f6"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_ours_frames/transfo_ours_row0_1.png",
+    "size": [
+      738,
+      493
+    ],
+    "mode": "RGBA",
+    "sha256": "b55893147b8f86ff456081d080aac9bd40124dcad4fb27eed41e178f3ffa97e5"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_ours_frames/transfo_ours_row0_2.png",
+    "size": [
+      738,
+      493
+    ],
+    "mode": "RGBA",
+    "sha256": "46b4a5d273a8f776e4e5c9fcd3f2e1a1ce373ca60fb2fd4b19b6a1863b1f8157"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_0.png",
+    "size": [
+      332,
+      436
+    ],
+    "mode": "RGBA",
+    "sha256": "31e6861f1da82f1215df3c2c91e05832b25976a3155b3ce5a120a238e1135b5e"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_1.png",
+    "size": [
+      332,
+      436
+    ],
+    "mode": "RGBA",
+    "sha256": "4f88454a30c175b375e9daf4bf1c6946358cb8f0553bce6d74c86d2c795d9978"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_2.png",
+    "size": [
+      332,
+      436
+    ],
+    "mode": "RGBA",
+    "sha256": "05a15dbcfe5c97c804dbfb66f0d5a19dbd60c7862fe8a4ffeeb72340fa528e1c"
+  },
+  {
+    "path": "assets/sprites/transformation/transfo_pieuvre_frames/transfopieuvre_3.png",
+    "size": [
+      332,
+      436
+    ],
+    "mode": "RGBA",
+    "sha256": "4049a6aecc1116bcfc7da027ff2d29c327e803efafd840487c7f995e91f4b897"
+  }
+]
