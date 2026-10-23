@@ -73,6 +73,7 @@ const ASSET_PRESENT = new Set([
   "assets/decors/tuiles_flottantes_frames/dirt_t.png",
   "assets/decors/tuiles_flottantes_frames/dirt_tl.png",
   "assets/decors/tuiles_flottantes_frames/dirt_tr.png",
+  "assets/items/firecamp_menu/interface.png",
   "assets/items/form_icone/papillon.png",
   "assets/items/form_icone/singe.png",
   "assets/items/objets/bocal_antidote.png",

@@ -15,7 +15,7 @@ Tu travailles dans le dépôt du jeu « Legend of Agarica » (Phaser 3). Ta miss
 2. Avant de générer, regarde les images de référence citées dans le mode d'emploi pour reproduire exactement le style existant :
    - `assets/sprites/agarica_frames/agarica_row0_0.png`
    - `assets/sprites/xara_frames/xara_walk_0.png`
-   - `assets/bosses_sprites/9a183398-c678-4590-ab59-155c7205e9c6.png`
+   - `assets/sprites/kainati.png`
    - `assets/sprites/loup_frames/loup_row0_0.png`
    - `assets/items/form_icone/loup.png`
    - `assets/items/totems.png`

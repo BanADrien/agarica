@@ -7,7 +7,7 @@ Données synchronisées : les tables de rangées ci-dessous et `src/data/asset_m
 ## Mode d'emploi
 
 1. Générer les images dans l'ordre de priorité : **P1** (indispensable pour que l'histoire se lise), puis **P2** (important), puis **P3** (finition).
-2. Pour les personnages : joindre à Codex une image de référence existante quand elle est indiquée (`assets/sprites/agarica_frames/agarica_row0_0.png`, `assets/sprites/xara_frames/xara_walk_0.png`, `assets/bosses_sprites/9a183398-c678-4590-ab59-155c7205e9c6.png`, `assets/sprites/loup_frames/loup_row0_0.png`, `assets/sprites/crapaud_frames/crapaud_row0_0.png`, `assets/items/totems.png`, `assets/items/form_icone/loup.png`, `assets/decors/déco item/bosquet/bosquet componant.png`, `assets/decors/floor.png`). Garder la même conversation Codex pour toutes les feuilles d'un même personnage.
+2. Pour les personnages : joindre à Codex une image de référence existante quand elle est indiquée (`assets/sprites/agarica_frames/agarica_row0_0.png`, `assets/sprites/xara_frames/xara_walk_0.png`, `assets/sprites/kainati.png`, `assets/sprites/loup_frames/loup_row0_0.png`, `assets/sprites/crapaud_frames/crapaud_row0_0.png`, `assets/items/totems.png`, `assets/items/form_icone/loup.png`, `assets/decors/déco item/bosquet/bosquet componant.png`, `assets/decors/floor.png`). Garder la même conversation Codex pour toutes les feuilles d'un même personnage.
 3. Enregistrer chaque image au chemin indiqué :
    - feuilles d'animation de personnages/ennemis → `assets/sprites/<id>.png` (+ `<id>_p2.png`, `_p3.png`… quand l'animation est répartie sur plusieurs images) ;
    - feuilles d'effets → `assets/vfx/<id>.png` ;
@@ -547,7 +547,7 @@ Output: one PNG image, 1536 x 1024 px, transparent background, exactly 1 row(s),
 - **Image(s) à produire** : `assets/sprites/kainati.png` (1536x1024), `assets/sprites/kainati_p2.png` (1536x1024), `assets/sprites/kainati_p3.png` (1536x1024), `assets/sprites/kainati_p4.png` (1536x1024)
 - **Découpe** : `assets/sprites/kainati_frames/kainati_row<r>_<c>.png` (auto, `tools/import_codex_assets.py`, mode `blob`)
 - **Orientation** : regarde à DROITE — **hauteur source** : ~400 px — **échelle en jeu** : `0.54` (≈ 216 px à l'écran)
-- **Notes** : Doit correspondre EXACTEMENT à `assets/bosses_sprites/9a183398-c678-4590-ab59-155c7205e9c6.png` (joindre cette image à Codex comme référence). 2 rangées par image (bandes de 512 px), 4 images. La pierre lancée n'est dessinée QUE tant qu'elle touche la main (après lâcher : asset `pierre`). La liane n'est pas dessinée.
+- **Notes** : Doit correspondre EXACTEMENT à `assets/sprites/kainati.png` (joindre cette image à Codex comme référence). 2 rangées par image (bandes de 512 px), 4 images. La pierre lancée n'est dessinée QUE tant qu'elle touche la main (après lâcher : asset `pierre`). La liane n'est pas dessinée.
 - **Anims (manifest)** : `idle` (row 0, 4 fr.), `throw_stone` (row 1, 4 fr.), `swing_vine` (row 2, 4 fr.), `leap` (row 3, 4 fr.), `land_stomp` (row 4, 4 fr.), `hit` (row 5, 3 fr.), `defeated_lucid` (row 6, 4 fr.)
 
 | Rangée (manifest) | Image | Animation | Frames | fps | Poses (gauche → droite) |
@@ -2172,3 +2172,75 @@ Output: one PNG, 1536 x 1024 px.
 | `cochon_bebe` | `assets/sprites/cochon_bebe.png` | `assets/sprites/cochon_bebe_frames/` | P3 | à générer |
 | `poisson` | `assets/sprites/poisson.png` | `assets/sprites/poisson_frames/` | P3 | à générer |
 | `titre_logo` | `assets/_codex_src/titre_logo.png` | `assets/ui/titre_logo.png` | P3 | à générer |
+
+## Lot n°8 (2026-10-23) — remplacer les dessins faits par code
+
+Prompts complets, prêts à coller : **`docs/production/PROMPT_CODEX_8.md`**.
+Source : `docs/production/INVENTAIRE_DESSINS_CODE.md` (tous les éléments marqués TOUJOURS), plus deux nouvelles animations : singe `climb` / `throw` et papillon `cast`.
+
+- **27 images** à générer.
+- **119 entrées** dans `src/data/asset_manifest.js` (bloc « Lot Codex n°8 ») : 5 feuilles animées et 114 images.
+- Plus `ui_feu_camp`, qui pointe vers l'image existante `assets/items/firecamp_menu/interface.png`.
+- Rien n'est encore branché : chaque entrée garde son placeholder tant que l'intégrateur n'a pas remplacé le dessin correspondant.
+
+Règles propres à ce lot :
+- **Bandes tuilables** (liquides, tapis, couches de fond) : elles touchent les deux bords et se raccordent. Contrôle par montage côte à côte dans `docs/production/controles/lot_8/`. Affichage en `tileSprite` avec `tileScale` = `scale`.
+- **Lueurs** (halos, rais, soleil, étincelles, anneaux) : vrai alpha doux. À défaut, blanc sur noir pur, affiché en mode ADD.
+- **Couches de fond** : préfixe `couche_` et non `fond_`, parce que l'éditeur liste les `fond_*` comme fonds de zone.
+- **États d'un même objet** (éteint/allumé, fermé/ouvert, intact/fissuré/brisé, poses de la petite araignée…) : même échelle et même position dans la case. Normalisation `fit` plus grande que le dessin, donc aucun redimensionnement.
+- **Particules** : normalisées à 128 px, `scale` = taille moyenne à l'écran.
+
+### Fiches identité ajoutées
+
+**Singe sauvage guéri** (`singe_gueri`)
+
+```text
+HEALED WILD MONKEY: a small skinny monkey of Kainati's tribe, EXACTLY the same design, proportions, size and rendering as the corrupted monkey of the reference sheet singe_corrompu.png, but HEALED: no moss at all, clean warm-brown fur (#8a5a32) with a cream-beige face, chest and belly (#e2b98a), calm friendly dark-brown eyes with a small white highlight (NOT glowing green), relaxed curious expression, long tail ending in a spiral curl, a thin vine bracelet on one wrist.
+```
+
+**Petite araignée de la forêt** (`araignee_petite_*`, indice Maexxna en forêt sombre 1)
+
+```text
+a tiny ordinary FOREST SPIDER (NOT a companion: much smaller and simpler than a hero spider): round dark violet-black body (#1a1024) with a smaller head, eight thin black legs, one glinting violet eye spot (#c77dff).
+```
+
+**Bête de mousse** (`bete_mousse_*`, abattue par Amanite en forêt flottante 2) et **créature de mousse guérie** (`mousse_creature_guerie_*`)
+
+```text
+MOSS BEAST: a creature made of toxic moss, about the size of a fox: a lumpy oval body of dark toxic moss (#2f5a2a), two rounded bumps on the back (#3e7a2c), two small glowing green eyes (#9bff5a), two stubby root legs.
+HEALED MOSS CREATURE: a small soft round ball of healthy light-green moss (#6fbf73, darker #3f7a4a underneath), a tiny sprout with one leaf on top (#b8f5a0), two small calm dark eyes and a tiny smile, no slime, no glow.
+```
+
+### Images du lot n°8
+
+| # | Image source | Entrées du manifeste | Découpe | Statut |
+|---|---|---|---|---|
+| 1 | `assets/_codex_src/liquides_mare.png` | `liquide_mare_fond`, `liquide_mare_voile`, `liquide_mare_surface_0..3` | bandes tuilables | à générer |
+| 2 | `assets/_codex_src/liquide_mousse_toxique.png` | `liquide_mousse_toxique` | tuilable (lac + marée) | à générer |
+| 3 | `assets/_codex_src/couche_ciel_jour.png` | `couche_ciel_jour` | opaque, tuilable | à générer |
+| 4 | `assets/_codex_src/couche_nappes.png` | `couche_nappe_nuages`, `couche_nappe_brume`, `couche_brume_avant` | bandes tuilables | à générer |
+| 5 | `assets/_codex_src/couche_nuages.png` | `couche_nuage_0..4`, `couche_soleil` | grille 3x2 | à générer |
+| 6 | `assets/_codex_src/decor_lumineux.png` | `decor_lanterne_eteinte` / `_allumee`, `decor_fente_fermee` / `_ouverte`, `decor_spirale_gravee`, `decor_plateforme_fantome` | grille 3x2 | à générer |
+| 7 | `assets/_codex_src/structures_ecorce.png` | `decor_plateforme_ecorce_intacte` / `_fissuree` / `_brisee`, `decor_rampe_lancement`, `decor_marches_racines`, `decor_autel_sommet` | grille 3x2 | à générer |
+| 8 | `assets/_codex_src/structures_larges.png` | `decor_pont_tronc`, `decor_cratere`, `decor_trou_effondre` | 3 bandes | à générer |
+| 9 | `assets/_codex_src/couche_lointains.png` | `couche_iles_lointaines`, `couche_horizon_malade` | bandes tuilables | à générer |
+| 10 | `assets/_codex_src/mare_plantes.png` | `decor_mare_berge`, `decor_mare_roseaux`, `decor_fleur_perchee`, `decor_plante_resistante_fleurie` / `_bouton`, `objet_graine_coeur` | grille 3x2 | à générer |
+| 11 | `assets/_codex_src/bandes_sol.png` | `decor_tapis_mousse` (tuilable), `decor_cercle_sain`, `decor_mousse_sechee` | 3 bandes | à générer |
+| 12 | `assets/_codex_src/mousses_plaques.png` | `decor_mousse_plaque_*` (3), `decor_mousse_lumineuse_*` (4), `decor_touffe_mousse_*` (4), `decor_empreinte_boue` | grille 4x3 | à générer |
+| 13 | `assets/_codex_src/couche_vignette.png` | `couche_vignette` | opaque, MULTIPLY | à générer |
+| 14 | `assets/_codex_src/particules_matieres.png` | 12 `fx_*` (éclats, mottes, feuille, pétales, gouttes, bulle, éclaboussure) | grille 4x3 | à générer |
+| 15 | `assets/_codex_src/particules_lumieres.png` | 12 `fx_*` (luciole, grain, étincelles, traînée, vent, ombre, marqueur, spore, bouffées, braise) | grille 4x3 | à générer |
+| 16 | `assets/_codex_src/halos_lumiere.png` | `fx_halo_doux`, `fx_halo_rayons`, `fx_rai_lumiere`, `fx_halo_objet`, `fx_aura_esprit`, `fx_lueur_sol` | grille 3x2, ADD | à générer |
+| 17 | `assets/vfx/vfx_mousse_toxique.png` | `vfx_mousse_toxique` (`bulle`, `boule`, `goutte`) | grid, 3 x 4 frames | à générer |
+| 18 | `assets/vfx/vfx_anneau_choc.png` | `vfx_anneau_choc` (`toxique`, `talisman`) | grid, 2 x 4 frames | à générer |
+| 19 | `assets/sprites/singe_extra.png` | `singe_extra` (`climb`, `throw`) | blob | à générer |
+| 20 | `assets/sprites/forme_papillon_extra.png` | `forme_papillon_extra` (`cast`) | blob | à générer |
+| 21 | `assets/sprites/singe_gueri.png` | `singe_gueri` (`idle`, `run`) | blob | à générer |
+| 22 | `assets/_codex_src/petites_creatures.png` | `araignee_petite_0..2`, `bete_mousse_vivante` / `_touchee` / `_morte`, `mousse_creature_guerie_0..1` | grille 4x2 | à générer |
+| 23 | `assets/_codex_src/objets_C.png` | `note_geralt`, `objet_grappin`, `objet_fleche`, `objet_collet` | grille 2x2 | à générer |
+| 24 | `assets/_codex_src/segments_tuilables.png` | `objet_corde`, `fx_fil_soie` | 1024x1536, colonnes, tuilables en hauteur | à générer |
+| 25 | `assets/_codex_src/ui_panneaux.png` | `ui_bulle`, `ui_bulle_pointe`, `ui_invite`, `ui_banniere` | grille 2x2, 9-slice | à générer |
+| 26 | `assets/_codex_src/ui_hud.png` | `ui_touche`, `ui_alerte`, `ui_etoiles_etourdi`, `ui_case_competence`, `ui_anneau_objet`, `ui_ornement_titre` | grille 3x2 | à générer |
+| 27 | `assets/_codex_src/ui_barres.png` | `ui_energie_cadre`, `ui_energie_remplissage`, `ui_boss_cadre`, `ui_boss_remplissage` | 4 bandes | à générer |
+
+Art déjà présent à **réutiliser** (ne pas régénérer) : `pierre`, `fleur_resistante`, `mousse_mur`, `mousse_amas_intact`, `mousse_amas_fissure`, `vfx_onde_choc`, `vfx_vague_mousse`, `rocher_roulant`, `kainati_sol`, `vfx_souffle_toxique`, `courant_air`, `vfx_purification`, `vfx_soin_papillon`, `vfx_flaque_mousse`, `vfx_impact_pierre`, `papillon`, `poisson`, `liane`, `idole`, `talisman_ours`, `bocal_antidote`, `repulsif`, `fond_foret_flottante`. Le détail par élément de l'inventaire est dans le prompt.

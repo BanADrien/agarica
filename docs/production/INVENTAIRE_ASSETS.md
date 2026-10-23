@@ -20,7 +20,7 @@ Référence interne utilisée pour produire `CODEX_SPRITES_A_GENERER.md`.
 - `sprites/agarica_frames` (idle 6, ancienne marche 5, course 6), `agarica_walk_frames` (4), `agarica_attack_frames` (5). Pas de saut/blessure/mort/liane/parole dédiés.
 - `loup_frames` (course 6, saut 4), `loup_attaque_frames` (8), `piaf_frames` (vol 4, plané 4, piqué 5) + plumes, `pieuvre_frames` (4), `ours_frames` (compétence fracas 6), `crapaud_frames` (5), `xara_frames` (marche, swing, switch, saut).
 - `transformation/` : humain→aigle, humain→loup, loup→aigle (flash), humain→ours, pieuvre.
-- `bosses_sprites/9a18...png` : Kainati corrompu, pose statique unique (1254x1254), non chargé.
+- `sprites/kainati.png` : Kainati corrompu (feuille Codex), référence visuelle du boss (l'ancienne pose statique `bosses_sprites/9a18…png` a été supprimée).
 - `items/totem_frames` : totems loup/pieuvre/aigle dim/lit. `feu_de_camp_frames` (4). `firecamp_menu/interface.png` (non utilisé). `form_icone/{loup,aigle,pieuvre}.png`. `unlock_popup_animate/unlock1..5`.
 - `decors/` : `plan4_ciel.png` (fond nuit), `arbres_frames` (8), `sous_bois_frames` (14), `plantes_frames` (bplante/hplante), `autotile_frames` (21 tuiles, jeu 'floor') + `tuiles_frames` (atlas `tuiles.png` découpé par `tools/cut_tuiles.py` : A1-A9, B, C1-C7, D1-D6 + 4 herbes, jeu 'tuiles'), `surface_frames`, `deco_item_frames/bosquet` (18 props). Planche `bosquet componant.png` : cabane, huttes, cottage, tour, tente, murailles, cercle de feu NON découpés.
 
