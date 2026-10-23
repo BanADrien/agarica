@@ -49,6 +49,24 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P1] Agarica - attaques à la dague en arc (côté / haut / bas en l'air),
+  // demandées le 2026-10-23 pour remplacer l'estoc : poses du corps SEULES
+  // (dague tenue, aucune traînée) ; l'arc lumineux est la feuille vfx_slash.
+  agarica_slash: {
+    dir: "assets/sprites/agarica_slash_frames", prefix: "agarica_slash",
+    anims: {
+      side: { row: 0, frames: 4, fps: 18, repeat: 0 },
+      up: { row: 1, frames: 4, fps: 18, repeat: 0 },
+      down: { row: 2, frames: 4, fps: 18, repeat: 0 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 36, h: 86, color: 0x3f7d3a, label: "Agarica" },
+    sheets: [
+      { file: "assets/sprites/agarica_slash.png", rows: [0, 1, 2] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P1] Forme du singe (Agarica transformée)
   singe: {
     dir: "assets/sprites/singe_frames", prefix: "singe",
@@ -446,6 +464,23 @@ const ASSET_MANIFEST = {
     placeholder: { w: 120, h: 120, color: 0x6ff0e0, label: "Soin" },
     sheets: [
       { file: "assets/vfx/vfx_soin_papillon.png", rows: [0, 1] },
+    ],
+    cut: "grid", align: "center",
+  },
+  // [P1] VFX - arcs de la dague (côté / haut / bas) : la forme de l'arc EST la
+  // zone qui touche (Player : hitbox calée sur l'arc affiché).
+  vfx_slash: {
+    dir: "assets/vfx/vfx_slash_frames", prefix: "vfx_slash",
+    anims: {
+      side: { row: 0, frames: 3, fps: 20, repeat: 0 },
+      up: { row: 1, frames: 3, fps: 20, repeat: 0 },
+      down: { row: 2, frames: 3, fps: 20, repeat: 0 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 110, h: 80, color: 0x9fffd0, label: "Slash" },
+    sheets: [
+      { file: "assets/vfx/vfx_slash.png", rows: [0, 1, 2] },
     ],
     cut: "grid", align: "center",
   },
