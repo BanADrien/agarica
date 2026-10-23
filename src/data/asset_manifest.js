@@ -330,6 +330,49 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // Trois bébés cochons de couleurs différentes (art Codex) : un par cochon du bosquet.
+  cochon_bebe_rose: {
+    dir: "assets/sprites/cochon_bebe_rose_frames", prefix: "cochon_bebe_rose",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 5, repeat: -1 },
+      walk: { row: 1, frames: 4, fps: 10, repeat: -1 },
+    },
+    scale: 0.2,
+    facing: "right",
+    placeholder: { w: 44, h: 32, color: 0xf0a8b8, label: "Cochon" },
+    sheets: [
+      { file: "assets/sprites/cochon_bebe_rose.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  cochon_bebe_gris: {
+    dir: "assets/sprites/cochon_bebe_gris_frames", prefix: "cochon_bebe_gris",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 5, repeat: -1 },
+      walk: { row: 1, frames: 4, fps: 10, repeat: -1 },
+    },
+    scale: 0.2,
+    facing: "right",
+    placeholder: { w: 44, h: 32, color: 0x9a9aa2, label: "Cochon" },
+    sheets: [
+      { file: "assets/sprites/cochon_bebe_gris.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  cochon_bebe_orange: {
+    dir: "assets/sprites/cochon_bebe_orange_frames", prefix: "cochon_bebe_orange",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 5, repeat: -1 },
+      walk: { row: 1, frames: 4, fps: 10, repeat: -1 },
+    },
+    scale: 0.2,
+    facing: "right",
+    placeholder: { w: 44, h: 32, color: 0xe0a060, label: "Cochon" },
+    sheets: [
+      { file: "assets/sprites/cochon_bebe_orange.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P3] Poisson de la source
   poisson: {
     dir: "assets/sprites/poisson_frames", prefix: "poisson",
