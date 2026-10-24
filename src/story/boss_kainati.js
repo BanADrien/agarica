@@ -1,71 +1,57 @@
 // ZONE_SCRIPTS.kainati_arene — combat contre Kainati, Roi des Simiens
 // (zone grand_arbre_arene, donnée `script: 'kainati_arene'` + `kainatiArena`).
-// Entités (boss, pierres, esprit) : src/entities/Kainati.js.
+// Entités (boss, dangers, esprit) : src/entities/Kainati.js.
 //
-// RÈGLES DU COMBAT (lisible et généreux, gagnable en forme humaine avec un
-// saut simple -- Agarica n'a PAS encore la forme singe) :
-// - Les lianes de l'arène sont un pur décor pour Agarica (décision
-//   utilisateur : en forme humaine, les lianes sont ignorées partout ; les
-//   anciennes « lianes-tremplins » qui la faisaient rebondir sont retirées).
-//   Seul Kainati s'y suspend.
-// - Kainati se balance de liane en liane, lance des salves de pierres en cloche
-//   (flash jaune + « ! » avant ; un coup de dague brise une pierre), puis
-//   plonge sur Agarica (flash rouge + ombre au sol) : land_stomp = ondes de
-//   choc au ras du sol (à sauter) puis il reste SONNÉ au sol ~2,2 s → fenêtre
-//   BONUS (2 PV par coup, 2 coups au plus par plongeon : il se relève alors
-//   d'un bond). Il plonge à chaque cycle (~9 s en phase 1).
-//   Il encaisse aussi À TOUT MOMENT (retour utilisateur 2026-10-23 : plus
-//   d'esquive) : 1 PV par coup (arc de dague, coup vers le haut quand il passe
-//   à portée, coup vers le bas avec rebond, pierre), ~0,35 s entre deux coups.
-//   Son contact blesse Agarica (sauf sonné ou battu).
-// - 14 PV. À 7 PV : phase 2 (cri, tout ×0,75 plus rapide, salves de 3 pierres,
-//   deux plongeons par cycle, pluie de pierres du plafond avec ombres au sol,
-//   y compris après chaque stomp).
-// - Victoire à 0 PV : il ne meurt pas (defeated_lucid, dernière frame tenue :
-//   inerte, plus d'IA ni de contact), cinématique « kainati_victoire », flag
-//   `kainatiDefeated`, rideau de
-//   mousse droit dissous, sorties vers le totem du singe (MondeSpirituelScene)
-//   et la route des hauteurs (ForetFlottante1Scene) créées.
-// - Mort d'Agarica : réapparition au point d'entrée, combat remis à zéro
-//   (Kainati plein PV sur sa liane, projectiles effacés, arène rouverte) ; il
-//   redémarre en repassant `lockX` (sans redonner l'intro).
-// - Revisite après victoire : Kainati apaisé au sol, immobile dans la même
-//   pose, « E : parler » (dialogue `kainati_calme`), passages ouverts.
+// ENCHAÎNEMENT (décision utilisateur 2026-10-24) : totem du singe dans les
+// racines → monde spirituel (forme singe) → retour aux racines → l'arène,
+// accessible SEULEMENT par les lianes de la cime → Kainati → la route des
+// hauteurs (forêt flottante 1) s'ouvre. Agarica a donc la forme singe ici.
 //
-// Flags : `kainatiIntroSeen`, `kainatiDefeated`.
-// Cinématiques / dialogues (surchargeables par src/story/acte1.js, chargé après) :
-//   CUTSCENES|DIALOGUES `kainati_intro`, `kainati_victoire` ; DIALOGUES `kainati_calme`.
-// Indices (toasts, une fois par combat) : au début, au 1er étourdissement.
+// RÈGLES DU COMBAT :
+// - Kainati reste au sol, entre ses deux postes (bords de l'arène). Les 4
+//   lianes sont pour Agarica : ses attaques pleine largeur (onde de choc,
+//   vague de mousse, éboulement) ne s'esquivent qu'accrochée à une liane.
+// - Frappable à tout moment (1 PV, ~0,26 s entre deux coups) ; après chaque
+//   charge (esquive : une liane) il heurte le rideau, rebondit vers le
+//   centre et reste SONNÉ ~3 s (2 PV par coup, ~0,2 s), puis retourne au
+//   trot à son poste. Son contact blesse (sauf sonné ou pendant ce retour).
+//   48 PV ; à 24, phase 2 (cri, plus vite,
+//   salves de 3 pierres, une pierre tombe de la canopée sur la liane
+//   d'Agarica pendant chaque grande attaque).
+// - Victoire : épargné, inerte assis (cinématique `kainati_victoire`), flag
+//   `kainatiDefeated` (+ `kainatiCalmX`), rideau droit dissous, sortie vers
+//   ForetFlottante1Scene. Revisite : il reste inerte, « E : parler ».
+// - Mort d'Agarica (comme boss_ghilt.js, 'player-depleted') : il se fige,
+//   fondu au noir, la zone redémarre à l'entrée (`from_racines`) ; le combat
+//   reprend en repassant `lockX`, sans redonner l'intro.
+//
+// Flags : `kainatiIntroSeen`, `kainatiDefeated`, `kainatiCalmX`.
+// Textes : CUTSCENES|DIALOGUES `kainati_intro`, `kainati_victoire`,
+// `kainati_calme` (src/story/acte1_arbre.js, chargé après ce fichier).
 
 const KAINATI_TALK_RANGE = 150;
+const KAINATI_BOSS_NAME = 'Kainati, Roi des Simiens';
 
-// --- Textes par défaut (ton digne ; l'agent Acte 1 peut les remplacer) ---
+// --- Textes par défaut (remplacés par acte1_arbre.js) ---
 if (!DIALOGUES.kainati_intro) {
   DIALOGUES.kainati_intro = [
     { who: 'kainati', text: "Encore une créature d'en bas qui grimpe vers ma cime..." },
-    { who: 'kainati', text: "La mousse t'a suivie jusqu'ici. Tu ne toucheras pas à mon arbre !" },
-    { who: 'agarica', text: "Attends ! Je ne suis pas venue pour..." },
     { who: 'kainati', text: 'Assez ! Les branches jugeront pour moi.' },
   ];
 }
 if (!DIALOGUES.kainati_victoire) {
   DIALOGUES.kainati_victoire = [
-    { who: 'kainati', text: '...' },
     { who: 'kainati', text: 'La brume se dissipe... Tu... combats la mousse ?' },
-    { who: 'agarica', text: "Oui. Elle ronge la forêt. Je cherche un moyen de l'arrêter." },
-    { who: 'kainati', text: "Elle m'avait rempli de colère. Je voyais une ennemie là où il n'y avait qu'une enfant des bois." },
-    { who: 'kainati', text: "Tu as lu mes bonds sans les connaître. Tu as compris mon mouvement." },
-    { who: 'kainati', text: "Derrière ma branche dort le totem de mon peuple. Va. Écoute-le comme tu m'as écouté." },
+    { who: 'kainati', text: 'Va. La route des hauteurs est à toi.' },
   ];
 }
 if (!DIALOGUES.kainati_calme) {
   DIALOGUES.kainati_calme = [
-    { who: 'kainati', text: "Le totem t'attend derrière ma branche. Plus haut, la route mène vers les îles des hauteurs." },
     { who: 'kainati', text: 'Que les lianes te portent, petite druidesse.' },
   ];
 }
 
-// --- Petits wrappers tolérants : l'API StoryKit arrive en parallèle (Fondation) ---
+// --- Petits wrappers tolérants ---
 function kainatiFlag(scene, key, def) {
   if (typeof storyGet === 'function') return storyGet(key, def);
   const v = scene.registry.get(key);
@@ -77,8 +63,13 @@ function kainatiSetFlag(scene, key, value) {
   else scene.registry.set(key, value);
 }
 
-function kainatiToast(scene, text, ms = 2200) {
+function kainatiToast(scene, text, ms = 2600) {
   if (typeof showToast === 'function') showToast(scene, text, ms);
+}
+
+function kainatiBubble(scene, who, text, ms) {
+  if (typeof storyBulle === 'function') storyBulle(scene, who, text, ms, { replace: true });
+  else kainatiToast(scene, text, ms || 2600);
 }
 
 function kainatiFrozen(scene) {
@@ -99,43 +90,26 @@ function kainatiDelay(scene, ms) {
   return new Promise((resolve) => scene.time.delayedCall(ms, resolve));
 }
 
-// Barre de boss : celle de StoryKit, sinon une barre minimale locale.
-function kainatiShowBar(scene, st) {
-  const ratio = () => (st.boss ? st.boss.hp / st.boss.maxHp : 0);
-  if (typeof showBossBar === 'function') { showBossBar(scene, 'Kainati, Roi des Simiens', ratio); return; }
-  if (st.bar) return;
-  const g = scene.add.graphics().setScrollFactor(0).setDepth(1500);
-  const label = scene.add.text(480, 18, 'Kainati, Roi des Simiens', {
-    fontFamily: 'sans-serif', fontSize: '16px', color: '#ffe9f5', stroke: '#2a1f45', strokeThickness: 4,
-  }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(1501);
-  st.bar = { g, label, ratio };
+function kainatiLock(scene, on) {
+  if (on) scene.__cutsceneLock = (Number(scene.__cutsceneLock) || 0) + 1;
+  else scene.__cutsceneLock = Math.max(0, (Number(scene.__cutsceneLock) || 0) - 1);
+  const p = scene.player;
+  if (on && p && p.body) { p.setAccelerationX(0); p.setVelocityX(0); }
 }
 
-function kainatiDrawBar(st) {
-  if (!st.bar) return;
-  const { g, ratio } = st.bar;
-  g.clear();
-  g.fillStyle(0x120c1e, 0.85).fillRect(300, 40, 360, 12);
-  g.fillStyle(0xc0503a, 1).fillRect(302, 42, 356 * Phaser.Math.Clamp(ratio(), 0, 1), 8);
-}
-
-function kainatiHideBar(scene, st) {
-  if (typeof hideBossBar === 'function') hideBossBar(scene);
-  if (st.bar) { st.bar.g.destroy(); st.bar.label.destroy(); st.bar = null; }
-}
-
-// --- Rideaux de mousse (bords de l'arène) ---
-function kainatiMakeCurtain(scene, x, floorY) {
-  const c = scene.add.container(x, 0).setDepth(4);
-  c.add(scene.add.rectangle(0, floorY / 2, 44, floorY + 40, 0x2f4a22, 0.92).setStrokeStyle(3, 0x1a2a12));
-  for (let y = 20; y < floorY; y += 46) {
-    c.add(scene.add.circle(Phaser.Math.Between(-16, 16), y, Phaser.Math.Between(10, 16), 0x587a32, 0.95));
-    c.add(scene.add.circle(Phaser.Math.Between(-12, 12), y + 22, Phaser.Math.Between(5, 9), 0x8fb04a, 0.9));
-  }
+// --- Rideaux de mousse (bords de l'arène) : art `mousse_mur` (drawMossVisual,
+// StoryKit), dessin par code en repli ; corps statique qui bloque Agarica.
+function kainatiMakeCurtain(scene, x, floorY, ceilY) {
+  const h = floorY - ceilY + 20;
+  const y = floorY - h / 2;
+  const visual = typeof drawMossVisual === 'function'
+    ? drawMossVisual(scene, x, y, 64, h, 'mousse_mur', true)
+    : scene.add.rectangle(x, y, 44, h, 0x2f4a22, 0.92).setStrokeStyle(3, 0x1a2a12);
+  visual.setDepth(4);
   const zone = scene.add.zone(x, floorY / 2 - 200, 40, floorY + 400);
   scene.physics.add.existing(zone, true);
   scene.physics.add.collider(scene.player, zone);
-  return { visual: c, zone };
+  return { visual, zone, x };
 }
 
 function kainatiSetCurtain(scene, curtain, closed, instant = false) {
@@ -144,43 +118,39 @@ function kainatiSetCurtain(scene, curtain, closed, instant = false) {
   scene.tweens.killTweensOf(curtain.visual);
   if (instant) { curtain.visual.setAlpha(closed ? 1 : 0).setVisible(closed); return; }
   curtain.visual.setVisible(true);
+  if (closed) {
+    spawnFx(scene, 'mossBreak', curtain.x, scene.__kainati.cfg.floorY - 120, { w: 60, h: 160 });
+  } else {
+    spawnFx(scene, 'melt', curtain.x, scene.__kainati.cfg.floorY - 160, { w: 60, h: 300, count: 8 });
+  }
   scene.tweens.add({
     targets: curtain.visual,
     alpha: closed ? 1 : 0,
-    duration: closed ? 350 : 900,
+    duration: closed ? 350 : 1100,
     onComplete: () => curtain.visual.setVisible(closed),
   });
 }
 
-// --- Lianes (décor : Kainati s'y suspend) : celles de Liane.js si elles
-// existent, sinon un dessin local ---
-function kainatiSetupVines(scene, st) {
-  st.vineDefs = st.cfgVines.map((v) => ({ ...v, cooldown: 0, visual: null }));
-  const formesVines = Array.isArray(scene.vines) && scene.vines.length > 0;
-  if (formesVines) return;
-  for (const v of st.vineDefs) {
-    const c = scene.add.container(v.x, v.y).setDepth(3);
-    c.add(scene.add.rectangle(0, 0, 7, v.length, 0x4c6b2a).setOrigin(0.5, 0).setStrokeStyle(2, 0x23331a));
-    for (let y = 30; y < v.length; y += 42) {
-      c.add(scene.add.ellipse((y / 42) % 2 ? 7 : -7, y, 14, 7, 0x6f9a3a));
-    }
-    c.add(scene.add.circle(0, v.length, 7, 0x8fb04a).setStrokeStyle(2, 0x23331a));
-    v.visual = c;
-  }
-}
-
-// Indices du combat (une fois chacun par combat, remis à zéro avec lui).
-function kainatiUpdateHints(scene, st) {
+// --- Coups d'Agarica : Kainati n'est pas dans scene.enemies (pas de corps
+// Arcade) ; on teste mêlée / piqué / pierre nous-mêmes, une fois par
+// attaque, et on branche le « juice » générique (juiceOnEnemyHit : hit-stop,
+// secousse, étincelles, flash, recul au dessin).
+function kainatiLandHit(scene, st, source) {
   const boss = st.boss;
-  if (!st.fightActive || !boss || boss.defeated) return;
-  if (boss.state === 'stunned' && !st.toldStun) {
-    st.toldStun = true;
-    kainatiToast(scene, 'Kainati est sonné au sol : chaque coup compte double !');
+  const res = boss.takeHit(source);
+  if (!res) return false;
+  const p = scene.player;
+  if (typeof juiceOnEnemyHit === 'function') juiceOnEnemyHit(scene, boss.sprite, { ...source, player: p });
+  if (res.stunned) {
+    // Coup double : plus lourd (secousse, éclat plus gros).
+    const r = boss.getHitRect();
+    juiceShake(scene, 'medium');
+    spawnFx(scene, 'impact', Phaser.Math.Clamp(p.x, r.x, r.right), r.centerY, { power: 1.5, color: 0xffe066 });
   }
+  if (typeof ENERGY_PER_HIT !== 'undefined' && p.gainEnergy && source.kind !== 'skill') p.gainEnergy(ENERGY_PER_HIT);
+  return true;
 }
 
-// Coups du joueur : Kainati n'est pas dans scene.enemies (pas de corps
-// Arcade), on teste donc nous-mêmes mêlée / piqué / compétence, une fois par attaque.
 function kainatiCheckPlayerHits(scene, st, time) {
   const p = scene.player;
   const boss = st.boss;
@@ -188,56 +158,89 @@ function kainatiCheckPlayerHits(scene, st, time) {
   const rect = boss.getHitRect();
   const atk = p.getAttackHitbox ? p.getAttackHitbox() : null;
   if (atk && Phaser.Geom.Intersects.RectangleToRectangle(atk, rect)) {
-    const id = p.eagleDiving ? `dive-${Math.floor(time / 500)}` : `atk-${p.attackEndTime}`;
-    if (id !== st.lastAttackId) {
+    const id = p.isAttacking ? `atk-${p.attackEndTime}` : `dive-${Math.floor(time / 400)}`;
+    // Coup consommé seulement s'il porte : pendant sa courte invulnérabilité,
+    // le même coup (arc encore actif) porte dès qu'elle finit -- avant, il
+    // était perdu sans dégât ni effet alors que l'arc le touchait.
+    if (id !== st.lastAttackId && kainatiLandHit(scene, st, { kind: p.isAttacking ? 'melee' : 'dive', type: 'attack' })) {
       st.lastAttackId = id;
-      if (boss.takeHit({ type: 'attack' }) && typeof ENERGY_PER_HIT !== 'undefined' && p.gainEnergy) p.gainEnergy(ENERGY_PER_HIT);
     }
   }
-  const sk = p.getSkillHitbox ? p.getSkillHitbox() : null;
-  if (sk && sk !== st.lastSkillRect && Phaser.Geom.Intersects.RectangleToRectangle(sk, rect)) {
-    st.lastSkillRect = sk;
-    boss.takeHit({ type: 'skill' });
-  }
-  // Pierres lancées par Agarica (compétence pierre) : hors de scene.enemies,
-  // Kainati n'est pas touché par leur overlap -- testées ici.
+  // Pierres lancées par Agarica (compétence pierre) : hors de scene.enemies.
   if (typeof PierreProjectile === 'function') {
     for (const o of scene.children.list) {
       if (!(o instanceof PierreProjectile) || o.done || !o.active) continue;
       if (!Phaser.Geom.Intersects.RectangleToRectangle(o.getBounds(), rect)) continue;
-      if (boss.takeHit({ type: 'pierre' }) && typeof ENERGY_PER_HIT !== 'undefined' && p.gainEnergy) p.gainEnergy(ENERGY_PER_HIT);
+      kainatiLandHit(scene, st, { kind: 'pierre', type: 'pierre', x: o.x, y: o.y });
       o.shatter();
     }
+  }
+}
+
+// --- Indices (une fois chacun par combat) ---
+function kainatiOnAttack(scene, st, ev) {
+  if (!st.fightActive || st.disposed) return;
+  const told = st.told;
+  if (['slam', 'roar', 'sweep'].includes(ev.kind) && !told.full) {
+    told.full = true;
+    kainatiBubble(scene, 'xara', 'Tout le sol va y passer ! Accroche-toi à une liane, vite !', 2600);
+  } else if (ev.kind === 'charge' && !told.charge) {
+    told.charge = true;
+    kainatiBubble(scene, 'xara', 'Il va charger ! Accroche-toi à une liane !', 2400);
   }
 }
 
 // --- Déroulé ---
 async function kainatiStartFight(scene, st) {
   st.starting = true;
+  st.told = {};
   kainatiSetCurtain(scene, st.leftCurtain, true);
+  kainatiSetCurtain(scene, st.rightCurtain, true, true);
   const cam = scene.cameras.main;
   cam.setBounds(st.cfg.minX, 0, st.cfg.maxX - st.cfg.minX, scene.scale.height);
-  if (!kainatiFlag(scene, 'kainatiIntroSeen', false)) {
+  const firstTime = !kainatiFlag(scene, 'kainatiIntroSeen', false);
+  st.boss.face(scene.player.x > st.boss.x ? 1 : -1);
+  st.boss.setPose('roarWind');
+  juiceShake(scene, firstTime ? 'medium' : 'light', 500);
+  if (firstTime) {
     await kainatiPlay(scene, 'kainati_intro');
     kainatiSetFlag(scene, 'kainatiIntroSeen', true);
+  } else {
+    await kainatiDelay(scene, 700);
   }
   if (st.disposed || scene !== st.scene) return;
-  kainatiShowBar(scene, st);
+  if (typeof showBossBar === 'function') showBossBar(scene, KAINATI_BOSS_NAME, () => (st.boss ? st.boss.hp / st.boss.maxHp : 0));
   st.boss.start();
   st.fightActive = true;
   st.starting = false;
-  st.toldStun = false;
-  kainatiToast(scene, "Frappe-le dès qu'il passe à ta portée (saute, ↑ + attaque). Quand il plonge, saute l'onde de choc : sonné, il encaisse double !", 3800);
+  if (firstTime) {
+    kainatiToast(scene, 'Ses grandes attaques couvrent tout le sol : saute sous une liane pour t\'y accrocher (Z/S : monter, descendre).\nFrappe-le quand tu peux ; après une charge, il est sonné : coups doublés !', 5200);
+  }
 }
 
-// Mort d'Agarica (ou sortie forcée) : tout revient à l'état d'avant combat.
-function kainatiResetFight(scene, st) {
+// Mort d'Agarica (dernier cœur) : même logique que boss_ghilt.js — il se
+// fige, puis fondu au noir et la zone redémarre proprement à l'entrée.
+async function kainatiPlayerDown(scene, st) {
+  if (st.downFired || st.disposed) return;
+  st.downFired = true;
   st.fightActive = false;
   st.starting = false;
-  st.boss.reset();
-  kainatiHideBar(scene, st);
-  kainatiSetCurtain(scene, st.leftCurtain, false, true);
-  scene.cameras.main.setBounds(st.camBounds.x, st.camBounds.y, st.camBounds.width, st.camBounds.height);
+  st.boss.freeze();
+  if (typeof hideBossBar === 'function') hideBossBar(scene);
+  kainatiToast(scene, 'Agarica s\'effondre…', 1200);
+  // Laisse la pose `death` (Player.finishHit, ~1,1 s) se jouer.
+  await kainatiDelay(scene, 1150);
+  if (st.disposed) return;
+  kainatiLock(scene, true);
+  const cam = scene.cameras.main;
+  const black = scene.add.rectangle(0, 0, cam.width, cam.height, 0x000000).setOrigin(0).setScrollFactor(0).setDepth(2500).setAlpha(0);
+  await new Promise((r) => scene.tweens.add({ targets: black, alpha: 1, duration: 450, onComplete: r }));
+  if (st.disposed) return;
+  const p = scene.player;
+  scene.registry.set('hearts', p && p.maxHearts ? p.maxHearts : 3);
+  kainatiLock(scene, false);
+  scene.scene.restart({ enterId: 'from_racines' });
+  scene.player = null;
 }
 
 function kainatiRevealPassage(scene, st, instant) {
@@ -246,131 +249,151 @@ function kainatiRevealPassage(scene, st, instant) {
   scene.cameras.main.setBounds(st.camBounds.x, st.camBounds.y, st.camBounds.width, st.camBounds.height);
   if (st.passageRevealed) return;
   st.passageRevealed = true;
-  scene.__exits = scene.__exits || [];
-  for (const exit of st.cfg.exitsAfterVictory || []) {
-    scene.__exits.push(exit);
-    if (exit.targetScene === 'MondeSpirituelScene') {
-      // Ouverture lumineuse dans l'écorce : le passage vers le totem du singe.
-      const h = exit.height || 110;
-      const glow = scene.add.ellipse(exit.x, exit.y, 70, h, 0xbfe8a0, 0.35).setDepth(2);
-      const core = scene.add.ellipse(exit.x, exit.y, 44, h - 20, 0x1a1428, 0.9).setDepth(2);
-      scene.tweens.add({ targets: glow, alpha: 0.7, duration: 900, yoyo: true, repeat: -1 });
-      if (!instant) {
-        [glow, core].forEach((o) => o.setScale(0.1));
-        scene.tweens.add({ targets: [glow, core], scale: 1, duration: 900, ease: 'Back.Out' });
-      }
-    }
-  }
+  // Nouveau tableau : scene.__exits EST le tableau `exits` de la donnée de
+  // zone (LevelKit) -- y pousser l'ajoutait à la donnée elle-même, une fois de
+  // plus à chaque visite de l'arène.
+  scene.__exits = [...(scene.__exits || []), ...(st.cfg.exitsAfterVictory || [])];
 }
 
 async function kainatiVictory(scene, st) {
+  if (st.won) return;
+  st.won = true;
   st.fightActive = false;
-  kainatiHideBar(scene, st);
+  const boss = st.boss;
+  if (typeof hideBossBar === 'function') hideBossBar(scene);
   kainatiSetFlag(scene, 'kainatiDefeated', true);
-  await kainatiDelay(scene, 1300);
+  kainatiSetFlag(scene, 'kainatiCalmX', Math.round(boss.x));
+  // Gros coup de grâce : ralenti, zoom, anneau ; la mousse le quitte en lueurs.
+  const cy = boss.cfg.floorY - 110;
+  juiceSlowMo(scene, { ms: 700, physics: 3, anims: 0.35 });
+  juiceZoomPulse(scene, { zoom: 1.06, ms: 1000 });
+  juiceShake(scene, 'heavy');
+  juiceShockRing(scene, boss.x, cy, { size: 300, ms: 600, color: 0xbfe8a0 });
+  spawnFx(scene, 'mossBreak', boss.x, cy, { w: 160, h: 180 });
+  playSfx('boss_end', { boss: 'kainati' });
+  for (let i = 0; i < 6; i++) {
+    scene.time.delayedCall(200 + i * 180, () => {
+      if (!st.disposed) spawnFx(scene, 'motes', boss.x + Phaser.Math.Between(-60, 60), cy + 40, { count: 4, spread: 30, color: [0x9bff5a, 0x3e7a2c, 0xbfe8a0] });
+    });
+  }
+  // defeated_lucid (4 frames à 4 i/s) : il s'assoit, la brume quitte ses yeux.
+  await kainatiDelay(scene, 1700);
   if (st.disposed) return;
   await kainatiPlay(scene, 'kainati_victoire');
   if (st.disposed) return;
+  boss.makeCalm(boss.x);
   kainatiRevealPassage(scene, st, false);
-  st.boss.makeCalm(st.boss.feet.x);
-  kainatiToast(scene, 'Un passage vers le totem du singe s\'est ouvert dans l\'écorce.', 3000);
+  kainatiToast(scene, 'La route des hauteurs s\'est ouverte, à l\'est →', 3200);
 }
 
 ZONE_SCRIPTS.kainati_arene = {
   create(scene, levelData) {
     const data = levelData || scene.levelData || scene.__levelData || GRAND_ARBRE_ARENE_DATA;
     const cfg = {
-      minX: 512, maxX: 1472, floorY: 448, lockX: 600, startVine: 1, calmX: 1390, exitsAfterVictory: [],
+      minX: 512, maxX: 1472, floorY: 448, ceilingY: 0, lockX: 600, calmX: 1300, spotInset: 105, recoil: 200, exitsAfterVictory: [],
       ...(data.kainatiArena || {}),
     };
-    const cfgVines = (data.vines && data.vines.length) ? data.vines : [{ x: cfg.minX + 240, y: -30, length: 280 }, { x: cfg.maxX - 240, y: -30, length: 280 }];
     const cam = scene.cameras.main;
     const b = cam.getBounds();
     const st = {
-      scene, cfg, cfgVines, vineDefs: null, fightActive: false, starting: false, disposed: false,
-      dying: false, passageRevealed: false,
-      camBounds: { x: b.x, y: b.y, width: b.width, height: b.height },
+      scene, cfg, fightActive: false, starting: false, disposed: false, won: false, downFired: false,
+      passageRevealed: false, told: {}, camBounds: { x: b.x, y: b.y, width: b.width, height: b.height },
     };
     if (scene.__kainati) scene.__kainati.disposed = true;
     scene.__kainati = st;
 
     st.boss = new KainatiBoss(scene, {
-      vines: cfgVines, startVine: Phaser.Math.Clamp(cfg.startVine, 0, cfgVines.length - 1),
-      minX: cfg.minX, maxX: cfg.maxX, floorY: cfg.floorY, ceilingY: 0,
+      minX: cfg.minX, maxX: cfg.maxX, floorY: cfg.floorY, ceilingY: cfg.ceilingY,
+      spots: [cfg.minX + cfg.spotInset, cfg.maxX - cfg.spotInset], startSpot: 1, recoil: cfg.recoil,
     });
-    scene.kainati = st.boss; // accès debug
+    scene.kainati = st.boss; // Player.pogoTargetHit + debug
     // PNJ « kainati » pour les étapes npcAnim/npcFace/npcMove de runCutscene.
     scene.npcs = scene.npcs || {};
     scene.npcs.kainati = st.boss.sprite;
-    st.leftCurtain = kainatiMakeCurtain(scene, cfg.minX, cfg.floorY);
-    st.rightCurtain = kainatiMakeCurtain(scene, cfg.maxX, cfg.floorY);
+    st.leftCurtain = kainatiMakeCurtain(scene, cfg.minX, cfg.floorY, cfg.ceilingY + 64);
+    st.rightCurtain = kainatiMakeCurtain(scene, cfg.maxX, cfg.floorY, cfg.ceilingY + 64);
     kainatiSetCurtain(scene, st.leftCurtain, false, true);
 
     if (kainatiFlag(scene, 'kainatiDefeated', false)) {
-      st.boss.makeCalm(cfg.calmX);
+      // Inerte, là où il a été épargné (ou calmX) ; passages ouverts.
+      const x = Phaser.Math.Clamp(kainatiFlag(scene, 'kainatiCalmX', cfg.calmX) || cfg.calmX, cfg.minX + 110, cfg.maxX - 110);
+      st.boss.makeCalm(x);
+      st.boss.face(-1);
       kainatiRevealPassage(scene, st, true);
     }
 
     // Parler à Kainati apaisé (événement clavier : ne consomme pas le JustDown de Player).
     st.talkPrompt = scene.add.text(0, 0, 'E : parler', {
-      fontFamily: 'sans-serif', fontSize: '14px', color: '#ffe9f5', backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
-    }).setOrigin(0.5, 1).setDepth(1200).setVisible(false);
+      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5', backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
+    }).setOrigin(0.5, 1).setDepth(1050).setVisible(false);
     st.onKeyE = () => {
       if (st.disposed || !st.boss.calm || !st.talkPrompt.visible || st.talking || kainatiFrozen(scene)) return;
       st.talking = true;
-      kainatiPlay(scene, 'kainati_calme').then(() => { st.talking = false; });
+      st.talkPrompt.setVisible(false);
+      st.boss.face(scene.player.x > st.boss.x ? 1 : -1);
+      st.boss.setTalking(true);
+      kainatiPlay(scene, 'kainati_calme').then(() => {
+        st.talking = false;
+        if (!st.disposed) st.boss.setTalking(false);
+      });
     };
     scene.input.keyboard.on('keydown-E', st.onKeyE);
-    // Le dernier cœur perdu gèle le monde le temps de la pose `death`
-    // (Player.hitByEnemy, ~1,1 s) puis recharge les cœurs : update() (coupé
-    // pendant le gel) ne voyait jamais `hearts <= 0`. On écoute le registre.
-    st.onHearts = (parent, value) => { if (!st.disposed && value <= 0) st.dying = true; };
-    scene.registry.events.on('changedata-hearts', st.onHearts);
-    // Signal direct de Player.hitByEnemy (couvre aussi le 1er `set` du
-    // registre, qui n'émet pas 'changedata-hearts').
-    st.onDepleted = () => { if (!st.disposed) st.dying = true; };
+    // Dernier cœur : signal direct de Player.hitByEnemy (+ registre, au cas où).
+    st.onDepleted = () => { if (!st.disposed && (st.fightActive || st.starting)) kainatiPlayerDown(scene, st); };
+    st.onHearts = (parent, value) => { if (value <= 0) st.onDepleted(); };
     scene.events.on('player-depleted', st.onDepleted);
+    scene.registry.events.on('changedata-hearts', st.onHearts);
+    // Compétences de dégâts (ours…) : émises une fois par activation (LevelKit).
+    st.onSkill = (ev) => {
+      if (st.disposed || !st.fightActive || !ev || !ev.rect || ev.token === st.lastSkillToken) return;
+      if (!Phaser.Geom.Intersects.RectangleToRectangle(ev.rect, st.boss.getHitRect())) return;
+      st.lastSkillToken = ev.token;
+      kainatiLandHit(scene, st, { kind: 'skill', skillId: ev.skillId, rect: ev.rect });
+    };
+    scene.events.on('player-skill', st.onSkill);
+    st.onAttack = (ev) => kainatiOnAttack(scene, st, ev);
+    scene.events.on('kainati-attack', st.onAttack);
+    st.onStunned = () => {
+      if (st.told.stun || !st.fightActive) return;
+      st.told.stun = true;
+      kainatiToast(scene, 'Kainati est sonné : fonce (Maj) et frappe, chaque coup compte double !', 2600);
+    };
+    scene.events.on('kainati-stunned', st.onStunned);
+    st.onPhase2 = () => kainatiBubble(scene, 'xara', 'Il enrage ! Des pierres tombent de là-haut : bouge sur ta liane !', 3000);
+    scene.events.on('kainati-phase2', st.onPhase2);
     scene.events.once('shutdown', () => {
       st.disposed = true;
-      scene.registry.events.off('changedata-hearts', st.onHearts);
       scene.events.off('player-depleted', st.onDepleted);
+      scene.registry.events.off('changedata-hearts', st.onHearts);
+      scene.events.off('player-skill', st.onSkill);
+      scene.events.off('kainati-attack', st.onAttack);
+      scene.events.off('kainati-stunned', st.onStunned);
+      scene.events.off('kainati-phase2', st.onPhase2);
       scene.input.keyboard.off('keydown-E', st.onKeyE);
-      kainatiHideBar(scene, st);
+      if (typeof hideBossBar === 'function') hideBossBar(scene);
     });
   },
 
   update(scene, time, delta) {
     const st = scene.__kainati;
-    if (!st || st.disposed || !scene.player) return;
+    if (!st || st.disposed || !scene.player || !scene.player.body) return;
     if (typeof currentLevelScene !== 'undefined' && scene !== currentLevelScene) return;
     if (kainatiFrozen(scene)) return;
     const p = scene.player;
     const dt = Math.min(delta, 50);
-    // Lianes résolues à la 1re frame : les handlers de données (Liane.js) ont tous tourné.
-    if (!st.vineDefs) kainatiSetupVines(scene, st);
-
     const defeated = kainatiFlag(scene, 'kainatiDefeated', false);
 
-    // Mort du joueur (cœurs à 0, puis rechargés au point d'entrée) : reset propre.
-    if (p.hearts <= 0) st.dying = true;
-    else if (st.dying) {
-      st.dying = false;
-      if (st.fightActive || st.starting) kainatiResetFight(scene, st);
-    }
-
-    if (!defeated && !st.fightActive && !st.starting && !st.dying && p.x > st.cfg.lockX && p.x < st.cfg.maxX) {
+    if (!defeated && !st.fightActive && !st.starting && !st.downFired && p.hearts > 0 && p.x > st.cfg.lockX && p.x < st.cfg.maxX) {
       kainatiStartFight(scene, st);
     }
 
     st.boss.update(dt, p);
     kainatiCheckPlayerHits(scene, st, time);
-    kainatiUpdateHints(scene, st);
-    kainatiDrawBar(st);
     if (st.fightActive && st.boss.defeated) kainatiVictory(scene, st);
 
     // Invite « E : parler » près de Kainati apaisé.
-    const near = st.boss.calm && Math.abs(p.x - st.boss.feet.x) < KAINATI_TALK_RANGE && Math.abs(p.y - st.boss.feet.y) < 120;
+    const near = st.boss.calm && Math.abs(p.x - st.boss.x) < KAINATI_TALK_RANGE && Math.abs(p.y - st.boss.cfg.floorY) < 120;
     st.talkPrompt.setVisible(near && !st.talking);
-    if (near) st.talkPrompt.setPosition(st.boss.feet.x, st.boss.feet.y - st.boss.h - 10);
+    if (near) st.talkPrompt.setPosition(st.boss.x, st.boss.cfg.floorY - st.boss.h - 10);
   },
 };

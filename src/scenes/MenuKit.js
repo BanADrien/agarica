@@ -87,12 +87,15 @@ const MENU_CHAPTERS = [
   },
   {
     id: 'grand_arbre', act: 'Acte I', name: 'Le grand arbre',
-    desc: 'Des racines immenses, des pierres qui tombent… et une gardienne au sommet.',
-    scene: 'GrandArbreRacinesScene', enterId: 'from_foret_sombre', zones: ['grand_arbre_racines', 'grand_arbre_arene', 'monde_spirituel', 'epreuve_singe'], color: 0x4a3420, bg: 'fond_grand_arbre',
+    desc: 'Des racines immenses, un totem endormi… et un roi furieux au sommet.',
+    scene: 'GrandArbreRacinesScene', enterId: 'from_foret_sombre', zones: ['grand_arbre_racines', 'monde_spirituel', 'grand_arbre_arene', 'epreuve_singe'], color: 0x4a3420, bg: 'fond_grand_arbre',
+    // Ordre : totem du singe (racines) → monde spirituel (forme singe) → lianes
+    // de la cime → Kainati épargné (l'épreuve reste optionnelle : pas de talisman).
     gives: {
       flags: {
-        visited_grand_arbre_racines: true, visited_grand_arbre_arene: true, visited_monde_spirituel: true,
-        kainatiIntroSeen: true, kainatiDefeated: true, hasMonkeyForm: true, mondeSpirituelFini: true, airForm: 'monkey',
+        visited_grand_arbre_racines: true, visited_monde_spirituel: true, visited_grand_arbre_arene: true,
+        totemSingeActif: true, hasMonkeyForm: true, mondeSpirituelFini: true, airForm: 'monkey',
+        kainatiIntroSeen: true, kainatiDefeated: true,
       },
     },
   },

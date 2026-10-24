@@ -538,9 +538,9 @@ cinématique. Images du lot Codex n°8 utilisées dès qu'elles existent (`fx_*`
 | 1 | `bosquet` → BosquetScene | habitants vs mousse, aide (gratter), 3 bébés cochons, père → talisman ours, vol idole par Amanite, Agarica ment, bannissement | `talismanOurs` (item `talisman_ours`), `banished` |
 | 2 | `foret_sombre_1` | désespoir, rencontre Xara, amas de mousse bloquant, talisman réagit → compétence ours, 1er ennemi corrompu | `xaraMet`, skill `ours` |
 | 3 | `foret_sombre_2` | totem du loup, ravins, pistes, mare aux 3 poissons, plante résistante visible inaccessible (en hauteur), mur de mousse (repulsif, acte 2), vue sur le grand arbre | `hasWolfForm`, `planteVue` |
-| 4 | `grand_arbre_racines` | racines, pierres qui tombent, ennemis, feu de camp, lianes visibles mais inutilisables | — |
-| 5 | `grand_arbre_arene` | Boss Kainati (script `kainati_arene`) → épargné, ouvre accès au totem du singe | `kainatiDefeated` |
-| 6 | `monde_spirituel` | Kainati esprit montre les lianes → forme singe | `hasMonkeyForm` |
+| 4 | `grand_arbre_racines` | racines, pierres qui tombent, ennemis, feu de camp, lianes visibles mais inutilisables ; au bout de la grande branche, TOTEM DU SINGE (E : `totem_monkey_dim` → `totem_monkey_lit`) → monde spirituel ; au retour, les 2 lianes de la cime (forme singe obligatoire) mènent seules à l'arène | `totemSingeActif` |
+| 5 | `monde_spirituel` | l'esprit simien ancestral éprouve Agarica (question) et donne la forme singe, puis la guide de liane en liane → retour au totem | `hasMonkeyForm`, `mondeSpirituelFini` |
+| 6 | `grand_arbre_arene` | Boss Kainati (script `kainati_arene`) au sol : charge, pierres, attaques pleine largeur (onde de choc, vague de mousse, éboulement) esquivées sur 4 lianes → épargné (inerte, parle), ouvre la route des hauteurs | `kainatiIntroSeen`, `kainatiDefeated`, `kainatiCalmX` |
 | 7 | `epreuve_singe` (optionnel) | longue course de lianes en 5 sections de difficulté croissante (24 lianes pendues sous des blocs, 12 288 px de large, ~14 000 px de parcours dont ~800 px d'escalade le long des lianes ; une lanterne par section, chute = lanterne ; mousse toxique `liquidFloor` en contrebas ; clés de script : pierres en rythme `rhythmRocks` (couloirs `{x, top, offset}`), marée `tides`, plateformes qui s'effritent `crumble`, pierres `rockfalls` ; singe corrompu) → talisman du singe au sommet (bout droit) | `talismanSinge`, skill `pierre` |
 | 8 | `foret_flottante_1` | Geralt + Clak, duel comique (s'ouvre sur l'« Invocation du Crabe Ancestral »), carte ; puis ASCENSION verticale (P1-P9, `camera.vertical`, `levelTop: -1200`, `skyReveal`) jusqu'au belvédère au-dessus des cimes, sortie en haut à droite vers les îles | `geraltMet`, item `carte_geralt` |
 | 9 | `foret_flottante_2` | îles, totem de poche cassé, Amanite (1re rencontre), totem de l'aigle, courants d'air | item `totem_poche_casse`, `amaniteMet`, `hasEagleForm` |
@@ -640,7 +640,8 @@ Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
 - **Lianes** : chaque liane pend sous une case solide (attache = haut de la case + 64,
   x dans la case) ; dans un enchaînement, écarts réglés pour le lâcher puissant (il
   faut de l'élan, la liane précédente seule n'atteint jamais l'appui suivant).
-  Racines : 2 lianes à 448 px ; monde spirituel : 4 (2 par vide, tutoriel) ; épreuve : 24.
+  Racines : 2 + 2 lianes à 448 px (épreuve à gauche, cime à droite) ; monde spirituel : 4 (2 par vide, tutoriel) ;
+  arène de Kainati : 4 (sous la canopée, bas à y=234) ; épreuve : 24.
 - **Saut simple sur le chemin critique** (avant le singe) : marches de 1-2 cases, ravin
   de 5 cases de la forêt sombre 2 précédé de 3 cases plates (fenêtre d'appel du loup
   x ≈ 1180-1340) ; aucune marche de 3 cases avant le singe.

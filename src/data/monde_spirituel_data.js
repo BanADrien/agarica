@@ -1,8 +1,9 @@
-// Zone « monde_spirituel » : l'arbre d'avant, le monde spirituel de Kainati
-// (acte 1, zone 6 de PLAN_DEV.md). On y arrive par le passage du totem du
-// singe, dans l'arène, après la victoire. L'esprit de Kainati donne la forme
-// singe dès l'arrivée, puis GUIDE Agarica de liane en liane au-dessus du vide
-// (« suis mes mouvements »). Logique : src/story/acte1_arbre.js
+// Zone « monde_spirituel » : l'arbre d'avant, le monde spirituel du peuple
+// singe (acte 1, PLAN_DEV.md). On y arrive par le TOTEM DU SINGE des racines
+// (bout de la grande branche), AVANT le combat contre Kainati. L'esprit
+// simien ancestral éprouve Agarica (question), lui donne la forme singe, puis
+// la GUIDE de liane en liane au-dessus du vide (« suis mes mouvements »).
+// Les deux sorties ramènent au totem. Logique : src/story/acte1_arbre.js
 // (ZONE_SCRIPTS.monde_spirituel + CUTSCENES `esprit_*`).
 //
 // Plan (grille 64, surface du sol y=448) :
@@ -10,7 +11,7 @@
 //   x 640-1344   1er vide : 3 lianes (A, B, C)
 //   x 1344-1600  îlot (y=384) : point de reprise
 //   x 1600-2240  2e vide : 3 lianes (D, E, F)
-//   x 2240-2880  l'arbre spirituel ; passage de retour vers l'arène (bord droit)
+//   x 2240-2880  l'arbre spirituel ; passage de retour vers le totem (bord droit)
 // Une chute dans le vide ramène au dernier point de reprise, sans dégât.
 const MONDE_SPIRITUEL_SURFACE_Y = 448;
 
@@ -70,12 +71,14 @@ const MONDE_SPIRITUEL_DATA = {
     { id: 'fin', x: 2420, w: 60, cutscene: 'esprit_fin' },
   ],
   exits: [
-    // Le passage derrière l'arbre spirituel : retour à la cime (porte du totem).
-    { x: 2864, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_monde_spirituel' } },
-    // Retour possible à tout moment par où l'on est venue.
-    { x: 16, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_monde_spirituel' } },
+    // Le passage derrière l'arbre spirituel : retour au totem des racines.
+    { x: 2864, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_monde_spirituel' } },
+    // Retour possible à tout moment par où l'on est venue (le totem).
+    { x: 16, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_monde_spirituel' } },
   ],
   entries: [
+    { id: 'from_racines', x: 200, y: 400, height: 100 },
+    // Ancien passage depuis l'arène (sauvegardes d'avant la refonte).
     { id: 'from_arene', x: 200, y: 400, height: 100 },
   ],
 };

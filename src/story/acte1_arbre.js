@@ -1,16 +1,20 @@
 // Dialogues, cinématiques et scripts des zones du grand arbre — agent Acte 1 (arbre).
 //
-// Zones (cf. docs/production/PLAN_DEV.md, progression 4 à 7) :
-//   foret_sombre_2 → grand_arbre_racines → grand_arbre_arene (Kainati,
-//   src/story/boss_kainati.js) → monde_spirituel (forme singe) → arène →
-//   foret_flottante_1 (acte 2). Optionnel : racines ⇄ epreuve_singe
-//   (talisman du singe), par les lianes des racines, en forme singe.
+// Zones (cf. docs/production/PLAN_DEV.md, progression 4 à 7) — ordre décidé
+// par l'utilisateur (2026-10-24) :
+//   foret_sombre_2 → grand_arbre_racines : TOTEM DU SINGE au bout de la
+//   grande branche (E) → monde_spirituel (l'esprit simien ancestral éprouve
+//   Agarica et lui donne la forme singe) → retour au totem → lianes de la
+//   cime (forme singe obligatoire) → grand_arbre_arene (Kainati,
+//   src/story/boss_kainati.js, épargné) → foret_flottante_1 (acte 2).
+//   Optionnel : racines ⇄ epreuve_singe (talisman du singe), par les lianes
+//   de la branche d'élan, en forme singe (avant ou après Kainati).
 // Chargé APRÈS boss_kainati.js : les textes de Kainati (`kainati_intro`,
 // `kainati_victoire`, `kainati_calme`) remplacent ceux par défaut.
 //
-// Flags posés ici : mondeSpirituelFini, talismanSinge (+ item talisman_singe,
-// compétence pierre), hasMonkeyForm (via l'étape `form`) ; + flags
-// automatiques de StoryKit (trig_*, pickup_*).
+// Flags posés ici : totemSingeActif (totem éveillé), mondeSpirituelFini,
+// talismanSinge (+ compétence pierre), hasMonkeyForm (via l'étape `form`) ;
+// + flags automatiques de StoryKit (trig_*, pickup_*).
 
 // ---------------------------------------------------------------------------
 // Petits utilitaires
@@ -148,16 +152,122 @@ CUTSCENES.racines_pierres = cutsceneBulles((scene) => {
   ];
 });
 
+// Bout de la grande branche, sans la forme singe : le vide de la cime, ses
+// lianes hors d'atteinte… et le totem.
 CUTSCENES.racines_cime = cutsceneBulles([
-  'Là-haut, la cime. Quelque chose de grand se balance dans les lianes… Je l\'entends respirer.',
-  { who: 'agarica', text: 'Le roi de l\'arbre. Je vais lui parler.' },
-  'Et s\'il ne t\'écoute pas… Quand il plonge, il retombe sonné : c\'est là qu\'il faut frapper.',
-]);
+  'La cime est de l\'autre côté de ce vide. Il n\'y a que ces lianes pour y aller.',
+  { who: 'agarica', text: 'Bien trop loin pour mes mains. Et ce totem… un singe sculpté.' },
+  'Il dort. Pose ta main dessus : ce bois-là a une âme.',
+], 'Le totem du singe : approche-toi et appuie sur E.');
+
+// Retour du monde spirituel, forme singe en main : la cime.
+CUTSCENES.racines_cime_singe = cutsceneBulles([
+  'Tes mains de singe, maintenant. Les lianes te porteront jusqu\'à la cime.',
+  { who: 'agarica', text: 'Et là-haut, le roi. L\'esprit m\'a demandé de l\'épargner.' },
+  'Prends de l\'élan, lâche quand la liane remonte.',
+], 'Lianes : ← → pour se balancer · Espace pour lâcher · Z/S pour monter/descendre');
+
+// Totem du singe (au bout de la grande branche) : art `totem_monkey_dim`,
+// puis `totem_monkey_lit` une fois éveillé ; il ouvre le monde spirituel.
+CUTSCENES.totem_singe_eveil = [
+  (scene) => CUTSCENE_STEP_HANDLERS.playerFace(scene, scene.player.x <= GRAND_ARBRE_RACINES_DATA.totemSinge.x ? 'right' : 'left'),
+  { say: [
+    { who: 'agarica', text: 'Un totem… sculpté en singe. Le bois est tiède, comme une peau.' },
+  ] },
+  { call: (scene) => arbreTotemSingeEveil(scene) },
+  { wait: 1100 },
+  { say: [
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Enfant des bois… Tes mains cherchent une prise qu\'elles n\'ont pas.' },
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Entre dans l\'arbre d\'avant. Nous verrons ce que vaut ton cœur.' },
+    { who: 'xara', text: 'Vas-y. Moi, je t\'attends ici, près du totem.' },
+  ] },
+  { flash: { ms: 450, color: 0xbfe8a0 } },
+  { goto: { scene: 'MondeSpirituelScene', data: { enterId: 'from_racines' } } },
+];
+
+// Totem déjà éveillé : il rouvre le passage (s'exercer avec l'esprit).
+CUTSCENES.totem_singe_retour = [
+  { flash: { ms: 350, color: 0xbfe8a0 } },
+  { goto: { scene: 'MondeSpirituelScene', data: { enterId: 'from_racines' } } },
+];
+
+const ARBRE_TOTEM_RANGE_X = 70;
+const ARBRE_TOTEM_RANGE_Y = 110;
+
+// Totem du singe des racines : image au sol (bas visible sur la branche),
+// halo qui respire une fois éveillé, invite « E », touche E (événement
+// clavier : ne consomme pas le JustDown du joueur ni des PNJ).
+function arbreTotemSinge(scene, cfg) {
+  const lit = !!storyGet('totemSingeActif');
+  const img = addItemImage(scene, cfg.x, cfg.y, lit ? 'totem_monkey_lit' : 'totem_monkey_dim', { origin: [0.5, 1] });
+  if (typeof anchorVisibleFeet === 'function') anchorVisibleFeet(img);
+  placeOnGround(scene, img, cfg.x, { refY: cfg.y, sink: GROUND_CONTACT_SINK });
+  storyPutBehindPlayer(scene, img);
+  const t = { img, cfg, lit, halo: null, busy: false };
+  scene.__totemSinge = t;
+  if (lit) arbreTotemHalo(scene, t);
+  t.prompt = scene.add.text(cfg.x, img.y - img.displayHeight - 10, '', {
+    fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5', backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
+  }).setOrigin(0.5, 1).setDepth(1050).setVisible(false);
+  t.near = () => {
+    const p = scene.player;
+    return !!(p && p.body && Math.abs(p.x - cfg.x) < ARBRE_TOTEM_RANGE_X && Math.abs(p.y - img.y) < ARBRE_TOTEM_RANGE_Y && p.body.blocked.down);
+  };
+  t.onKeyE = () => {
+    if (t.busy || scene.__totemSinge !== t || !t.prompt.visible || isWorldFrozen(scene)) return;
+    t.busy = true;
+    t.prompt.setVisible(false);
+    runCutscene(scene, t.lit ? 'totem_singe_retour' : 'totem_singe_eveil').finally(() => { t.busy = false; });
+  };
+  scene.input.keyboard.on('keydown-E', t.onKeyE);
+  scene.events.once('shutdown', () => scene.input.keyboard.off('keydown-E', t.onKeyE));
+  return t;
+}
+
+function arbreTotemHalo(scene, t) {
+  if (t.halo || typeof juiceTexture !== 'function') return;
+  const ht = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
+  const hs = (t.img.displayHeight * 1.1) / ht.size;
+  t.halo = scene.add.image(t.cfg.x, t.img.y - t.img.displayHeight * 0.55, ht.key)
+    .setBlendMode(Phaser.BlendModes.ADD).setTint(0x8fe3b8).setAlpha(0.3).setScale(hs);
+  scene.children.moveBelow(t.halo, t.img);
+  scene.tweens.add({ targets: t.halo, alpha: { from: 0.18, to: 0.45 }, scale: { from: hs * 0.92, to: hs * 1.06 }, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+}
+
+// Le totem s'éveille (dans la cinématique) : bois qui s'allume, éclat, anneau.
+function arbreTotemSingeEveil(scene) {
+  const t = scene.__totemSinge;
+  if (!t) return;
+  storySet('totemSingeActif', true);
+  t.lit = true;
+  const bottom = visibleBottomY(t.img);
+  if (scene.textures.exists('item-totem_monkey_lit')) t.img.setTexture('item-totem_monkey_lit');
+  setVisibleBottomY(t.img, bottom);
+  const cy = t.img.y - t.img.displayHeight * 0.55;
+  juiceFlash(t.img, 0xffffff, 160);
+  juiceBurstImage(scene, 'glow', t.cfg.x, cy, { size: t.img.displayHeight * 2.4, from: 0.3, to: 1.2, ms: 560, color: 0xe8fff2, alpha: 0.9 });
+  juiceShockRing(scene, t.cfg.x, cy, { size: t.img.displayHeight * 2, ms: 560, color: 0x8fe3b8 });
+  spawnFx(scene, 'motes', t.cfg.x, cy, { count: 22, spread: 26, power: 2.2, color: [0x8fe3b8, 0xe8fff2, 0xff9fc9] });
+  juiceShake(scene, 'medium');
+  playSfx('totem_activate', { form: 'monkey' });
+  arbreTotemHalo(scene, t);
+}
+
+function arbreUpdateTotem(scene, t, time) {
+  const show = !t.busy && t.near() && !isWorldFrozen(scene);
+  t.prompt.setText(t.lit ? 'E : entrer dans l\'arbre d\'avant' : 'E : éveiller le totem').setVisible(show);
+  // Lueurs qui montent du totem éveillé.
+  if (t.lit && time >= (t.moteAt || 0)) {
+    t.moteAt = time + (show ? 260 : 600);
+    spawnFx(scene, 'motes', t.cfg.x + Phaser.Math.Between(-16, 16), t.img.y - t.img.displayHeight * Phaser.Math.FloatBetween(0.3, 0.8), { count: 1, color: [0x8fe3b8, 0xe8fff2, 0xff9fc9] });
+  }
+}
 
 ZONE_SCRIPTS.grand_arbre_racines = {
   create(scene, data) {
     const st = { cfg: (data && data.rockfall) || null, timer: 600 };
     scene.__arbre = st;
+    const levelWidth = (data && data.levelWidth) || 3840;
     // Plus de tronc au premier plan (retour utilisateur) : ni le tronc
     // provisoire dessiné par code, ni le collage de pans d'écorce
     // (`grand_arbre_tronc_*`, dont sève corrompue et fenêtre de lune) qui
@@ -165,30 +275,34 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     // Décors `grand_arbre_tronc_*` de la donnée : derrière les branches (les
     // décors sont sinon dessinés devant les tuiles).
     sendBehindFrontGround(scene, (scene.props || []).filter((p) => p.propType && p.propType.startsWith('grand_arbre_tronc_')));
-    // Bord droit, sous la grande branche : mur invisible (le monde physique
-    // continue 200 px plus loin). Pas de pilier de tuiles : un mur de 2 cases
-    // ou plus partant du sol coince Agarica contre l'angle des tuiles.
-    const wall = scene.add.zone(3216, 270, 32, 540);
+    // Bord droit : mur invisible (le monde physique continue 200 px plus
+    // loin). Pas de pilier de tuiles : un mur de 2 cases ou plus partant du
+    // sol coince Agarica contre l'angle des tuiles.
+    const wall = scene.add.zone(levelWidth + 16, 270, 32, 1200);
     scene.physics.add.existing(wall, true);
     scene.physics.add.collider(scene.player, wall);
     if (scene.enemies) scene.physics.add.collider(scene.enemies, wall);
     // La fente de l'épreuve du singe, au bout des lianes (corniche gauche).
     arbreGlowPassage(scene, 40, -190, 120);
-    // Lumière de la cime, en haut à droite (sortie vers l'arène).
-    const cime = scene.add.ellipse(3170, -260, 120, 200, 0xffe9a8, 0.12);
+    // Lumière de la cime, en haut à droite (sortie vers l'arène, au bout de
+    // la corniche de la cime, après les lianes).
+    const cime = scene.add.ellipse(levelWidth - 50, -300, 120, 220, 0xffe9a8, 0.12);
     storyPutBehindPlayer(scene, cime);
     scene.tweens.add({ targets: cime, alpha: 0.25, duration: 1600, yoyo: true, repeat: -1 });
     // La mousse dense qui remonte le tunnel (sol et plafond).
     [420, 560, 900, 1040].forEach((x, i) => arbreMossDecor(scene, x, 448, 70 + (i % 2) * 20));
     [500, 760, 1120].forEach((x) => arbreMossDecor(scene, x, 320, 60, true));
-    [1500, 1950, 2420, 2900].forEach((x, i) => arbreMossDecor(scene, x, i === 0 ? 64 : -192, 50));
-    arbreMotes(scene, 1300, 3100, -380, 400, 14, [0x9bff5a, 0xbfe8a0, 0xff9ad5]);
+    [1500, 1950, 2420, 2560].forEach((x, i) => arbreMossDecor(scene, x, i === 0 ? 64 : -192, 50));
+    arbreMotes(scene, 1300, levelWidth - 100, -500, 400, 18, [0x9bff5a, 0xbfe8a0, 0xff9ad5]);
+    // Le totem du singe, au bout de la grande branche.
+    if (data && data.totemSinge) st.totem = arbreTotemSinge(scene, data.totemSinge);
   },
 
   update(scene, time, delta) {
     const st = scene.__arbre;
     const cfg = st && st.cfg;
     const p = scene.player;
+    if (st && st.totem && p && p.body) arbreUpdateTotem(scene, st.totem, time);
     // Le feu de camp de la fourche sert aussi de point de reprise : une
     // chute de cœurs plus haut ne renvoie pas tout en bas de l'arbre.
     if (st && p && !st.forkSpawn && p.body.blocked.down && p.x > 1344 && p.x < 1728 && p.y < 100 && p.y > 0) {
@@ -214,51 +328,45 @@ ZONE_SCRIPTS.grand_arbre_racines = {
 // 5. ARÈNE — textes de Kainati (le combat : src/story/boss_kainati.js)
 // ---------------------------------------------------------------------------
 // Kainati est digne et protecteur : la mousse l'a rendu méfiant et colérique,
-// pas mauvais. À la fin, il reconnaît le combat d'Agarica et lui ouvre le
-// passage du totem (monde spirituel).
+// pas mauvais. Agarica arrive avec les mains de ses ancêtres (forme singe) :
+// il y voit un vol. Épargné, il reconnaît son combat et lui ouvre la route
+// des hauteurs.
 DIALOGUES.kainati_intro = [
-  { who: 'kainati', text: 'Halte, enfant d\'en bas !' },
-  { who: 'kainati', text: 'Depuis des lunes, la mousse grimpe le long de mon arbre. Mon peuple tousse, mes branches pourrissent… et voilà qu\'elle t\'envoie, toi.' },
-  { who: 'agarica', text: 'La mousse ? Non, je la combats ! Je cherche seulement à…' },
-  { who: 'kainati', text: 'Tes pieds en portent l\'odeur ! Ma tête bourdonne… Personne n\'atteindra ma cime.' },
-  { who: 'xara', text: 'Agarica, regarde ses yeux. Ce n\'est pas lui qui parle… J\'ai déjà vu ce regard. Il y a longtemps.' },
-  { who: 'kainati', text: 'Assez ! Les branches jugeront pour moi.' },
+  { who: 'kainati', text: 'Halte, enfant d\'en bas ! Qui t\'a appris à courir sur mes lianes ?' },
+  { who: 'agarica', text: 'L\'esprit de tes ancêtres. Il m\'a confié ses mains, dans l\'arbre d\'avant.' },
+  { who: 'kainati', text: 'Mensonge ! Tu portes l\'odeur de la mousse… Elle grimpe le long de mon arbre depuis des lunes, et voilà qu\'elle t\'envoie.' },
+  { who: 'xara', text: 'Agarica, regarde ses yeux. Ce n\'est pas lui qui parle : c\'est la mousse.' },
+  { who: 'kainati', text: 'Assez ! Ma colère va secouer cet arbre jusqu\'aux racines. Reste au sol, si tu l\'oses !' },
 ];
 
 DIALOGUES.kainati_victoire = [
   { who: 'kainati', text: '…' },
   { who: 'kainati', text: 'Le bourdonnement… s\'est tu. La brume quitte mes yeux.' },
   { who: 'kainati', text: 'Tu aurais pu me jeter au bas de mon arbre. Tu ne l\'as pas fait.' },
-  { who: 'agarica', text: 'Ce n\'était pas toi, c\'était la mousse. Je la combats, Kainati. Elle ronge toute la forêt.' },
+  { who: 'agarica', text: 'Tes ancêtres m\'ont demandé de t\'épargner. Ce n\'était pas toi, c\'était la mousse. Je la combats : elle ronge toute la forêt.' },
   { who: 'kainati', text: 'Alors nous avons le même ennemi. Elle s\'était glissée en moi comme la sève dans le bois… et j\'ai pris une enfant des bois pour une ennemie.' },
-  { who: 'kainati', text: 'Pardonne au vieux roi. Tu as lu mes bonds sans les connaître : tu as compris mon mouvement.' },
-  { who: 'kainati', text: 'Derrière ma branche, l\'écorce s\'est ouverte. Là dort le totem de mon peuple : il te mènera dans l\'arbre d\'avant, où nos esprits t\'attendent.' },
-  { who: 'kainati', text: 'Et quand tu seras prête, la route des hauteurs continue vers l\'est, au-delà de ma cime.' },
-  { who: 'xara', text: 'Un totem qui ouvre sur le monde des esprits… Je ne pensais pas en revoir un un jour.' },
+  { who: 'kainati', text: 'Tu portes bien les mains de mon peuple. Pardonne au vieux roi.' },
+  { who: 'kainati', text: 'La route des hauteurs continue vers l\'est, au-delà de ma cime. Elle est à toi.' },
+  { who: 'xara', text: 'Il est à bout de forces. Laissons-le se reposer.' },
 ];
 
-// Route des hauteurs sans la forme du singe : impossible au saut simple (la
-// corniche de Geralt est à +192 px) -- Xara renvoie vers le passage du totem.
+// Filet (ancienne sauvegarde ou démarrage de test sans la forme singe) : la
+// route des hauteurs l'exige -- Xara renvoie vers le totem des racines.
 CUTSCENES.arene_sans_singe = [
   { call: (scene) => storyBulles(scene, [
     'Attends. Là-haut, les branches s\'écartent de trois bonnes longueurs… Tes jambes n\'y suffiront pas.',
-    'Le passage du totem brille sur la branche derrière nous. Son peuple t\'attend : va d\'abord le voir.',
-  ], 'Le passage du totem du singe : sur la branche haute, à gauche.') },
+    'Le totem du singe, au bout de la grande branche des racines : son peuple t\'attend.',
+  ], 'Le totem du singe : dans les racines, au bout de la grande branche.') },
   { playerFace: 'left' },
   { playerMove: { toX: 1640 } },
 ];
 
-// Kainati apaisé (revisites) : ses mots suivent la progression d'Agarica.
+// Kainati apaisé (E : parler, revisites comprises) : ses mots suivent la
+// progression d'Agarica. Il reste assis, inerte.
 CUTSCENES.kainati_calme = () => {
-  if (!storyGet('hasMonkeyForm')) {
-    return [{ say: [
-      { who: 'kainati', text: 'Le passage du totem brille derrière ma branche. Mon peuple t\'attend dans l\'arbre d\'avant.' },
-      { who: 'kainati', text: 'Va sans crainte. Là-bas, rien ne pourrit.' },
-    ] }];
-  }
   if (!storyGet('talismanSinge')) {
     return [{ say: [
-      { who: 'kainati', text: 'Tu portes nos mains, maintenant. Je le vois à ta façon de regarder les lianes.' },
+      { who: 'kainati', text: 'Mes jambes ne me portent plus… La mousse m\'a pris toutes mes forces en partant.' },
       { who: 'kainati', text: 'Les lianes de mes racines mènent à l\'épreuve de mon peuple. Termine-la, et notre talisman sera tien.' },
       { who: 'kainati', text: 'Ou continue vers l\'est, par la route des hauteurs. L\'épreuve t\'attendra : les arbres sont patients.' },
     ] }];
@@ -270,7 +378,7 @@ CUTSCENES.kainati_calme = () => {
 };
 // Repli si un jour CUTSCENES n'était pas consulté en premier.
 DIALOGUES.kainati_calme = [
-  { who: 'kainati', text: 'Le totem t\'attend derrière ma branche. Plus haut, la route mène vers les hauteurs.' },
+  { who: 'kainati', text: 'Plus haut, à l\'est, la route mène vers les hauteurs.' },
   { who: 'kainati', text: 'Que les lianes te portent, petite druidesse.' },
 ];
 
@@ -287,19 +395,32 @@ function mondeSpirituelGuidePath(scene) {
   return [v[0], v[1], sol(1470, 384), v[2], v[3], sol(2480, 448)];
 }
 
+// L'esprit simien ANCESTRAL (art `kainati_esprit`, nom affiché « Esprit
+// ancestral ») : l'aïeul du peuple de Kainati. Il éprouve le cœur d'Agarica
+// (question), lui donne la forme singe, puis la guide de liane en liane.
+const ESPRIT_NOM = 'Esprit ancestral';
+const espritDit = (text) => ({ who: 'kainati_esprit', name: ESPRIT_NOM, text });
+
 CUTSCENES.esprit_arrivee = [
   { wait: 400 },
   { say: [
-    { who: 'kainati_esprit', text: 'Bienvenue dans l\'arbre d\'avant, petite druidesse. Ici, rien ne pourrit.' },
-    { who: 'agarica', text: 'Kainati ? Tu… tu brilles.' },
-    { who: 'kainati_esprit', text: 'Ce que j\'étais avant la mousse. Le totem t\'a ouverte à nous : reçois notre forme.' },
+    espritDit('Bienvenue dans l\'arbre d\'avant, enfant des bois. Ici, rien ne pourrit.'),
+    { who: 'agarica', text: 'Tu… tu brilles. Qui es-tu ?' },
+    espritDit('Le premier de mon peuple. Mon descendant, Kainati, règne sur la cime de ton arbre… et la mousse lui ronge l\'esprit.'),
+    { ...espritDit('Dis-moi. Pourquoi veux-tu atteindre sa cime ?'), choices: [
+      { text: 'Pour arrêter la mousse qui ronge la forêt.' },
+      { text: 'Pour parler à votre roi, pas pour le combattre.' },
+    ] },
+    espritDit('Ta réponse a le goût de la sève, pas de la mousse. Ton cœur est droit.'),
+    espritDit('Reçois nos mains. Et si Kainati se dresse contre toi… ne le tue pas. Rends-lui ses yeux.'),
   ] },
+  { call: (scene) => (scene.__esprit ? scene.__esprit.bless(1200) : null) },
   { flash: { ms: 500, color: 0xbfe8a0 } },
   { form: 'hasMonkeyForm' },
   { wait: 900 },
   { say: [
-    { who: 'kainati_esprit', text: 'En l\'air, approche-toi d\'une liane : tes mains s\'y accrocheront. Balance-toi, puis lâche avec l\'élan.' },
-    { who: 'kainati_esprit', text: 'Suis mes mouvements.' },
+    espritDit('Mais des mains ne suffisent pas. Montre-moi qu\'elles ont compris.'),
+    espritDit('En l\'air, approche-toi d\'une liane : tes mains s\'y accrocheront. Balance-toi, puis lâche avec l\'élan. Suis mes mouvements.'),
   ] },
   { toast: { text: 'Forme du singe : en l\'air, accroche-toi aux lianes.\n← → : se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5200 } },
 ];
@@ -307,20 +428,21 @@ CUTSCENES.esprit_arrivee = [
 CUTSCENES.esprit_fin = [
   { playerFace: 'right' },
   { say: [
-    { who: 'kainati_esprit', text: 'Tu as gardé l\'élan jusqu\'au bout. Les branches te reconnaissent.' },
-    { who: 'kainati_esprit', text: 'Un jour, d\'autres esprits t\'offriront peut-être des ailes. Près d\'un feu, tu choisiras : nos mains ou leurs ailes, une seule à la fois.' },
-    { who: 'agarica', text: 'Merci, Kainati. Je ferai honneur à ton peuple.' },
-    { who: 'kainati_esprit', text: 'Les lianes de mes racines mènent à l\'épreuve de mon peuple. Le passage derrière moi te ramènera dans ton monde.' },
+    espritDit('Tu as gardé l\'élan jusqu\'au bout. L\'épreuve est réussie : les branches te reconnaissent.'),
+    espritDit('Un jour, d\'autres esprits t\'offriront peut-être des ailes. Près d\'un feu, tu choisiras : nos mains ou leurs ailes, une seule à la fois.'),
+    { who: 'agarica', text: 'Merci. Je ferai honneur à ton peuple.' },
+    espritDit('Retourne au totem. Au-delà, les lianes de la cime te mèneront jusqu\'à Kainati. Et les lianes de la branche d\'élan, à l\'épreuve de mon peuple.'),
   ] },
   { set: { mondeSpirituelFini: true } },
+  { toast: { text: 'Le passage derrière l\'arbre spirituel ramène au totem des racines.', ms: 3200 } },
 ];
 
 DIALOGUES.esprit_guide = [
-  { who: 'kainati_esprit', text: 'Ne regarde pas le vide. Regarde la liane suivante.' },
+  espritDit('Ne regarde pas le vide. Regarde la liane suivante.'),
 ];
 DIALOGUES.esprit_revisite = [
-  { who: 'kainati_esprit', text: 'Tu reviens t\'exercer ? L\'arbre d\'avant est patient.' },
-  { who: 'kainati_esprit', text: 'Souviens-toi : on lâche la liane quand elle monte, jamais quand elle retombe.' },
+  espritDit('Tu reviens t\'exercer ? L\'arbre d\'avant est patient.'),
+  espritDit('Souviens-toi : on lâche la liane quand elle monte, jamais quand elle retombe.'),
 ];
 
 ZONE_SCRIPTS.monde_spirituel = {
@@ -371,10 +493,12 @@ ZONE_SCRIPTS.monde_spirituel = {
 // ---------------------------------------------------------------------------
 // Seule l'arrivée (la voix de Kainati) est un dialogue bloquant ; les
 // remarques de chaque passage sont des bulles (elles ne gèlent rien).
+// La voix de l'épreuve est celle des ANCÊTRES (esprit ancestral) : l'épreuve
+// est ouverte avant comme après le combat contre Kainati.
 CUTSCENES.epreuve_intro = [
   { say: [
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Tu es venue. Bien. Ici, mon peuple ne touche jamais le sol.' },
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Cinq passages, chacun plus rude. En bas, la mousse attend ceux qui tombent. Au sommet, notre talisman.' },
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Tu es venue. Bien. Ici, mon peuple ne touche jamais le sol.' },
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Cinq passages, chacun plus rude. En bas, la mousse attend ceux qui tombent. Au sommet, notre talisman.' },
   ] },
   { camera: { x: 1250, y: 120, ms: 1700 } },
   { wait: 900 },
@@ -404,7 +528,7 @@ CUTSCENES.epreuve_s5 = cutsceneBulles([
 
 CUTSCENES.epreuve_sans_singe = cutsceneBulles([
   'Ces lianes filent jusqu\'au bout des branches… mais sans la forme du singe, elles ne te porteront pas.',
-  'L\'esprit de Kainati pourrait t\'apprendre leurs secrets. Le passage de son totem est dans l\'arène.',
+  'Le totem du singe, au bout de la grande branche des racines : ses esprits t\'apprendront leurs secrets.',
 ]);
 
 CUTSCENES.epreuve_forme_aigle = [
@@ -415,16 +539,16 @@ CUTSCENES.epreuve_talisman = [
   { flash: { ms: 450, color: 0xbfe8a0 } },
   { set: { talismanSinge: true } },
   { say: [
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Tu n\'as pas touché le sol. Mon peuple te salue, Agarica.' },
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Ce talisman garde notre plus vieux savoir : la pierre lancée juste, de loin, sans se mettre en danger.' },
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Tu n\'as pas touché le sol. Mon peuple te salue, Agarica.' },
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Ce talisman garde notre plus vieux savoir : la pierre lancée juste, de loin, sans se mettre en danger.' },
   ] },
   { playerPose: 'cast' },
   { skill: 'pierre' },
   { wait: 1200 },
   { playerPose: null },
   { say: [
-    { who: 'xara', text: 'Une pierre bien lancée vaut mieux qu\'une lame trop près des crocs. Ce vieux singe est sage.' },
-    { who: 'agarica', text: 'Merci, Kainati. Merci à ton peuple.' },
+    { who: 'xara', text: 'Une pierre bien lancée vaut mieux qu\'une lame trop près des crocs. Ces vieux singes sont sages.' },
+    { who: 'agarica', text: 'Merci, esprits du peuple singe.' },
   ] },
   { call: (scene) => epreuveOuvrirSommet(scene, false) },
   { toast: { text: 'Lancer de pierre : il coûte un peu d\'énergie. La fente, au bout du sommet, redescend vers les racines.', ms: 4000 } },
