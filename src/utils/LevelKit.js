@@ -400,8 +400,14 @@ function zoneBackdropSpec(data, { camLow = 0, camHigh = 0 } = {}) {
   const def = id && typeof getItemManifest === 'function' ? getItemManifest()[id] : null;
   const groundLine = bg.groundLine ?? data.backgroundGroundLine ?? (def && def.groundLine) ?? 1;
   const sky = data.skyReveal ? { ...(data.skyReveal === true ? {} : data.skyReveal) } : null;
+  // Fond peint qui a déjà son propre soleil : pas de second soleil par-dessus
+  // (sauf `rays: true` explicite dans la zone).
+  if (sky && sky.rays === undefined && BACKGROUNDS_WITH_SUN.has(id)) sky.rays = false;
   return { baseline, groundLine, camLow, camHigh, sky };
 }
+
+// Fonds lointains dont l'image contient déjà un soleil (cf. zoneBackdropSpec).
+const BACKGROUNDS_WITH_SUN = new Set(['fond_foret_flottante']);
 
 // Couleur moyenne des rangées du haut ou du bas d'une texture (mise en
 // cache) : prolongement des bords du fond lointain. Repli sombre si les
@@ -2508,6 +2514,9 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       //   bordure fermée à droite.
       // - aucun voisin (pos 'tl' sans hasEast -- îlot d'une seule case)
       //   -> platform1, seule variante fermée des DEUX côtés.
+      // Jeux des biomes : platform0 est périodique et le bord droit de
+      // platform2 est celui de platform0 (tools/import_codex_assets.py,
+      // make_platform_tiles) -- une rangée se lit comme UN seul bloc.
       if (pos === 't') {
         textureKey = 'autotile-dirt-platform0';
       } else if (pos === 'tr') {

@@ -59,8 +59,10 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   Échap/P pause.
 - **Formes** débloquées par l'histoire, automatiques (jamais un bouton) : sol = **Loup**
   (sprint, pistes, plateformes cachées), aérien = **Singe** (lianes) OU **Aigle** (plané,
-  courants d'air) OU **Papillon** (battement + dash en diagonale) au choix, eau = **Pieuvre**. **Compétences** (énergie) : ours, pierre,
-  papillon (soigne les corrompus). **Feux de camp** : soin, sauvegarde, menu formes /
+  courants d'air) au choix, eau = **Pieuvre**. **Compétences** (énergie) : ours, pierre,
+  papillon (soigne les corrompus). Le papillon n'est QU'une compétence (décision
+  utilisateur du 2026-10-24) : ce n'est pas une forme aérienne et il ne remplace
+  pas le double saut. **Feux de camp** : soin, sauvegarde, menu formes /
   compétences / totems (monde gelé).
 - **Compagnon Xara** (araignée) : suit Agarica, parle, pas de combat.
 - **StoryKit** : nouvelles clés de zone (npcs, triggers, pickups, mossBlocks, vines,

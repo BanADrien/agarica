@@ -42,9 +42,15 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+class RoomyHTTPServer(http.server.ThreadingHTTPServer):
+    # File d'attente par défaut (5) trop courte : le jeu charge ~600 fichiers
+    # d'un coup et des connexions étaient refusées (« connection refused »).
+    request_queue_size = 512
+
+
 def serve(port):
     handler = functools.partial(QuietHandler, directory=ROOT)
-    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', port), handler)
+    httpd = RoomyHTTPServer(('127.0.0.1', port), handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd
 

@@ -35,7 +35,8 @@ garder en double ici). Trois tables y sont lues :
     découpées vers les 21 noms de assets/decors/autotile_frames/ (disposition
     'blob' de LevelKit.js) : contour retiré sur les côtés intérieurs (pas de
     couture), cases du dessus à leur proportion naturelle, mousse calée sur
-    la ligne de marche (cf. make_tile).
+    la ligne de marche (cf. make_tile). Milieu et bout de plateforme
+    reconstruits pour se raccorder sans encoche (cf. make_platform_tiles).
 
 Fonds non transparents : si les 4 coins de l'image sont opaques et qu'elle
 n'est pas censée l'être (fonds `cover` exclus), le fond est retiré : noir via
@@ -82,7 +83,8 @@ TILE_EXPOSED = {
     'dirt_l': 'l', 'dirt_r': 'r',
     'dirt_bl': 'bl', 'dirt_b': 'b', 'dirt_br': 'br',
     # plateformes : 0 = milieu (voisins des 2 côtés), 2 = bout GAUCHE (miroir
-    # pour le bout droit), 1 = isolée (cf. renderAutotileGrid)
+    # pour le bout droit), 1 = isolée (cf. renderAutotileGrid). 0 et 2 sont
+    # ensuite refaits par make_platform_tiles (raccord sans encoche).
     'dirt_platform0': 'tb', 'dirt_platform1': 'tblr', 'dirt_platform2': 'tbl',
     'dirt_column': 'lr',
 }  # absent = case intérieure (centre, variantes, coins intérieurs)
@@ -607,6 +609,153 @@ def compose_inner_corner(angle, l_tile):
     return base
 
 
+# --------------------------------------------------------------------------- plateformes raccordables
+# Bug « les plateformes ne se collent pas » : sur la planche Codex, chaque
+# plateforme (milieu, bout gauche, isolée) est dessinée comme une petite île
+# COMPLÈTE -- flancs arrondis à contour sombre, dessous en bulbe, et pour le
+# jeu corrompu une taille de guêpe. Le rognage de make_tile (TILE_INSET sur
+# le côté intérieur, mesuré sur la rangée de rochers du bas, plus large que la
+# terre) laissait ces flancs dans chaque case : une plateforme de 3 cases se
+# lisait comme 3 îlots séparés par des encoches. On reconstruit donc :
+#   - dirt_platform0 (milieu) : coupé DANS le corps plein de l'île du milieu
+#     (cf. platform_core_cols), prolongé par lui-même si besoin, puis rendu
+#     PÉRIODIQUE (sa colonne de droite se raccorde à sa colonne de gauche) ;
+#   - dirt_platform2 (bout gauche, miroir pour le bout droit) : le bout
+#     arrondi de l'île de gauche, puis le milieu à partir de PLATFORM_JOIN_X
+#     -- son bord droit EST celui du milieu, donc raccord parfait.
+# Raccords par couture d'erreur minimale (seam_cut) : pas de fondu (pas de
+# fantômes de racines), une coupe nette qui passe là où les deux images se
+# ressemblent le plus. Même échelle que l'ancien milieu (aspect inchangé) et
+# même hauteur au-dessus de la ligne de marche pour les deux cases.
+PLATFORM_SEAM = 40          # px de case : largeur des bandes de raccord
+PLATFORM_BODY_INSET = 14    # px source : contour sombre + arrondi retirés du corps plein
+PLATFORM_JOIN_X = TILE // 2 - PLATFORM_SEAM // 2  # début du raccord bout / milieu
+
+
+def surface_row(arr):
+    """1re rangée opaque à plus de 50 % : haut de la mousse (cf. make_tile)."""
+    cov = (arr[:, :, 3] > 128).mean(axis=1)
+    return next((i for i, c in enumerate(cov) if c > 0.5), 0)
+
+
+def platform_core_cols(arr):
+    """Colonnes [x0, x1) où l'île est PLEINE sur toute sa partie haute (de 15 à
+    60 % de sa hauteur sous la mousse : terre, écorce, taille de guêpe
+    comprise), sans la frange irrégulière du dessous."""
+    s = surface_row(arr)
+    above = arr.shape[0] - s
+    full = (arr[s + int(above * 0.15):s + int(above * 0.6), :, 3] > 200).all(axis=0)
+    segs = find_segments(full)
+    if not segs:
+        return None
+    x0, x1 = max(segs, key=lambda t: t[1] - t[0])
+    return x0, x1 + 1
+
+
+def _premultiplied(arr):
+    f = arr.astype(np.float32)
+    a = f[:, :, 3:4] / 255
+    return np.concatenate([f[:, :, :3] * a, f[:, :, 3:4]], axis=2)
+
+
+def seam_cut(a, b):
+    """Bandes superposées a, b (h, w, 4) : pour chaque rangée y, colonne c[y]
+    dans [1, w-1] (à gauche : a, à partir de c[y] : b) le long du chemin
+    vertical continu (|c[y] - c[y-1]| <= 1) de moindre différence (couleurs
+    prémultipliées : deux pixels transparents ne coûtent rien)."""
+    err = np.abs(_premultiplied(a) - _premultiplied(b)).sum(axis=2)
+    h, w = err.shape
+    err[:, 0] = np.inf  # au moins une colonne de a (continuité côté gauche)
+    cost = err.copy()
+    back = np.zeros((h, w), int)
+    cols = np.arange(w)
+    for y in range(1, h):
+        prev = cost[y - 1]
+        cand = np.stack([np.r_[np.inf, prev[:-1]], prev, np.r_[prev[1:], np.inf]])
+        k = np.argmin(cand, axis=0)
+        back[y] = cols + k - 1
+        cost[y] += cand[k, cols]
+    c = np.zeros(h, int)
+    c[-1] = int(np.argmin(cost[-1]))
+    for y in range(h - 1, 0, -1):
+        c[y - 1] = back[y, c[y]]
+    return c
+
+
+def join_seam(a, b):
+    """a puis b, les PLATFORM_SEAM dernières colonnes de a superposées aux
+    premières de b et raccordées par seam_cut."""
+    n = PLATFORM_SEAM
+    c = seam_cut(a[:, -n:], b[:, :n])
+    band = b[:, :n].copy()
+    for y in range(a.shape[0]):
+        band[y, :c[y]] = a[y, a.shape[1] - n:a.shape[1] - n + c[y]]
+    return np.concatenate([a[:, :-n], band, b[:, n:]], axis=1)
+
+
+def make_periodic(strip, w):
+    """Case de largeur w qui se répète sans couture : ses PLATFORM_SEAM
+    premières colonnes passent de la suite de la colonne w-1 (strip[w:]) au
+    début de strip."""
+    n = PLATFORM_SEAM
+    out = strip[:, :w].copy()
+    c = seam_cut(strip[:, w:w + n], strip[:, :n])
+    for y in range(strip.shape[0]):
+        out[y, :c[y]] = strip[y, w:w + c[y]]
+    return out
+
+
+def on_surface(arr, surf, top, h):
+    """arr posé sur une toile de hauteur h, sa rangée `surf` à la rangée `top`."""
+    out = np.zeros((h, arr.shape[1], 4), np.uint8)
+    dy = top - surf
+    y0, y1 = max(0, -dy), min(arr.shape[0], h - dy)
+    out[y0 + dy:y1 + dy] = arr[y0:y1]
+    return out
+
+
+def make_platform_tiles(mid_cell, end_cell, label):
+    """(dirt_platform0, dirt_platform2) raccordables, ou None (repli make_tile)."""
+    mid, end = trim(mid_cell), trim(end_cell)
+    bx0, bx1 = body_x_range(mid)
+    scale = TILE / (bx1 - bx0 - 2 * TILE_INSET)  # échelle de l'ancien milieu
+
+    def resized(a):
+        h, w = a.shape[:2]
+        return np.array(Image.fromarray(a, 'RGBA').resize(
+            (max(1, round(w * scale)), max(1, round(h * scale))), Image.LANCZOS))
+
+    mid_s, end_s = resized(mid), resized(end)
+    core = platform_core_cols(mid_s)
+    inset = round(PLATFORM_BODY_INSET * scale)
+    if core is None or core[1] - core[0] - 2 * inset <= 2 * PLATFORM_SEAM:
+        warn(f'{label} : corps plein du milieu introuvable ou trop étroit -> découpe simple')
+        return None
+    if end_s.shape[1] < PLATFORM_JOIN_X + PLATFORM_SEAM:
+        warn(f'{label} : bout de plateforme trop étroit -> découpe simple')
+        return None
+    body = mid_s[:, core[0] + inset:core[1] - inset]
+    strip = body
+    while strip.shape[1] < TILE + PLATFORM_SEAM:
+        strip = join_seam(strip, body)
+    middle = make_periodic(strip, TILE)
+    # Même hauteur au-dessus de la ligne de marche pour les deux cases (le jeu
+    # ancre l'image par le bas) : mousse à SURFACE_TARGET du bas, ou plus haut
+    # si l'île est plus profonde (comme make_tile : on ne rogne pas le dessous).
+    sm, se = surface_row(middle), surface_row(end_s)
+    above = max(SURFACE_TARGET, middle.shape[0] - sm, end_s.shape[0] - se)
+    top = max(sm, se, TILE - above)
+    h = top + above
+    middle = on_surface(middle, sm, top, h)
+    end_c = on_surface(end_s, se, top, h)
+    left = middle.copy()
+    j = PLATFORM_JOIN_X
+    c = seam_cut(end_c[:, j:j + PLATFORM_SEAM], middle[:, j:j + PLATFORM_SEAM])
+    for y in range(h):
+        left[y, :j + c[y]] = end_c[y, :j + c[y]]
+    return Image.fromarray(middle, 'RGBA'), Image.fromarray(left, 'RGBA')
+
+
 def import_tileset(tid, e, force, dry):
     out_dir = ROOT / e['dir']
     srcs = {k: ROOT / v for k, v in e['src'].items()}
@@ -623,9 +772,11 @@ def import_tileset(tid, e, force, dry):
     if srcs['sol'].exists():
         cells = grid_cells_by_alpha(load_rgba(srcs['sol']), 4, 4, f'{tid} sol')
         jobs += [(name, cells[rc]) for rc, name in TILE_GRID.items()]
+    platform_cells = None
     if srcs['plateformes'].exists():
         cells = grid_cells_by_alpha(load_rgba(srcs['plateformes']), 3, 1, f'{tid} plateformes')
         jobs += [(n, cells[(0, i)]) for i, n in enumerate(PLATFORM_NAMES)]
+        platform_cells = cells
     if srcs['speciaux'].exists():
         cells = grid_cells_by_alpha(load_rgba(srcs['speciaux']), 3, 1, f'{tid} speciaux')
         jobs += [(n, cells[(0, i)]) for i, n in enumerate(SPECIAL_NAMES)]
@@ -635,6 +786,12 @@ def import_tileset(tid, e, force, dry):
             warn(f'{tid} : tuile {name} vide')
             continue
         tiles[name] = make_tile(cell, name)
+    # Milieu et bout de plateforme raccordables (cf. make_platform_tiles) ;
+    # l'île isolée (dirt_platform1) garde la découpe simple.
+    if platform_cells and 'dirt_platform0' in tiles and 'dirt_platform2' in tiles:
+        pair = make_platform_tiles(platform_cells[(0, 0)], platform_cells[(0, 2)], f'{tid} plateformes')
+        if pair:
+            tiles['dirt_platform0'], tiles['dirt_platform2'] = pair
     if 'dirt_angle' in tiles and 'dirt_l' in tiles:
         tiles['dirt_angle'] = compose_inner_corner(tiles['dirt_angle'], tiles['dirt_l'])
     for name, im in tiles.items():
