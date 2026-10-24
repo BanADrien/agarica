@@ -1,0 +1,316 @@
+{
+  "sources": {
+    "1": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    "2": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    "3": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        255,
+        255
+      ]
+    },
+    "4": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    "5": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "6": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "7": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "8": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "9": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    "10": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "11": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "12": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "13": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        255,
+        255
+      ]
+    },
+    "14": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "15": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    "16": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        253
+      ]
+    },
+    "17": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "18": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        253
+      ]
+    },
+    "19": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "20": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "21": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "22": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "23": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "24": {
+      "size": [
+        1024,
+        1536
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "25": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "26": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    },
+    "27": {
+      "size": [
+        1536,
+        1024
+      ],
+      "alpha_range": [
+        0,
+        254
+      ]
+    }
+  },
+  "animations": {
+    "vfx_mousse_toxique": {
+      "frames": 12
+    },
+    "vfx_anneau_choc": {
+      "frames": 8
+    },
+    "singe_extra": {
+      "frames": 8
+    },
+    "forme_papillon_extra": {
+      "frames": 4
+    },
+    "singe_gueri": {
+      "frames": 9
+    }
+  },
+  "protection": {
+    "existing_agarica_geralt_changed": [],
+    "src_changes_observed": [
+      "src\\data\\asset_present.js",
+      "src\\data\\epreuve_singe_data.js",
+      "src\\entities\\Ghilt.js",
+      "src\\entities\\Liane.js",
+      "src\\entities\\MousseCreature.js",
+      "src\\entities\\Piste.js",
+      "src\\entities\\Player.js",
+      "src\\entities\\Projectiles.js",
+      "src\\scenes\\CampfireMenuScene.js",
+      "src\\scenes\\DialogueScene.js",
+      "src\\scenes\\EndScreenScene.js",
+      "src\\scenes\\InventoryScene.js",
+      "src\\scenes\\MapScene.js",
+      "src\\scenes\\MenuKit.js",
+      "src\\scenes\\OptionsScene.js",
+      "src\\story\\acte1_arbre.js",
+      "src\\utils\\LevelKit.js",
+      "src\\utils\\StoryKit.js"
+    ],
+    "existing_asset_changes_observed": []
+  },
+  "problems": []
+}

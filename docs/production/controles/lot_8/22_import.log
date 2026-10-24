@@ -1,0 +1,16 @@
+[araignee_petite_0] -> assets/sprites/petites/araignee_petite_0.png (239x131)
+[araignee_petite_1] -> assets/sprites/petites/araignee_petite_1.png (240x149)
+[araignee_petite_2] -> assets/sprites/petites/araignee_petite_2.png (240x138)
+[bete_mousse_vivante] -> assets/sprites/petites/bete_mousse_vivante.png (256x199)
+[bete_mousse_touchee] -> assets/sprites/petites/bete_mousse_touchee.png (217x169)
+[bete_mousse_morte] -> assets/sprites/petites/bete_mousse_morte.png (244x89)
+[mousse_creature_guerie_0] -> assets/sprites/petites/mousse_creature_guerie_0.png (172x180)
+[mousse_creature_guerie_1] -> assets/sprites/petites/mousse_creature_guerie_1.png (196x150)
+
+================ RAPPORT ================
+Découpés maintenant (8) : araignee_petite_0, araignee_petite_1, araignee_petite_2, bete_mousse_vivante, bete_mousse_touchee, bete_mousse_morte, mousse_creature_guerie_0, mousse_creature_guerie_1
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 729 fichier(s) présent(s).

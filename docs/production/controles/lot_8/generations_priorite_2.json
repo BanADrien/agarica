@@ -1,0 +1,33 @@
+{
+  "mode": "image_gen intégré",
+  "prompt_set": "prompts.json",
+  "generated": [
+    {
+      "n": 14,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-f8311fce-0e7d-41a2-bdeb-09ab559c2034.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 15,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-f47cfaa0-fe29-4edc-9281-0314b11676f8.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 16,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-0ab98410-174e-4e9f-9817-98dee929ef4f.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 17,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-53626ca1-ce3f-4936-bc70-98192b51ee1d.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 18,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-1b86bf25-1d70-488e-9748-a9666f2540b2.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    }
+  ],
+  "revisions": [
+    {
+      "n": 16,
+      "prompt": "Edit this existing SIX-cell transparent light sheet1536x1024,3columns2rows. Change ONLY cell1 (TOP LEFT): replace its irregular oval/blob halo with a PERFECTLY ROUND, perfectly RADIAL-SYMMETRIC soft white light glow, like a clean Gaussian circular lens glow. Equal height and width, smooth white core and smooth alpha falloff to full transparency at circle rim, NO rays, NO cloudy texture, NO rough patches, NO uneven outline. Approximately440px diameter centered exactly atx256,y256, completely inside first512x512cell with30px margin. Preserve the other FIVE lights exactly as they are, same positions/colours/alpha. Preserve transparent alpha background and canvas1536x1024. No text.",
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-a865a0a6-e222-481f-8bb7-c5014de801bc.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    }
+  ]
+}

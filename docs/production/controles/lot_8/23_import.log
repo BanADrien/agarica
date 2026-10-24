@@ -1,0 +1,12 @@
+[note_geralt] -> assets/items/objets/note_geralt.png (256x243)
+[objet_grappin] -> assets/items/objets/objet_grappin.png (256x196)
+[objet_fleche] -> assets/items/objets/objet_fleche.png (256x57)
+[objet_collet] -> assets/items/objets/objet_collet.png (256x102)
+
+================ RAPPORT ================
+Découpés maintenant (4) : note_geralt, objet_grappin, objet_fleche, objet_collet
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 733 fichier(s) présent(s).

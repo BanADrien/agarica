@@ -1,0 +1,14 @@
+[liquide_mare_fond] -> assets/decors/liquides/liquide_mare_fond.png (1536x140)
+[liquide_mare_voile] -> assets/decors/liquides/liquide_mare_voile.png (1536x140)
+[liquide_mare_surface_0] -> assets/decors/liquides/liquide_mare_surface_0.png (1536x35)
+[liquide_mare_surface_1] -> assets/decors/liquides/liquide_mare_surface_1.png (1536x35)
+[liquide_mare_surface_2] -> assets/decors/liquides/liquide_mare_surface_2.png (1536x35)
+[liquide_mare_surface_3] -> assets/decors/liquides/liquide_mare_surface_3.png (1536x35)
+
+================ RAPPORT ================
+Découpés maintenant (6) : liquide_mare_fond, liquide_mare_voile, liquide_mare_surface_0, liquide_mare_surface_1, liquide_mare_surface_2, liquide_mare_surface_3
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 600 fichier(s) présent(s).

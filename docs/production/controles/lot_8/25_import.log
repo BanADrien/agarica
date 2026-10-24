@@ -1,0 +1,12 @@
+[ui_bulle] -> assets/ui/ui_bulle.png (638x298)
+[ui_bulle_pointe] -> assets/ui/ui_bulle_pointe.png (70x50)
+[ui_invite] -> assets/ui/ui_invite.png (639x159)
+[ui_banniere] -> assets/ui/ui_banniere.png (706x164)
+
+================ RAPPORT ================
+Découpés maintenant (4) : ui_bulle, ui_bulle_pointe, ui_invite, ui_banniere
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 739 fichier(s) présent(s).

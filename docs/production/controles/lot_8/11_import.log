@@ -1,0 +1,11 @@
+[decor_tapis_mousse] -> assets/decors/elements/decor_tapis_mousse.png (1536x180)
+[decor_cercle_sain] -> assets/decors/elements/decor_cercle_sain.png (1440x119)
+[decor_mousse_sechee] -> assets/decors/elements/decor_mousse_sechee.png (999x198)
+
+================ RAPPORT ================
+Découpés maintenant (3) : decor_tapis_mousse, decor_cercle_sain, decor_mousse_sechee
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 637 fichier(s) présent(s).

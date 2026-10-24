@@ -1,0 +1,14 @@
+[decor_plateforme_ecorce_intacte] -> assets/decors/elements/decor_plateforme_ecorce_intacte.png (451x104)
+[decor_plateforme_ecorce_fissuree] -> assets/decors/elements/decor_plateforme_ecorce_fissuree.png (452x104)
+[decor_plateforme_ecorce_brisee] -> assets/decors/elements/decor_plateforme_ecorce_brisee.png (451x105)
+[decor_rampe_lancement] -> assets/decors/elements/decor_rampe_lancement.png (439x278)
+[decor_marches_racines] -> assets/decors/elements/decor_marches_racines.png (419x399)
+[decor_autel_sommet] -> assets/decors/elements/decor_autel_sommet.png (396x258)
+
+================ RAPPORT ================
+Découpés maintenant (6) : decor_plateforme_ecorce_intacte, decor_plateforme_ecorce_fissuree, decor_plateforme_ecorce_brisee, decor_rampe_lancement, decor_marches_racines, decor_autel_sommet
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 623 fichier(s) présent(s).

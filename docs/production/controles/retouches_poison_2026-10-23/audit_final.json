@@ -1,0 +1,220 @@
+{
+  "sources": {
+    "2": {
+      "path": "assets/_codex_src/liquide_mousse_toxique.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "11": {
+      "path": "assets/_codex_src/bandes_sol.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "12": {
+      "path": "assets/_codex_src/mousses_plaques.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "14": {
+      "path": "assets/_codex_src/particules_matieres.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "15": {
+      "path": "assets/_codex_src/particules_lumieres.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "17": {
+      "path": "assets/vfx/vfx_mousse_toxique.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "22": {
+      "path": "assets/_codex_src/petites_creatures.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "9": {
+      "path": "assets/_codex_src/couche_lointains.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "31": {
+      "path": "assets/vfx/vfx_souffle_toxique.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "32": {
+      "path": "assets/vfx/vfx_flaque_mousse.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "33": {
+      "path": "assets/vfx/vfx_vague_mousse.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "34": {
+      "path": "assets/_codex_src/mousse_amas.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "unselected_cells_identical": true
+    },
+    "35": {
+      "path": "assets/_codex_src/mousse_mur.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "unselected_cells_identical": true
+    },
+    "36": {
+      "path": "assets/_codex_src/porte_mousse.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "unselected_cells_identical": true
+    }
+  },
+  "frames": {
+    "vfx_mousse_toxique": 12,
+    "vfx_souffle_toxique": 6,
+    "vfx_flaque_mousse": 8,
+    "vfx_vague_mousse": 4
+  },
+  "raccords": {
+    "liquide_mousse_toxique": {
+      "edge_rgba_max_difference": 0,
+      "vertical": false
+    },
+    "decor_tapis_mousse": {
+      "edge_rgba_max_difference": 0,
+      "vertical": false
+    },
+    "couche_horizon_malade": {
+      "edge_rgba_max_difference": 0,
+      "vertical": false
+    }
+  },
+  "problems": [],
+  "changed_assets": [
+    "assets/vfx/vfx_flaque_mousse.png",
+    "assets/vfx/vfx_mousse_toxique.png",
+    "assets/vfx/vfx_souffle_toxique.png",
+    "assets/vfx/vfx_vague_mousse.png",
+    "assets/_codex_src/bandes_sol.png",
+    "assets/_codex_src/couche_lointains.png",
+    "assets/_codex_src/liquide_mousse_toxique.png",
+    "assets/_codex_src/mousses_plaques.png",
+    "assets/_codex_src/mousse_amas.png",
+    "assets/_codex_src/mousse_mur.png",
+    "assets/_codex_src/particules_lumieres.png",
+    "assets/_codex_src/particules_matieres.png",
+    "assets/_codex_src/petites_creatures.png",
+    "assets/_codex_src/porte_mousse.png",
+    "assets/vfx/particules/fx_bouffee_toxique.png",
+    "assets/vfx/particules/fx_eclaboussure_toxique.png",
+    "assets/vfx/particules/fx_eclat_mousse.png",
+    "assets/vfx/particules/fx_goutte_toxique.png",
+    "assets/vfx/particules/fx_motte_mousse.png",
+    "assets/vfx/particules/fx_spore_toxique.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row0_0.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row0_1.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row0_2.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row0_3.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row1_0.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row1_1.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row1_2.png",
+    "assets/vfx/vfx_flaque_mousse_frames/vfx_flaque_mousse_row1_3.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row0_0.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row0_1.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row0_2.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row0_3.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row1_0.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row1_1.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row1_2.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row1_3.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row2_0.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row2_1.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row2_2.png",
+    "assets/vfx/vfx_mousse_toxique_frames/vfx_mousse_toxique_row2_3.png",
+    "assets/vfx/vfx_souffle_toxique_frames/vfx_souffle_toxique_row0_0.png",
+    "assets/vfx/vfx_souffle_toxique_frames/vfx_souffle_toxique_row0_1.png",
+    "assets/vfx/vfx_souffle_toxique_frames/vfx_souffle_toxique_row0_2.png",
+    "assets/vfx/vfx_souffle_toxique_frames/vfx_souffle_toxique_row1_0.png",
+    "assets/vfx/vfx_souffle_toxique_frames/vfx_souffle_toxique_row1_1.png",
+    "assets/vfx/vfx_souffle_toxique_frames/vfx_souffle_toxique_row1_2.png",
+    "assets/vfx/vfx_vague_mousse_frames/vfx_vague_mousse_row0_0.png",
+    "assets/vfx/vfx_vague_mousse_frames/vfx_vague_mousse_row0_1.png",
+    "assets/vfx/vfx_vague_mousse_frames/vfx_vague_mousse_row0_2.png",
+    "assets/vfx/vfx_vague_mousse_frames/vfx_vague_mousse_row0_3.png",
+    "assets/sprites/petites/bete_mousse_morte.png",
+    "assets/sprites/petites/bete_mousse_touchee.png",
+    "assets/sprites/petites/bete_mousse_vivante.png",
+    "assets/items/objets/mousse_amas_fissure.png",
+    "assets/items/objets/mousse_amas_intact.png",
+    "assets/items/objets/mousse_mur.png",
+    "assets/items/objets/porte_mousse.png",
+    "assets/decors/elements/decor_mousse_lumineuse_petite.png",
+    "assets/decors/elements/decor_mousse_lumineuse_plafond.png",
+    "assets/decors/elements/decor_mousse_lumineuse_sol.png",
+    "assets/decors/elements/decor_mousse_lumineuse_tronc.png",
+    "assets/decors/elements/decor_mousse_plaque_grattee.png",
+    "assets/decors/elements/decor_mousse_plaque_intacte.png",
+    "assets/decors/elements/decor_mousse_plaque_repoussee.png",
+    "assets/decors/elements/decor_mousse_sechee.png",
+    "assets/decors/elements/decor_tapis_mousse.png",
+    "assets/decors/elements/decor_touffe_mousse_grande.png",
+    "assets/decors/elements/decor_touffe_mousse_moyenne.png",
+    "assets/decors/elements/decor_touffe_mousse_penchee.png",
+    "assets/decors/elements/decor_touffe_mousse_petite.png",
+    "assets/decors/fonds/couche_horizon_malade.png",
+    "assets/decors/liquides/liquide_mousse_toxique.png"
+  ],
+  "unexpected_asset_changes": [],
+  "src_changes_observed": [
+    "src/data/foret_flottante_1_data.js",
+    "src/data/foret_flottante_2_data.js",
+    "src/scenes/ForetFlottante1Scene.js",
+    "src/scenes/ForetFlottante2Scene.js",
+    "src/story/acte2.js"
+  ],
+  "existing_agarica_geralt_changed": []
+}

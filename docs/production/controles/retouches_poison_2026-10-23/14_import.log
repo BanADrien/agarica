@@ -1,0 +1,12 @@
+[fx_eclat_mousse] -> assets/vfx/particules/fx_eclat_mousse.png (128x121)
+[fx_motte_mousse] -> assets/vfx/particules/fx_motte_mousse.png (123x128)
+[fx_goutte_toxique] -> assets/vfx/particules/fx_goutte_toxique.png (67x128)
+[fx_eclaboussure_toxique] -> assets/vfx/particules/fx_eclaboussure_toxique.png (128x73)
+
+================ RAPPORT ================
+Découpés maintenant (4) : fx_eclat_mousse, fx_motte_mousse, fx_goutte_toxique, fx_eclaboussure_toxique
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

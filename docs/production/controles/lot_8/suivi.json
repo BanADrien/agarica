@@ -1,0 +1,1533 @@
+{
+  "1": {
+    "source": "assets/_codex_src/liquides_mare.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        0,
+        15,
+        1536,
+        155
+      ],
+      [
+        0,
+        185,
+        1536,
+        325
+      ],
+      [
+        0,
+        409,
+        1536,
+        444
+      ],
+      [
+        0,
+        579,
+        1536,
+        614
+      ],
+      [
+        0,
+        750,
+        1536,
+        785
+      ],
+      [
+        0,
+        921,
+        1536,
+        956
+      ]
+    ],
+    "ids": [
+      "liquide_mare_fond",
+      "liquide_mare_voile",
+      "liquide_mare_surface_0",
+      "liquide_mare_surface_1",
+      "liquide_mare_surface_2",
+      "liquide_mare_surface_3"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {
+      "liquide_mare_fond": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "liquide_mare_voile": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "liquide_mare_surface_0": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "liquide_mare_surface_1": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "liquide_mare_surface_2": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "liquide_mare_surface_3": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      }
+    },
+    "borders": {}
+  },
+  "2": {
+    "source": "assets/_codex_src/liquide_mousse_toxique.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [],
+    "ids": [
+      "liquide_mousse_toxique"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {
+      "liquide_mousse_toxique": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      }
+    },
+    "borders": {}
+  },
+  "3": {
+    "source": "assets/_codex_src/couche_ciel_jour.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [],
+    "ids": [
+      "couche_ciel_jour"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {
+      "couche_ciel_jour": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      }
+    },
+    "borders": {}
+  },
+  "4": {
+    "source": "assets/_codex_src/couche_nappes.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        0,
+        30,
+        1536,
+        310
+      ],
+      [
+        0,
+        431,
+        1536,
+        591
+      ],
+      [
+        0,
+        703,
+        1536,
+        1003
+      ]
+    ],
+    "ids": [
+      "couche_nappe_nuages",
+      "couche_nappe_brume",
+      "couche_brume_avant"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {
+      "couche_nappe_nuages": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "couche_nappe_brume": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "couche_brume_avant": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      }
+    },
+    "borders": {}
+  },
+  "5": {
+    "source": "assets/_codex_src/couche_nuages.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        62,
+        156,
+        449,
+        356
+      ],
+      [
+        601,
+        156,
+        934,
+        356
+      ],
+      [
+        1086,
+        156,
+        1474,
+        356
+      ],
+      [
+        30,
+        722,
+        482,
+        814
+      ],
+      [
+        628,
+        713,
+        908,
+        823
+      ],
+      [
+        1060,
+        567,
+        1500,
+        969
+      ]
+    ],
+    "ids": [
+      "couche_nuage_0",
+      "couche_nuage_1",
+      "couche_nuage_2",
+      "couche_nuage_3",
+      "couche_nuage_4",
+      "couche_soleil"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "6": {
+    "source": "assets/_codex_src/decor_lumineux.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        156,
+        86,
+        356,
+        426
+      ],
+      [
+        668,
+        86,
+        868,
+        426
+      ],
+      [
+        1150,
+        36,
+        1410,
+        476
+      ],
+      [
+        126,
+        548,
+        386,
+        988
+      ],
+      [
+        626,
+        618,
+        909,
+        918
+      ],
+      [
+        1081,
+        688,
+        1479,
+        848
+      ]
+    ],
+    "ids": [
+      "decor_lanterne_eteinte",
+      "decor_lanterne_allumee",
+      "decor_fente_fermee",
+      "decor_fente_ouverte",
+      "decor_spirale_gravee",
+      "decor_plateforme_fantome"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "7": {
+    "source": "assets/_codex_src/structures_ecorce.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        30,
+        203,
+        482,
+        308
+      ],
+      [
+        542,
+        203,
+        994,
+        308
+      ],
+      [
+        1054,
+        203,
+        1506,
+        308
+      ],
+      [
+        36,
+        628,
+        476,
+        908
+      ],
+      [
+        558,
+        568,
+        978,
+        968
+      ],
+      [
+        1080,
+        638,
+        1480,
+        898
+      ]
+    ],
+    "ids": [
+      "decor_plateforme_ecorce_intacte",
+      "decor_plateforme_ecorce_fissuree",
+      "decor_plateforme_ecorce_brisee",
+      "decor_rampe_lancement",
+      "decor_marches_racines",
+      "decor_autel_sommet"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "8": {
+    "source": "assets/_codex_src/structures_larges.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        48,
+        125,
+        1488,
+        215
+      ],
+      [
+        193,
+        371,
+        1343,
+        651
+      ],
+      [
+        168,
+        725,
+        1368,
+        980
+      ]
+    ],
+    "ids": [
+      "decor_pont_tronc",
+      "decor_cratere",
+      "decor_trou_effondre"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "9": {
+    "source": "assets/_codex_src/couche_lointains.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        0,
+        46,
+        1536,
+        466
+      ],
+      [
+        0,
+        618,
+        1536,
+        918
+      ]
+    ],
+    "ids": [
+      "couche_iles_lointaines",
+      "couche_horizon_malade"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {
+      "couche_iles_lointaines": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      },
+      "couche_horizon_malade": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      }
+    },
+    "borders": {}
+  },
+  "10": {
+    "source": "assets/_codex_src/mare_plantes.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        36,
+        106,
+        476,
+        406
+      ],
+      [
+        643,
+        36,
+        893,
+        476
+      ],
+      [
+        1130,
+        31,
+        1430,
+        481
+      ],
+      [
+        131,
+        542,
+        381,
+        994
+      ],
+      [
+        643,
+        542,
+        893,
+        994
+      ],
+      [
+        1130,
+        648,
+        1430,
+        888
+      ]
+    ],
+    "ids": [
+      "decor_mare_berge",
+      "decor_mare_roseaux",
+      "decor_fleur_perchee",
+      "decor_plante_resistante_fleurie",
+      "decor_plante_resistante_bouton",
+      "objet_graine_coeur"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "11": {
+    "source": "assets/_codex_src/bandes_sol.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        0,
+        80,
+        1536,
+        260
+      ],
+      [
+        48,
+        451,
+        1488,
+        571
+      ],
+      [
+        268,
+        753,
+        1268,
+        953
+      ]
+    ],
+    "ids": [
+      "decor_tapis_mousse",
+      "decor_cercle_sain",
+      "decor_mousse_sechee"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {
+      "decor_tapis_mousse": {
+        "edge_rgba_max_difference": 0,
+        "vertical": false
+      }
+    },
+    "borders": {}
+  },
+  "12": {
+    "source": "assets/_codex_src/mousses_plaques.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        30,
+        95,
+        354,
+        245
+      ],
+      [
+        414,
+        132,
+        738,
+        245
+      ],
+      [
+        798,
+        133,
+        1122,
+        245
+      ],
+      [
+        1186,
+        105,
+        1501,
+        235
+      ],
+      [
+        92,
+        371,
+        292,
+        652
+      ],
+      [
+        416,
+        446,
+        736,
+        576
+      ],
+      [
+        885,
+        479,
+        1035,
+        543
+      ],
+      [
+        1294,
+        507,
+        1394,
+        652
+      ],
+      [
+        142,
+        784,
+        242,
+        994
+      ],
+      [
+        526,
+        714,
+        626,
+        994
+      ],
+      [
+        887,
+        794,
+        1032,
+        994
+      ],
+      [
+        1214,
+        773,
+        1474,
+        933
+      ]
+    ],
+    "ids": [
+      "decor_mousse_plaque_intacte",
+      "decor_mousse_plaque_grattee",
+      "decor_mousse_plaque_repoussee",
+      "decor_mousse_lumineuse_sol",
+      "decor_mousse_lumineuse_tronc",
+      "decor_mousse_lumineuse_plafond",
+      "decor_mousse_lumineuse_petite",
+      "decor_touffe_mousse_petite",
+      "decor_touffe_mousse_moyenne",
+      "decor_touffe_mousse_grande",
+      "decor_touffe_mousse_penchee",
+      "decor_empreinte_boue"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "13": {
+    "source": "assets/_codex_src/couche_vignette.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [],
+    "ids": [
+      "couche_vignette"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "14": {
+    "source": "assets/_codex_src/particules_matieres.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        107,
+        85,
+        276,
+        255
+      ],
+      [
+        487,
+        75,
+        665,
+        265
+      ],
+      [
+        891,
+        80,
+        1029,
+        260
+      ],
+      [
+        1254,
+        81,
+        1434,
+        259
+      ],
+      [
+        112,
+        426,
+        271,
+        596
+      ],
+      [
+        509,
+        441,
+        643,
+        581
+      ],
+      [
+        870,
+        420,
+        1050,
+        603
+      ],
+      [
+        1258,
+        411,
+        1430,
+        611
+      ],
+      [
+        148,
+        748,
+        235,
+        958
+      ],
+      [
+        514,
+        758,
+        637,
+        948
+      ],
+      [
+        855,
+        749,
+        1065,
+        956
+      ],
+      [
+        1234,
+        801,
+        1454,
+        905
+      ]
+    ],
+    "ids": [
+      "fx_eclat_mousse",
+      "fx_motte_mousse",
+      "fx_motte_terre",
+      "fx_eclat_ecorce",
+      "fx_eclat_pierre",
+      "fx_feuille",
+      "fx_petale_rose",
+      "fx_petale_blanc",
+      "fx_goutte_toxique",
+      "fx_goutte_antidote",
+      "fx_bulle",
+      "fx_eclaboussure_toxique"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "15": {
+    "source": "assets/_codex_src/particules_lumieres.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        89,
+        65,
+        295,
+        275
+      ],
+      [
+        477,
+        65,
+        675,
+        275
+      ],
+      [
+        859,
+        65,
+        1061,
+        275
+      ],
+      [
+        1249,
+        65,
+        1439,
+        275
+      ],
+      [
+        82,
+        486,
+        302,
+        536
+      ],
+      [
+        466,
+        491,
+        686,
+        531
+      ],
+      [
+        850,
+        471,
+        1070,
+        551
+      ],
+      [
+        1234,
+        481,
+        1454,
+        541
+      ],
+      [
+        108,
+        763,
+        276,
+        943
+      ],
+      [
+        478,
+        773,
+        673,
+        933
+      ],
+      [
+        862,
+        768,
+        1058,
+        938
+      ],
+      [
+        1264,
+        756,
+        1424,
+        950
+      ]
+    ],
+    "ids": [
+      "fx_luciole",
+      "fx_grain_lumiere",
+      "fx_etincelle",
+      "fx_etincelle_papillon",
+      "fx_trainee_papillon",
+      "fx_trait_vent",
+      "fx_ombre_sol",
+      "fx_marqueur_danger",
+      "fx_spore_toxique",
+      "fx_bouffee_poussiere",
+      "fx_bouffee_toxique",
+      "fx_braise"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "16": {
+    "source": "assets/_codex_src/halos_lumiere.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        30,
+        30,
+        482,
+        482
+      ],
+      [
+        542,
+        30,
+        994,
+        482
+      ],
+      [
+        1160,
+        30,
+        1400,
+        482
+      ],
+      [
+        106,
+        618,
+        406,
+        918
+      ],
+      [
+        548,
+        558,
+        988,
+        978
+      ],
+      [
+        1054,
+        708,
+        1506,
+        828
+      ]
+    ],
+    "ids": [
+      "fx_halo_doux",
+      "fx_halo_rayons",
+      "fx_rai_lumiere",
+      "fx_halo_objet",
+      "fx_aura_esprit",
+      "fx_lueur_sol"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "17": {
+    "source": "assets/vfx/vfx_mousse_toxique.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        147,
+        152,
+        237,
+        189
+      ],
+      [
+        511,
+        127,
+        641,
+        213
+      ],
+      [
+        895,
+        103,
+        1025,
+        238
+      ],
+      [
+        1264,
+        112,
+        1424,
+        229
+      ],
+      [
+        82,
+        442,
+        302,
+        580
+      ],
+      [
+        466,
+        441,
+        686,
+        582
+      ],
+      [
+        850,
+        439,
+        1070,
+        583
+      ],
+      [
+        1234,
+        441,
+        1454,
+        581
+      ],
+      [
+        179,
+        818,
+        204,
+        888
+      ],
+      [
+        563,
+        825,
+        588,
+        880
+      ],
+      [
+        894,
+        818,
+        1025,
+        888
+      ],
+      [
+        1311,
+        840,
+        1377,
+        865
+      ]
+    ],
+    "ids": [
+      "vfx_mousse_toxique"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "18": {
+    "source": "assets/vfx/vfx_anneau_choc.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        153,
+        211,
+        231,
+        301
+      ],
+      [
+        486,
+        184,
+        666,
+        328
+      ],
+      [
+        827,
+        121,
+        1093,
+        391
+      ],
+      [
+        1197,
+        94,
+        1491,
+        418
+      ],
+      [
+        151,
+        723,
+        232,
+        813
+      ],
+      [
+        486,
+        696,
+        666,
+        839
+      ],
+      [
+        825,
+        633,
+        1095,
+        902
+      ],
+      [
+        1202,
+        606,
+        1485,
+        930
+      ]
+    ],
+    "ids": [
+      "vfx_anneau_choc"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "19": {
+    "source": "assets/sprites/singe_extra.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        126,
+        173,
+        257,
+        430
+      ],
+      [
+        521,
+        203,
+        631,
+        430
+      ],
+      [
+        900,
+        170,
+        1020,
+        430
+      ],
+      [
+        1293,
+        202,
+        1395,
+        430
+      ],
+      [
+        104,
+        804,
+        281,
+        942
+      ],
+      [
+        482,
+        778,
+        670,
+        942
+      ],
+      [
+        858,
+        793,
+        1061,
+        942
+      ],
+      [
+        1245,
+        794,
+        1443,
+        942
+      ]
+    ],
+    "ids": [
+      "singe_extra"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "20": {
+    "source": "assets/sprites/forme_papillon_extra.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        106,
+        403,
+        278,
+        622
+      ],
+      [
+        483,
+        450,
+        669,
+        622
+      ],
+      [
+        870,
+        402,
+        1050,
+        622
+      ],
+      [
+        1264,
+        471,
+        1423,
+        622
+      ]
+    ],
+    "ids": [
+      "forme_papillon_extra"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "21": {
+    "source": "assets/sprites/singe_gueri.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        101,
+        260,
+        283,
+        430
+      ],
+      [
+        488,
+        259,
+        665,
+        430
+      ],
+      [
+        871,
+        264,
+        1049,
+        430
+      ],
+      [
+        1264,
+        230,
+        1425,
+        430
+      ],
+      [
+        53,
+        796,
+        255,
+        942
+      ],
+      [
+        367,
+        788,
+        554,
+        942
+      ],
+      [
+        691,
+        788,
+        845,
+        942
+      ],
+      [
+        968,
+        789,
+        1183,
+        942
+      ],
+      [
+        1274,
+        801,
+        1490,
+        942
+      ]
+    ],
+    "ids": [
+      "singe_gueri"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "22": {
+    "source": "assets/_codex_src/petites_creatures.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        72,
+        224,
+        312,
+        356
+      ],
+      [
+        456,
+        205,
+        696,
+        356
+      ],
+      [
+        840,
+        216,
+        1080,
+        356
+      ],
+      [
+        1215,
+        156,
+        1472,
+        356
+      ],
+      [
+        83,
+        698,
+        301,
+        868
+      ],
+      [
+        453,
+        778,
+        699,
+        868
+      ],
+      [
+        873,
+        678,
+        1046,
+        858
+      ],
+      [
+        1245,
+        708,
+        1442,
+        858
+      ]
+    ],
+    "ids": [
+      "araignee_petite_0",
+      "araignee_petite_1",
+      "araignee_petite_2",
+      "bete_mousse_vivante",
+      "bete_mousse_touchee",
+      "bete_mousse_morte",
+      "mousse_creature_guerie_0",
+      "mousse_creature_guerie_1"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "23": {
+    "source": "assets/_codex_src/objets_C.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        199,
+        81,
+        568,
+        431
+      ],
+      [
+        952,
+        103,
+        1352,
+        408
+      ],
+      [
+        160,
+        718,
+        608,
+        818
+      ],
+      [
+        887,
+        662,
+        1417,
+        874
+      ]
+    ],
+    "ids": [
+      "note_geralt",
+      "objet_grappin",
+      "objet_fleche",
+      "objet_collet"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "24": {
+    "source": "assets/_codex_src/segments_tuilables.png",
+    "size": [
+      1024,
+      1536
+    ],
+    "placements": [],
+    "ids": [
+      "objet_corde",
+      "fx_fil_soie"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {
+      "objet_corde": {
+        "edge_rgba_max_difference": 0,
+        "vertical": true
+      },
+      "fx_fil_soie": {
+        "edge_rgba_max_difference": 0,
+        "vertical": true
+      }
+    },
+    "borders": {}
+  },
+  "25": {
+    "source": "assets/_codex_src/ui_panneaux.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        64,
+        106,
+        704,
+        406
+      ],
+      [
+        1117,
+        231,
+        1187,
+        281
+      ],
+      [
+        64,
+        688,
+        704,
+        848
+      ],
+      [
+        798,
+        685,
+        1506,
+        850
+      ]
+    ],
+    "ids": [
+      "ui_bulle",
+      "ui_bulle_pointe",
+      "ui_invite",
+      "ui_banniere"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {
+      "ui_bulle": {
+        "left": 21,
+        "right": 21,
+        "top": 32,
+        "bottom": 33,
+        "visible_border": {
+          "left": 18,
+          "right": 18,
+          "top": 17,
+          "bottom": 17
+        },
+        "method": "central flat-fill scan, RGB distance <30; visible border excludes transparent margins, alpha threshold 128; inspect corners for slice insets"
+      },
+      "ui_invite": {
+        "left": 41,
+        "right": 39,
+        "top": 34,
+        "bottom": 29,
+        "visible_border": {
+          "left": 40,
+          "right": 37,
+          "top": 22,
+          "bottom": 21
+        },
+        "method": "central flat-fill scan, RGB distance <30; visible border excludes transparent margins, alpha threshold 128; inspect corners for slice insets"
+      },
+      "ui_banniere": {
+        "left": 40,
+        "right": 46,
+        "top": 53,
+        "bottom": 39,
+        "visible_border": {
+          "left": 23,
+          "right": 30,
+          "top": 35,
+          "bottom": 20
+        },
+        "method": "central flat-fill scan, RGB distance <30; visible border excludes transparent margins, alpha threshold 128; inspect corners for slice insets"
+      }
+    }
+  },
+  "26": {
+    "source": "assets/_codex_src/ui_hud.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        106,
+        106,
+        406,
+        406
+      ],
+      [
+        688,
+        101,
+        848,
+        411
+      ],
+      [
+        1054,
+        175,
+        1506,
+        336
+      ],
+      [
+        96,
+        617,
+        416,
+        919
+      ],
+      [
+        599,
+        598,
+        937,
+        938
+      ],
+      [
+        1093,
+        713,
+        1467,
+        823
+      ]
+    ],
+    "ids": [
+      "ui_touche",
+      "ui_alerte",
+      "ui_etoiles_etourdi",
+      "ui_case_competence",
+      "ui_anneau_objet",
+      "ui_ornement_titre"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {}
+  },
+  "27": {
+    "source": "assets/_codex_src/ui_barres.png",
+    "size": [
+      1536,
+      1024
+    ],
+    "placements": [
+      [
+        93,
+        83,
+        1443,
+        173
+      ],
+      [
+        123,
+        359,
+        1413,
+        409
+      ],
+      [
+        68,
+        608,
+        1468,
+        672
+      ],
+      [
+        88,
+        877,
+        1448,
+        915
+      ]
+    ],
+    "ids": [
+      "ui_energie_cadre",
+      "ui_energie_remplissage",
+      "ui_boss_cadre",
+      "ui_boss_remplissage"
+    ],
+    "status": "importe sans avertissement",
+    "raccords": {},
+    "borders": {
+      "ui_energie_cadre": {
+        "left": 75,
+        "right": 75,
+        "top": 38,
+        "bottom": 30,
+        "visible_border": {
+          "left": 69,
+          "right": 70,
+          "top": 19,
+          "bottom": 19
+        },
+        "method": "central flat-fill scan, RGB distance <30; visible border excludes transparent margins, alpha threshold 128; inspect corners for slice insets"
+      },
+      "ui_boss_cadre": {
+        "left": 71,
+        "right": 69,
+        "top": 25,
+        "bottom": 25,
+        "visible_border": {
+          "left": 65,
+          "right": 63,
+          "top": 16,
+          "bottom": 18
+        },
+        "method": "central flat-fill scan, RGB distance <30; visible border excludes transparent margins, alpha threshold 128; inspect corners for slice insets"
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+[ui_energie_cadre] -> assets/ui/ui_energie_cadre.png (1350x90)
+[ui_energie_remplissage] -> assets/ui/ui_energie_remplissage.png (1287x49)
+[ui_boss_cadre] -> assets/ui/ui_boss_cadre.png (1398x64)
+[ui_boss_remplissage] -> assets/ui/ui_boss_remplissage.png (1358x37)
+
+================ RAPPORT ================
+Découpés maintenant (4) : ui_energie_cadre, ui_energie_remplissage, ui_boss_cadre, ui_boss_remplissage
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

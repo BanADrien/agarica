@@ -1,0 +1,11 @@
+[decor_pont_tronc] -> assets/decors/elements/decor_pont_tronc.png (1436x90)
+[decor_cratere] -> assets/decors/elements/decor_cratere.png (1148x280)
+[decor_trou_effondre] -> assets/decors/elements/decor_trou_effondre.png (1196x255)
+
+================ RAPPORT ================
+Découpés maintenant (3) : decor_pont_tronc, decor_cratere, decor_trou_effondre
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 626 fichier(s) présent(s).

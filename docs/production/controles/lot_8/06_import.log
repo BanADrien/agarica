@@ -1,0 +1,14 @@
+[decor_lanterne_eteinte] -> assets/decors/elements/decor_lanterne_eteinte.png (199x340)
+[decor_lanterne_allumee] -> assets/decors/elements/decor_lanterne_allumee.png (199x339)
+[decor_fente_fermee] -> assets/decors/elements/decor_fente_fermee.png (258x440)
+[decor_fente_ouverte] -> assets/decors/elements/decor_fente_ouverte.png (259x440)
+[decor_spirale_gravee] -> assets/decors/elements/decor_spirale_gravee.png (281x300)
+[decor_plateforme_fantome] -> assets/decors/elements/decor_plateforme_fantome.png (398x160)
+
+================ RAPPORT ================
+Découpés maintenant (6) : decor_lanterne_eteinte, decor_lanterne_allumee, decor_fente_fermee, decor_fente_ouverte, decor_spirale_gravee, decor_plateforme_fantome
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 617 fichier(s) présent(s).

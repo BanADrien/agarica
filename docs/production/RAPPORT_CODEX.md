@@ -341,3 +341,136 @@ Camp de Geralt (ForetFlottante1Scene) : fond foret_sombre et grands arbres norma
 ### Camp de Geralt : arbres au bas du cadre - 2026-10-23
 
 Fond foret_flottante retabli dans ForetFlottante1Scene. Option treesAtScreenBottom : pieds des grands arbres abaisses de 75 pixels, a y=546 pour une vue de 540 pixels (6 pixels pour absorber la marge du sprite), facteur vertical 0 pour les verrouiller au bas du cadre pendant les mouvements de camera. Les autres zones gardent leur comportement ; largeTrees=false dans la zone suivante reste applique. Verification Edge/Playwright : pieds y=546, scrollFactorY=0, aucune erreur JavaScript. Capture : controles/geralt_arbres_bas_cadre.png.
+
+
+<!-- LOT8_SUIVI -->
+## Lot n°8 — 2026-10-23
+
+Génération via image_gen intégré ; prompts : `controles/lot_8/prompts.json`. Dessins bruts, montages de raccord source/import et journaux : `controles/lot_8/`. Finition mécanique : `lot_8.py` (placement, dimensions, raccords en alpha prémultiplié). Aucun dessin de réutilisation régénéré, aucune retouche des images existantes d’Agarica/Geralt.
+
+| # | Source | Statut | Contrôles / problèmes |
+|---|---|---|---|
+| 1 | `assets/_codex_src/liquides_mare.png` | importe sans avertissement | Raccords : liquide_mare_fond Δ=0, liquide_mare_voile Δ=0, liquide_mare_surface_0 Δ=0, liquide_mare_surface_1 Δ=0, liquide_mare_surface_2 Δ=0, liquide_mare_surface_3 Δ=0 6 bandes ; surfaces animees derivees par decalages horizontaux de 96 px ; raccords source/import controles. |
+| 2 | `assets/_codex_src/liquide_mousse_toxique.png` | importe sans avertissement | Raccords : liquide_mousse_toxique Δ=0 Bande toxique opaque dans son corps ; toile restante transparente. |
+| 3 | `assets/_codex_src/couche_ciel_jour.png` | importe sans avertissement | Raccords : couche_ciel_jour Δ=0 Couche opaque ; bas uniforme #2a9ef7 sur 60 px. |
+| 4 | `assets/_codex_src/couche_nappes.png` | importe sans avertissement | Raccords : couche_nappe_nuages Δ=0, couche_nappe_brume Δ=0, couche_brume_avant Δ=0 3 bandes ; brume avant opaque dans ses 60 % inferieurs ; alpha doux au-dessus. |
+| 5 | `assets/_codex_src/couche_nuages.png` | importe sans avertissement |  6 elements ; nuages et soleil en alpha doux. |
+| 6 | `assets/_codex_src/decor_lumineux.png` | importe sans avertissement |  6 objets ; paires eteint/allume et ferme/ouvert normalisees aux memes dimensions. |
+| 7 | `assets/_codex_src/structures_ecorce.png` | importe sans avertissement |  6 decors ; largeur des trois etats de plateforme identique. |
+| 8 | `assets/_codex_src/structures_larges.png` | importe sans avertissement |  3 objets ; pont normalise a 1440 x 90 px. |
+| 9 | `assets/_codex_src/couche_lointains.png` | importe sans avertissement | Raccords : couche_iles_lointaines Δ=0, couche_horizon_malade Δ=0 Regeneration corrective : retrait du tapis continu sous les iles ; alpha et raccords controles. |
+| 10 | `assets/_codex_src/mare_plantes.png` | importe sans avertissement |  6 elements ; plante fleurie/bouton de memes dimensions ; petites variations de dessin entre les deux etats. |
+| 11 | `assets/_codex_src/bandes_sol.png` | importe sans avertissement | Raccords : decor_tapis_mousse Δ=0 3 bandes ; seul le tapis est tuilable. |
+| 12 | `assets/_codex_src/mousses_plaques.png` | importe sans avertissement |  12 elements ; touffes petite/moyenne/grande 145/210/280 px de haut ; base commune. Mousse de tronc avec une mince bordure brune residuelle. |
+| 13 | `assets/_codex_src/couche_vignette.png` | importe sans avertissement |  Vignette opaque en niveaux de gris. |
+| 14 | `assets/_codex_src/particules_matieres.png` | importe sans avertissement |  12 particules ; suppression des miettes detachees. |
+| 15 | `assets/_codex_src/particules_lumieres.png` | importe sans avertissement |  12 effets ; lueurs et ombre sur vrai alpha. |
+| 16 | `assets/_codex_src/halos_lumiere.png` | importe sans avertissement |  6 lueurs ; halo regenere puis bords alpha adoucis ; legere texture nuageuse conservee dans le halo doux. |
+| 17 | `assets/vfx/vfx_mousse_toxique.png` | importe sans avertissement |  12 frames, 3 rangees de 4 ; import valide. |
+| 18 | `assets/vfx/vfx_anneau_choc.png` | importe sans avertissement |  8 frames, 2 rangees de 4 ; import valide ; alpha doux. |
+| 19 | `assets/sprites/singe_extra.png` | importe sans avertissement |  8 frames : climb 4 / throw 4 ; silhouettes connexes. Grimpe jusqu a 260 px ; lancers accroupis 138-164 px, echelle commune preservee. |
+| 20 | `assets/sprites/forme_papillon_extra.png` | importe sans avertissement |  4 frames cast ; troisieme pose regeneree pour corriger la vue frontale ; toutes dirigees a droite ; silhouettes connexes. |
+| 21 | `assets/sprites/singe_gueri.png` | importe sans avertissement |  9 frames : idle 4 / run 5 ; yeux bruns sans emission ; silhouettes connexes. |
+| 22 | `assets/_codex_src/petites_creatures.png` | importe sans avertissement |  8 creatures ; petites particules de mousse detachees retirees. |
+| 23 | `assets/_codex_src/objets_C.png` | importe sans avertissement |  4 accessoires ; fleche vers la droite ; note a gribouillis illisibles. |
+| 24 | `assets/_codex_src/segments_tuilables.png` | importe sans avertissement | Raccords : objet_corde Δ=0, fx_fil_soie Δ=0 2 segments ; montages verticaux avant/apres import ; raccord RGBA exact. |
+| 25 | `assets/_codex_src/ui_panneaux.png` | importe sans avertissement |  4 panneaux ; pointe ouverte ; centres libres ; bordures et essais 9-slice mesures ci-dessous. |
+| 26 | `assets/_codex_src/ui_hud.png` | importe sans avertissement |  6 elements ; touches et cases sans lettres ; seul symbole typographique : !. |
+| 27 | `assets/_codex_src/ui_barres.png` | importe sans avertissement |  4 barres ; remplissages separes ; cadres mesures et essais en etirement horizontal. |
+
+### Bordures mesurées (pixels des sorties, sans agrandissement pour ces cadres)
+
+- `ui_bulle` : gauche 21, droite 21, haut 32, bas 33. Mesure de la bordure centrale ; réserver aussi les ornements des coins pour le 9-slice.
+- `ui_invite` : gauche 41, droite 39, haut 34, bas 29. Mesure de la bordure centrale ; réserver aussi les ornements des coins pour le 9-slice.
+- `ui_banniere` : gauche 40, droite 46, haut 53, bas 39. Mesure de la bordure centrale ; réserver aussi les ornements des coins pour le 9-slice.
+- `ui_energie_cadre` : gauche 75, droite 75, haut 38, bas 30. Mesure de la bordure centrale ; réserver aussi les ornements des coins pour le 9-slice.
+- `ui_boss_cadre` : gauche 71, droite 69, haut 25, bas 25. Mesure de la bordure centrale ; réserver aussi les ornements des coins pour le 9-slice.
+
+Lueurs : sorties RGBA à alpha réel ; aucun fond noir de repli utilisé. Mesures détaillées : `controles/lot_8/suivi.json`.
+<!-- /LOT8_SUIVI -->
+
+<!-- LOT8_CLOTURE -->
+
+### Cloture et limites du lot 8
+
+Les 27 sources ont ete generees dans l ordre des priorites 1 a 4, puis importees individuellement. Les revisions concernent uniquement ces nouvelles sources. Les 119 entrees livrent 114 images et 5 animations (41 frames). Galerie : [controles/lot_8/index.html](controles/lot_8/index.html).
+
+Les 16 elements tuilables disposent chacun de montages source et sortie : copies cote a cote, ou superposees pour corde/soie. Difference maximale RGBA aux bords apres import : **0**. Les sources font 1536 x 1024, sauf les segments verticaux en 1024 x 1536. Ciel et vignette sont opaques ; les autres toiles conservent leur transparence. Les lueurs sont livrees en alpha doux, **aucune sur fond noir**.
+
+Contraintes de taille contradictoires : les marges de 30 px ont ete preservees. Les elements annonces a 460/470/480 px dans une cellule de 512 px sont limites a 452 px ; ceux de 340 px dans une cellule de 384 px a 324 px ; la mousse de tronc de 320 px dans une rangee de 341 px a 281 px ; la banniere de 720 px a 708 px. Les formes d une meme famille restent dessinees par generation : les dimensions sont normalisees, mais les contours des etats ne sont pas des copies pixel-identiques. Les variations residuelles sont signalees dans les lignes concernees.
+
+#### Mesure des bordures et recommandations 9-slice
+
+Ordre des valeurs : **gauche / droite / haut / bas**, en pixels a l echelle source. La decoupe automatique rogne seulement les marges transparentes (1 a 2 px pour les panneaux), sans redimensionner ces cinq cadres. La bordure visible est mesuree sur les axes centraux, alpha >= 128, jusqu au remplissage interieur (distance RGB < 30). Les valeurs de retrait incluent les marges transparentes dues aux ornements. Les decoupes recommandees sont plus grandes pour proteger les coins ; elles ne sont pas des epaisseurs de trait.
+
+| Cadre | Sortie | Bordure visible G/D/H/B | Retrait au fond G/D/H/B | Decoupes conseillees G/D/H/B |
+|---|---|---|---|---|
+| `ui_bulle` | 638 x 298 | 18/18/17/17 | 21/21/32/33 | 74/74/60/60 |
+| `ui_invite` | 639 x 159 | 40/37/22/21 | 41/39/34/29 | 105/105/70/70 |
+| `ui_banniere` | 706 x 164 | 23/30/35/20 | 40/46/53/39 | 115/115/75/75 |
+| `ui_energie_cadre` | 1350 x 90 | 69/70/19/19 | 75/75/38/30 | 105/105/38/30 |
+| `ui_boss_cadre` | 1398 x 64 | 65/63/16/18 | 71/69/25/25 | 110/110/25/25 |
+
+Preuves d etirement : `controles/lot_8/9slice_*.jpg`. Les barres utilisent surtout les extremites gauche/droite pour le 3-slice ; conserver leur hauteur. Les ouvertures centrales des cadres energie/boss mesurent environ 22/14 px de haut sur l axe central : ajuster la hauteur ou masquer les remplissages a l integration. Aucun code d integration ajoute.
+
+Audit : [audit_final.json](controles/lot_8/audit_final.json), aucune anomalie de dimensions, de raccord ou de connexite des frames des personnages. Empreintes comparees a l etat initial : **aucun asset existant modifie**, donc aucune retouche des images existantes Agarica/Geralt ni des elements a reutiliser. Le manifeste reste intact. Nous avons uniquement laisse l importeur mettre a jour `src/data/asset_present.js`. D autres modifications de `src/` sont apparues en parallele pendant la session ; elles sont listees dans l audit et n ont pas ete modifiees ni annulees par ce travail.
+
+#### Import complet final
+
+Commande : `python tools/import_codex_assets.py`. Journal : [final_lot_8_2026-10-23.log](imports/final_lot_8_2026-10-23.log).
+
+```text
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (212) : agarica_extra, agarica_slash, singe, transfo_singe, geralt_invocation, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, cochon_bebe_rose, cochon_bebe_gris, cochon_bebe_orange, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_invocation_clak, vfx_impact_pierre, singe_extra, forme_papillon_extra, singe_gueri, vfx_mousse_toxique, vfx_anneau_choc, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, liquide_mare_fond, liquide_mare_voile, liquide_mare_surface_0, liquide_mare_surface_1, liquide_mare_surface_2, liquide_mare_surface_3, liquide_mousse_toxique, couche_ciel_jour, couche_nappe_nuages, couche_nappe_brume, couche_brume_avant, couche_nuage_0, couche_nuage_1, couche_nuage_2, couche_nuage_3, couche_nuage_4, couche_soleil, decor_lanterne_eteinte, decor_lanterne_allumee, decor_fente_fermee, decor_fente_ouverte, decor_spirale_gravee, decor_plateforme_fantome, decor_plateforme_ecorce_intacte, decor_plateforme_ecorce_fissuree, decor_plateforme_ecorce_brisee, decor_rampe_lancement, decor_marches_racines, decor_autel_sommet, decor_pont_tronc, decor_cratere, decor_trou_effondre, couche_iles_lointaines, couche_horizon_malade, decor_mare_berge, decor_mare_roseaux, decor_fleur_perchee, decor_plante_resistante_fleurie, decor_plante_resistante_bouton, objet_graine_coeur, decor_tapis_mousse, decor_cercle_sain, decor_mousse_sechee, decor_mousse_plaque_intacte, decor_mousse_plaque_grattee, decor_mousse_plaque_repoussee, decor_mousse_lumineuse_sol, decor_mousse_lumineuse_tronc, decor_mousse_lumineuse_plafond, decor_mousse_lumineuse_petite, decor_touffe_mousse_petite, decor_touffe_mousse_moyenne, decor_touffe_mousse_grande, decor_touffe_mousse_penchee, decor_empreinte_boue, couche_vignette, fx_eclat_mousse, fx_motte_mousse, fx_motte_terre, fx_eclat_ecorce, fx_eclat_pierre, fx_feuille, fx_petale_rose, fx_petale_blanc, fx_goutte_toxique, fx_goutte_antidote, fx_bulle, fx_eclaboussure_toxique, fx_luciole, fx_grain_lumiere, fx_etincelle, fx_etincelle_papillon, fx_trainee_papillon, fx_trait_vent, fx_ombre_sol, fx_marqueur_danger, fx_spore_toxique, fx_bouffee_poussiere, fx_bouffee_toxique, fx_braise, fx_halo_doux, fx_halo_rayons, fx_rai_lumiere, fx_halo_objet, fx_aura_esprit, fx_lueur_sol, araignee_petite_0, araignee_petite_1, araignee_petite_2, bete_mousse_vivante, bete_mousse_touchee, bete_mousse_morte, mousse_creature_guerie_0, mousse_creature_guerie_1, note_geralt, objet_grappin, objet_fleche, objet_collet, objet_corde, fx_fil_soie, ui_bulle, ui_bulle_pointe, ui_invite, ui_banniere, ui_touche, ui_alerte, ui_etoiles_etourdi, ui_case_competence, ui_anneau_objet, ui_ornement_titre, ui_energie_cadre, ui_energie_remplissage, ui_boss_cadre, ui_boss_remplissage, ui_feu_camp, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).
+```
+
+
+<!-- RETOUCHES_POISON_2026 -->
+## Retouches poison — 2026-10-23
+
+Redessins via imagegen : palette verte courte, aplats mats, contours noirs et pixels lisibles. Sauvegardes, générations, comparaisons et imports : `controles/retouches_poison_2026-10-23/`. Les cellules sans poison des planches mixtes sont conservées à l identique ; seuls les identifiants concernés sont réimportés.
+
+| Source | État | Contrôle |
+|---|---|---|
+| `assets/_codex_src/liquide_mousse_toxique.png` | Import sans avertissement | liquide_mousse_toxique : raccord RGBA Δ=0 |
+| `assets/_codex_src/bandes_sol.png` | Import sans avertissement | decor_tapis_mousse : raccord RGBA Δ=0 |
+| `assets/_codex_src/mousses_plaques.png` | Import sans avertissement |  |
+| `assets/_codex_src/particules_matieres.png` | Import sans avertissement |  |
+| `assets/_codex_src/particules_lumieres.png` | Import sans avertissement |  |
+| `assets/vfx/vfx_mousse_toxique.png` | Import sans avertissement |  |
+| `assets/_codex_src/petites_creatures.png` | Import sans avertissement |  |
+| `assets/_codex_src/couche_lointains.png` | Import sans avertissement | couche_horizon_malade : raccord RGBA Δ=0 |
+| `assets/vfx/vfx_souffle_toxique.png` | Import sans avertissement |  |
+| `assets/vfx/vfx_flaque_mousse.png` | Import sans avertissement |  |
+| `assets/vfx/vfx_vague_mousse.png` | Import sans avertissement |  |
+| `assets/_codex_src/mousse_amas.png` | Import sans avertissement |  |
+| `assets/_codex_src/mousse_mur.png` | Import sans avertissement |  |
+| `assets/_codex_src/porte_mousse.png` | Import sans avertissement |  |
+
+Galerie : [avant / après](controles/retouches_poison_2026-10-23/index.html).
+<!-- /RETOUCHES_POISON_2026 -->
+
+### Contrôles finaux des retouches poison
+
+14 sources redessinées : 28 images fixes et 4 animations totalisant 30 frames. Les 3 raccords tuilables ont une différence RGBA nulle après import. Les cellules hors poison sont pixel-identiques aux sauvegardes. Les dimensions de toile et les nombres de frames sont conservés. Les dessins sont issus d imagegen ; les scripts assurent uniquement découpe, placement, dimensions et raccords. Le haut d une touffe et les gouttières du souffle ont été repositionnés pour éviter une coupe des dessins. La vague est normalisée à 300 x 70 px par frame.
+
+Sauvegardes : `controles/retouches_poison_2026-10-23/avant/`. Audit : [audit_final.json](controles/retouches_poison_2026-10-23/audit_final.json). Aucun changement des images existantes Agarica/Geralt ni des assets hors du périmètre. Aucun code du jeu ni manifeste édité par ce travail. Des modifications parallèles de `src/` sont recensées dans l audit ; elles ont été préservées.
+
+Import complet : `python tools/import_codex_assets.py`. [Journal complet](imports/final_retouches_poison_2026-10-23.log).
+
+```text
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (212) : agarica_extra, agarica_slash, singe, transfo_singe, geralt_invocation, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, cochon_bebe_rose, cochon_bebe_gris, cochon_bebe_orange, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_invocation_clak, vfx_impact_pierre, singe_extra, forme_papillon_extra, singe_gueri, vfx_mousse_toxique, vfx_anneau_choc, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, liquide_mare_fond, liquide_mare_voile, liquide_mare_surface_0, liquide_mare_surface_1, liquide_mare_surface_2, liquide_mare_surface_3, liquide_mousse_toxique, couche_ciel_jour, couche_nappe_nuages, couche_nappe_brume, couche_brume_avant, couche_nuage_0, couche_nuage_1, couche_nuage_2, couche_nuage_3, couche_nuage_4, couche_soleil, decor_lanterne_eteinte, decor_lanterne_allumee, decor_fente_fermee, decor_fente_ouverte, decor_spirale_gravee, decor_plateforme_fantome, decor_plateforme_ecorce_intacte, decor_plateforme_ecorce_fissuree, decor_plateforme_ecorce_brisee, decor_rampe_lancement, decor_marches_racines, decor_autel_sommet, decor_pont_tronc, decor_cratere, decor_trou_effondre, couche_iles_lointaines, couche_horizon_malade, decor_mare_berge, decor_mare_roseaux, decor_fleur_perchee, decor_plante_resistante_fleurie, decor_plante_resistante_bouton, objet_graine_coeur, decor_tapis_mousse, decor_cercle_sain, decor_mousse_sechee, decor_mousse_plaque_intacte, decor_mousse_plaque_grattee, decor_mousse_plaque_repoussee, decor_mousse_lumineuse_sol, decor_mousse_lumineuse_tronc, decor_mousse_lumineuse_plafond, decor_mousse_lumineuse_petite, decor_touffe_mousse_petite, decor_touffe_mousse_moyenne, decor_touffe_mousse_grande, decor_touffe_mousse_penchee, decor_empreinte_boue, couche_vignette, fx_eclat_mousse, fx_motte_mousse, fx_motte_terre, fx_eclat_ecorce, fx_eclat_pierre, fx_feuille, fx_petale_rose, fx_petale_blanc, fx_goutte_toxique, fx_goutte_antidote, fx_bulle, fx_eclaboussure_toxique, fx_luciole, fx_grain_lumiere, fx_etincelle, fx_etincelle_papillon, fx_trainee_papillon, fx_trait_vent, fx_ombre_sol, fx_marqueur_danger, fx_spore_toxique, fx_bouffee_poussiere, fx_bouffee_toxique, fx_braise, fx_halo_doux, fx_halo_rayons, fx_rai_lumiere, fx_halo_objet, fx_aura_esprit, fx_lueur_sol, araignee_petite_0, araignee_petite_1, araignee_petite_2, bete_mousse_vivante, bete_mousse_touchee, bete_mousse_morte, mousse_creature_guerie_0, mousse_creature_guerie_1, note_geralt, objet_grappin, objet_fleche, objet_collet, objet_corde, fx_fil_soie, ui_bulle, ui_bulle_pointe, ui_invite, ui_banniere, ui_touche, ui_alerte, ui_etoiles_etourdi, ui_case_competence, ui_anneau_objet, ui_ornement_titre, ui_energie_cadre, ui_energie_remplissage, ui_boss_cadre, ui_boss_remplissage, ui_feu_camp, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).
+```

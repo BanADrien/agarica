@@ -1,0 +1,10 @@
+[fx_spore_toxique] -> assets/vfx/particules/fx_spore_toxique.png (108x128)
+[fx_bouffee_toxique] -> assets/vfx/particules/fx_bouffee_toxique.png (128x111)
+
+================ RAPPORT ================
+Découpés maintenant (2) : fx_spore_toxique, fx_bouffee_toxique
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

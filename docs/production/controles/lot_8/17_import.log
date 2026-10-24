@@ -1,0 +1,13 @@
+[vfx_mousse_toxique] découpe de 1 image(s)
+  rangée 0 bulle: 4 frame(s) [OK]
+  rangée 1 boule: 4 frame(s) [OK]
+  rangée 2 goutte: 4 frame(s) [OK]
+  canvas uniforme 227x151 -> assets/vfx/vfx_mousse_toxique_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : vfx_mousse_toxique
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 692 fichier(s) présent(s).

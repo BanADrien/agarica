@@ -1,0 +1,20 @@
+[fx_luciole] -> assets/vfx/particules/fx_luciole.png (126x128)
+[fx_grain_lumiere] -> assets/vfx/particules/fx_grain_lumiere.png (121x128)
+[fx_etincelle] -> assets/vfx/particules/fx_etincelle.png (123x128)
+[fx_etincelle_papillon] -> assets/vfx/particules/fx_etincelle_papillon.png (111x128)
+[fx_trainee_papillon] -> assets/vfx/particules/fx_trainee_papillon.png (128x27)
+[fx_trait_vent] -> assets/vfx/particules/fx_trait_vent.png (128x22)
+[fx_ombre_sol] -> assets/vfx/particules/fx_ombre_sol.png (128x43)
+[fx_marqueur_danger] -> assets/vfx/particules/fx_marqueur_danger.png (128x33)
+[fx_spore_toxique] -> assets/vfx/particules/fx_spore_toxique.png (120x128)
+[fx_bouffee_poussiere] -> assets/vfx/particules/fx_bouffee_poussiere.png (128x105)
+[fx_bouffee_toxique] -> assets/vfx/particules/fx_bouffee_toxique.png (128x113)
+[fx_braise] -> assets/vfx/particules/fx_braise.png (103x128)
+
+================ RAPPORT ================
+Découpés maintenant (12) : fx_luciole, fx_grain_lumiere, fx_etincelle, fx_etincelle_papillon, fx_trainee_papillon, fx_trait_vent, fx_ombre_sol, fx_marqueur_danger, fx_spore_toxique, fx_bouffee_poussiere, fx_bouffee_toxique, fx_braise
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 674 fichier(s) présent(s).

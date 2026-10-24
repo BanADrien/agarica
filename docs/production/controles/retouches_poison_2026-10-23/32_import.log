@@ -1,0 +1,12 @@
+[vfx_flaque_mousse] découpe de 1 image(s)
+  rangée 0 spawn: 4 frame(s) [OK]
+  rangée 1 idle: 4 frame(s) [OK]
+  canvas uniforme 307x138 -> assets/vfx/vfx_flaque_mousse_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : vfx_flaque_mousse
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

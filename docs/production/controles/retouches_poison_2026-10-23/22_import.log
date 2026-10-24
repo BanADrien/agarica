@@ -1,0 +1,11 @@
+[bete_mousse_vivante] -> assets/sprites/petites/bete_mousse_vivante.png (260x197)
+[bete_mousse_touchee] -> assets/sprites/petites/bete_mousse_touchee.png (212x169)
+[bete_mousse_morte] -> assets/sprites/petites/bete_mousse_morte.png (244x87)
+
+================ RAPPORT ================
+Découpés maintenant (3) : bete_mousse_vivante, bete_mousse_touchee, bete_mousse_morte
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

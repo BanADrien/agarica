@@ -1,0 +1,65 @@
+{
+  "mode": "image_gen intégré",
+  "prompt_set": "prompts.json",
+  "generated": [
+    {
+      "n": 1,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-de62fc7f-93cf-4653-b309-c57e5853a18d.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 2,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-33da602e-2351-4ff2-b07d-e8b0e775b75c.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 3,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-05ce74d1-6b1d-4253-a8c5-9ae559c8b7fe.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 4,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-b35d2c4e-a720-4cf9-bf11-65878077cef7.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 5,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-d8045e60-3b1b-481e-87e0-ca32953d680e.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 6,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-990e0096-9da8-49ea-9ef4-a958906b9595.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 7,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-5ba43933-0b3d-4731-b549-5eef466e9940.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 8,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-f1fd82ed-6178-477d-ad25-2ad4ece323ad.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 9,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-2d74a8cb-7592-4e95-bea0-2a21a2909583.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 10,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-03de27f5-e363-4692-80cd-2d1e0f9bfe35.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 11,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-6cad118f-e9de-472e-a3f9-b3295321af62.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 12,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-2b2a3590-0ba8-4691-9189-a067f5905ba8.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    },
+    {
+      "n": 13,
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-a5bc39c8-cd20-4c23-a436-594ce893e830.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    }
+  ],
+  "revisions": [
+    {
+      "n": 9,
+      "prompt": "Edit this TWO-BAND layer sheet. Preserve the entire BOTTOM BAND sick green forest horizon exactly, including its transparent upper area. In the TOP BAND ONLY, remove ALL clouds, all low forest canopy, all distant mountains and all continuous scenery below/between the floating islands. Keep the 5-6 separate floating island shapes and their trees, rocks, dangling roots and waterfalls. There must be TRUE ALPHA TRANSPARENCY everywhere around, between and BELOW the floating islands; absolutely NO opaque cloud bank, mountains or horizon in this top band. Each island is isolated. Keep the same soft desaturated blue-grey painted rendering, exact1536x1024 canvas, two equal512px bands, first-band art inside y30..482, second band unchanged. No text. Horizontal tileable edges. This is a layer isolation correction.",
+      "output_hint": "Generated images are saved to C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc as C:\\Users\\adrie\\.codex\\generated_images\\01a162da-6f2a-73d3-8574-eb153d9275cc\\exec-fe5febb9-6e10-4b76-af83-5fb35713464b.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link."
+    }
+  ]
+}

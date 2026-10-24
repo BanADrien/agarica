@@ -1,0 +1,20 @@
+[fx_eclat_mousse] -> assets/vfx/particules/fx_eclat_mousse.png (128x127)
+[fx_motte_mousse] -> assets/vfx/particules/fx_motte_mousse.png (120x128)
+[fx_motte_terre] -> assets/vfx/particules/fx_motte_terre.png (98x128)
+[fx_eclat_ecorce] -> assets/vfx/particules/fx_eclat_ecorce.png (128x127)
+[fx_eclat_pierre] -> assets/vfx/particules/fx_eclat_pierre.png (119x128)
+[fx_feuille] -> assets/vfx/particules/fx_feuille.png (122x128)
+[fx_petale_rose] -> assets/vfx/particules/fx_petale_rose.png (125x128)
+[fx_petale_blanc] -> assets/vfx/particules/fx_petale_blanc.png (111x128)
+[fx_goutte_toxique] -> assets/vfx/particules/fx_goutte_toxique.png (52x128)
+[fx_goutte_antidote] -> assets/vfx/particules/fx_goutte_antidote.png (83x128)
+[fx_bulle] -> assets/vfx/particules/fx_bulle.png (128x126)
+[fx_eclaboussure_toxique] -> assets/vfx/particules/fx_eclaboussure_toxique.png (128x60)
+
+================ RAPPORT ================
+Découpés maintenant (12) : fx_eclat_mousse, fx_motte_mousse, fx_motte_terre, fx_eclat_ecorce, fx_eclat_pierre, fx_feuille, fx_petale_rose, fx_petale_blanc, fx_goutte_toxique, fx_goutte_antidote, fx_bulle, fx_eclaboussure_toxique
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 662 fichier(s) présent(s).

@@ -1,0 +1,14 @@
+[couche_nuage_0] -> assets/decors/fonds/couche_nuage_0.png (387x196)
+[couche_nuage_1] -> assets/decors/fonds/couche_nuage_1.png (333x198)
+[couche_nuage_2] -> assets/decors/fonds/couche_nuage_2.png (386x193)
+[couche_nuage_3] -> assets/decors/fonds/couche_nuage_3.png (451x89)
+[couche_nuage_4] -> assets/decors/fonds/couche_nuage_4.png (280x106)
+[couche_soleil] -> assets/decors/fonds/couche_soleil.png (414x377)
+
+================ RAPPORT ================
+Découpés maintenant (6) : couche_nuage_0, couche_nuage_1, couche_nuage_2, couche_nuage_3, couche_nuage_4, couche_soleil
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 611 fichier(s) présent(s).

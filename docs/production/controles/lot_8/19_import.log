@@ -1,0 +1,12 @@
+[singe_extra] découpe de 1 image(s)
+  rangée 0 climb: 4 frame(s) [OK]
+  rangée 1 throw: 4 frame(s) [OK]
+  canvas uniforme 209x267 -> assets/sprites/singe_extra_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : singe_extra
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 708 fichier(s) présent(s).

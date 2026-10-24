@@ -1,0 +1,14 @@
+[ui_touche] -> assets/ui/ui_touche.png (256x255)
+[ui_alerte] -> assets/ui/ui_alerte.png (130x256)
+[ui_etoiles_etourdi] -> assets/ui/ui_etoiles_etourdi.png (256x91)
+[ui_case_competence] -> assets/ui/ui_case_competence.png (256x243)
+[ui_anneau_objet] -> assets/ui/ui_anneau_objet.png (254x256)
+[ui_ornement_titre] -> assets/ui/ui_ornement_titre.png (372x110)
+
+================ RAPPORT ================
+Découpés maintenant (6) : ui_touche, ui_alerte, ui_etoiles_etourdi, ui_case_competence, ui_anneau_objet, ui_ornement_titre
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 745 fichier(s) présent(s).

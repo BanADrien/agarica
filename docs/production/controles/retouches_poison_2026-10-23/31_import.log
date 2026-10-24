@@ -1,0 +1,12 @@
+[vfx_souffle_toxique] découpe de 1 image(s)
+  rangée 0 start: 3 frame(s) [OK]
+  rangée 1 idle: 3 frame(s) [OK]
+  canvas uniforme 395x278 -> assets/vfx/vfx_souffle_toxique_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : vfx_souffle_toxique
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

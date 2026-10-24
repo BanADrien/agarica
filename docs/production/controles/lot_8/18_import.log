@@ -1,0 +1,12 @@
+[vfx_anneau_choc] découpe de 1 image(s)
+  rangée 0 toxique: 4 frame(s) [OK]
+  rangée 1 talisman: 4 frame(s) [OK]
+  canvas uniforme 301x327 -> assets/vfx/vfx_anneau_choc_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : vfx_anneau_choc
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 700 fichier(s) présent(s).

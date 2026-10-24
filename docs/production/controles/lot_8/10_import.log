@@ -1,0 +1,14 @@
+[decor_mare_berge] -> assets/decors/elements/decor_mare_berge.png (440x299)
+[decor_mare_roseaux] -> assets/decors/elements/decor_mare_roseaux.png (249x439)
+[decor_fleur_perchee] -> assets/decors/elements/decor_fleur_perchee.png (298x449)
+[decor_plante_resistante_fleurie] -> assets/decors/elements/decor_plante_resistante_fleurie.png (248x452)
+[decor_plante_resistante_bouton] -> assets/decors/elements/decor_plante_resistante_bouton.png (249x450)
+[objet_graine_coeur] -> assets/items/objets/objet_graine_coeur.png (298x239)
+
+================ RAPPORT ================
+Découpés maintenant (6) : decor_mare_berge, decor_mare_roseaux, decor_fleur_perchee, decor_plante_resistante_fleurie, decor_plante_resistante_bouton, objet_graine_coeur
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 634 fichier(s) présent(s).

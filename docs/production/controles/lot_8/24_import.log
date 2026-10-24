@@ -1,0 +1,10 @@
+[objet_corde] -> assets/items/objets/objet_corde.png (19x512)
+[fx_fil_soie] -> assets/vfx/particules/fx_fil_soie.png (10x512)
+
+================ RAPPORT ================
+Découpés maintenant (2) : objet_corde, fx_fil_soie
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 735 fichier(s) présent(s).

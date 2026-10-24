@@ -1,0 +1,14 @@
+[fx_halo_doux] -> assets/vfx/particules/fx_halo_doux.png (411x403)
+[fx_halo_rayons] -> assets/vfx/particules/fx_halo_rayons.png (422x426)
+[fx_rai_lumiere] -> assets/vfx/particules/fx_rai_lumiere.png (211x443)
+[fx_halo_objet] -> assets/vfx/particules/fx_halo_objet.png (271x263)
+[fx_aura_esprit] -> assets/vfx/particules/fx_aura_esprit.png (422x405)
+[fx_lueur_sol] -> assets/vfx/particules/fx_lueur_sol.png (405x110)
+
+================ RAPPORT ================
+Découpés maintenant (6) : fx_halo_doux, fx_halo_rayons, fx_rai_lumiere, fx_halo_objet, fx_aura_esprit, fx_lueur_sol
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 680 fichier(s) présent(s).
