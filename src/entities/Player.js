@@ -708,28 +708,25 @@ const TRANSFO_WOLF_EAGLE_BODY = transfoBodyConfig(TRANSFO_WOLF_EAGLE_FRAME_WIDTH
 // EAU = pieuvre. `equippedForms` garde son format historique (tableau de 3,
 // lu par LevelKit : sanctuaires, triche Ctrl+Shift+D) mais est normalisé en
 // [sol, aérien, eau] ; `airForm` (registre) mémorise le choix aérien.
-// Papillon : 3e forme aérienne (trou sombre, avec la compétence papillon).
-const AIR_FORM_IDS = ['eagle', 'monkey', 'butterfly'];
+// Décision utilisateur : « le papillon ne doit être qu'une compétence, pas
+// remplacer le double saut ». Plus de forme aérienne papillon (l'ancien
+// battement + dash en diagonale est retiré) : seuls le singe et l'aigle
+// donnent le 2e saut. Le papillon reste la compétence de soin (SKILL_DEFS,
+// Projectiles.js), avec sa courte pose d'incantation (startSkillFormPose).
+const AIR_FORM_IDS = ['eagle', 'monkey'];
+// Anciennes formes aériennes encore présentes dans de vieilles sauvegardes
+// (`airForm`, `equippedForms`) : migrées au chargement vers la forme
+// aérienne débloquée restante (cf. resolveInitialAirForm).
+const OBSOLETE_AIR_FORM_IDS = ['butterfly'];
 const FORM_FLAG_BY_ID = {
   wolf: 'hasWolfForm', eagle: 'hasEagleForm', monkey: 'hasMonkeyForm', octopus: 'hasOctopusForm',
-  butterfly: 'hasButterflyForm',
 };
-// --- Forme PAPILLON (décisions utilisateur) -----------------------------------
-// 2e appui sur Espace en l'air : PAS un saut -- battement d'ailes sur place
-// (transformation brève), puis DASH en ligne droite, diagonale FIXE
-// avant-haut (sens où elle regarde), sans gravité ; puis chute normale en
-// forme humaine. Un seul dash par saut (rechargé au sol, ou par un rebond).
-const BUTTERFLY_FLAP_MS = 130;
-const BUTTERFLY_DASH_MS = 380;
-// 760 px/s pendant 0,38 s = ~290 px le long de la diagonale (≈ 4,5 cases ;
-// ~205 px vers l'avant ET vers le haut).
-const BUTTERFLY_DASH_SPEED = 760;
-const BUTTERFLY_DASH_ANGLE = Math.PI / 4;
-// Vitesse horizontale gardée à la sortie du dash (chute humaine normale).
-const BUTTERFLY_EXIT_SPEED_X = 190;
-// Le papillon (art centré) est dessiné centré sur le buste, pas aux pieds.
+// --- Pose PAPILLON de la compétence de soin ---------------------------------
+// Durée de la transformation humaine -> papillon (art `transfo_papillon`,
+// recréée à cette durée) : la phase 'in' de SKILL_FORM_POSE_MS.papillon.
+const BUTTERFLY_TRANSFO_MS = 130;
+// Poussière lumineuse de la pose (centrée sur le buste, pas aux pieds).
 const BUTTERFLY_CENTER_ABOVE_FEET = 38;
-const BUTTERFLY_TRAIL_EVERY_MS = 22;
 const BUTTERFLY_DUST_COLORS = [0x9ff3ff, 0x6fd8ff, 0xffb3f0, 0xfff6a0];
 const BUTTERFLY_PH_KEY = 'butterfly-ph';
 const ANIM_BUTTERFLY_PH_KEY = 'butterfly-ph-flap';
@@ -793,7 +790,7 @@ const JUMP_COYOTE_MS = 110;
 const JUMP_BUFFER_MS = 120;
 // Juice (visuel seul) : couleurs des éclats de transformation par forme.
 const FORM_FX_COLORS = {
-  agarica: 0xff9fc9, wolf: 0x7dfcd8, eagle: 0xfff1c0, monkey: 0xa8e07a, butterfly: 0xffb3f0, octopus: 0x9fe3ff,
+  agarica: 0xff9fc9, wolf: 0x7dfcd8, eagle: 0xfff1c0, monkey: 0xa8e07a, octopus: 0x9fe3ff,
 };
 // Même idée en sortant de l'eau (forme pieuvre) : la nage s'arrête
 // `waterGraceMs` après la surface ; un saut dans cette fenêtre fait sortir
@@ -834,8 +831,8 @@ const HIT_BLINK_MS = 90;
 const HIT_BLINK_ALPHA = 0.35;
 // Chute dans le vide (cf. startFallOut, et updateStoryFall dans StoryKit) :
 // vitesse de chute minimale une fois la chute engagée, pour qu'Agarica sorte
-// franchement par le bas de l'écran (en plané d'aigle ou au sortir d'un dash
-// papillon, elle le traversait sinon au ralenti).
+// franchement par le bas de l'écran (en plané d'aigle, elle le traversait
+// sinon au ralenti).
 const FALL_OUT_MIN_VY = 520;
 const THROW_POSE_MS = 220;
 // Compétences « avec la forme » (cf. startSkillFormPose) : durées des phases
@@ -1226,6 +1223,15 @@ const TOTEM_BODIES = {
   energie: { label: 'Énergie', statKey: 'energyBonus', perStack: 15 },
   degats: { label: 'Dégâts', statKey: 'skillSizeBonus', perStack: 0.15 },
 };
+// Démo : le système de totems est prévu APRÈS la démo (demande explicite :
+// "lock la partie totem pour la démo, cadenas chaîne"). Tant que c'est vrai,
+// recomputeTotemBonuses calcule comme si aucun totem n'était porté, SANS
+// toucher à `equippedTotem` ni au registre (un totem équipé avant le verrou
+// -- ancienne partie, tests -- reste sauvegardé) ; le menu du feu de camp
+// lit la même constante pour afficher le cadenas (CampfireMenuScene).
+// Passer à `false` suffit à tout rouvrir. Règle tenue ici, dans le joueur,
+// plutôt qu'en remplaçant la méthode depuis le menu (patch invisible).
+const DEMO_TOTEMS_LOCKED = true;
 
 class Player extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
@@ -1293,9 +1299,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.hasMonkeyForm = scene.registry.get('hasMonkeyForm') || false;
     // Formes aériennes déjà connues à la création : seule une forme débloquée
     // EN COURS de jeu (totem, cinématique, triche) devient automatiquement
-    // la forme aérienne active, cf. syncFormSlots().
-    this.hasButterflyForm = scene.registry.get('hasButterflyForm') || false;
-    this.airFormsSeen = { eagle: this.hasEagleForm, monkey: this.hasMonkeyForm, butterfly: this.hasButterflyForm };
+    // la forme aérienne active, cf. syncFormSlots(). (Plus de forme papillon :
+    // `hasButterflyForm` d'une vieille sauvegarde reste au registre, ignoré.)
+    this.airFormsSeen = { eagle: this.hasEagleForm, monkey: this.hasMonkeyForm };
     this.airForm = this.resolveInitialAirForm(scene.registry.get('airForm'));
     this.applyAirForm(this.airForm);
 
@@ -1522,9 +1528,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // (cf. agaricaSheetScale, `method: 'area'`) -- même « masse » apparente
     // qu'Agarica, une échelle par image source (singe.png / singe_p2.png).
     FORMS.monkey = agaricaSheetPoseConfig(scene, 'singe', 'jump', { method: 'area' });
-    // Papillon : art `forme_papillon` (centré, face à DROITE) s'il existe,
-    // sinon placeholder dessiné par code ; hitbox au gabarit humain (comme
-    // le singe) pour que les collisions ne changent pas pendant le dash.
+    // Papillon (pose de la compétence de soin, cf. drawSkillFormPose) : art
+    // `forme_papillon` (centré, face à DROITE) s'il existe, sinon placeholder
+    // dessiné par code ; hitbox au gabarit humain (comme le singe) pour que
+    // les collisions ne changent pas pendant l'incantation.
     ensureManifestAnims(scene, 'forme_papillon');
     ensureManifestAnims(scene, 'transfo_papillon');
     ensureButterflyPlaceholder(scene);
@@ -1535,20 +1542,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       const { w, h } = BUTTERFLY_PH_SIZE;
       FORMS.butterfly = { texture: `${BUTTERFLY_PH_KEY}-0`, scale: 1, frameWidth: w, frameHeight: h, body: transfoBodyConfig(w, h, 1) };
     }
-    // Transfo humaine -> papillon (art à venir) : recréée à la durée du battement.
+    // Transfo humaine -> papillon (phases 'in'/'out' de la pose de soin) :
+    // recréée à la durée de ces phases (BUTTERFLY_TRANSFO_MS).
     this.butterflyTransfoKey = null;
     if (hasManifestArt(scene, 'transfo_papillon') && scene.anims.exists('transfo_papillon-transform')) {
       this.butterflyTransfoKey = 'transfo_papillon-transform-timed';
       if (!scene.anims.exists(this.butterflyTransfoKey)) {
         const frames = scene.anims.get('transfo_papillon-transform').frames.map((f) => ({ key: f.textureKey }));
-        scene.anims.create({ key: this.butterflyTransfoKey, frames, frameRate: frames.length / (BUTTERFLY_FLAP_MS / 1000), repeat: 0 });
+        scene.anims.create({ key: this.butterflyTransfoKey, frames, frameRate: frames.length / (BUTTERFLY_TRANSFO_MS / 1000), repeat: 0 });
       }
     }
-    // 'flap' (battement sur place) | 'dash' | null ; cf. updateButterflyDash.
-    this.butterflyPhase = null;
-    this.butterflyPhaseEnd = 0;
-    this.butterflyDir = 1;
-    this.butterflyTrailAt = 0;
     ensureManifestAnims(scene, 'singe');
     ensureManifestAnims(scene, 'transfo_singe');
     ensureManifestAnims(scene, 'agarica_extra');
@@ -1592,10 +1595,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.hasMonkeyForm = true;
       this.airFormsSeen.monkey = true;
       playerStateSet(scene, 'hasMonkeyForm', true);
-      // Idem pour le papillon (débloqué, pas activé).
-      this.hasButterflyForm = true;
-      this.airFormsSeen.butterfly = true;
-      playerStateSet(scene, 'hasButterflyForm', true);
     });
     this.jumpsUsed = 0;
     this.justJumped = false;
@@ -1775,7 +1774,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       });
       spawnFx(this.scene, 'feathers', this.x, this.y - 40, { count: 2, power: 0.8 });
       playSfx('feather_shot');
-    } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.butterflyPhase && !this.vine
+    } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.vine
       && now >= this.attackCooldownEndTime) {
       // (Sur une liane : aucune attaque -- les deux mains tiennent la liane,
       // demande utilisateur ; K/clic y est simplement ignoré.)
@@ -1980,14 +1979,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         } else {
           this.setVelocityY(this.jumpVelocity);
         }
-      } else if (!swimming && airForm === 'butterfly' && this.jumpsUsed < 2 && !this.butterflyPhase) {
-        // Papillon : le 2e appui n'est pas un saut mais le dash (cf.
-        // startButterflyDash) ; un 1er appui en l'air (chute d'un bord) reste
-        // un saut normal, comme pour le singe et l'aigle.
-        this.jumpsUsed += 1;
-        jumpActed = true;
-        if (this.jumpsUsed === 2) this.startButterflyDash(now);
-        else { this.setVelocityY(this.jumpVelocity); juiceJump = 'air'; }
       } else if (!swimming && airForm === 'eagle' && this.jumpsUsed < 2) {
         jumpActed = true;
         juiceJump = 'air';
@@ -2019,9 +2010,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Appui en l'air sans aucun effet : mémorisé pour l'atterrissage.
     if (jumpJustPressed && !jumpActed && !jumpConsumed && !this.vine && !onGround && !swimming) this.jumpBufferedAt = now;
 
-    // Papillon : battement puis dash (écrase vitesse et gravité, cf. plus bas).
-    if (this.butterflyPhase) this.updateButterflyDash(now, swimming || onGround);
-
     // Rebond (pogo) : coup vers le bas qui touche quelque chose de frappable,
     // une fois par coup. Testé AVANT LevelKit (qui applique les dégâts juste
     // après Player.update) : l'ennemi touché est donc encore vivant ici.
@@ -2042,7 +2030,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Vol de liane en liane (lâcher avec Espace, cf. releaseVine) : chute à la
     // gravité normale, sans le surplus de chute -- un vrai vol plané.
-    const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine && !this.butterflyPhase && !this.vineFlight;
+    const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine && !this.vineFlight;
     this.body.gravity.y = falling ? this.fallGravityBonus : 0;
 
     // Descente en piqué : S maintenu remplace le plané par une accélération
@@ -2070,7 +2058,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.inWater && !(this.hasOctopusForm && this.formEquipped('octopus'))) {
       this.hitByEnemy();
     }
-    this.body.setAllowGravity(!swimming && !this.vine && !this.butterflyPhase);
+    this.body.setAllowGravity(!swimming && !this.vine);
     if (swimming) {
       const swimUp = upHeld || this.keys.jump.isDown;
       const vy = swimUp ? -this.swimSpeed : downHeld ? this.swimSpeed : 0;
@@ -2081,8 +2069,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (swimming) {
       this.setForm('octopus');
-    } else if (this.butterflyPhase) {
-      this.setForm('butterfly');
     } else if (this.vine) {
       this.setForm('monkey');
     } else if (!onGround && this.jumpsUsed >= 2 && this.airJumpForm === 'eagle') {
@@ -2121,10 +2107,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // déplacement) — même convention dans les deux sens (entrée/sortie).
       this.beginFormTransition(now, ANIM_TRANSFO_TO_WOLF_KEY, this.wolfTransformDuration, TRANSFO_WOLF_SCALE, TRANSFO_WOLF_BODY, true);
     } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming && leavingWolf
-      && this.form !== 'monkey' && this.form !== 'butterfly') {
+      && this.form !== 'monkey') {
       // (Loup -> singe : c'est la transfo singe, plus bas, qui prend le relais
-      // -- l'anim Loup -> humaine aurait montré Agarica entre les deux ; Loup
-      // -> papillon : le battement d'ailes sert de transformation.)
+      // -- l'anim Loup -> humaine aurait montré Agarica entre les deux.)
       // `!this.formTransitionActive` (retour utilisateur, reformulé une 2e
       // fois avec plus de détail : "au moment de la transfo la hitbox se
       // desactive ou s'actualise donc je passe à travers les murs pendant
@@ -2377,8 +2362,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           const mc = agaricaSheetPoseConfig(this.scene, 'singe', monkeyAnim, { method: 'area' });
           this.applyBodyForScale(mc.scale, mc.body);
         }
-      } else if (this.form === 'butterfly') {
-        this.applyButterflyPose(now);
       } else if (this.form === 'octopus') {
         // Pas d'attaque du tout pour cette forme (cf. le garde-fou
         // `this.form !== 'octopus'` sur le déclenchement plus haut) --
@@ -2498,7 +2481,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       return;
     }
     if (to === 'monkey' && this.vine) return; // gerbe de feuilles déjà faite à la prise
-    if (to === 'butterfly' || from === 'butterfly') return; // poussière d'ailes dédiée (dash)
     if (to === 'agarica') {
       spawnFx(sc, 'star', this.x, cy, { count: 5, tint: [color, 0xffffff], power: 0.8 });
       if (from === 'monkey') spawnFx(sc, 'leaves', this.x, cy, { count: 4, power: 0.7 });
@@ -2669,7 +2651,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // table, sans toucher à cette méthode.
   tryActivateSkill(slotIndex, now) {
     const skillId = this.skillSlots[slotIndex];
-    if (!skillId || now < this.skillCooldownEndTime || this.butterflyPhase) return;
+    if (!skillId || now < this.skillCooldownEndTime) return;
     const def = SKILL_DEFS[skillId];
     if (this.energy < def.cost) {
       // Retour visuel : la barre d'énergie tremble (juice, HUD).
@@ -2758,7 +2740,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // une seule fois.
   recomputeTotemBonuses() {
     const bonus = { heartBonus: 0, energyBonus: 0, skillSizeBonus: 0 };
-    const t = this.equippedTotem;
+    // Démo (DEMO_TOTEMS_LOCKED) : totem équipé ignoré, mais gardé tel quel.
+    const t = DEMO_TOTEMS_LOCKED ? { head: null, body: null } : (this.equippedTotem || { head: null, body: null });
     if (t.head && t.body) {
       const body = TOTEM_BODIES[t.body];
       bonus[body.statKey] += body.perStack;
@@ -2796,15 +2779,20 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // d'`equippedForms` (anciennes sauvegardes / triche : aigle prioritaire) ;
   // jamais choisi et rien d'équipé → la forme aérienne débloquée (aigle si
   // les deux), pour qu'une forme obtenue sans feu de camp marche aussitôt.
+  // Vieille sauvegarde où le papillon (forme aérienne retirée, cf.
+  // OBSOLETE_AIR_FORM_IDS) était équipé : même repli -- l'aigle ou le singe
+  // débloqué reprend l'emplacement, sinon aucun (un seul saut). applyAirForm,
+  // juste après, réécrit `airForm` / `equippedForms` (sauvegarde migrée).
   resolveInitialAirForm(regAir) {
     if (regAir === null) return null;
-    if (regAir && this.isFormUnlocked(regAir)) return regAir;
+    if (AIR_FORM_IDS.includes(regAir) && this.isFormUnlocked(regAir)) return regAir;
     const inSlots = AIR_FORM_IDS.filter((id) => this.equippedForms.includes(id) && this.isFormUnlocked(id));
     if (inSlots.length) return inSlots.includes('eagle') ? 'eagle' : inSlots[0];
-    if (regAir === undefined && this.equippedForms.every((f) => !f)) {
+    const obsolete = OBSOLETE_AIR_FORM_IDS.includes(regAir)
+      || this.equippedForms.some((f) => OBSOLETE_AIR_FORM_IDS.includes(f));
+    if (obsolete || (regAir === undefined && this.equippedForms.every((f) => !f))) {
       if (this.hasEagleForm) return 'eagle';
       if (this.hasMonkeyForm) return 'monkey';
-      if (this.hasButterflyForm) return 'butterfly';
     }
     return null;
   }
@@ -2985,108 +2973,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.events.emit('vine-release', vine);
   }
 
-  // --- Forme papillon : battement + dash (cf. BUTTERFLY_*) ------------------
+  // --- Pose papillon (compétence de soin) -------------------------------------
+  // (L'ancienne forme aérienne papillon -- battement + dash en diagonale -- a
+  // été retirée : le papillon n'est plus qu'une compétence, cf. AIR_FORM_IDS.)
 
-  startButterflyDash(now) {
-    this.butterflyPhase = 'flap';
-    this.butterflyPhaseEnd = now + BUTTERFLY_FLAP_MS;
-    this.butterflyDir = this.facingDir >= 0 ? 1 : -1;
-    this.airJumpForm = 'butterfly';
-    this.wolfJumpCarry = false;
-    this.formTransitionActive = false;
-    this.setAcceleration(0, 0);
-    this.setVelocity(0, 0);
-    this.spawnButterflySparkles(18);
-    // Juice : halo rose et petit anneau au battement d'ailes.
-    const cy = this.y - BUTTERFLY_CENTER_ABOVE_FEET;
-    juiceBurstImage(this.scene, 'glow', this.x, cy, { size: 90, from: 0.3, to: 1.1, ms: 240, color: 0xffb3f0, alpha: 0.7 });
-    juiceShockRing(this.scene, this.x, cy, { size: 80, ms: 260, color: 0x9ff3ff });
-    playSfx('butterfly_flap');
-  }
-
-  // `abort` : sol touché, eau... Le dash s'arrête aussi contre un mur/plafond.
-  updateButterflyDash(now, abort) {
-    if (abort) { this.endButterflyDash(); return; }
-    const b = this.body;
-    this.setAcceleration(0, 0);
-    this.setDrag(0, 0);
-    if (this.butterflyPhase === 'flap') {
-      this.setVelocity(0, 0);
-      if (now >= this.butterflyPhaseEnd) {
-        this.butterflyPhase = 'dash';
-        this.butterflyPhaseEnd = now + BUTTERFLY_DASH_MS;
-        // Juice : départ du dash (traits de vitesse, poussière d'ailes).
-        spawnFx(this.scene, 'streaks', this.x, this.y - BUTTERFLY_CENTER_ABOVE_FEET, { dir: this.butterflyDir, count: 4, spread: 18 });
-        spawnFx(this.scene, 'wingDust', this.x, this.y - BUTTERFLY_CENTER_ABOVE_FEET, { count: 8, power: 1.4 });
-        playSfx('butterfly_dash');
-      }
-    }
-    if (this.butterflyPhase === 'dash') {
-      const blocked = b.blocked.up || (this.butterflyDir > 0 ? b.blocked.right : b.blocked.left);
-      if (now >= this.butterflyPhaseEnd || (blocked && now > this.butterflyPhaseEnd - BUTTERFLY_DASH_MS + 40)) {
-        this.endButterflyDash();
-        return;
-      }
-      b.maxVelocity.set(BUTTERFLY_DASH_SPEED, BUTTERFLY_DASH_SPEED);
-      this.setVelocity(
-        this.butterflyDir * Math.cos(BUTTERFLY_DASH_ANGLE) * BUTTERFLY_DASH_SPEED,
-        -Math.sin(BUTTERFLY_DASH_ANGLE) * BUTTERFLY_DASH_SPEED,
-      );
-      if (now >= this.butterflyTrailAt) {
-        this.butterflyTrailAt = now + BUTTERFLY_TRAIL_EVERY_MS;
-        this.spawnButterflyTrail();
-      }
-      // Juice : silhouettes rose / turquoise en alternance derrière le dash.
-      if (now >= this.juiceGhostAt) {
-        this.juiceGhostAt = now + 40;
-        this.juiceGhostFlip = !this.juiceGhostFlip;
-        juiceGhost(this.scene, this, { tint: this.juiceGhostFlip ? 0xffb3f0 : 0x9ff3ff, alpha: 0.26, ms: 200 });
-      }
-    }
-  }
-
-  endButterflyDash() {
-    if (!this.butterflyPhase) return;
-    const wasDash = this.butterflyPhase === 'dash';
-    this.butterflyPhase = null;
-    this.body.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
-    // Chute humaine normale : un peu d'élan vers l'avant, plus de montée.
-    this.setVelocity(wasDash ? this.butterflyDir * BUTTERFLY_EXIT_SPEED_X : this.body.velocity.x, 0);
-    this.jumpsUsed = 2;
-    this.spawnButterflySparkles(10);
-    spawnFx(this.scene, 'wingDust', this.x, this.y - BUTTERFLY_CENTER_ABOVE_FEET, { count: 6 });
-  }
-
-  // Pose du papillon : art `forme_papillon` (flap / dash) ou placeholder,
-  // centré sur le buste (BUTTERFLY_CENTER_ABOVE_FEET) ; hitbox inchangée.
-  applyButterflyPose(now) {
-    const sc = this.scene;
-    // Transformation : échelle de SA feuille (transfo_papillon), calibrée
-    // comme les autres (cf. agaricaSheetPoseConfig).
-    let cfg = FORMS.butterfly;
-    if (this.butterflyPhase === 'flap' && this.butterflyTransfoKey) {
-      this.anims.play(this.butterflyTransfoKey, true);
-      cfg = agaricaSheetPoseConfig(sc, 'transfo_papillon', 'transform');
-      this.applyBodyForScale(cfg.scale, cfg.body);
-    } else if (this.butterflyArt) {
-      const want = this.butterflyPhase === 'flap' ? 'forme_papillon-flap' : 'forme_papillon-dash';
-      if (sc.anims.exists(want)) this.anims.play(want, true);
-    } else {
-      this.anims.play(ANIM_BUTTERFLY_PH_KEY, true);
-    }
-    this.setFlipX(this.butterflyDir < 0);
-    // Penché dans le sens du dash (diagonale), droit pendant le battement.
-    this.setRotation(this.butterflyPhase === 'dash' ? -this.butterflyDir * 0.35 : 0);
-    const W = this.frame.realWidth;
-    const H = this.frame.realHeight;
-    this.setOrigin(0.5, 0.5 + BUTTERFLY_CENTER_ABOVE_FEET / (H * this.scaleY));
-    const b = cfg.body;
-    this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
-    // Remis à (0.5, 1) / rotation 0 en tête de l'image suivante (cf. resetVineArtAnchor).
-    this.vineArtAnchored = true;
-  }
-
-  // Poussière lumineuse (transformation, fin du dash).
+  // Poussière lumineuse (pose de soin sans art de transformation).
   spawnButterflySparkles(count) {
     const sc = this.scene;
     const cx = this.x;
@@ -3098,22 +2989,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       sc.tweens.add({
         targets: dot, x: cx + Math.cos(a) * Phaser.Math.Between(18, 42), y: cy + Math.sin(a) * Phaser.Math.Between(14, 34),
         alpha: 0, scale: 0.3, duration: Phaser.Math.Between(260, 420), ease: 'Quad.easeOut', onComplete: () => dot.destroy(),
-      });
-    }
-  }
-
-  // Traînée du dash : grains lumineux laissés derrière, qui retombent en s'éteignant.
-  spawnButterflyTrail() {
-    const sc = this.scene;
-    const cx = this.x;
-    const cy = this.y - BUTTERFLY_CENTER_ABOVE_FEET;
-    for (let i = 0; i < 2; i++) {
-      const dot = sc.add.circle(cx + Phaser.Math.Between(-6, 6), cy + Phaser.Math.Between(-8, 8), Phaser.Math.Between(2, 4),
-        BUTTERFLY_DUST_COLORS[Phaser.Math.Between(0, BUTTERFLY_DUST_COLORS.length - 1)], 0.95)
-        .setDepth(this.depth - 1).setBlendMode(Phaser.BlendModes.ADD);
-      sc.tweens.add({
-        targets: dot, y: dot.y + Phaser.Math.Between(10, 26), alpha: 0, scale: 0.2,
-        duration: Phaser.Math.Between(380, 560), onComplete: () => dot.destroy(),
       });
     }
   }
@@ -3279,7 +3154,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // si la pose est interrompue (coup reçu, changement de forme).
   // Renvoie false si la pose ne peut pas être jouée.
   startSkillFormPose(kind, now, { onRelease = null } = {}) {
-    if (this.form !== 'agarica' || this.vine || this.butterflyPhase || this.storyPose) return false;
+    if (this.form !== 'agarica' || this.vine || this.storyPose) return false;
     const prev = this.skillFormPose;
     // Relance pendant la pose (pierre en rafale) : déjà singe, on enchaîne le lancer.
     const chained = prev && prev.kind === kind && prev.phase !== 'out';
@@ -3313,8 +3188,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const p = this.skillFormPose;
     if (!p) return;
     if (!p.released && p.onRelease && now >= p.releaseAt) { p.released = true; p.onRelease(); }
-    // Coup reçu, pose narrative, liane, papillon : la pose s'efface.
-    if (now < this.hurtPoseUntil || this.storyPose || this.vine || this.butterflyPhase) { this.endSkillFormPose(true); return; }
+    // Coup reçu, pose narrative, liane : la pose s'efface.
+    if (now < this.hurtPoseUntil || this.storyPose || this.vine) { this.endSkillFormPose(true); return; }
     if (now >= p.end) {
       if (p.puffOut) this.spawnSkillFormPuff(p.kind);
       this.endSkillFormPose(true);
@@ -3634,14 +3509,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // l'écran ») ------------------------------------------------------------
   // Appelée par updateStoryFall (StoryKit) dès que la ligne de chute de la
   // zone est franchie : Agarica continue de tomber et sort par le bas de
-  // l'écran. Plus de liane, de dash ni de plané ; collisions coupées (sol,
+  // l'écran. Plus de liane ni de plané ; collisions coupées (sol,
   // ennemis) pour qu'aucun rebord sous la ligne de chute ne la rattrape ; le
   // monde est gelé par StoryKit (ni touche ni ennemi), la physique continue.
   startFallOut() {
     if (this.fallingOut) return;
     const now = this.scene.time.now;
     if (this.vine) this.releaseVine(false, now);
-    if (this.butterflyPhase) this.endButterflyDash();
     this.endSkillFormPose(true);
     this.fallingOut = true;
     this.isAttacking = false;
@@ -3667,8 +3541,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // plus pendant la chute) ; jamais la pose `death` couchée.
   applyFallOutPose() {
     const facingRight = this.facingDir >= 0;
-    // Papillon : hors dash, Agarica retombe en forme humaine (cf. update()).
-    if (this.form === 'butterfly') this.setForm('agarica');
     if (this.form === 'agarica') {
       if (hasManifestArt(this.scene, 'agarica_extra', 'jump_fall')) {
         this.applyAgaricaExtraPose('jump_fall');
@@ -3741,7 +3613,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.isInvulnerable || this.fallingOut) return;
     this.isInvulnerable = true;
     if (this.vine) this.releaseVine(false, this.scene.time.now);
-    if (this.butterflyPhase) this.endButterflyDash();
     this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;
     this.hearts -= 1;
     this.scene.registry.set('hearts', this.hearts);
@@ -3783,8 +3654,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       && (this.scene.time.now - this.lastInWaterTime < this.waterGraceMs);
     if (depleted && !opts.fall && !this.body.blocked.down && !swimming
       && typeof storyWatchAirDeath === 'function' && storyWatchAirDeath(this.scene)) {
-      // update() ne tourne plus (monde gelé) : gravité rendue ici (liane ou
-      // dash papillon la coupent, update() la rétablissait), plus de plané,
+      // update() ne tourne plus (monde gelé) : gravité rendue ici (la liane
+      // la coupe, update() la rétablissait), plus de plané,
       // et pose de coup tenue pendant la chute.
       this.body.setAllowGravity(true);
       this.body.gravity.y = this.fallGravityBonus;

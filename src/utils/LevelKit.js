@@ -1841,6 +1841,342 @@ function calibratedScale(scene, frameKeys, { refKey, refScale = 1, maxScale = In
   return { scale: Math.min(maxScale, scale), method: used };
 }
 
+// ===========================================================================
+// INTERFACE ANCRÉE DANS LE MONDE : TOUJOURS DANS L'ÉCRAN
+// Retour utilisateur (capture) : « la touche d'interaction dépasse de l'écran
+// et c'est pas le seul endroit » -- l'invite « E » du grand totem de l'aigle
+// passait au-dessus du haut de l'écran, une bulle de Xara était coupée sur le
+// bord gauche. Règle commune : tout élément d'interface posé dans le MONDE
+// (il suit un objet : invites « E », textes flottants, bulles de dialogue)
+// reste dans la vue de la caméra, à WORLD_UI_MARGIN px des bords, recalé à
+// CHAQUE image. API (PLAN_DEV.md, à documenter) :
+//   keepWorldUiInView(obj, { prompt })  inscrit un objet (texte, image,
+//     conteneur). `prompt: true` = invite d'interaction : si son ancre passe
+//     au-dessus du haut de l'écran, elle se pose à hauteur de la tête
+//     d'Agarica (à l'aplomb de la cible) au lieu de disparaître ou de rester
+//     collée au bord.
+//   worldUiAddLayout(scene, id, fn)     mise en page sur mesure, appelée aux
+//     mêmes moments avec la vue (bulles de StoryKit : la pointe suit le
+//     personnage, cf. layoutSpeechBubble) ; `fn(view, { hud, characters })` peut renvoyer
+//     les rectangles (monde) qu'elle occupe : les invites les évitent.
+//   worldUiView(scene[, marge])         rectangle visible (monde), marge déduite.
+//   worldUiHudRects(scene)              bandes du HUD (monde) : obstacles que
+//     tout élément évite (cœurs/énergie en haut à gauche, compétences en bas).
+//   worldUiAddScreenObstacle(obj)       ajoute un objet fixé à l'écran (toast)
+//     à ces obstacles tant qu'il est affiché.
+//   worldUiFreeSpot(rect, view, durs, mous)  place libre la plus proche d'un
+//     rectangle (bulles), cf. son commentaire.
+// Le propriétaire continue de placer l'objet sur son ancre (setPosition,
+// tween…) : le recalage s'applique par-dessus et s'annule tout seul si plus
+// personne ne bouge l'objet (un texte posé une fois revient à son ancre quand
+// la caméra y revient).
+// Moments du recalage : POST_UPDATE (après les update() et la physique), puis
+// à nouveau quand la caméra qui suit Agarica a calculé son défilement de
+// l'image (événement FOLLOW_UPDATE, émis au rendu, APRÈS postupdate) -- sans
+// ce 2e passage l'élément avait une image de retard et débordait de quelques
+// px pendant un déplacement.
+// ===========================================================================
+const WORLD_UI_MARGIN = 8;
+// Invite reposée à hauteur de tête : écart entre le haut visible d'Agarica
+// et le bas de l'invite.
+const WORLD_UI_HEAD_GAP = 8;
+
+// Vue de la caméra principale EN CE MOMENT, en coordonnées monde, marge
+// déduite. Calculée depuis scrollX/scrollY (et non `worldView`, qui n'est
+// remis à jour qu'au rendu) ; même formule que Camera.preRender (zoom compris).
+function worldUiView(scene, margin = WORLD_UI_MARGIN) {
+  const cam = scene && scene.cameras && scene.cameras.main;
+  if (!cam) return null;
+  const w = cam.width / cam.zoom;
+  const h = cam.height / cam.zoom;
+  const left = cam.scrollX + (cam.width - w) / 2;
+  const top = cam.scrollY + (cam.height - h) / 2;
+  return { left: left + margin, top: top + margin, right: left + w - margin, bottom: top + h - margin };
+}
+
+// Décalage qui ramène le segment [a, b] dans [min, max] (centré s'il est
+// plus grand que la vue).
+function worldUiAxisShift(a, b, min, max) {
+  if (b - a > max - min) return (min + max) / 2 - (a + b) / 2;
+  if (a < min) return min - a;
+  if (b > max) return max - b;
+  return 0;
+}
+
+// Y (monde) du BAS d'une invite posée à hauteur de la tête d'Agarica (haut
+// visible de son dessin, cf. objectVisibleBox), ou null sans joueur. Lissé
+// une fois par image (comme le haut des bulles) : les frames d'une anim
+// n'ont pas toutes la tête à la même hauteur, l'invite tressautait.
+function worldUiHeadY(scene, item) {
+  const p = scene.player;
+  if (!p || !p.active) return null;
+  let top = null;
+  if (p.frame && !p.rotation && typeof objectVisibleBox === 'function') {
+    const box = objectVisibleBox(p);
+    if (box) top = box.top;
+  }
+  if (top === null) top = p.getBounds().y;
+  const raw = top - WORLD_UI_HEAD_GAP;
+  const frame = scene.game.loop.frame;
+  if (item.head == null || Math.abs(raw - item.head) > 40) item.head = raw;
+  else if (item.headFrame !== frame) item.head += (raw - item.head) * 0.3;
+  item.headFrame = frame;
+  return item.head;
+}
+
+function worldUiState(scene) {
+  if (!scene.__worldUi) {
+    // Une liste par instance de scène (le listener reste posé d'une visite à
+    // l'autre, comme registerVisibleFeetBody ; les objets détruits en sortent).
+    scene.__worldUi = { items: new Set(), layouts: new Map() };
+    scene.events.on('postupdate', () => worldUiUpdate(scene));
+  }
+  return scene.__worldUi;
+}
+
+// La caméra est recréée à chaque (re)démarrage de la scène : écouteur posé
+// sur l'instance courante, une fois.
+function worldUiHookCamera(scene) {
+  const cam = scene.cameras && scene.cameras.main;
+  if (!cam || cam.__worldUiHooked) return;
+  cam.__worldUiHooked = true;
+  cam.on(Phaser.Cameras.Scene2D.Events.FOLLOW_UPDATE, () => worldUiUpdate(scene));
+}
+
+// Idempotent : un objet déjà inscrit (deux appels pour la même invite) garde
+// une seule entrée -- deux recalages du même objet se marchaient dessus.
+function keepWorldUiInView(obj, { prompt = false } = {}) {
+  if (!obj || !obj.scene) return obj;
+  const scene = obj.scene;
+  const st = worldUiState(scene);
+  worldUiHookCamera(scene);
+  const known = obj.__worldUiItem;
+  if (known && st.items.has(known)) {
+    known.prompt = known.prompt || prompt;
+    return obj;
+  }
+  const item = { obj, prompt, last: null };
+  obj.__worldUiItem = item;
+  st.items.add(item);
+  return obj;
+}
+
+function worldUiAddLayout(scene, id, fn) {
+  const st = worldUiState(scene);
+  worldUiHookCamera(scene);
+  st.layouts.set(id, fn);
+}
+
+// Bandes du HUD (fixé à l'écran, profondeur 1000-1003) en coordonnées MONDE
+// pour la vue actuelle : cœurs + énergie en haut à gauche, cases de
+// compétences en bas à gauche. Une invite ou une bulle ramenée dans un coin
+// de l'écran se posait dessus (bulle à la profondeur 1040 : elle cachait les
+// cœurs ou les compétences) ; ce sont donc des obstacles de la règle commune.
+// Un objet à scrollFactor 0 posé en (x, y) écran se dessine au même endroit
+// qu'un objet du monde en (scrollX + x, scrollY + y), zoom compris (les deux
+// sont agrandis autour du centre de la caméra). Mesures d'après les
+// constantes du HUD (drawHud) ; WORLD_UI_HUD_ART_REACH = demi-côté de l'icône
+// Codex d'une compétence (40 px) ou pastille de sa touche (+14, rayon 8),
+// plus grandes que la case dessinée (HUD_SKILL_SIZE).
+const WORLD_UI_HUD_PAD = 4;
+const WORLD_UI_HUD_ART_REACH = 22;
+function worldUiHudRects(scene) {
+  const cam = scene && scene.cameras && scene.cameras.main;
+  if (!cam) return [];
+  const pad = WORLD_UI_HUD_PAD;
+  const screen = [];
+  if (scene.hudGraphics && scene.hudGraphics.active && scene.player) {
+    const hearts = Math.max(1, scene.player.maxHearts || 1);
+    const topW = Math.max(HUD_ENERGY_BAR_WIDTH, hearts * (HUD_HEART_SIZE + HUD_HEART_GAP) - HUD_HEART_GAP);
+    const topH = HUD_HEART_SIZE + HUD_ENERGY_BAR_GAP_Y + HUD_ENERGY_BAR_HEIGHT;
+    const skillY = scene.scale.height - HUD_MARGIN - HUD_SKILL_SIZE / 2;
+    const firstCx = HUD_MARGIN + HUD_SKILL_SIZE / 2;
+    const lastCx = firstCx + (HUD_SKILL_LABELS.length - 1) * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
+    const reach = Math.max(HUD_SKILL_SIZE / 2, WORLD_UI_HUD_ART_REACH);
+    screen.push(
+      { left: HUD_MARGIN, right: HUD_MARGIN + topW, top: HUD_MARGIN, bottom: HUD_MARGIN + topH },
+      { left: firstCx - reach, right: lastCx + reach, top: skillY - reach, bottom: skillY + reach },
+    );
+  }
+  // Autres éléments fixés à l'écran inscrits par leur créateur (toast
+  // d'aide en haut de l'écran, cf. worldUiAddScreenObstacle), tant qu'ils
+  // sont affichés.
+  const st = scene.__worldUi;
+  if (st && st.screen) {
+    for (const o of st.screen) {
+      if (!o.scene || !o.active) { st.screen.delete(o); continue; }
+      if (!o.visible || o.alpha <= 0.05) continue;
+      const r = o.getBounds();
+      screen.push({ left: r.x, right: r.right, top: r.y, bottom: r.bottom });
+    }
+  }
+  return screen.map((r) => ({
+    left: cam.scrollX + r.left - pad, right: cam.scrollX + r.right + pad,
+    top: cam.scrollY + r.top - pad, bottom: cam.scrollY + r.bottom + pad, hud: true,
+  }));
+}
+
+// Inscrit un objet fixé à l'écran (scrollFactor 0, coordonnées écran) comme
+// obstacle de la règle commune, au même titre que le HUD : les bulles et les
+// invites ne se posent pas dessous. Retiré tout seul à sa destruction.
+function worldUiAddScreenObstacle(obj) {
+  if (!obj || !obj.scene) return obj;
+  const st = worldUiState(obj.scene);
+  if (!st.screen) st.screen = new Set();
+  st.screen.add(obj);
+  return obj;
+}
+
+// Boîte visible (monde) d'un personnage, ou null s'il n'est pas affiché.
+// Xara qui parle est cachée sous son sprite de parole (cf.
+// storySpeakerTalkAnim, StoryKit) : c'est lui qu'on mesure alors.
+function worldUiBodyBox(obj) {
+  if (!obj || !obj.active) return null;
+  const t = obj.__talkSprite && obj.__talkSprite.active ? obj.__talkSprite : obj;
+  if (!t.visible || t.alpha <= 0) return null;
+  if (t.frame && !t.rotation) {
+    const box = objectVisibleBox(t);
+    if (box) return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  }
+  if (!t.getBounds) return null;
+  const r = t.getBounds();
+  return { left: r.x, right: r.right, top: r.y, bottom: r.bottom };
+}
+
+// Personnages à l'écran (Agarica, Xara, PNJ de StoryKit) : obstacles « mous »
+// de la règle commune -- une bulle ou une invite déplacée évite de les cacher.
+// `owner` : le personnage (une bulle ne s'évite pas elle-même).
+function worldUiCharacterRects(scene, view) {
+  const out = [];
+  const seen = new Set();
+  const add = (o) => {
+    if (!o || seen.has(o)) return;
+    seen.add(o);
+    const b = worldUiBodyBox(o);
+    if (b && b.left < view.right && b.right > view.left && b.top < view.bottom && b.bottom > view.top) out.push({ ...b, owner: o });
+  };
+  add(scene.player);
+  add(scene.xara);
+  for (const n of Object.values(scene.npcs || {})) add(n);
+  return out;
+}
+
+// Place libre la plus proche pour le rectangle monde `r` (bulle) : il reste
+// dans `view` et sort des obstacles `hard` (HUD, autres bulles : jamais
+// recouverts si une place existe), en évitant si possible les `soft`
+// (personnages : à ne pas cacher). Ne bouge rien si `r` ne touche aucun
+// obstacle dur. Candidats : juste au-dessus, au-dessous, à gauche, à droite
+// de chaque obstacle touché (deux rebonds) ; coût = obstacles durs touchés,
+// puis personnages recouverts (surface), puis distance parcourue.
+// Renvoie { dx, dy }.
+function worldUiFreeSpot(r, view, hard = [], soft = [], gap = WORLD_UI_OBSTACLE_GAP) {
+  const w = r.right - r.left;
+  const h = r.bottom - r.top;
+  const fitAxis = (a, min, max, size) => (size > max - min ? (min + max - size) / 2 : Phaser.Math.Clamp(a, min, max - size));
+  const fit = (left, top) => ({ left: fitAxis(left, view.left, view.right, w), top: fitAxis(top, view.top, view.bottom, h) });
+  const hits = (c, list) => list.filter((o) => c.left < o.right + gap && c.left + w > o.left - gap
+    && c.top < o.bottom + gap && c.top + h > o.top - gap);
+  const cost = (c) => {
+    let k = hits(c, hard).length * 1e6 + Math.hypot(c.left - r.left, c.top - r.top);
+    for (const o of soft) {
+      const ow = Math.min(c.left + w, o.right) - Math.max(c.left, o.left);
+      const oh = Math.min(c.top + h, o.bottom) - Math.max(c.top, o.top);
+      if (ow > 0 && oh > 0) k += 2000 + 20 * Math.sqrt(ow * oh);
+    }
+    return k;
+  };
+  const start = { left: r.left, top: r.top };
+  if (!hits(start, hard).length) return { dx: 0, dy: 0 };
+  // `soft` peut être une fonction : liste calculée seulement si besoin.
+  if (typeof soft === 'function') soft = soft() || [];
+  let best = start;
+  let bestCost = cost(start);
+  let frontier = [start];
+  for (let depth = 0; depth < 2 && frontier.length; depth++) {
+    const next = [];
+    for (const c of frontier) {
+      for (const o of [...hits(c, hard), ...hits(c, soft)]) {
+        for (const [l, t] of [[c.left, o.top - gap - h], [c.left, o.bottom + gap], [o.left - gap - w, c.top], [o.right + gap, c.top]]) {
+          const n = fit(l, t);
+          const k = cost(n);
+          if (k < bestCost) { best = n; bestCost = k; }
+          next.push(n);
+        }
+      }
+    }
+    frontier = next.slice(0, 64);
+  }
+  return { dx: best.left - r.left, dy: best.top - r.top };
+}
+
+// Écart gardé entre un élément déplacé et l'obstacle qu'il évite (HUD,
+// bulle), cf. worldUiFreeSpot.
+const WORLD_UI_OBSTACLE_GAP = 4;
+
+function worldUiClampItem(scene, item, view, obstacles = [], characters = []) {
+  const obj = item.obj;
+  // Personne n'a bougé l'objet depuis le dernier recalage : on repart de son
+  // ancre (sinon le décalage s'accumulerait d'une image à l'autre).
+  const last = item.last;
+  if (last && obj.x === last.x && obj.y === last.y) {
+    obj.x -= last.dx;
+    obj.y -= last.dy;
+  }
+  item.last = null;
+  if (!obj.visible || obj.alpha <= 0) return;
+  const b = obj.getBounds();
+  let dy = 0;
+  if (item.prompt && b.y < view.top) {
+    const headY = worldUiHeadY(scene, item);
+    if (headY !== null) dy = headY - b.bottom;
+  } else {
+    item.head = null;
+  }
+  const dx = worldUiAxisShift(b.x, b.right, view.left, view.right);
+  dy += worldUiAxisShift(b.y + dy, b.bottom + dy, view.top, view.bottom);
+  // Tous les éléments (invites ET textes flottants) évitent le HUD et les
+  // bulles : un « Bond du Blaireau ! » ramené dans un coin ne doit pas plus
+  // cacher les cœurs qu'une invite. Place libre la plus proche (au-dessus,
+  // au-dessous ou à côté) : coincée entre deux bulles empilées, l'ancienne
+  // recherche (au-dessus / au-dessous seulement) finissait sur l'une d'elles.
+  let ox = 0;
+  if (obstacles.length) {
+    const free = worldUiFreeSpot({ left: b.x + dx, right: b.right + dx, top: b.y + dy, bottom: b.bottom + dy }, view, obstacles, characters);
+    ox = free.dx;
+    dy += free.dy;
+  }
+  const dxAll = dx + ox;
+  if (!dxAll && !dy) return;
+  obj.x += dxAll;
+  obj.y += dy;
+  item.last = { x: obj.x, y: obj.y, dx: dxAll, dy };
+}
+
+function worldUiUpdate(scene) {
+  const st = scene.__worldUi;
+  if (!st || !scene.sys || !scene.sys.isActive()) return;
+  worldUiHookCamera(scene);
+  const view = worldUiView(scene);
+  if (!view) return;
+  // Le HUD est un obstacle pour tous ; mises en page sur mesure d'abord
+  // (bulles, qui évitent aussi le HUD) : leurs rectangles sont des obstacles
+  // pour les invites.
+  const hud = worldUiHudRects(scene);
+  // Personnages : mesurés seulement si quelqu'un en a besoin (bulle posée,
+  // élément à déplacer), une fois par passe.
+  let characters = null;
+  const getCharacters = () => characters || (characters = worldUiCharacterRects(scene, view));
+  const obstacles = [...hud];
+  for (const fn of st.layouts.values()) {
+    const rects = fn(view, { hud, get characters() { return getCharacters(); } });
+    if (Array.isArray(rects)) obstacles.push(...rects);
+  }
+  for (const item of st.items) {
+    if (!item.obj.scene || !item.obj.active) { st.items.delete(item); continue; }
+    worldUiClampItem(scene, item, view, obstacles, getCharacters);
+  }
+}
+
 // Totem sans art historique (singe) : image du manifest `totem_<type>_<état>`
 // (ou son placeholder) à la place de `totem-<type>-<état>`.
 function totemTextureKey(scene, totemType, state) {
@@ -1892,6 +2228,9 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     backgroundColor: '#2a1f45',
     padding: { x: 6, y: 3 },
   }).setOrigin(0.5).setVisible(false);
+  // Grand totem (aigle de la forêt flottante 2) : son sommet sort du haut de
+  // l'écran -- l'invite se pose alors à hauteur de la tête d'Agarica.
+  keepWorldUiInView(prompt, { prompt: true });
 
   scene.events.on('update', () => {
     // Cf. `currentLevelScene` : ce listener n'est jamais retiré au départ
@@ -1967,6 +2306,7 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
       color: '#ffe9f5',
       align: 'center',
     }).setOrigin(0.5);
+    keepWorldUiInView(label);
     scene.tweens.add({
       targets: label,
       alpha: 0,
@@ -2050,6 +2390,7 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     backgroundColor: '#2a1f45',
     padding: { x: 6, y: 3 },
   }).setOrigin(0.5).setVisible(false);
+  keepWorldUiInView(prompt, { prompt: true });
 
   scene.events.on('update', () => {
     // Cf. `currentLevelScene` (même raison que dans addAbilityShrine) :
@@ -2240,6 +2581,9 @@ const PROP_GROUND_SINK = GROUND_STAND_SINK;
 // de la case -- à réduire ici si ça se voit trop (garder ≥ 4 px pour
 // qu'Agarica humaine passe encore sous une plateforme à une rangée du sol).
 const AUTOTILE_UNDERSIDE_TRIM = AUTOTILE_TILESETS[AUTOTILE_TILESET].undersideTrim;
+// Rognage minimal gardé quand une plateforme de biome rallonge le dessous de
+// sa hitbox pour suivre son image (cf. renderAutotileGrid, mossShift).
+const AUTOTILE_UNDERSIDE_KEEP = 4;
 // Cf. son commentaire d'origine plus haut (addAbilityShrine). 'tuiles' : le
 // dessus de l'herbe est un trait plein à la hauteur de marche, un enfoncement
 // de 3 px suffit à planter le socle dedans. (Le feu de camp, lui, se pose
@@ -2461,6 +2805,63 @@ function autotileLayoutFor(scene, tileset) {
   return complete ? 'blob' : AUTOTILE_LAYOUT;
 }
 
+// --- Ligne de mousse des plateformes des jeux de biome ----------------------
+// Une case de plateforme d'un jeu de biome (dirt_platform0/1/2) n'a pas la
+// même composition que la case de sol dirt_t : en-tête de mousse plus épais,
+// image parfois plus haute (293 px pour 256 dans 'tuiles_corrompues'). Calée
+// par son BAS comme les autres cases, sa mousse était dessinée ~17 px
+// au-dessus de la ligne de marche (contre ~4,7 px pour dirt_t) : les pieds
+// d'Agarica s'y enfonçaient. On cale donc l'IMAGE d'une plateforme de biome
+// sur sa ligne de mousse : même hauteur à l'écran que celle de dirt_t du même
+// jeu. Hitbox et hauteur de marche inchangées (seule l'image bouge).
+// Ligne de mousse = 1re rangée (depuis le haut) dont >= 70 % des colonnes du
+// milieu de l'image sont opaques : les champignons, brins et pousses qui
+// dépassent ne comptent pas, les bouts arrondis des plateformes non plus.
+const AUTOTILE_MOSS_LINE_COVERAGE = 0.7;
+const AUTOTILE_MOSS_LINE_CACHE = new Map();
+
+// Fraction (0..1) de la hauteur de l'image où commence la mousse pleine,
+// mesurée une fois par texture ; null si illisible (page en file://, canvas
+// « tainted ») -- l'image garde alors son calage par le bas.
+function autotileMossLineFrac(scene, key) {
+  if (AUTOTILE_MOSS_LINE_CACHE.has(key)) return AUTOTILE_MOSS_LINE_CACHE.get(key);
+  let frac = null;
+  const map = scene.textures.exists(key) ? readFrameAlpha(scene.textures.getFrame(key)) : null;
+  if (map) {
+    const x0 = Math.floor(map.w * 0.25);
+    const x1 = Math.ceil(map.w * 0.75);
+    const need = (x1 - x0) * AUTOTILE_MOSS_LINE_COVERAGE;
+    for (let y = 0; y < map.h && frac === null; y++) {
+      let opaque = 0;
+      for (let x = x0; x < x1; x++) if (map.alpha[y * map.w + x] > 128) opaque++;
+      if (opaque >= need) frac = y / map.h;
+    }
+  }
+  AUTOTILE_MOSS_LINE_CACHE.set(key, frac);
+  return frac;
+}
+
+// Décalage vertical (px monde, > 0 = vers le bas) à appliquer à l'image
+// d'une case de plateforme du jeu `tileset` pour que sa ligne de mousse
+// tombe sur celle de dirt_t. platform0 (milieu) et platform2 (bout, raccord
+// fait pour se lire comme UN seul bloc avec platform0) reçoivent le MÊME
+// décalage, mesuré sur platform0 : le raccord reste sans marche ;
+// platform1 (îlot d'une case) a le sien. Les deux images partagent le même
+// bas (calage commun de renderAutotileGrid), d'où la comparaison depuis le bas.
+function autotileBiomePlatformMossShift(scene, tileset, textureKey, baseSize) {
+  const refKey = textureKey === 'autotile-dirt-platform1' ? textureKey : 'autotile-dirt-platform0';
+  const platKey = `${tileset}:${refKey}`;
+  const groundKey = `${tileset}:autotile-dirt-t`;
+  const pf = autotileMossLineFrac(scene, platKey);
+  const gf = autotileMossLineFrac(scene, groundKey);
+  if (pf === null || gf === null) return 0;
+  const heightOf = (key) => {
+    const f = scene.textures.getFrame(key);
+    return baseSize * (f.realHeight / f.realWidth);
+  };
+  return (1 - pf) * heightOf(platKey) - (1 - gf) * heightOf(groundKey);
+}
+
 function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
   if (autotileLayoutFor(scene, options.tileset) === 'atlas') return renderAtlasAutotileGrid(scene, groundGroup, cells, options);
   const isBackLayer = !!options.back;
@@ -2569,6 +2970,9 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       : (AUTOTILE_CORNER_HEIGHT_BOOST[pos] || 1);
     if (zoneFrame) heightBoost = zoneFrame.realHeight / zoneFrame.realWidth;
     const baseSize = GROUND_TILE_SIZE + AUTOTILE_OVERLAP * 2;
+    // Plateforme d'un jeu de biome : image calée sur sa ligne de mousse (cf.
+    // autotileBiomePlatformMossShift), pas sur son bas.
+    const mossShift = isPlatform && zoneFrame ? autotileBiomePlatformMossShift(scene, options.tileset, textureKey, baseSize) : 0;
 
     if (groundGroup && !isBackLayer) {
       const tile = groundGroup.create(cx, cy, GROUND_HITBOX_KEY).setVisible(false);
@@ -2598,14 +3002,22 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       }
       // Dessous raccourci (cf. AUTOTILE_UNDERSIDE_TRIM, 0 avec 'floor') : il
       // suit le dessous des images, remontées d'autant.
+      // Plateforme de biome recalée vers le BAS (mossShift > 0, 12,5 px pour
+      // 'tuiles_corrompues') : son dessous (roche, pointes) dépasse d'autant
+      // sous la hitbox, la tête d'Agarica qui s'y cogne s'enfonçait de 16 px
+      // dans la roche (relecture). Le rognage du dessous est réduit d'autant,
+      // en gardant AUTOTILE_UNDERSIDE_KEEP px rognés (cf. le commentaire
+      // d'AUTOTILE_UNDERSIDE_TRIM : passage sous une plateforme posée une
+      // rangée au-dessus du sol). Le haut de la hitbox ne bouge pas.
       if (AUTOTILE_UNDERSIDE_TRIM && !hasSouth) {
         const top = tile.body.offset.y;
-        tile.body.setSize(GROUND_TILE_SIZE, GROUND_TILE_SIZE - top - AUTOTILE_UNDERSIDE_TRIM);
+        const grow = mossShift > 0 ? Math.min(mossShift, Math.max(0, AUTOTILE_UNDERSIDE_TRIM - AUTOTILE_UNDERSIDE_KEEP)) : 0;
+        tile.body.setSize(GROUND_TILE_SIZE, GROUND_TILE_SIZE - top - AUTOTILE_UNDERSIDE_TRIM + grow);
         tile.body.setOffset(0, top);
       }
     }
     const displayHeight = baseSize * heightBoost;
-    const tileCenterY = cy - (displayHeight - baseSize) / 2 - AUTOTILE_BLOB_VISUAL_LIFT;
+    const tileCenterY = cy - (displayHeight - baseSize) / 2 - AUTOTILE_BLOB_VISUAL_LIFT + mossShift;
     // Retour utilisateur : "les tuiles terre arriere plan ne doivent pas
     // etre transparant du tout" -- AUTOTILE_BACKLAYER_ALPHA=1 ci-dessous
     // (déjà réglé par un retour précédent) ne peut que RÉDUIRE
@@ -4180,13 +4592,16 @@ function juiceFxState(scene) {
   return scene.__juiceFx;
 }
 
-function juiceEmitter(scene, kind) {
+// `plain` : variante de la recette sur sa texture de repli BLANCHE (dessinée
+// par code), qui prend n'importe quelle teinte -- cf. juiceParticles.
+function juiceEmitter(scene, kind, plain = false) {
   const st = juiceFxState(scene);
-  let e = st.emitters[kind];
+  const slot = plain ? `${kind}|plain` : kind;
+  let e = st.emitters[slot];
   if (e && e.scene) return e;
   const r = FX_PARTICLES[kind];
   if (!r) return null;
-  const tex = juiceTexture(scene, r.art, r.tex);
+  const tex = plain ? juiceTexture(scene, null, r.tex) : juiceTexture(scene, r.art, r.tex);
   const base = r.size / tex.size;
   const cfg = {
     emitting: false,
@@ -4207,8 +4622,29 @@ function juiceEmitter(scene, kind) {
   if (r.depth === 'ui') e.setScrollFactor(0);
   e.__recipe = r;
   e.__fixedTint = tex.art && !r.tintArt ? (r.artTint ?? 0xffffff) : null;
-  st.emitters[kind] = e;
+  st.emitters[slot] = e;
   return e;
+}
+
+// Change la valeur d'un réglage d'émetteur pour les PROCHAINES émissions.
+// Les raccourcis de Phaser 3.80 (setParticleTint, setEmitterAngle,
+// setParticleSpeed, setParticleLifespan) passent par EmitterOp.onChange, qui
+// ne remplace PAS une valeur en tableau ou en {min, max} : la teinte, l'angle,
+// la vitesse (et `power`) et la durée de vie de l'appel étaient ignorés --
+// d'où les étincelles d'une blessure, demandées rouges, qui sortaient avec
+// les couleurs de la recette. `loadConfig` recharge vraiment l'opérateur
+// (même chemin que la création de l'émetteur) ; repli sur les raccourcis.
+const JUICE_EMITTER_SETTERS = {
+  angle: 'setEmitterAngle', speedX: 'setParticleSpeed', lifespan: 'setParticleLifespan', tint: 'setParticleTint',
+};
+function juiceEmitterOp(e, name, value) {
+  const op = e.ops && e.ops[name];
+  if (op && typeof op.loadConfig === 'function') {
+    op.loadConfig({ [op.propertyKey]: value });
+    return;
+  }
+  const setter = JUICE_EMITTER_SETTERS[name];
+  if (setter && typeof e[setter] === 'function') e[setter](value);
 }
 
 // Émet `count` particules de la recette `kind` en (x, y). opts : count,
@@ -4216,18 +4652,25 @@ function juiceEmitter(scene, kind) {
 // lifespan [min, max], tint (couleur ou tableau), spread (px autour du point).
 function juiceParticles(scene, kind, x, y, opts = {}) {
   if (!scene || !scene.add || !scene.sys || !scene.sys.isActive()) return null;
-  const e = juiceEmitter(scene, kind);
+  let e = juiceEmitter(scene, kind);
   if (!e) return null;
+  // Teinte DEMANDÉE par l'appelant sur une recette dont l'art est déjà
+  // coloré (étincelle verte `fx_etincelle`, bouffée brune…) : l'art ne peut
+  // pas la prendre (teinte multipliée : rouge × vert = presque noir, et sans
+  // teinte les étincelles rouges d'une blessure sortaient vertes). On émet
+  // alors avec la texture de repli blanche de la même recette, qui la prend
+  // exactement. Sans teinte demandée : l'art, comme avant.
+  const callerTint = opts.tint !== undefined && opts.tint !== null;
+  if (callerTint && e.__fixedTint !== null) e = juiceEmitter(scene, kind, true) || e;
   const r = e.__recipe;
   const power = opts.power ?? 1;
   const sp = opts.speed || r.speed;
   const ang = opts.angle || r.angle;
-  e.setEmitterAngle({ min: ang[0], max: ang[1] });
-  e.setParticleSpeed({ min: sp[0] * power, max: sp[1] * power });
   const life = opts.lifespan || r.lifespan;
-  e.setParticleLifespan({ min: life[0], max: life[1] });
-  if (e.__fixedTint !== null) e.setParticleTint(e.__fixedTint);
-  else e.setParticleTint(opts.tint !== undefined && opts.tint !== null ? opts.tint : r.tint);
+  juiceEmitterOp(e, 'angle', { min: ang[0], max: ang[1] });
+  juiceEmitterOp(e, 'speedX', { min: sp[0] * power, max: sp[1] * power });
+  juiceEmitterOp(e, 'lifespan', { min: life[0], max: life[1] });
+  juiceEmitterOp(e, 'tint', e.__fixedTint !== null ? e.__fixedTint : (callerTint ? opts.tint : r.tint));
   const count = Math.max(0, Math.round(opts.count ?? 6));
   const spread = opts.spread || 0;
   if (!spread) {
@@ -4258,10 +4701,16 @@ function juiceBurstImage(scene, kind, x, y, { size = 80, from = 0.3, to = 1, ms 
   return img;
 }
 
-// Anneau de choc : art `vfx_anneau_choc` (anim 'talisman' ou 'toxique') s'il
-// existe, sinon anneau dessiné.
-function juiceShockRing(scene, x, y, { size = 120, color = 0xe8fff2, ms = 420, variant = 'talisman', flat = 1, depth } = {}) {
-  if (typeof hasManifestArt === 'function' && hasManifestArt(scene, 'vfx_anneau_choc', variant)) {
+// Anneau de choc. L'art `vfx_anneau_choc` est DÉJÀ coloré (rangée 'toxique'
+// vert mousse, rangée 'talisman' ambre et feuilles) : il ne sert que si
+// l'appelant le demande (`variant: 'toxique' | 'talisman'`). Bug corrigé :
+// `variant` valait 'talisman' par défaut, donc TOUS les anneaux (coups,
+// ramassages, purification, totems…) sortaient ambre et ignoraient `color`.
+// Sans variante : anneau dessiné par code, teinté de `color`.
+const JUICE_SHOCK_RING_ART_VARIANTS = ['toxique', 'talisman'];
+function juiceShockRing(scene, x, y, { size = 120, color = 0xe8fff2, ms = 420, variant = null, flat = 1, depth } = {}) {
+  if (JUICE_SHOCK_RING_ART_VARIANTS.includes(variant)
+    && typeof hasManifestArt === 'function' && hasManifestArt(scene, 'vfx_anneau_choc', variant)) {
     const fx = addManifestSprite(scene, x, y, 'vfx_anneau_choc', variant, { origin: [0.5, 0.5] })
       .setDepth(depth ?? FX_DEPTHS.front).setBlendMode(Phaser.BlendModes.ADD);
     const k = size / Math.max(fx.width, 1);
@@ -4378,7 +4827,8 @@ function spawnFx(scene, kind, x, y, opts = {}) {
       juiceParticles(scene, 'dust', x - 20, y - 4, { count: Math.round(6 * s), angle: [180, 200], power: 2.2 * s, lifespan: [420, 760] });
       juiceParticles(scene, 'dust', x + 20, y - 4, { count: Math.round(6 * s), angle: [340, 360], power: 2.2 * s, lifespan: [420, 760] });
       juiceParticles(scene, 'earth', x, y - 4, { count: Math.round(8 * s), power: 1.2 });
-      juiceShockRing(scene, x, y - 6, { size: 230 * s, ms: 380, color: 0xffe2b0, flat: 0.28 });
+      // Fracas de l'ours = pouvoir du talisman de l'ours : anneau ambre dessiné.
+      juiceShockRing(scene, x, y - 6, { size: 230 * s, ms: 380, color: 0xffe2b0, flat: 0.28, variant: 'talisman' });
       break;
     }
     case 'embers':

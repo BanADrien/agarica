@@ -15,7 +15,7 @@
 // - Totem : UN SEUL {head, body} (pas plusieurs emplacements -- revenu sur
 //   l'idée de cumul entre plusieurs totems, demande explicite : "un seul
 //   totem au total"), cf. Player.equippedTotem. VERROUILLÉ pour la démo,
-//   cf. CAMPFIRE_TOTEMS_LOCKED juste en dessous.
+//   cf. DEMO_TOTEMS_LOCKED (Player.js) et CAMPFIRE_TOTEMS_LOCKED plus bas.
 //
 // Cartes sans art dédié : rectangle coloré par catégorie + icône du
 // manifest si elle existe. `rebuildUI()` détruit et recrée TOUTES les
@@ -24,42 +24,20 @@
 // (glisser OU clic) : si l'état du joueur n'a pas changé, rebuildUI()
 // replace chaque carte exactement là où elle était avant.
 // Emplacements de formes (démo histoire) : SOL = loup, AÉRIEN = singe OU
-// aigle OU papillon (exclusifs), EAU = pieuvre. L'équipement passe par
+// aigle (exclusifs), EAU = pieuvre. L'équipement passe par
 // Player.equipForm/unequipForm (qui tiennent `equippedForms` + `airForm`).
+// Le papillon n'est PAS une forme (décision utilisateur : « le papillon ne
+// doit être qu'une compétence ») : il n'apparaît que parmi les compétences.
 
-// Démo : le système de totems est prévu APRÈS la démo (demande explicite :
-// "lock la partie totem pour la démo, cadenas chaîne"). Passer à `false`
-// suffit à tout rouvrir : section interactive, bonus de nouveau appliqués.
-const CAMPFIRE_TOTEMS_LOCKED = true; // démo : le système de totems est prévu après la démo
-
-// Verrou des BONUS de totem pendant la démo, sans toucher à la sauvegarde :
-// un totem équipé avant le verrou (ancienne partie, tests) reste dans
-// `equippedTotem` / le registre, mais Player.recomputeTotemBonuses calcule
-// comme si aucun totem n'était porté. Fait ici, par enveloppe du prototype
-// (ce fichier est chargé après Player.js, cf. index.html), pour garder
-// l'interrupteur du verrou en un seul endroit ; le jour où on déverrouille,
-// la méthode d'origine de Player.js reste intacte.
-if (CAMPFIRE_TOTEMS_LOCKED && typeof Player === 'function'
-  && Player.prototype.recomputeTotemBonuses && !Player.prototype.recomputeTotemBonuses.campfireTotemsLocked) {
-  const recomputeWithTotems = Player.prototype.recomputeTotemBonuses;
-  const recomputeWithoutTotems = function recomputeTotemBonusesLocked() {
-    const kept = this.equippedTotem;
-    this.equippedTotem = { head: null, body: null };
-    try {
-      recomputeWithTotems.call(this);
-    } finally {
-      this.equippedTotem = kept;
-    }
-  };
-  recomputeWithoutTotems.campfireTotemsLocked = true;
-  Player.prototype.recomputeTotemBonuses = recomputeWithoutTotems;
-}
+// Démo : totems verrouillés (cadenas, aucune interaction). La règle vit dans
+// Player.js (DEMO_TOTEMS_LOCKED : bonus ignorés par recomputeTotemBonuses,
+// sauvegarde intacte) ; le menu ne fait que la lire pour son affichage.
+const CAMPFIRE_TOTEMS_LOCKED = typeof DEMO_TOTEMS_LOCKED !== 'undefined' ? DEMO_TOTEMS_LOCKED : true;
 
 const FORM_INFO = {
   wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), perçoit les pistes cachées.' },
   monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court), s\'accroche aux lianes (gauche/droite pour se balancer, Espace pour lâcher, S pour tomber).' },
   eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : donne le double saut (plus haut) puis le plané, porté par les courants d\'air (S = piqué).' },
-  butterfly: { flag: 'hasButterflyForm', label: 'Papillon', slot: 'air', icon: ['form-icon-butterfly', 'item-form_icone_papillon'], desc: "Papillon (aérien) : 2e appui sur Espace en l'air = battement d'ailes puis élan en diagonale vers l'avant et le haut (un par saut)." },
   octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
 };
 const FORM_IDS = Object.keys(FORM_INFO);
@@ -557,9 +535,9 @@ class CampfireMenuScene extends Phaser.Scene {
       }
     }
     // Jusqu'à 3 formes libres : cartes de 100 alignées sur les colonnes des
-    // emplacements (pas de 120) ; 4-5 : cartes de 63, pas de 69 (348 px),
-    // SANS icône : avec, il resterait 31 px pour le nom (« Papillon » en
-    // fait 40 à 11 px) et toute la rangée tomberait à 8 px.
+    // emplacements (pas de 120) ; 4 (rien d'équipé) : cartes de 63, pas de
+    // 69, SANS icône : avec, il resterait 31 px pour le nom (un nom de 8
+    // lettres fait ~40 px à 11 px) et toute la rangée tomberait à 8 px.
     const formFew = pool.length <= 3;
     this.rowXs(pool.length, leftCx, formFew ? 120 : 69).forEach((x, i) => {
       const [id, opts] = pool[i];
@@ -777,7 +755,7 @@ function campfireFitLabel(txt, label, maxW, maxH) {
 
 // Même taille de libellé pour tout un groupe de cartes (une catégorie) :
 // la plus petite trouvée par campfireFitLabel. Sinon « Loup » en 11 px
-// voisinait « Papillon » en 9 px dans la même rangée. Réduire ne fait que
+// voisinait un nom plus long en 9 px dans la même rangée. Réduire ne fait que
 // rétrécir, donc chaque libellé tient toujours dans sa carte.
 function campfireUniformLabels(cards) {
   const labels = cards.map((c) => c.getData('label')).filter(Boolean);

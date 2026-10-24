@@ -406,9 +406,32 @@ const SAVE_STORAGE_KEY = 'agarica-save-v1';
 // est sauvegardée, ces clés-là comprises, ainsi que les flags d'histoire et
 // l'inventaire `inventory`).
 const SAVE_PLAYER_KEYS = [
-  'hasWolfForm', 'hasEagleForm', 'hasOctopusForm', 'hasMonkeyForm', 'hasButterflyForm', 'equippedForms', 'airForm',
+  'hasWolfForm', 'hasEagleForm', 'hasOctopusForm', 'hasMonkeyForm', 'equippedForms', 'airForm',
   'hearts', 'energy', 'unlockedSkills', 'skillSlots', 'equippedTotem',
 ];
+
+// Sauvegardes d'avant la décision « le papillon n'est qu'une compétence » :
+// la forme aérienne papillon (retirée, cf. AIR_FORM_IDS dans Player.js) a pu
+// y être équipée (`airForm`, 2e case d'`equippedForms`). Migrée au
+// chargement vers la forme aérienne débloquée restante (aigle d'abord, puis
+// singe), sinon aucune -- même règle que Player.resolveInitialAirForm, qui
+// rattrape aussi un registre posé autrement (?flags=, tests). Le reste de la
+// sauvegarde (flag `hasButterflyForm` compris, désormais ignoré) est gardé.
+const SAVE_OBSOLETE_AIR_FORMS = ['butterfly'];
+
+function migrateSaveValues(values) {
+  if (!values || typeof values !== 'object') return values;
+  const forms = Array.isArray(values.equippedForms) ? values.equippedForms : null;
+  const obsoleteAir = SAVE_OBSOLETE_AIR_FORMS.includes(values.airForm);
+  const obsoleteSlot = !!forms && forms.some((f) => SAVE_OBSOLETE_AIR_FORMS.includes(f));
+  if (!obsoleteAir && !obsoleteSlot) return values;
+  const air = values.hasEagleForm ? 'eagle' : values.hasMonkeyForm ? 'monkey' : null;
+  if (obsoleteAir || values.airForm === undefined) values.airForm = air;
+  if (forms) {
+    values.equippedForms = forms.map((f) => (SAVE_OBSOLETE_AIR_FORMS.includes(f) ? (values.airForm || null) : f));
+  }
+  return values;
+}
 
 function storyRegistry(scene) {
   if (scene && scene.registry) return scene.registry;
@@ -464,7 +487,9 @@ function readSaveData() {
     const raw = localStorage.getItem(SAVE_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && parsed.values ? parsed : null;
+    if (!parsed || !parsed.values) return null;
+    migrateSaveValues(parsed.values);
+    return parsed;
   } catch (e) {
     return null;
   }
@@ -601,11 +626,9 @@ function unlockSkillFromStory(scene, skillId, { silent = false } = {}) {
       itemId: STORY_SKILL_ICON[skillId] || `skill_icone_${skillId}`, color: 0x8fe3b8,
     });
   }
-  // Le totem de poche (trou sombre) donne EN MÊME TEMPS la forme du papillon
-  // (3e forme aérienne) : sa bannière suit celle de la compétence.
-  if (skillId === 'papillon' && typeof unlockFormFromStory === 'function') {
-    unlockFormFromStory(scene, 'hasButterflyForm', { silent });
-  }
+  // (Le papillon ne débloque plus de forme aérienne : décision utilisateur,
+  // « le papillon ne doit être qu'une compétence, pas remplacer le double
+  // saut », cf. AIR_FORM_IDS dans Player.js.)
   return !already;
 }
 
@@ -614,8 +637,6 @@ const STORY_FORM_INFO = {
   // Sans forme aérienne, Agarica n'a qu'un saut : c'est la forme qui donne le double saut.
   hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: 'Donne le double saut (plus haut) et le plané.' },
   hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: 'Donne le double saut ; accroche aux lianes et balancement.' },
-  // Débloquée avec la compétence papillon (cf. unlockSkillFromStory).
-  hasButterflyForm: { type: 'butterfly', name: 'Forme du papillon', desc: "2e appui sur Espace en l'air : un battement d'ailes, puis un élan en diagonale vers l'avant et le haut." },
   hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Nage automatique.' },
 };
 
@@ -641,7 +662,7 @@ function unlockFormFromStory(scene, flag, { silent = false } = {}) {
   if (scene.textures.exists('unlock-anim-0') && scene.textures.exists(`form-icon-${info.type}`)) {
     showFormUnlockPopup(scene, info.type);
   } else {
-    const iconId = { monkey: 'singe', butterfly: 'papillon' }[info.type] || info.type;
+    const iconId = { monkey: 'singe' }[info.type] || info.type;
     showStoryBanner(scene, { kicker: 'Nouvelle forme', title: info.name, desc: info.desc, itemId: `form_icone_${iconId}`, color: 0xc77dff });
   }
   return true;
@@ -1015,6 +1036,8 @@ function showToast(scene, text, ms = 2600) {
     backgroundColor: '#2a1f45', padding: { x: 12, y: 7 }, wordWrap: { width: 590 }, // ne déborde pas sur le HUD
   }).setOrigin(0.5).setScrollFactor(0).setDepth(2050).setAlpha(0);
   scene.__storyToast = t;
+  // Règle commune (LevelKit) : bulles et invites ne se posent pas dessous.
+  if (typeof worldUiAddScreenObstacle === 'function') worldUiAddScreenObstacle(t);
   t.setScale(0.92);
   scene.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 240, ease: 'Back.Out' });
   scene.tweens.add({ targets: t, alpha: 0, duration: 350, delay: Math.max(400, ms - 350), onComplete: () => t.destroy() });
@@ -1064,14 +1087,15 @@ function speechBubbleTarget(scene, target) {
 // Haut VISIBLE du personnage (cf. objectVisibleBox) ; un sprite tourné
 // (suspendu, penché) : ses bornes. Xara qui parle est cachée sous son sprite
 // de parole (cf. storySpeakerTalkAnim) : c'est lui qu'on suit alors.
+// `left`/`right` : bords visibles (bulle posée à côté, cf. layoutSpeechBubble).
 function speechBubbleAnchor(target) {
   const t = target.__talkSprite && target.__talkSprite.active ? target.__talkSprite : target;
   if (t.frame && !t.rotation && typeof objectVisibleBox === 'function') {
     const box = objectVisibleBox(t);
-    if (box) return { x: (box.left + box.right) / 2, top: box.top };
+    if (box) return { x: (box.left + box.right) / 2, top: box.top, left: box.left, right: box.right };
   }
-  const b = t.getBounds ? t.getBounds() : { centerX: t.x, y: t.y - 60 };
-  return { x: b.centerX, top: b.y };
+  const b = t.getBounds ? t.getBounds() : { centerX: t.x, y: t.y - 60, x: t.x - 20, right: t.x + 20 };
+  return { x: b.centerX, top: b.y, left: b.x, right: b.right };
 }
 
 function speechBubbleState(scene) {
@@ -1084,7 +1108,19 @@ function speechBubbleState(scene) {
     scene.events.on('postupdate', () => updateSpeechBubbles(scene));
     scene.events.on('shutdown', () => { scene.__speechBubbles = null; });
   }
+  // Règle commune « interface toujours dans l'écran » (LevelKit) : la bulle
+  // est remise en page avec la vue de la caméra une fois son défilement de
+  // l'image calculé (sinon une image de retard en mouvement).
+  if (typeof worldUiAddLayout === 'function') worldUiAddLayout(scene, 'speechBubbles', (view, ctx) => layoutAllSpeechBubbles(scene, view, ctx));
   return scene.__speechBubbles;
+}
+
+// Vue (monde) où les bulles doivent tenir : celle de la règle commune
+// (marge WORLD_UI_MARGIN), sinon la vue brute de la caméra.
+function speechBubbleView(scene) {
+  if (typeof worldUiView === 'function') return worldUiView(scene);
+  const v = scene.cameras.main.worldView;
+  return { left: v.x + 8, top: v.y + 8, right: v.right - 8, bottom: v.bottom - 8 };
 }
 
 function buildSpeechBubble(scene, text) {
@@ -1094,71 +1130,286 @@ function buildSpeechBubble(scene, text) {
   }).setOrigin(0.5, 1);
   const w = Math.ceil(label.width + SPEECH_BUBBLE_PAD.x * 2);
   const h = Math.ceil(label.height + SPEECH_BUBBLE_PAD.y * 2);
+  // Origine du conteneur = CENTRE de la bulle : l'apparition (échelle 0,85 -> 1)
+  // reste dans le rectangle final, donc dans l'écran (avant, l'origine était
+  // le bout de la pointe et la bulle glissait vers le personnage en grandissant).
+  label.setPosition(0, h / 2 - SPEECH_BUBBLE_PAD.y);
   const g = scene.add.graphics();
   const c = scene.add.container(0, 0, [g, label]).setDepth(SPEECH_BUBBLE_DEPTH).setAlpha(0);
   return { container: c, g, label, w, h };
 }
 
-// Fond sombre, liseré vert lunaire, pointe vers le personnage (`tipX` relatif
-// au centre de la bulle). Origine du conteneur = bout de la pointe. `lift` :
-// bulle remontée au-dessus d'une autre (pointe allongée d'autant).
-function drawSpeechBubble(b, tipX, lift = 0) {
+// Base de la pointe d'une bulle (w x h, centre en 0,0) vers `tip` (relatif
+// au centre) : bord latéral seulement si le point visé est à côté de la
+// bulle, dans sa hauteur (bulle posée à côté) ; sinon bord du bas (ou du
+// haut), même si le personnage déborde un peu de la bulle (bulle calée
+// contre le bord de l'écran). { beside, s, x, y } : `s` = sens du bord
+// (+1 droite/bas, -1 gauche/haut), (x, y) = milieu de la base SUR le bord.
+function speechBubbleTailBase(w, h, tip) {
+  const hw = w / 2;
+  const hh = h / 2;
+  const beside = Math.abs(tip.x) > hw && Math.abs(tip.y) <= hh;
+  if (beside) {
+    const s = tip.x > 0 ? 1 : -1;
+    return { beside, s, x: s * hw, y: Phaser.Math.Clamp(tip.y, -hh + 9, hh - 9) };
+  }
+  const s = tip.y > 0 ? 1 : -1;
+  return { beside, s, x: Phaser.Math.Clamp(tip.x, -hw + 12, hw - 12), y: s * hh };
+}
+
+// Fond sombre, liseré vert lunaire, pointe vers le personnage. `tip` : bout
+// de la pointe relatif au CENTRE de la bulle, ou null (pointe cachée). La
+// pointe part du bord qui fait face au personnage (bas d'habitude ; haut, ou
+// côté, quand la bulle a dû se poser ailleurs) et sa base glisse le long de
+// ce bord pour rester en face de lui.
+function drawSpeechBubble(b, tip) {
   const { g, w, h } = b;
-  const top = -SPEECH_BUBBLE_TAIL - lift - h;
-  const left = -w / 2 - tipX;
-  const tx = Phaser.Math.Clamp(0, left + 12, left + w - 12);
+  const hw = w / 2;
+  const hh = h / 2;
   g.clear();
   g.fillStyle(STORY_UI.night, 0.93);
   g.lineStyle(2, STORY_UI.vineLight, 0.95);
-  g.fillRoundedRect(left, top, w, h, 8);
-  g.strokeRoundedRect(left, top, w, h, 8);
-  g.fillTriangle(tx - 7, top + h - 1, tx + 7, top + h - 1, 0, 0);
-  g.lineBetween(tx - 7, top + h, 0, 0);
-  g.lineBetween(tx + 7, top + h, 0, 0);
+  g.fillRoundedRect(-hw, -hh, w, h, 8);
+  g.strokeRoundedRect(-hw, -hh, w, h, 8);
+  if (!tip) return;
+  // Base de la pointe : deux points du bord, posés 1 px DANS la bulle.
+  const base = speechBubbleTailBase(w, h, tip);
+  const s = base.s;
+  let p1;
+  let p2;
+  let c1;
+  let c2;
+  if (!base.beside) {
+    const tx = base.x;
+    const ey = base.y;
+    p1 = [tx - 7, ey - s];
+    p2 = [tx + 7, ey - s];
+    c1 = [tx - 5.5, ey - s];
+    c2 = [tx + 5.5, ey - s];
+  } else {
+    const ex = base.x;
+    const ty = base.y;
+    p1 = [ex - s, ty - 7];
+    p2 = [ex - s, ty + 7];
+    c1 = [ex - s, ty - 5.5];
+    c2 = [ex - s, ty + 5.5];
+  }
+  g.fillTriangle(p1[0], p1[1], p2[0], p2[1], tip.x, tip.y);
+  g.lineBetween(p1[0], p1[1], tip.x, tip.y);
+  g.lineBetween(p2[0], p2[1], tip.x, tip.y);
   // Recouvre le liseré sous la base de la pointe (la pointe sort de la bulle).
   g.lineStyle(3, STORY_UI.night, 1);
-  g.lineBetween(tx - 5.5, top + h - 1, tx + 5.5, top + h - 1);
-  b.label.setPosition(left + w / 2, -SPEECH_BUBBLE_TAIL - lift - SPEECH_BUBBLE_PAD.y);
+  g.lineBetween(c1[0], c1[1], c2[0], c2[1]);
 }
 
-// `placed` : rectangles (monde) des bulles déjà posées cette image. Deux
-// personnages côte à côte (Xara et Agarica) : la bulle suivante remonte
-// au-dessus de la première au lieu de la recouvrir (remontée lissée).
-function positionSpeechBubble(scene, b, placed = []) {
+// Écart horizontal entre le bord visible du personnage et une bulle posée à
+// côté de lui (cf. layoutSpeechBubble).
+const SPEECH_BUBBLE_SIDE_GAP = 14;
+// Déplacement d'une bulle qui évite une autre bulle ou le HUD (cf.
+// worldUiFreeSpot) : lissé une fois par image (elle glisse vers sa place,
+// comme l'ancienne « remontée lissée ») ; un grand saut (nouvelle bulle,
+// autre situation) est pris d'un coup.
+const SPEECH_BUBBLE_SHIFT_EASE = 0.3;
+const SPEECH_BUBBLE_SHIFT_SNAP = 60;
+
+function speechBubbleRectsMeet(a, b, gap = 0) {
+  return a.left < b.right + gap && a.right > b.left - gap && a.top < b.bottom + gap && a.bottom > b.top - gap;
+}
+
+// Boîte visible d'un personnage et personnages à l'écran (Agarica, Xara,
+// PNJ) : une bulle évite de les cacher. Calculés par la règle commune de
+// LevelKit (worldUiBodyBox, worldUiCharacterRects : les invites les évitent
+// aussi).
+function speechBubbleBodyBox(obj) {
+  return typeof worldUiBodyBox === 'function' ? worldUiBodyBox(obj) : null;
+}
+
+function speechBubbleCharacters(scene, view) {
+  return typeof worldUiCharacterRects === 'function' ? worldUiCharacterRects(scene, view) : [];
+}
+
+// Bulle posée à CÔTÉ du personnage (`side` : 1 à droite, -1 à gauche), à
+// hauteur de sa tête.
+function speechBubbleSideRect(b, L, side, view) {
+  const half = b.w / 2;
+  const cx = side > 0 ? L.right + SPEECH_BUBBLE_SIDE_GAP + half : L.left - SPEECH_BUBBLE_SIDE_GAP - half;
+  const bottom = Phaser.Math.Clamp(L.tipY + SPEECH_BUBBLE_GAP + b.h - 6, view.top + b.h, view.bottom);
+  return { left: cx - half, right: cx + half, top: bottom - b.h, bottom };
+}
+
+// Côté où poser la bulle quand il n'y a pas la place au-dessus : celui où
+// elle tient dans l'écran sans toucher un obstacle (HUD, bulle déjà posée)
+// ni cacher un autre personnage. Ordre : le côté déjà pris (pas de
+// va-et-vient d'une image à l'autre), puis le côté OPPOSÉ à Agarica (ou à
+// Xara quand c'est Agarica qui parle : sa compagne la suit de près) --
+// relecture : la bulle de Xara se posait toujours à sa droite, sur Agarica
+// debout à côté, alors que la gauche était libre. 0 si aucun côté n'est
+// libre : la bulle reste alors au-dessus, calée en haut de l'écran.
+function speechBubbleChooseSide(b, L, view, hard, others) {
+  const scene = b.container.scene;
+  const ref = b.target === scene.player ? scene.xara : scene.player;
+  const refBox = ref && ref !== b.target ? speechBubbleBodyBox(ref) : null;
+  const away = refBox && (refBox.left + refBox.right) / 2 > L.ax ? -1 : 1;
+  const order = b.side ? [b.side, -b.side] : [away, -away];
+  for (const side of order) {
+    const r = speechBubbleSideRect(b, L, side, view);
+    if (r.left < view.left || r.right > view.right) continue;
+    if (hard.some((o) => speechBubbleRectsMeet(r, o, 4)) || others.some((o) => speechBubbleRectsMeet(r, o))) continue;
+    return side;
+  }
+  return 0;
+}
+
+// Mise en page d'une bulle dans la vue `view` (règle commune de LevelKit :
+// tout dans l'écran, marge WORLD_UI_MARGIN), d'après `b.layout` (ancre
+// lissée par positionSpeechBubble). Appelée en postupdate ET quand la caméra
+// a fini son défilement de l'image, toujours via layoutAllSpeechBubbles (même
+// ordre, même résultat). `ctx` : { placed, hud, characters } = bulles déjà
+// posées dans cette passe, bandes du HUD, personnages à l'écran.
+// 1. Au-dessus du personnage, glissée le long du bord gauche/droit au besoin,
+//    calée en haut de la vue s'il n'y a pas la place.
+// 2. Pas la place au-dessus (tête près du haut de l'écran) et personnage
+//    VISIBLE en x : à CÔTÉ de lui, à hauteur de sa tête, du côté libre (cf.
+//    speechBubbleChooseSide) -- plutôt que de descendre sur sa tête. Hors
+//    de l'écran sur le côté : jamais à côté (relecture : la bulle d'une Xara
+//    sortie à gauche était posée à côté d'elle, donc hors de l'écran).
+// 3. Si elle touche le HUD ou une bulle déjà posée (deux têtes près du haut,
+//    coin de l'écran) : déplacée à la place libre la plus proche
+//    (worldUiFreeSpot), en évitant de cacher les personnages.
+// 4. Toujours ramenée dans la vue. Pointe : vers le haut visible du
+//    personnage, cachée si ce point est hors de l'écran ou recouvert par la
+//    bulle ; tracée par layoutAllSpeechBubbles une fois toutes les bulles posées.
+function layoutSpeechBubble(b, view, ctx = {}) {
+  const L = b.layout;
+  if (!L || !view || !b.container.active) return;
+  const placed = ctx.placed || [];
+  const hard = [...(ctx.hud || []), ...placed];
+  const chars = ctx.characters || [];
+  const others = chars.filter((c) => c.owner !== b.target);
+  const half = b.w / 2;
+  let cx = Phaser.Math.Clamp(L.ax, view.left + half, view.right - half);
+  let bottom = Phaser.Math.Clamp(L.tipY - SPEECH_BUBBLE_TAIL, view.top + b.h, view.bottom);
+  // Point visé par la pointe : le haut visible du personnage (bulle au-dessus)
+  // ou son visage, juste avant son bord (bulle à côté).
+  let aimX = L.ax;
+  let aimY = L.tipY;
+  const roomAbove = L.tipY - SPEECH_BUBBLE_TAIL - b.h >= view.top;
+  const visibleX = L.left != null && L.right >= view.left && L.left <= view.right;
+  b.side = !roomAbove && visibleX ? speechBubbleChooseSide(b, L, view, hard, others) : 0;
+  if (b.side) {
+    const r = speechBubbleSideRect(b, L, b.side, view);
+    cx = (r.left + r.right) / 2;
+    bottom = r.bottom;
+    aimX = b.side > 0 ? L.right + 4 : L.left - 4;
+    aimY = L.tipY + SPEECH_BUBBLE_GAP + 14;
+  }
+  const rect = { left: cx - half, right: cx + half, top: bottom - b.h, bottom };
+  const shift = typeof worldUiFreeSpot === 'function' ? worldUiFreeSpot(rect, view, hard, chars) : { dx: 0, dy: 0 };
+  const frame = b.container.scene.game.loop.frame;
+  if (b.shiftFrame !== frame) {
+    b.shiftPrev = b.shift || null;
+    b.shiftFrame = frame;
+  }
+  const prev = b.shiftPrev;
+  b.shift = !prev || Math.hypot(shift.dx - prev.dx, shift.dy - prev.dy) > SPEECH_BUBBLE_SHIFT_SNAP ? shift
+    : { dx: prev.dx + (shift.dx - prev.dx) * SPEECH_BUBBLE_SHIFT_EASE, dy: prev.dy + (shift.dy - prev.dy) * SPEECH_BUBBLE_SHIFT_EASE };
+  // Le glissement ne doit pas faire passer la bulle SUR une autre (ou sur le
+  // HUD) quand sa place d'arrivée est libre (saut rapide, caméra verticale :
+  // le lissage traînait derrière et les textes se chevauchaient quelques
+  // images) : elle y va alors d'un coup.
+  const onHard = (d) => hard.some((o) => speechBubbleRectsMeet({
+    left: rect.left + d.dx, right: rect.right + d.dx, top: rect.top + d.dy, bottom: rect.bottom + d.dy,
+  }, o));
+  if ((b.shift.dx !== shift.dx || b.shift.dy !== shift.dy) && onHard(b.shift) && !onHard(shift)) b.shift = shift;
+  // Toujours dans la vue, quel que soit le côté choisi ou le déplacement.
+  cx = Phaser.Math.Clamp(cx + b.shift.dx, view.left + half, view.right - half);
+  bottom = Phaser.Math.Clamp(bottom + b.shift.dy, view.top + b.h, view.bottom);
+  const cy = bottom - b.h / 2;
+  b.container.setPosition(cx, cy);
+  b.rect = { left: cx - half, right: cx + half, top: bottom - b.h, bottom };
+  const m = typeof WORLD_UI_MARGIN === 'number' ? WORLD_UI_MARGIN : 8;
+  const onScreen = aimX >= view.left - m && aimX <= view.right + m && aimY >= view.top - m && aimY <= view.bottom + m;
+  const tx = aimX - cx;
+  const ty = aimY - cy;
+  const covered = Math.abs(tx) <= half + 3 && Math.abs(ty) <= b.h / 2 + 3;
+  b.tip = onScreen && !covered ? { x: tx, y: ty } : null;
+}
+
+// Pointe libre : elle ne traverse aucune autre bulle ni le HUD. Retour de
+// relecture : une bulle remontée au-dessus d'une autre tirait sa pointe à
+// travers celle du dessous et en barrait le texte (« Enco|e une nuit… »).
+// Segment de la base (sur le bord de la bulle) au bout, échantillonné tous
+// les 3 px, obstacles élargis de la demi-largeur de la pointe.
+function speechBubbleTailClear(b, blockers) {
+  const tip = b.tip;
+  if (!tip) return false;
+  const base = speechBubbleTailBase(b.w, b.h, tip);
+  const x0 = b.container.x + base.x;
+  const y0 = b.container.y + base.y;
+  const x1 = b.container.x + tip.x;
+  const y1 = b.container.y + tip.y;
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 3));
+  const pad = 4;
+  for (let i = 1; i <= n; i++) {
+    const x = x0 + ((x1 - x0) * i) / n;
+    const y = y0 + ((y1 - y0) * i) / n;
+    if (blockers.some((r) => r !== b.rect && x > r.left - pad && x < r.right + pad && y > r.top - pad && y < r.bottom + pad)) return false;
+  }
+  return true;
+}
+
+// Met en page TOUTES les bulles, dans l'ordre où elles sont apparues : une
+// bulle évite celles déjà posées. Appelée en postupdate (updateSpeechBubbles)
+// et par la règle commune de LevelKit (worldUiAddLayout, `ctx.hud`) ; les
+// pointes sont tracées à la fin, quand on connaît la place de chacune.
+// Renvoie les rectangles des bulles visibles : les invites « E » les évitent.
+function layoutAllSpeechBubbles(scene, view, ctx = {}) {
+  const st = scene.__speechBubbles;
+  if (!st || !st.byTarget.size || !view) return [];
+  const hud = ctx.hud || (typeof worldUiHudRects === 'function' ? worldUiHudRects(scene) : []);
+  const characters = ctx.characters || speechBubbleCharacters(scene, view);
+  const placed = [];
+  const laid = [];
+  for (const [target, slot] of st.byTarget) {
+    const b = slot.current;
+    if (!b || !target.active || !b.container.active) continue;
+    positionSpeechBubble(scene, b);
+    layoutSpeechBubble(b, view, { placed, hud, characters });
+    if (!b.rect) continue;
+    placed.push(b.rect);
+    laid.push(b);
+  }
+  const blockers = [...placed, ...hud];
+  for (const b of laid) drawSpeechBubble(b, b.tip && speechBubbleTailClear(b, blockers) ? b.tip : null);
+  return laid.filter((b) => b.container.alpha > 0).map((b) => b.rect);
+}
+
+// Ancre de la bulle : haut visible du personnage, lissé UNE fois par image
+// (les frames d'une anim n'ont pas toutes la même tête) -- les mises en page
+// suivantes de la même image (caméra, cf. worldUiAddLayout) repartent de la
+// même valeur au lieu de lisser une 2e fois.
+function positionSpeechBubble(scene, b) {
   const a = speechBubbleAnchor(b.target);
   const tipY = a.top - SPEECH_BUBBLE_GAP;
-  // Haut visible lissé : les frames d'une anim n'ont pas toutes la même tête.
-  b.tipY = b.tipY == null || Math.abs(tipY - b.tipY) > 40 ? tipY : b.tipY + (tipY - b.tipY) * 0.25;
-  const view = scene.cameras.main.worldView;
-  // La bulle reste dans l'écran ; seule la pointe suit le personnage.
-  const half = b.w / 2;
-  const cx = Phaser.Math.Clamp(a.x, view.x + half + 4, view.right - half - 4);
-  const y = Math.max(b.tipY, view.y + b.h + SPEECH_BUBBLE_TAIL + 4);
-  let lift = 0;
-  for (let k = 0; k < placed.length; k++) {
-    const bottom = y - SPEECH_BUBBLE_TAIL - lift;
-    const hit = placed.find((r) => cx - half < r.right + 4 && cx + half > r.left - 4
-      && bottom > r.top - 4 && bottom - b.h < r.bottom + 4);
-    if (!hit) break;
-    lift = y - SPEECH_BUBBLE_TAIL - (hit.top - 4);
+  const frame = scene.game.loop.frame;
+  if (b.tipFrame !== frame) {
+    b.tipPrev = b.tipY;
+    b.tipFrame = frame;
   }
-  b.lift = b.lift == null || Math.abs(lift - b.lift) > 60 ? lift : b.lift + (lift - b.lift) * 0.3;
-  b.container.setPosition(a.x, y);
-  drawSpeechBubble(b, a.x - cx, b.lift);
-  const bottom = y - SPEECH_BUBBLE_TAIL - b.lift;
-  placed.push({ left: cx - half, right: cx + half, top: bottom - b.h, bottom });
+  const prev = b.tipPrev;
+  b.tipY = prev == null || Math.abs(tipY - prev) > 40 ? tipY : prev + (tipY - prev) * 0.25;
+  b.layout = { ax: a.x, tipY: b.tipY, left: a.left, right: a.right };
 }
 
 function updateSpeechBubbles(scene) {
   const st = scene.__speechBubbles;
   if (!st) return;
-  const placed = [];
-  for (const [target, slot] of st.byTarget) {
+  // Copie : terminer une bulle peut retirer son entrée ou lancer la suivante.
+  for (const [target, slot] of [...st.byTarget]) {
     const b = slot.current;
-    if (!b) continue;
-    if (!target.active || !b.container.active) { finishSpeechBubble(scene, target, slot, true); continue; }
-    positionSpeechBubble(scene, b, placed);
+    if (b && (!target.active || !b.container.active)) finishSpeechBubble(scene, target, slot, true);
   }
+  layoutAllSpeechBubbles(scene, speechBubbleView(scene));
 }
 
 function finishSpeechBubble(scene, target, slot, instant = false) {
@@ -1178,15 +1429,16 @@ function finishSpeechBubble(scene, target, slot, instant = false) {
     }
   };
   if (instant || !b.container.active) { done(); return; }
-  scene.tweens.add({ targets: b.container, alpha: 0, y: b.container.y - 6, duration: SPEECH_BUBBLE_FADE_MS, onComplete: done });
+  // Fondu seul : la position est tenue à chaque image (dans l'écran).
+  scene.tweens.add({ targets: b.container, alpha: 0, duration: SPEECH_BUBBLE_FADE_MS, onComplete: done });
 }
 
 function startSpeechBubble(scene, target, slot, req) {
   const b = buildSpeechBubble(scene, req.text);
-  Object.assign(b, { target, resolve: req.resolve, tipY: null, lift: null });
+  Object.assign(b, { target, resolve: req.resolve, tipY: null, shift: null, side: 0 });
   slot.current = b;
-  // Toutes les bulles repositionnées : la nouvelle se range d'emblée au-dessus
-  // de ses voisines (cf. positionSpeechBubble).
+  // Toutes les bulles remises en page : la nouvelle prend d'emblée une place
+  // libre à côté de ses voisines (cf. layoutSpeechBubble).
   updateSpeechBubbles(scene);
   b.container.setScale(0.85);
   scene.tweens.add({ targets: b.container, alpha: 1, scale: 1, duration: 140, ease: 'Back.Out' });
@@ -2002,6 +2254,9 @@ function ensureStoryPrompt(scene) {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
       backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
     }).setOrigin(0.5, 1).setDepth(STORY_PROMPT_DEPTH).setVisible(false);
+    // Règle commune (LevelKit) : invite toujours dans l'écran ; ancre au-dessus
+    // du haut (grand PNJ, objet en hauteur) -> à hauteur de la tête d'Agarica.
+    if (typeof keepWorldUiInView === 'function') keepWorldUiInView(st.prompt, { prompt: true });
   }
   return st.prompt;
 }
