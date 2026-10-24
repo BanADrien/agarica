@@ -269,6 +269,34 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P1] Geralt au combat (duel de la forêt flottante 1, prompt Codex n°9) :
+  // tir droit / en cloche, saut avec tir plongeant, réception ratée, sonné,
+  // pose d'un collet, pris à son propre collet, touché. Même échelle source
+  // que `geralt` (~230 px debout) ; calibré par planche sur son idle
+  // (GeraltDuel.sheetFactor). Frames figées par le code : voir
+  // docs/production/PROMPT_CODEX_9_GERALT.md.
+  geralt_combat: {
+    dir: "assets/sprites/geralt_combat_frames", prefix: "geralt_combat",
+    anims: {
+      shoot: { row: 0, frames: 5, fps: 12, repeat: 0 },
+      shoot_up: { row: 1, frames: 5, fps: 12, repeat: 0 },
+      jump_shoot: { row: 2, frames: 4, fps: 10, repeat: 0 },
+      crash: { row: 3, frames: 4, fps: 10, repeat: 0 },
+      stunned: { row: 4, frames: 4, fps: 6, repeat: -1 },
+      set_trap: { row: 5, frames: 4, fps: 10, repeat: 0 },
+      trapped: { row: 6, frames: 4, fps: 10, repeat: 0 },
+      hurt: { row: 7, frames: 3, fps: 12, repeat: 0 },
+    },
+    scale: 0.30,
+    facing: "right",
+    placeholder: { w: 34, h: 70, color: 0x7a5c3a, label: "Geralt" },
+    sheets: [
+      { file: "assets/sprites/geralt_combat.png", rows: [0, 1, 2] },
+      { file: "assets/sprites/geralt_combat_p2.png", rows: [3, 4, 5] },
+      { file: "assets/sprites/geralt_combat_p3.png", rows: [6, 7] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P2] Clak, le crabe totem de Geralt
   clak: {
     dir: "assets/sprites/clak_frames", prefix: "clak",
@@ -444,6 +472,38 @@ const ASSET_MANIFEST = {
     placeholder: { w: 195, h: 210, color: 0x9ff0e0, label: "Esprit Kainati" },
     sheets: [
       { file: "assets/sprites/kainati_esprit.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // [P2] Kainati épargné (après le combat) : assis, calme, lucide -- revisites
+  // de l'arène et « E : parler ». Même échelle que `kainati` (recalé par
+  // surface visible sur `defeated_lucid` frame 4 si besoin). Prompt Codex n°9.
+  kainati_calme: {
+    dir: "assets/sprites/kainati_calme_frames", prefix: "kainati_calme",
+    anims: {
+      sit_idle: { row: 0, frames: 4, fps: 5, repeat: -1 },
+      sit_talk: { row: 1, frames: 4, fps: 7, repeat: -1 },
+    },
+    scale: 0.6,
+    facing: "right",
+    placeholder: { w: 195, h: 210, color: 0xe8e8e8, label: "Kainati" },
+    sheets: [
+      { file: "assets/sprites/kainati_calme.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // [P2] Esprit simien ancestral : donne la forme singe (monde spirituel).
+  // Prompt Codex n°9.
+  kainati_esprit_extra: {
+    dir: "assets/sprites/kainati_esprit_extra_frames", prefix: "kainati_esprit_extra",
+    anims: {
+      give: { row: 0, frames: 4, fps: 6, repeat: 0 },
+    },
+    scale: 0.6,
+    facing: "right",
+    placeholder: { w: 195, h: 210, color: 0x9ff0e0, label: "Esprit" },
+    sheets: [
+      { file: "assets/sprites/kainati_esprit_extra.png", rows: [0] },
     ],
     cut: "blob", align: "bottom",
   },

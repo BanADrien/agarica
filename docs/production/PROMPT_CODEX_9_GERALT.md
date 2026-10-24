@@ -3,7 +3,7 @@
 Le duel de la forêt flottante 1 est devenu un vrai combat (`src/entities/GeraltDuel.js`) : tir droit, tir en cloche, saut en cloche avec tir plongeant puis réception ratée, pose de collets, pris à son propre collet, sonné, touché. Aujourd'hui, ces poses empruntent des frames existantes (`attack_miss` 0-1 pour viser, `trip_fall` pour les chutes). Le code est **déjà branché** sur les ids ci-dessous : dès que `geralt_combat` est importé, il remplace les poses de repli, sans autre changement.
 
 - **3 images** à générer : `geralt_combat.png`, `geralt_combat_p2.png`, `geralt_combat_p3.png`.
-- **1 entrée de manifeste** à ajouter : `geralt_combat` (bloc prêt à coller en bas de ce fichier).
+- **1 entrée de manifeste** : `geralt_combat`, déjà ajoutée au manifeste (2026-10-25).
 - Même échelle que `assets/sprites/geralt.png` : Geralt **~230 px de haut debout** (hauteur visible mesurée sur `geralt_frames/geralt_row0_0.png`). Le jeu calibre chaque planche sur l'idle de Geralt (même taille visible debout), mais une planche dessinée à la bonne échelle reste plus nette.
 - Le nombre de frames de chaque rangée est **imposé par le code** (frames figées : voir la colonne « usage en jeu »).
 
@@ -32,7 +32,7 @@ Nouvelles images pour « Legend of Agarica » (prompt n°9, poses de combat de G
 - une silhouette connexe par frame (arc, flèche encochée et carquois touchent le personnage) ;
 - tourné vers la DROITE ;
 - aucun texte ;
-- ne modifie ni `src/` ni le manifeste (l'entrée `geralt_combat` est ajoutée à part par l'intégrateur).
+- ne modifie ni `src/` ni le manifeste (l'entrée `geralt_combat` y est déjà).
 Joins comme référence `assets/sprites/geralt.png`, `assets/sprites/geralt_p2.png` et `assets/sprites/geralt_frames/geralt_row0_0.png`.
 Même personnage, MÊME ÉCHELLE (Geralt ~230 px de haut debout, comme sur geralt.png), même rendu, mêmes couleurs (cheveux et barbe brun-roux).
 Aucun effet détaché (poussière, étoiles, traits de vitesse) : le jeu les ajoute.
@@ -92,7 +92,6 @@ Mise en page (dans chaque prompt) : SPRITE SHEET LAYOUT RULES: canvas 1536 x 102
    - frame 3 : il se rattrape, l'air vexé.
 
 À la fin :
-- ajoute l'entrée ci-dessous dans `src/data/asset_manifest.js` (bloc « [P1] Geralt ») ;
 - lance `python tools/import_codex_assets.py --only geralt_combat`, puis un `python tools/import_codex_assets.py` final (régénère asset_present.js) ;
 - vérifie que chaque rangée a EXACTEMENT le nombre de frames du tableau (3 rangées 5/5/4, 4/4/4, 4/3) ;
 - mets à jour `docs/production/RAPPORT_CODEX.md`.

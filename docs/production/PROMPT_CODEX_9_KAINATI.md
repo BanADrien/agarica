@@ -2,7 +2,7 @@
 
 Refonte du combat de Kainati et de son enchaînement (totem du singe dans les racines → monde spirituel → lianes de la cime → arène). Le combat est complet avec l'art actuel (`kainati`, `kainati_sol`, `kainati_esprit`). Deux feuilles l'améliorent quand elles arrivent : le code les utilise déjà, derrière `hasManifestArt`, avec un repli sur les poses existantes.
 
-- **2 images**, 2 nouvelles entrées du manifeste (`ASSET_MANIFEST`) à coller telles quelles (plus bas).
+- **2 images** ; les 2 entrées du manifeste (`kainati_calme`, `kainati_esprit_extra`) sont déjà ajoutées (2026-10-25).
 - Taille : le code recale chaque nouvelle feuille par **surface visible** sur la pose existante équivalente (`kainatiSourceScale` et `KainatiEsprit.bless`, `src/entities/Kainati.js`). Kainati ne change donc pas de taille d'une pose à l'autre, même si la feuille est un peu plus grande ou plus petite. Vise quand même la même échelle.
 
 | # | Image source | Taille | Découpe | Entrée du manifeste | Utilisée pour | Repli actuel |
@@ -54,7 +54,7 @@ Puis `python tools/import_codex_assets.py` : il régénère `src/data/asset_pres
 Nouvelles images pour « Legend of Agarica » (lot n°9, Kainati). 2 feuilles animées.
 
 RÈGLES
-- Ne modifie ni `src/` ni le manifeste `src/data/asset_manifest.js` (l'intégrateur colle les entrées).
+- Ne modifie ni `src/` ni le manifeste `src/data/asset_manifest.js` (les entrées y sont déjà).
 - Fond transparent.
 - Une rangée = une animation, nombre de frames exact. Frames séparées d'au moins 40 px, rangées d'au moins 60 px.
 - Une silhouette connexe par frame : un objet tenu ou une lumière tenue touche la main ; aucune particule détachée.
