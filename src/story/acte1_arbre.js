@@ -60,46 +60,13 @@ function arbreMossDecor(scene, x, y, w, flip = false) {
   return g;
 }
 
-// Tronc du grand arbre monté avec les morceaux de la planche Codex
-// `grand_arbre_tronc` (parois d'écorce, nœud, sève, fenêtre de lune…) : trois
-// colonnes de pièces empilées qui se recouvrent un peu, derrière les branches.
-// Remplace le tronc provisoire dessiné par code (retiré, retour utilisateur).
-// Sans l'art : pas de tronc du tout, plutôt qu'un placeholder sombre.
-const ARBRE_TRONC_PIECES = [
-  'paroi_ecorce', 'paroi_noeud', 'paroi_ecorce', 'seve_corrompue', 'paroi_ecorce',
-  'champignons_lumineux', 'paroi_noeud', 'paroi_ecorce', 'fenetre_lune',
-];
-
-function arbreTrunkFromArt(scene, x1, x2, top, bottom) {
-  const key = (n) => `${PROP_PREFIX}grand_arbre_tronc_${n}`;
-  if (!ARBRE_TRONC_PIECES.every((n) => scene.textures.exists(key(n)))) return null;
-  const cols = 3;
-  const colW = (x2 - x1) / cols;
-  const imgs = [];
-  let k = 0;
-  for (let c = 0; c < cols; c++) {
-    let yb = bottom + 12; // pied légèrement enfoncé dans le sol
-    while (yb > top) {
-      const n = ARBRE_TRONC_PIECES[(k + c * 4) % ARBRE_TRONC_PIECES.length];
-      k++;
-      const img = scene.add.image(x1 + colW * (c + 0.5), yb, key(n)).setOrigin(0.5, 1);
-      img.setScale((colW * 1.18) / img.width);
-      img.setFlipX((c + k) % 2 === 1);
-      // Pièces empilées volontairement en l'air (pas des décors posés au sol).
-      img.trunkPiece = true;
-      imgs.push(img);
-      yb -= img.displayHeight * 0.9;
-    }
-  }
-  sendBehindFrontGround(scene, imgs);
-  return imgs;
-}
-
 // Pierre qui tombe des branches supérieures, télégraphiée par une ombre qui
 // grandit sur la branche (`surfaceY`). Tout en tweens : la démo de la
 // cinématique fonctionne monde gelé ; les dégâts, eux, attendent le dégel.
 function arbreDropRock(scene, x, surfaceY, telegraph = 1000) {
-  const shadow = scene.add.ellipse(x, surfaceY - 3, 22, 8, 0x12000c, 0.25).setDepth(990);
+  // Opacité portée par l'objet (pas par le remplissage) : le tween d'alpha
+  // ci-dessous la fait monter jusqu'à 0,6 (avant : ~0,15, invisible sur l'herbe).
+  const shadow = scene.add.ellipse(x, surfaceY - 3, 22, 8, 0x12000c, 1).setAlpha(0.25).setDepth(990);
   scene.tweens.add({
     targets: shadow,
     scaleX: 3,
@@ -191,8 +158,10 @@ ZONE_SCRIPTS.grand_arbre_racines = {
   create(scene, data) {
     const st = { cfg: (data && data.rockfall) || null, timer: 600 };
     scene.__arbre = st;
-    // Le tronc en morceaux d'art Codex (plus de tronc provisoire dessiné).
-    arbreTrunkFromArt(scene, 1540, 2120, -420, 448);
+    // Plus de tronc au premier plan (retour utilisateur) : ni le tronc
+    // provisoire dessiné par code, ni le collage de pans d'écorce
+    // (`grand_arbre_tronc_*`, dont sève corrompue et fenêtre de lune) qui
+    // l'avait remplacé ; le fond `fond_grand_arbre` montre l'arbre.
     // Décors `grand_arbre_tronc_*` de la donnée : derrière les branches (les
     // décors sont sinon dessinés devant les tuiles).
     sendBehindFrontGround(scene, (scene.props || []).filter((p) => p.propType && p.propType.startsWith('grand_arbre_tronc_')));
@@ -323,30 +292,25 @@ CUTSCENES.esprit_arrivee = [
   { say: [
     { who: 'kainati_esprit', text: 'Bienvenue dans l\'arbre d\'avant, petite druidesse. Ici, rien ne pourrit.' },
     { who: 'agarica', text: 'Kainati ? Tu… tu brilles.' },
-    { who: 'kainati_esprit', text: 'Ce que tu vois, c\'est ce que j\'étais avant la mousse. Ce que mon peuple est depuis toujours.' },
-    { who: 'kainati_esprit', text: 'Le totem t\'a ouverte à nous. Reçois notre forme.' },
+    { who: 'kainati_esprit', text: 'Ce que j\'étais avant la mousse. Le totem t\'a ouverte à nous : reçois notre forme.' },
   ] },
   { flash: { ms: 500, color: 0xbfe8a0 } },
   { form: 'hasMonkeyForm' },
   { wait: 900 },
   { say: [
-    { who: 'kainati_esprit', text: 'Le singe ne vole pas. Son saut est plus court… mais ses mains n\'oublient jamais une liane.' },
-    { who: 'kainati_esprit', text: 'En l\'air, approche-toi d\'une liane : tu t\'y accrocheras seule. Balance-toi, puis saute pour lâcher avec l\'élan.' },
+    { who: 'kainati_esprit', text: 'En l\'air, approche-toi d\'une liane : tes mains s\'y accrocheront. Balance-toi, puis lâche avec l\'élan.' },
     { who: 'kainati_esprit', text: 'Suis mes mouvements.' },
   ] },
-  { toast: { text: 'Forme du singe : en l\'air, accroche-toi aux lianes.\n← → : se balancer · Espace : lâcher avec l\'élan · S : se laisser tomber', ms: 5200 } },
+  { toast: { text: 'Forme du singe : en l\'air, accroche-toi aux lianes.\n← → : se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5200 } },
 ];
 
 CUTSCENES.esprit_fin = [
   { playerFace: 'right' },
   { say: [
     { who: 'kainati_esprit', text: 'Tu as gardé l\'élan jusqu\'au bout. Les branches te reconnaissent.' },
-    { who: 'kainati_esprit', text: 'D\'autres esprits t\'offriront peut-être des ailes. On dit que l\'aigle saute plus haut que nous… et qu\'il plane.' },
-    { who: 'kainati_esprit', text: 'Mais ses ailes et nos mains partagent la même place en toi : une seule à la fois.' },
-    { who: 'kainati_esprit', text: 'Près d\'un feu de camp, tu choisiras laquelle t\'accompagne dans les airs. Le loup, lui, garde toujours sa place.' },
+    { who: 'kainati_esprit', text: 'Un jour, d\'autres esprits t\'offriront peut-être des ailes. Près d\'un feu, tu choisiras : nos mains ou leurs ailes, une seule à la fois.' },
     { who: 'agarica', text: 'Merci, Kainati. Je ferai honneur à ton peuple.' },
-    { who: 'kainati_esprit', text: 'Les lianes de mes racines mènent à l\'épreuve de mon peuple. Celle qui la termine reçoit notre talisman.' },
-    { who: 'kainati_esprit', text: 'Va. Le passage derrière moi te ramènera dans ton monde.' },
+    { who: 'kainati_esprit', text: 'Les lianes de mes racines mènent à l\'épreuve de mon peuple. Le passage derrière moi te ramènera dans ton monde.' },
   ] },
   { set: { mondeSpirituelFini: true } },
 ];
@@ -405,17 +369,38 @@ ZONE_SCRIPTS.monde_spirituel = {
 // ---------------------------------------------------------------------------
 // 7. ÉPREUVE DU SINGE (optionnelle)
 // ---------------------------------------------------------------------------
+// Seule l'arrivée (la voix de Kainati) est un dialogue bloquant ; les
+// remarques de chaque passage sont des bulles (elles ne gèlent rien).
 CUTSCENES.epreuve_intro = [
   { say: [
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Tu es venue. Bien.' },
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Mon peuple grimpe ici depuis la première sève. Personne ne touche le sol… et en bas, la mousse attend ceux qui tombent.' },
-    { who: 'kainati', name: 'Voix de Kainati', text: 'Cinq passages, chacun plus rude que le précédent. Au bout des branches, la lumière : le talisman de mon peuple t\'y attend.' },
+    { who: 'kainati', name: 'Voix de Kainati', text: 'Tu es venue. Bien. Ici, mon peuple ne touche jamais le sol.' },
+    { who: 'kainati', name: 'Voix de Kainati', text: 'Cinq passages, chacun plus rude. En bas, la mousse attend ceux qui tombent. Au sommet, notre talisman.' },
   ] },
   { camera: { x: 1250, y: 120, ms: 1700 } },
   { wait: 900 },
   { cameraFollow: true },
-  { toast: { text: 'Une lanterne au début de chaque passage : une chute te ramène à la dernière allumée.\nPompe (← →) pour prendre de l\'élan, lâche (Espace) quand la liane monte.', ms: 5200 } },
+  { toast: { text: '← → : prendre de l\'élan · Espace : lâcher quand la liane monte · Z/S : monter/descendre\nUne chute ramène à la dernière lanterne allumée.', ms: 5600 } },
 ];
+
+CUTSCENES.epreuve_s2 = cutsceneBulles([
+  'Des pierres, encore… Elles tombent en rythme. Regarde l\'ombre.',
+  { who: 'agarica', text: 'J\'attends qu\'elle tombe, je saute, et je grimpe vite.' },
+]);
+
+CUTSCENES.epreuve_s3 = cutsceneBulles([
+  'Les lianes s\'écartent. Prends tout ton élan avant de lâcher.',
+  'Et méfie-toi d\'en bas : un singe nous guette.',
+]);
+
+CUTSCENES.epreuve_s4 = cutsceneBulles([
+  'La mousse monte et descend, là, en bas… comme une respiration.',
+  { who: 'agarica', text: 'Quand elle reflue, je fonce et je grimpe.' },
+]);
+
+CUTSCENES.epreuve_s5 = cutsceneBulles([
+  'Plus de repos, maintenant. Et cette branche, en bas, ne tiendra pas.',
+  { who: 'agarica', text: 'Je vois la lumière, tout en haut. J\'y suis presque.' },
+]);
 
 CUTSCENES.epreuve_sans_singe = cutsceneBulles([
   'Ces lianes filent jusqu\'au bout des branches… mais sans la forme du singe, elles ne te porteront pas.',
@@ -448,40 +433,17 @@ CUTSCENES.epreuve_talisman = [
 // La fente du sommet (raccourci vers les racines, bord droit du sommet) ne
 // s'ouvre qu'une fois le talisman pris : sinon l'élan de la dernière liane y
 // jetterait Agarica.
-const EPREUVE_SINGE_SOMMET_X = 11500;
+const EPREUVE_SINGE_SOMMET_X = 12088;
 const EPREUVE_SINGE_SOMMET_Y = -128;
-const EPREUVE_SINGE_SORTIE_SOMMET = { x: 11696, y: -186, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
+const EPREUVE_SINGE_SORTIE_SOMMET = { x: 12272, y: -186, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
 
 function epreuveOuvrirSommet(scene, instant) {
   if (scene.__epreuveSommet) return;
   scene.__epreuveSommet = true;
   scene.__exits = scene.__exits || [];
   scene.__exits.push(EPREUVE_SINGE_SORTIE_SOMMET);
-  const p = arbreGlowPassage(scene, 11680, -186, 110);
+  const p = arbreGlowPassage(scene, 12256, -186, 110);
   if (!instant) [p.glow, p.core].forEach((o) => { o.setScale(0.1); scene.tweens.add({ targets: o, scale: 1, duration: 900, ease: 'Back.Out' }); });
-}
-
-// Mousse toxique tout au fond (décor ; y tomber = `fall` de la donnée, retour
-// à la dernière lanterne) : nappe sombre, bulles vertes qui crèvent.
-function epreuveDrawToxicMoss(scene, x1, x2) {
-  const g = scene.add.graphics();
-  const rnd = new Phaser.Math.RandomDataGenerator(['mousse-toxique']);
-  g.fillStyle(0x16280f, 1).fillRect(x1, 486, x2 - x1, 80);
-  for (let x = x1; x < x2; x += 46) {
-    g.fillStyle(rnd.frac() < 0.5 ? 0x2f5a2a : 0x3e7a2c, 1);
-    g.fillEllipse(x + rnd.between(0, 20), 488 + rnd.between(-4, 6), rnd.between(50, 80), rnd.between(20, 34));
-  }
-  for (let x = x1; x < x2; x += 37) g.fillStyle(0x9bff5a, 0.65).fillCircle(x + rnd.between(0, 30), 486 + rnd.between(-6, 14), rnd.realInRange(1.5, 3.5));
-  storyPutBehindPlayer(scene, g);
-  for (let x = x1 + 120; x < x2; x += 260 + rnd.between(0, 160)) {
-    const b = scene.add.circle(x, 492, rnd.between(4, 8), 0x9bff5a, 0.55);
-    storyPutBehindPlayer(scene, b);
-    scene.tweens.add({
-      targets: b, y: 470, alpha: 0, scale: 1.6, duration: rnd.between(1300, 2200),
-      delay: rnd.between(0, 2000), repeat: -1, repeatDelay: rnd.between(300, 1500),
-    });
-  }
-  return g;
 }
 
 // Plateformes d'écorce qui s'effritent (donnée `crumble`) : ~0,6 s après
@@ -537,20 +499,73 @@ function epreuveUpdateCrumbles(scene, list, now) {
   }
 }
 
+// Pierre d'un couloir en rythme : comme arbreDropRock (ombre qui grandit sur
+// la branche, puis chute), mais elle part de `topY` (par défaut 320 px plus
+// haut) avec une durée de chute qui suit la hauteur (même accélération). Un
+// couloir posé le long d'une liane couvre ainsi toute sa partie basse, là où
+// l'on s'accroche et commence à grimper : rester dessous = prendre la pierre.
+// L'ombre fonce vraiment en grandissant (opacité de remplissage pleine,
+// alpha de l'objet 0,3 → 0,8, posée sur les brins d'herbe) : avec le
+// remplissage à 0,25 d'arbreDropRock, elle tombait à ~0,15 d'opacité et ne
+// se voyait plus sur l'herbe. Renvoie le délai jusqu'à l'impact (ms).
+function epreuveDropRock(scene, x, surfaceY, telegraph, topY) {
+  const top = topY != null ? topY : surfaceY - 320;
+  const fallMs = Math.round(340 * Math.sqrt(Math.max(1, surfaceY - 12 - top) / 308));
+  const shadow = scene.add.ellipse(x, surfaceY - 5, 24, 8, 0x12000c, 1).setAlpha(0.3).setDepth(990);
+  scene.tweens.add({
+    targets: shadow, scaleX: 3, scaleY: 2, alpha: 0.8, duration: telegraph, ease: 'Sine.easeIn',
+    onComplete: () => {
+      if (!scene.sys || !scene.sys.isActive()) return;
+      const rock = typeof addKainatiStoneImage === 'function'
+        ? addKainatiStoneImage(scene, x, top)
+        : scene.add.circle(x, top, 12, 0x6d6a70).setStrokeStyle(2, 0x1e1a24).setDepth(991);
+      let hit = false;
+      scene.tweens.add({
+        targets: rock, y: surfaceY - 12, angle: 260, duration: fallMs, ease: 'Quad.easeIn',
+        onUpdate: () => {
+          const p = scene.player;
+          if (hit || !p || !p.body || isWorldFrozen(scene)) return;
+          const b = p.body;
+          if (Phaser.Geom.Intersects.CircleToRectangle(new Phaser.Geom.Circle(rock.x, rock.y, 12), new Phaser.Geom.Rectangle(b.x, b.y, b.width, b.height))) {
+            hit = true;
+            p.hitByEnemy();
+          }
+        },
+        onComplete: () => {
+          shadow.destroy();
+          if (typeof spawnKainatiImpact === 'function') spawnKainatiImpact(scene, rock.x, surfaceY);
+          rock.destroy();
+          if (!hit && scene.player && Math.abs(scene.player.x - x) < 300) scene.cameras.main.shake(90, 0.003);
+        },
+      });
+    },
+  });
+  return telegraph + fallMs;
+}
+
 // Pierres EN RYTHME (donnée `rhythmRocks`) : tous les `period` ms, une pierre
-// par couloir, annoncée par l'ombre qui grandit (`telegraph`). Le rythme ne
-// dépend pas d'Agarica (on l'observe, puis on passe entre deux chutes) ; il ne
-// tourne que si elle est dans les parages (`x1`-`x2`).
+// par couloir, annoncée par l'ombre qui grandit (`telegraph`). Couloir = x, ou
+// { x, top, offset } (départ de la chute, décalage dans le cycle en ms : deux
+// couloirs décalés d'une demi-période font « boum… boum… »). Le rythme ne
+// dépend pas d'Agarica (on l'observe, puis on passe entre deux chutes) :
+// l'horloge tourne tout le temps (sinon elle repartait de zéro à l'arrivée et
+// qui fonçait passait toujours avant la 1re pierre), les pierres ne tombent
+// que si elle est dans les parages (`x1`-`x2`). `impacts[i]` : instant du
+// prochain impact du couloir i (repère public pour lire le rythme, tests).
 function epreuveUpdateRhythms(scene, list, time, delta) {
   const p = scene.player;
   for (const r of list) {
-    if (p.x < r.x1 || p.x > r.x2) { r.clock = 0; continue; }
+    const prev = r.clock;
     r.clock += delta;
-    if (r.clock < r.period) continue;
-    r.clock -= r.period;
-    for (const x of r.lanes) arbreDropRock(scene, x, r.surfaceY, r.telegraph);
-    // Impact (fin de l'ombre) : repère public pour qui veut lire le rythme.
-    r.lastImpactAt = time + r.telegraph + 340;
+    if (p.x < r.x1 || p.x > r.x2) continue;
+    r.lanes.forEach((ln, i) => {
+      const lane = typeof ln === 'number' ? { x: ln } : ln;
+      const off = lane.offset || 0;
+      // Déclenche quand (horloge - décalage) franchit un multiple de la période.
+      if (Math.floor((r.clock - off) / r.period) <= Math.floor((prev - off) / r.period)) return;
+      r.impacts[i] = time + epreuveDropRock(scene, lane.x, r.surfaceY, r.telegraph, lane.top);
+      r.lastImpactAt = r.impacts[i];
+    });
   }
 }
 
@@ -561,23 +576,33 @@ function epreuveCreateTide(scene, t) {
   const g = scene.add.graphics();
   storyPutBehindPlayer(scene, g);
   const tide = { ...t, g, phase: 0, t: 0, top: t.low };
-  epreuveDrawTide(tide);
+  epreuveDrawTide(tide, 0);
   return tide;
 }
 
-function epreuveDrawTide(tide) {
+// Nappe un peu translucide (on devine le passage dessous), crête bosselée
+// qui ondule et liseré de bulles toxiques : la même mousse que celle du fond.
+function epreuveDrawTide(tide, time) {
   const g = tide.g;
   g.clear();
-  const h = 560 - tide.top;
+  const top = tide.top;
+  const h = 560 - top;
   if (h <= 0) return;
-  g.fillStyle(0x16280f, 0.95).fillRect(tide.x, tide.top + 6, tide.w, h);
-  g.fillStyle(0x3e7a2c, 1);
-  for (let x = tide.x; x < tide.x + tide.w; x += 28) g.fillEllipse(x + 14, tide.top + 6, 40, 16);
-  g.fillStyle(0x9bff5a, 0.7);
-  for (let x = tide.x + 10; x < tide.x + tide.w; x += 46) g.fillCircle(x, tide.top + 4, 2.5);
+  const x1 = tide.x;
+  const x2 = tide.x + tide.w;
+  const ph = time / 260;
+  g.fillStyle(0x16280f, 0.86).fillRect(x1, top + 8, tide.w, h);
+  g.fillStyle(0x24401a, 0.9).fillRect(x1, top + 8, tide.w, 26);
+  for (let x = x1, i = 0; x < x2; x += 24, i++) {
+    g.fillStyle(i % 2 ? 0x3e7a2c : 0x2f5a2a, 1).fillEllipse(x + 12, top + 8 + Math.sin(ph + i * 0.9) * 3, 36, 18);
+  }
+  g.fillStyle(0x9bff5a, 0.75);
+  for (let x = x1 + 10, i = 0; x < x2; x += 38, i++) {
+    g.fillCircle(x + Math.sin(ph * 0.7 + i) * 4, top + 3 + Math.cos(ph + i * 1.7) * 2, 2.5);
+  }
 }
 
-function epreuveUpdateTides(scene, list, delta) {
+function epreuveUpdateTides(scene, list, time, delta) {
   const p = scene.player;
   for (const td of list) {
     td.t += delta;
@@ -587,7 +612,7 @@ function epreuveUpdateTides(scene, list, delta) {
     const ease = (u) => 0.5 - Math.cos(Math.PI * u) / 2;
     td.top = td.phase === 0 ? td.low : td.phase === 2 ? td.high
       : td.phase === 1 ? Phaser.Math.Linear(td.low, td.high, ease(k)) : Phaser.Math.Linear(td.high, td.low, ease(k));
-    epreuveDrawTide(td);
+    epreuveDrawTide(td, time);
     const inX = p.x > td.x && p.x < td.x + td.w;
     if (inX && p.body.bottom > td.top + 10 && !isWorldFrozen(scene)) {
       const back = scene.__story.checkpoint || { x: p.spawnX, y: p.spawnY };
@@ -603,24 +628,21 @@ ZONE_SCRIPTS.epreuve_singe = {
   create(scene, data) {
     scene.__epreuveSommet = false;
     const sx = EPREUVE_SINGE_SOMMET_X;
-    // Au sommet : un autel de pierre et un rai de lumière, visibles de loin.
-    // Socle posé sur la surface de marche du sommet (dessin prévu pour y -192).
-    const g = scene.add.graphics({ x: sx - 110, y: storyStandY(scene, sx, EPREUVE_SINGE_SOMMET_Y) + 192 });
-    g.fillStyle(0xffe9a8, 0.08).fillRect(50, -400, 120, 210);
-    g.fillStyle(0x4a4058, 1).fillRoundedRect(82, -220, 56, 28, 6);
-    g.fillStyle(0x6d6480, 1).fillRoundedRect(90, -228, 40, 10, 4);
-    const beam = scene.add.rectangle(sx, EPREUVE_SINGE_SOMMET_Y - 128, 60, 200, 0xffe9a8, 0.12);
+    // Au sommet : un rai de lumière au-dessus de l'autel (décor
+    // `grand_arbre_autel_singe` de la donnée), visible de loin. L'ancien
+    // socle dessiné par code est retiré : il doublait l'autel.
+    const beam = scene.add.rectangle(sx, EPREUVE_SINGE_SOMMET_Y - 150, 64, 240, 0xffe9a8, 0.12);
     storyPutBehindPlayer(scene, beam);
-    storyPutBehindPlayer(scene, g);
     scene.tweens.add({ targets: beam, alpha: 0.28, duration: 1300, yoyo: true, repeat: -1 });
-    const w = (data && data.levelWidth) || scene.levelWidth || 13184;
+    const w = (data && data.levelWidth) || scene.levelWidth || 12288;
     arbreMotes(scene, 0, w, -380, 420, 60, [0xbfe8a0, 0xffe9a8, 0x9bff5a]);
-    epreuveDrawToxicMoss(scene, 448, w);
+    // (La mousse toxique du fond est la bande `liquidFloor` de la donnée,
+    // LevelKit : plus de nappe dessinée ici, elle l'était deux fois.)
     scene.__epreuve = {
       crumbles: epreuveCreateCrumbles(scene, data && data.crumble),
       rockfalls: ((data && data.rockfalls) || []).map((r) => ({ ...r, timer: 600 })),
       // Pierres en rythme : horloge propre (même cadence à chaque visite).
-      rhythms: ((data && data.rhythmRocks) || []).map((r) => ({ ...r, clock: 0, lastImpactAt: -1e9 })),
+      rhythms: ((data && data.rhythmRocks) || []).map((r) => ({ ...r, clock: 0, lastImpactAt: -1e9, impacts: r.lanes.map(() => -1e9) })),
       tides: ((data && data.tides) || []).map((t) => epreuveCreateTide(scene, t)),
     };
     if (storyGet('talismanSinge')) epreuveOuvrirSommet(scene, true);
@@ -632,7 +654,7 @@ ZONE_SCRIPTS.epreuve_singe = {
     if (!st || !p || !p.body) return;
     epreuveUpdateCrumbles(scene, st.crumbles, time);
     epreuveUpdateRhythms(scene, st.rhythms, time, delta);
-    epreuveUpdateTides(scene, st.tides, delta);
+    epreuveUpdateTides(scene, st.tides, time, delta);
     // Pierres des guetteurs : seulement quand Agarica est sur l'îlot (ou juste
     // au-dessus), comme sur la grande branche des racines.
     for (const rf of st.rockfalls) {
@@ -642,7 +664,7 @@ ZONE_SCRIPTS.epreuve_singe = {
       if (rf.timer > 0) continue;
       rf.timer = rf.every;
       const x = Phaser.Math.Clamp(p.x + Phaser.Math.Between(-30, 30), rf.x1, rf.x2);
-      arbreDropRock(scene, x, rf.surfaceY, rf.telegraph);
+      epreuveDropRock(scene, x, rf.surfaceY, rf.telegraph);
     }
   },
 };
