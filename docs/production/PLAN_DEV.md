@@ -150,7 +150,7 @@ Clés gérées par la **Fondation** :
   pour la logique spécifique d'une zone (boss, événements) sans écrire dans la scène
   (les fichiers Scene restent le gabarit générique de l'éditeur).
 - `checkpoints: [{x, y}]` — point de réapparition (sans menu), utilisé par l'épreuve du singe.
-- Bulles non bloquantes (acte1.js, utilisables partout) : `storyBulle(scene, who, text, ms?)`, `storyBulles(scene, lignes, toast?, délai?)`, `cutsceneBulles(lignes, toast?, délai?)` (cinématique « vide » pour un déclencheur : ne gèle rien). S'appuient sur `showSpeechBubble` (StoryKit) si elle existe, sinon un toast. Règle : seules les scènes importantes (rencontres, révélations, boss, objets) restent des dialogues bloquants.
+- Bulles non bloquantes (acte1.js, utilisables partout) : `storyBulle(scene, who, text, ms?, {replace})`, `storyBulles(scene, lignes, toast?, délai?)`, `cutsceneBulles(lignes, toast?, délai?)` (cinématique « vide » pour un déclencheur : ne gèle rien). S'appuient sur `showSpeechBubble` (StoryKit) si elle existe, sinon un toast. Une seule « conversation » de bulles à la fois par zone : un nouveau `storyBulles` annule les répliques pas encore dites du précédent (sa 1re réplique remplace la bulle en cours du même personnage) ; pendant un dialogue bloquant, la suite attend. Règle : seules les scènes importantes (rencontres, révélations, boss, objets) restent des dialogues bloquants, et courts.
 
 Clés gérées par l'agent **Formes** (fichier `src/entities/Liane.js`, `src/entities/Piste.js`,
 `src/entities/CourantAir.js`) :
@@ -541,8 +541,8 @@ cinématique. Images du lot Codex n°8 utilisées dès qu'elles existent (`fx_*`
 | 4 | `grand_arbre_racines` | racines, pierres qui tombent, ennemis, feu de camp, lianes visibles mais inutilisables | — |
 | 5 | `grand_arbre_arene` | Boss Kainati (script `kainati_arene`) → épargné, ouvre accès au totem du singe | `kainatiDefeated` |
 | 6 | `monde_spirituel` | Kainati esprit montre les lianes → forme singe | `hasMonkeyForm` |
-| 7 | `epreuve_singe` (optionnel) | longue course de lianes en 5 sections (25 lianes, ~13 000 px, une lanterne par section, mousse toxique en contrebas, plateformes qui s'effritent `crumble`, pierres `rockfalls`, singe corrompu) → talisman du singe au sommet (bout droit) | `talismanSinge`, skill `pierre` |
-| 8 | `foret_flottante_1` | Geralt + Clak, duel comique, carte | `geraltMet`, item `carte_geralt` |
+| 7 | `epreuve_singe` (optionnel) | longue course de lianes en 5 sections de difficulté croissante (24 lianes pendues sous des blocs, 12 288 px de large, ~14 000 px de parcours dont ~800 px d'escalade le long des lianes ; une lanterne par section, chute = lanterne ; mousse toxique `liquidFloor` en contrebas ; clés de script : pierres en rythme `rhythmRocks` (couloirs `{x, top, offset}`), marée `tides`, plateformes qui s'effritent `crumble`, pierres `rockfalls` ; singe corrompu) → talisman du singe au sommet (bout droit) | `talismanSinge`, skill `pierre` |
+| 8 | `foret_flottante_1` | Geralt + Clak, duel comique (s'ouvre sur l'« Invocation du Crabe Ancestral »), carte ; puis ASCENSION verticale (P1-P9, `camera.vertical`, `levelTop: -1200`, `skyReveal`) jusqu'au belvédère au-dessus des cimes, sortie en haut à droite vers les îles | `geraltMet`, item `carte_geralt` |
 | 9 | `foret_flottante_2` | îles, totem de poche cassé, Amanite (1re rencontre), totem de l'aigle, courants d'air | item `totem_poche_casse`, `amaniteMet`, `hasEagleForm` |
 | 10 | `clairiere_plante` | plane jusqu'à la plante, prélève la fleur | item `fleur_resistante` |
 | 11 | `hutte_morgat` | Morgat + papillons, donne la fleur (obligatoire) → repulsif ; antidote en préparation ; rampe de lancement → cinématique crash | item `repulsif`, `crashDone` |
@@ -635,6 +635,25 @@ Détails compétences (agent Formes) :
 Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
 (`src/story/acte2.js`, zones 8-16), Éditeur (`src/scenes/EditorScene.js`, `index.html`
 #editor-ui) pour placer les nouvelles clés.
+
+## Niveaux et histoire — règles (agent Niveaux 2, 2026-10-23)
+- **Lianes** : chaque liane pend sous une case solide (attache = haut de la case + 64,
+  x dans la case) ; dans un enchaînement, écarts réglés pour le lâcher puissant (il
+  faut de l'élan, la liane précédente seule n'atteint jamais l'appui suivant).
+  Racines : 2 lianes à 448 px ; monde spirituel : 4 (2 par vide, tutoriel) ; épreuve : 24.
+- **Saut simple sur le chemin critique** (avant le singe) : marches de 1-2 cases, ravin
+  de 5 cases de la forêt sombre 2 précédé de 3 cases plates (fenêtre d'appel du loup
+  x ≈ 1180-1340) ; aucune marche de 3 cases avant le singe.
+- **Forêt flottante 1/2** : caméra verticale + ciel (`skyReveal`) ; FF2 en plein jour
+  (`skyReveal: { start: -1, end: 0, leaves: false }`, `largeTrees: false` dans la donnée,
+  plus forcés par les scènes). Plus de plafond `a2Ceiling` quand `camera.vertical`.
+- **Bandes de liquide/brume** (`liquidFloor` + `backgroundBaseline`) : épreuve (mousse),
+  FF1 (brume), FF2 (brume), monde spirituel (brume), hutte (brume au-delà de la falaise).
+- **Réapparition** : forêt corrompue 1, après le mur de mousse qui se referme (x 700)
+  et aux feux (`acte1RespawnAfter`) -- sinon une mort ramenait derrière le mur, coincée.
+- Formes provisoires sombres dessinées par code retirées (silhouette du grand arbre en
+  FS2, tronc des racines et collage de pans d'écorce, îles/horizon de FF2, horizon de la
+  hutte, marches du vieux sentier) ; murs de l'arène de Ghil't en art `mousse_mur`.
 
 ## Poses narratives d'Agarica (orchestrateur, 2026-10-05)
 Art Codex `agarica_extra` importé (rangées jump_rise, jump_fall, hurt, death, talk, sad ; liane_hang/liane_swing/cast/receive_item à venir).

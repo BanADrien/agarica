@@ -63,12 +63,12 @@ function storyBulleDuree(text) {
   return Phaser.Math.Clamp(1500 + text.length * 42, 2300, 5200);
 }
 
-function storyBulle(scene, who, text, ms) {
+function storyBulle(scene, who, text, ms, { replace = false } = {}) {
   if (!scene || !scene.sys || !scene.sys.isActive() || !scene.player) return null;
   const dur = ms || storyBulleDuree(text);
   if (typeof showSpeechBubble === 'function') {
     try {
-      return showSpeechBubble(scene, who === 'agarica' ? scene.player : who, text, { ms: dur });
+      return showSpeechBubble(scene, who === 'agarica' ? scene.player : who, text, { ms: dur, who, replace });
     } catch (e) {
       console.warn('[bulle]', e);
     }
@@ -78,22 +78,38 @@ function storyBulle(scene, who, text, ms) {
 }
 
 // Enchaîne des bulles ({who, text} ou texte seul = Xara) puis, éventuellement,
-// un toast d'aide ; ne bloque rien. Arrêt si on quitte la zone.
+// un toast d'aide ; ne bloque rien. Une seule « conversation » à la fois par
+// zone : un nouveau déclencheur annule les répliques pas encore dites du
+// précédent (avant, deux déclencheurs proches entrelaçaient leurs répliques
+// hors contexte) ; pendant un dialogue bloquant, la suite attend. Arrêt si on
+// quitte la zone.
 function storyBulles(scene, lines, toast, delay = 0) {
   const visit = scene.__storyVisit;
-  const alive = () => scene.sys && scene.sys.isActive() && scene.__storyVisit === visit;
-  let t = delay;
-  for (const l of lines) {
-    const line = typeof l === 'string' ? { who: 'xara', text: l } : l;
+  const conv = (scene.__bulleConvSeq || 0) + 1;
+  scene.__bulleConvSeq = conv;
+  scene.__bulleConv = conv;
+  const alive = () => scene.sys && scene.sys.isActive() && scene.__storyVisit === visit && scene.__bulleConv === conv;
+  const queue = lines.map((l) => (typeof l === 'string' ? { who: 'xara', text: l } : l));
+  const total = queue.reduce((acc, l) => acc + storyBulleDuree(l.text) + 200, delay);
+  let first = true;
+  const next = () => {
+    if (!alive() || !queue.length) return;
+    if (typeof isWorldFrozen === 'function' && isWorldFrozen(scene)) { scene.time.delayedCall(250, next); return; }
+    const line = queue.shift();
     const dur = storyBulleDuree(line.text);
-    scene.time.delayedCall(t, () => { if (alive()) storyBulle(scene, line.who, line.text, dur); });
-    t += dur + 200;
-  }
+    // La 1re réplique remplace une bulle encore affichée du même personnage.
+    storyBulle(scene, line.who, line.text, dur, { replace: first });
+    first = false;
+    scene.time.delayedCall(dur + 200, next);
+  };
+  scene.time.delayedCall(delay, next);
   if (toast) {
     const tt = typeof toast === 'string' ? { text: toast } : toast;
     // Sans bulles (repli en toasts), le toast d'aide passe après elles.
-    const at = typeof showSpeechBubble === 'function' ? delay + 500 : t;
-    scene.time.delayedCall(at, () => { if (alive()) showToast(scene, tt.text, tt.ms || 3200); });
+    const at = typeof showSpeechBubble === 'function' ? delay + 500 : total;
+    scene.time.delayedCall(at, () => {
+      if (scene.sys && scene.sys.isActive() && scene.__storyVisit === visit) showToast(scene, tt.text, tt.ms || 3200);
+    });
   }
 }
 
@@ -160,14 +176,16 @@ DIALOGUES.bosquet_garde_porte = [
   { who: 'garde', text: "Les portes de l'est restent closes la nuit, Agarica. Ordre du chef." },
 ];
 
-CUTSCENES.bosquet_intro = [
-  { wait: 1900 },
-  { say: [
-    { who: 'agarica', text: 'Encore une nuit à se battre contre la mousse…' },
-    { who: 'agarica', text: 'Orme et les druides sont sur le chemin de la source. Ils auront besoin d\'aide.' },
-  ] },
-  { toast: '← → (ou Q / D) : se déplacer' },
-];
+// Aides du tutoriel : un simple toast, sans cinématique (une étape `toast`
+// dans une cinématique arrêtait Agarica et relâchait les touches tenues).
+CUTSCENES.bosquet_tuto_saut = (scene) => { showToast(scene, 'Espace : sauter'); return []; };
+CUTSCENES.bosquet_tuto_parler = (scene) => { showToast(scene, 'E : parler aux habitants.'); return []; };
+
+// Pensées d'Agarica au réveil : en bulles, on peut déjà marcher.
+CUTSCENES.bosquet_intro = cutsceneBulles([
+  { who: 'agarica', text: 'Encore une nuit à se battre contre la mousse…' },
+  { who: 'agarica', text: 'Orme et les druides sont sur le chemin de la source. Ils auront besoin d\'aide.' },
+], '← → (ou Q / D) : se déplacer', 1900);
 
 CUTSCENES.bosquet_aide_debut = [
   // En cas de chute de cœurs pendant l'aide : on revient près d'Orme, pas au début du bosquet.
@@ -182,20 +200,17 @@ CUTSCENES.bosquet_aide_debut = [
 ];
 
 CUTSCENES.bosquet_barriere_aide = [
-  { say: [{ who: 'habitant', name: 'Orme, le vieux druide', text: 'Hé ! Il reste de la mousse à gratter derrière toi !' }] },
+  { call: (scene) => storyBulles(scene, [{ who: 'druide_orme', text: 'Hé ! Il reste de la mousse à gratter derrière toi !' }]) },
   { playerMove: { toX: 2320 } },
 ];
 
 CUTSCENES.bosquet_mousse_revient = [
   { wait: 300 },
-  { say: [
-    { who: 'habitant', name: 'Orme, le vieux druide', text: 'Bien gratté ! Le chemin respire à nouveau…' },
-  ] },
+  { call: (scene) => storyBulles(scene, [{ who: 'druide_orme', text: 'Bien gratté ! Le chemin respire à nouveau…' }]) },
   { call: (scene) => acte1BosquetRegrow(scene) },
-  { wait: 900 },
+  { wait: 1400 },
   { say: [
-    { who: 'agarica', text: '… Non. Regarde, Orme. Elle repousse déjà.' },
-    { who: 'agarica', text: 'Et l\'amas sur la source ? Je peux essayer de le gratter, lui aussi.' },
+    { who: 'agarica', text: '… Non. Regarde, Orme : elle repousse déjà. Et l\'amas sur la source ? Je vais essayer.' },
   ] },
   { playerMove: { toX: BOSQUET_SOURCE_X - 80 } },
   { playerFace: 'right' },
@@ -207,8 +222,7 @@ CUTSCENES.bosquet_mousse_revient = [
   { shake: { ms: 200, intensity: 0.006 } },
   { say: [
     { who: 'agarica', text: 'Aïe ! Elle est dure comme de la pierre…' },
-    { who: 'habitant', name: 'Orme, le vieux druide', text: 'En trois nuits, cet amas a étouffé la source. Ni nos grattoirs ni le feu n\'en viennent à bout.' },
-    { who: 'habitant', name: 'Orme, le vieux druide', text: 'Il faudrait une force bien plus grande que nos pauvres bras.' },
+    { who: 'habitant', name: 'Orme, le vieux druide', text: 'Ni nos grattoirs ni le feu n\'en viennent à bout. Il faudrait une force bien plus grande que nos bras.' },
   ] },
   { call: (scene) => acte1BosquetSpawnCreature(scene) },
   { shake: { ms: 300, intensity: 0.01 } },
@@ -237,8 +251,7 @@ CUTSCENES.bosquet_talisman = [
   { say: [
     { who: 'pere_chef', text: 'Agarica. Orme m\'a dit que tu l\'avais aidé. Et qu\'une bête est sortie de l\'amas.' },
     { who: 'agarica', text: 'Elle repousse partout, Père. On gratte, on brûle… et la nuit suivante, tout recommence.' },
-    { who: 'pere_chef', text: 'Je sais. Chaque nuit, la forêt recule un peu plus.' },
-    { who: 'pere_chef', text: 'Approche. Je veux te confier quelque chose.' },
+    { who: 'pere_chef', text: 'Je sais. Approche : je veux te confier quelque chose.' },
   ] },
   { npcAnim: { npc: 'pere_chef', anim: 'give_talisman' } },
   { wait: 500 },
@@ -515,17 +528,14 @@ CUTSCENES.fs1_desespoir = (scene) => [
   { wait: 1900 },
   { say: [
     'Les portes de l\'est se sont refermées. Derrière elles, plus un bruit.',
-    { who: 'agarica', text: 'Bannie…' },
-    { who: 'agarica', text: 'Père ne m\'a même pas regardée partir.' },
+    { who: 'agarica', text: 'Bannie… Père ne m\'a même pas regardée partir.' },
     storyGet('amaniteCouverte') === false
       ? { who: 'agarica', text: 'Et toi, Amanite… Je t\'ai suppliée de la reposer. Où es-tu, maintenant ?' }
       : { who: 'agarica', text: 'Et toi, Amanite… Tu m\'avais promis de rapporter l\'idole. Où es-tu, maintenant ?' },
-    { who: 'agarica', text: 'Je n\'ai jamais dépassé la lisière. Je ne sais même pas où aller.' },
   ] },
   { playerPose: null },
-  { say: [
-    { who: 'agarica', text: '… Allez, Agarica. Pleurer ne fera pas reculer la mousse. Un pas, puis un autre.' },
-  ] },
+  // La résolution, sans bloquer : en bulle, en se remettant en route.
+  { call: (scene) => storyBulles(scene, [{ who: 'agarica', text: '… Allez, Agarica. Pleurer ne fera pas reculer la mousse. Un pas, puis un autre.' }]) },
   { toast: 'Avance dans la forêt →' },
 ];
 
@@ -541,23 +551,19 @@ CUTSCENES.fs1_rencontre = [
   { call: (scene) => storyNpcRest(scene.npcs.xara) },
   // Rencontre : dialogue bloquant gardé, mais resserré à l'essentiel.
   { say: [
-    { who: 'agarica', text: 'Qui… qui parle ?' },
-    { who: 'xara', name: '???', text: 'Ici. Sur la souche. Bonsoir.' },
-    { who: 'agarica', text: 'Une araignée qui parle ?! … Euh, bonsoir. Je m\'appelle Agarica.' },
+    { who: 'agarica', text: 'Qui… qui parle ? … Une araignée ?!' },
     { who: 'xara', text: 'Xara. Et toi, tu es la petite druidesse qu\'on vient de mettre à la porte.' },
   ] },
   { call: (scene) => acte1Fs1LittleSpider(scene) },
   { wait: 900 },
   { say: [
     'Une minuscule araignée, sortie des feuilles, recule vivement devant Xara… comme on s\'incline devant quelqu\'un.',
-    { who: 'xara', text: 'Elle est timide, c\'est tout. Parlons plutôt de toi.' },
-    { who: 'agarica', text: 'Je n\'ai nulle part où aller. Et je veux prouver au bosquet que je peux l\'aider, malgré tout.' },
+    { who: 'agarica', text: 'Je n\'ai nulle part où aller… mais je veux aider le bosquet, malgré tout.' },
     { who: 'xara', text: 'Alors trouve un moyen d\'agir contre la mousse. Je connais chaque sentier d\'ici au grand arbre.' },
     { who: 'agarica', text: 'Tu… tu viendrais avec moi ?' },
-    { who: 'xara', text: 'Il faut bien que quelqu\'un t\'empêche de tomber dans le premier ravin venu.' },
   ] },
   { npcAnim: { npc: 'xara', anim: 'mysterious' } },
-  { say: [{ who: 'xara', text: '… Et puis, cela fait bien longtemps que personne ne m\'a demandé de rester.' }] },
+  { say: [{ who: 'xara', text: 'Il faut bien que quelqu\'un t\'empêche de tomber dans le premier ravin venu. Et puis… cela fait longtemps qu\'on ne m\'a pas demandé de rester.' }] },
   { xaraJoin: true },
   { toast: 'Objectif : trouver un moyen d\'agir contre la mousse.' },
 ];
@@ -576,14 +582,12 @@ CUTSCENES.fs1_creature = cutsceneBulles([
 CUTSCENES.fs1_talisman = [
   { playerFace: 'right' },
   { say: [
-    { who: 'agarica', text: 'Encore un amas… aussi dur que celui qui étouffe la source du bosquet.' },
-    { who: 'xara', text: 'Et les racines, au-dessus, montent jusqu\'au ciel. C\'est le seul passage vers l\'est.' },
+    { who: 'agarica', text: 'Encore un amas… et les racines, au-dessus, montent jusqu\'au ciel. C\'est le seul passage.' },
   ] },
   { call: (scene) => acte1TalismanGlow(scene) },
   { shake: { ms: 260, intensity: 0.004 } },
   { say: [
     'Contre sa poitrine, le talisman de l\'ours se met à battre comme un cœur.',
-    { who: 'agarica', text: 'Aïe ! Il est brûlant !' },
     { who: 'xara', text: 'Un talisman des anciens chefs qui s\'éveille… Écoute-le.' },
   ] },
   { playerPose: 'cast' },
@@ -591,10 +595,10 @@ CUTSCENES.fs1_talisman = [
   { call: (scene) => acte1FillEnergy(scene) },
   { wait: 1200 },
   { playerPose: null },
-  { say: [
-    { who: 'agarica', text: 'Une force immense… comme si un ours se dressait derrière moi. Père… tu savais.' },
-    { who: 'xara', text: 'Alors laisse-le frapper.' },
-  ] },
+  { call: (scene) => storyBulles(scene, [
+    { who: 'agarica', text: 'Une force immense… comme un ours dressé derrière moi. Père… tu savais.' },
+    'Alors laisse-le frapper.',
+  ]) },
   { toast: 'A : Fracas de l\'ours (consomme l\'énergie, la barre sous tes cœurs). Colle-toi à l\'amas et frappe !' },
 ];
 
@@ -713,10 +717,16 @@ ZONE_SCRIPTS.foret_sombre_1 = {
     if (!st.amasDone && amas && storyGet('trig_foret_sombre_1_talisman') && p.unlockedSkills.has('ours')
       && p.energy < SKILL_DEFS.ours.cost && Math.abs(p.x - FS1_AMAS_X) < 360 && scene.time.now > st.nextRefill
       && !p.skillTransformActive) {
+      // Toutes les 4 s, cela faisait un toast de plus à chaque essai raté
+      // (« coupe le jeu ») : le texte n'est dit qu'une fois, ensuite la
+      // lueur du talisman suffit.
       st.nextRefill = scene.time.now + 4000;
       acte1FillEnergy(scene);
       acte1TalismanGlow(scene);
-      showToast(scene, 'Le talisman de l\'ours pulse : sa force revient. (A)', 2200);
+      if (!st.refillToldOnce) {
+        st.refillToldOnce = true;
+        showToast(scene, 'Le talisman de l\'ours pulse : sa force revient. (A)', 2200);
+      }
     }
   },
 };
@@ -869,12 +879,11 @@ function acte1Fs2DrawCoeur(scene) {
   return { g, glow };
 }
 
-// Le vieux sentier vers la hutte, au fond de la poche : racines-marches et
-// une lueur rose qui descend des hauteurs.
+// Le vieux sentier vers la hutte, au fond de la poche : une lueur rose qui
+// descend des hauteurs (l'arche de racines est un décor de la donnée ; les
+// anciennes « marches » dessinées par code, des formes sombres, sont retirées).
 function acte1Fs2DrawSentier(scene) {
   const g = scene.add.graphics();
-  g.fillStyle(0x2a2238, 1);
-  for (let i = 0; i < 4; i++) g.fillRoundedRect(5000 + i * 26, 430 - i * 34, 40, 10, 4);
   g.fillStyle(0xff9fc9, 0.12).fillTriangle(5050, 448, 5120, 448, 5120, 256);
   storyPutBehindPlayer(scene, g);
 }

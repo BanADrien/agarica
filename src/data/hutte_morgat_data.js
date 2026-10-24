@@ -25,6 +25,8 @@ const HUTTE_MORGAT_DATA = {
   avoidRanges: [[800, 1250]],
   playerSpawn: { x: 110, y: 412 },
   fall: { y: 600, mode: 'hurt' },
+  // Brume du vide au-delà de la falaise (là où part le grand vol).
+  liquidFloor: { y: 500, style: 'brume', x1: 2600 },
   campfires: [{ x: 1500, y: 448 }],
   // Décors (`hutte_morgat`) : la hutte elle-même (remplace l'ancien dessin du
   // script, cf. a2DrawHutte), le chaudron où mijote l'antidote, l'atelier.

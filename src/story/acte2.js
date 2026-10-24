@@ -170,42 +170,31 @@ function a2Npc(scene, key) {
 Object.assign(DIALOGUES, {
   geralt_rencontre: [
     { who: 'geralt', text: 'HALTE ! Pas un pas de plus, porteuse de mousse !' },
-    { who: 'clak', text: 'Clac !' },
     { who: 'agarica', text: 'Porteuse de… quoi ? Je ne porte rien du tout !' },
     { who: 'geralt', text: 'C\'est exactement ce que dirait quelqu\'un qui porte de la mousse. Ou qui vient voler mes notes.' },
     { who: 'geralt', text: 'Geralt, ranger des marches boisées. Et voici Clak, mon totem. Tremble.' },
     { who: 'clak', text: 'Clac clac.' },
     { who: 'geralt', text: 'En garde ! Un duel, et la vérité éclatera !' },
-    { who: 'agarica', text: 'Je ne veux pas te faire de mal…' },
-    { who: 'geralt', text: 'Ha ! Personne ne m\'a jamais fait de mal. Enfin… presque personne. Enfin, pas souvent.' },
   ],
   geralt_rendu_victoire: [
     { who: 'geralt', text: 'Ouille… D\'accord, d\'accord ! Je me rends. Stratégiquement.' },
-    { who: 'agarica', text: 'Tu n\'as rien de cassé ?' },
-    { who: 'geralt', text: 'Juste ma réputation. Clak la recollera.' },
+    { who: 'geralt', text: 'Rien de cassé. Juste ma réputation : Clak la recollera.' },
   ],
   geralt_rendu_temps: [
     { who: 'xara', text: 'Ça suffit, vous deux. Vous allez finir par vous faire mal… lui, surtout.' },
     { who: 'geralt', text: 'Pff. Je la tenais. Clak, dis-lui que je la tenais.' },
-    { who: 'clak', text: '…' },
   ],
   geralt_paix: [
     { who: 'xara', text: 'Ranger, vous cherchez l\'origine de la mousse. Elle aussi. Vous auriez pu commencer par là.' },
-    { who: 'geralt', text: '… Tu cherches la source, toi aussi ?' },
     { who: 'agarica', text: 'Je veux sauver la forêt. Et… pouvoir rentrer chez moi, un jour.' },
     { who: 'geralt', text: 'Alors on est dans la même galère, petite. Tiens. Ma carte.' },
   ],
   geralt_carte: [
-    { who: 'geralt', text: 'Elle est incomplète. Les flèches qui se contredisent, c\'est normal. Les traces de pinces, c\'est Clak.' },
-    { who: 'geralt', text: 'Mais regarde ce que j\'ai noté : la mousse ne s\'étale pas au hasard. Elle monte. Vers les hauteurs.' },
+    { who: 'geralt', text: 'Les traces de pinces, c\'est Clak. Mais regarde : la mousse ne s\'étale pas au hasard. Elle monte, vers les hauteurs.' },
     { who: 'geralt', text: 'Et elle pousse plus vite là où les bêtes sont malades. Comme si elle suivait la fièvre… ou l\'inverse.' },
     { who: 'agarica', text: 'Alors il faut monter. On y va ensemble ?' },
-    { who: 'geralt', text: '« Ensemble », oui. Regarde-moi bien faire.' },
   ],
   geralt_essai: [
-    { who: 'clak', text: 'Clac. Clac clac.' },
-    { who: 'geralt', text: 'Il dit que j\'aurais pu demander de l\'aide. Je ne lui ai pas demandé son avis.' },
-    { who: 'geralt', text: 'J\'avais une corde, trois pièges et un discours héroïque. Rien de tout ça ne saute plus haut que moi.' },
     { who: 'geralt', text: 'Bon. Va, Agarica. Je garde le camp, et je mettrai la carte à jour avec ce que tu rapporteras.' },
     { who: 'agarica', text: 'Merci, Geralt ! Je reviendrai tout te raconter.' },
   ],
@@ -218,7 +207,7 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: '… Moi aussi, je t\'aime bien, Clak.' },
   ],
   ff1_vue: [
-    { who: 'agarica', text: 'Oh… Xara, regarde ! La brume se déchire… Le ciel, en plein jour !' },
+    { who: 'agarica', text: 'Oh… Xara, regarde ! Au-dessus des arbres… le ciel, en plein jour !' },
     { who: 'xara', text: 'Plus loin, des îles flottent : les anciens gardiens y vivaient.' },
     { who: 'agarica', text: 'Et là-bas, tout au loin… cette forêt presque noire.' },
     { who: 'xara', text: 'Le cœur de la mousse. Retiens bien la direction.' },
@@ -231,8 +220,9 @@ CUTSCENES.ff1_intro = cutsceneBulles([
   'La forêt est trop grande pour la nettoyer coin par coin. Il faut remonter jusqu\'à sa source.',
   'Je connais un chemin, par les hauteurs. Grimpe, et garde les yeux ouverts.',
 ], null, 200);
+// Au sommet de l'ascension (belvédère, y -896) : la caméra lève les yeux vers le ciel.
 CUTSCENES.ff1_vue = [
-  { camera: { x: 3420, y: 230, ms: 1100 } },
+  { camera: { x: 3360, y: -1000, ms: 1100 } },
   { say: 'ff1_vue' },
   { cameraFollow: true },
 ];
@@ -274,6 +264,10 @@ CUTSCENES.geralt_fin_duel = (scene) => {
     { npcAnim: { npc: 'geralt', anim: 'idle' } },
     { camera: { x: 1820, y: 300, ms: 600 } },
     { call: (sc) => a2GeraltComicJump(sc) },
+    { call: (sc) => storyBulles(sc, [
+      { who: 'clak', text: 'Clac. Clac clac.' },
+      { who: 'geralt', text: 'Il dit que j\'aurais pu demander de l\'aide. Je ne lui ai pas demandé son avis.' },
+    ]) },
     { say: 'geralt_essai' },
     { set: { geraltMet: true } },
     { call: (sc) => a2Ff1EndDuel(sc) },
@@ -339,8 +333,16 @@ function a2Ff1EndDuel(scene) {
 }
 
 // --- Duel comique : Geralt enchaîne des « techniques » qui ratent toutes ---
+// L'invocation ouvre le duel (sinon, trois coups rapides et on ne la voyait
+// jamais) : c'est la seule vraie attaque, esquivable et sans dégât.
 const GERALT_DUEL = { minX: 660, maxX: 1560, hits: 3, timeoutMs: 40000, pauseMs: 1500 };
-const GERALT_TECHNIQUES = ['fleche', 'bond', 'piege', 'charge'];
+const GERALT_TECHNIQUES = ['invocation', 'fleche', 'bond', 'piege', 'charge'];
+// Remarques de Xara (bulles) après la première fois de certaines techniques.
+const GERALT_XARA_BULLES = {
+  invocation: 'Un crabe… ancestral. Évidemment.',
+  fleche: 'Il vise très bien… le crabe.',
+  charge: 'Je crois que le crabe est de ton côté.',
+};
 
 async function a2Ff1Encounter(scene) {
   const st = scene.__a2;
@@ -364,7 +366,16 @@ function a2DuelUpdate(scene) {
   const now = scene.time.now;
   // Coups d'Agarica (mêlée ou piqué), un seul par attaque.
   const atk = p.getAttackHitbox && p.getAttackHitbox();
-  if (atk && now >= d.invulUntil && Phaser.Geom.Intersects.RectangleToRectangle(atk, g.getBounds())) {
+  // En transe (invocation), Geralt est « protégé par ses ancêtres » : les
+  // coups rebondissent (une fois par attaque).
+  if (atk && d.trance && Phaser.Geom.Intersects.RectangleToRectangle(atk, d.trance.getBounds())) {
+    const token = `t-${p.attackEndTime}`;
+    if (token !== d.tranceToken) {
+      d.tranceToken = token;
+      a2Float(scene, d.trance.x, d.trance.y - 100, 'Ping !', '#fff6e0', { size: 14, ms: 700 });
+    }
+  }
+  if (atk && !d.trance && now >= d.invulUntil && Phaser.Geom.Intersects.RectangleToRectangle(atk, g.getBounds())) {
     const token = p.isAttacking ? `m-${p.attackEndTime}` : `d-${Math.floor(now / 400)}`;
     if (token !== d.lastToken) {
       d.lastToken = token;
@@ -384,8 +395,7 @@ function a2DuelUpdate(scene) {
         if (!scene.sys.isActive() || !scene.player) return;
         d.busy = false;
         d.nextAt = scene.time.now + GERALT_DUEL.pauseMs;
-        if (d.tech === 1) storyBulle(scene, 'xara', 'Il vise très bien… le crabe.', 2400);
-        if (d.tech === 3) storyBulle(scene, 'xara', 'Je crois que le crabe est de ton côté.', 2400);
+        if (d.tech <= GERALT_TECHNIQUES.length && GERALT_XARA_BULLES[tech]) storyBulle(scene, 'xara', GERALT_XARA_BULLES[tech], 2400);
       });
   }
 }
@@ -407,12 +417,139 @@ function a2GeraltDir(scene, g) {
   return scene.player.x >= g.x ? 1 : -1;
 }
 
+// Invocation du Crabe Ancestral (art Codex `geralt_invocation` + colonne de
+// lumière `vfx_invocation_clak` ; montage de docs/production/controles/
+// invocation_clak_2026-10-23) : Geralt s'élève en transe, une colonne
+// blanche s'abat sur la position d'Agarica et Clak s'y matérialise, pic
+// d'énergie, dissipation… et Clak retombe. Seule vraie attaque du duel :
+// esquivable (~1,8 s pour sortir de la colonne) et sans dégât (Agarica est
+// juste bousculée). Geralt redescend ensuite sur son sol (`d.gy`).
+const GERALT_INVOCATION = { lift: 46, telegraphMs: 1800, hitHalfW: 46 };
+
+// Effets « juice » (LevelKit) s'ils existent : purement visuels.
+function a2Fx(scene, kind, x, y, opts) {
+  if (typeof spawnFx === 'function') spawnFx(scene, kind, x, y, opts);
+}
+
+async function a2GeraltInvocation(scene, d, g, dir) {
+  const clak = a2Npc(scene, 'clak');
+  const p = scene.player;
+  const alive = () => scene.sys.isActive() && !!scene.player && g.active;
+  const groundY = d.gy;
+  a2Float(scene, g.x, g.y - 90, 'Invocation du Crabe Ancestral !', '#ffd27a', { ms: 1800 });
+  // Pose d'invocation par-dessus le PNJ (caché le temps de la technique),
+  // ramenée à la même taille visible que Geralt.
+  const ov = addManifestSprite(scene, g.x, groundY, 'geralt_invocation', 'rise');
+  const gb = typeof objectVisibleBox === 'function' ? objectVisibleBox(g) : null;
+  const ob = typeof objectVisibleBox === 'function' ? objectVisibleBox(ov) : null;
+  if (gb && ob && ob.bottom > ob.top) ov.setScale(ov.scaleX * ((gb.bottom - gb.top) / (ob.bottom - ob.top)));
+  if (hasManifestArt(scene, 'geralt_invocation')) ov.setFlipX(dir < 0);
+  ov.setDepth(g.depth);
+  g.setVisible(false);
+  d.trance = ov;
+  // Cible : là où se tient Agarica quand la colonne apparaît.
+  const tx = Phaser.Math.Clamp(p.x, GERALT_DUEL.minX + 60, GERALT_DUEL.maxX - 60);
+  let col = null;
+  let glow = null;
+  try {
+    // 1. Préparation puis élévation (Geralt flotte, pieds relâchés).
+    await a2Wait(scene, 250);
+    await a2Tween(scene, { targets: ov, y: groundY - GERALT_INVOCATION.lift, duration: 650, ease: 'Sine.easeOut' });
+    if (!alive()) return;
+    const bob = scene.tweens.add({ targets: ov, y: groundY - GERALT_INVOCATION.lift - 6, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // 2. Canalisation (yeux blancs, bras levés) et colonne de lumière sur
+    // Agarica : Clak s'efface à côté de Geralt… pour se matérialiser dedans.
+    ov.playManifest('channel', false);
+    scene.time.delayedCall(330, () => { if (ov.active && ov.anims) ov.anims.pause(); });
+    if (clak) scene.tweens.add({ targets: clak, alpha: 0, duration: 300 });
+    col = addManifestSprite(scene, tx, groundY + 2, 'vfx_invocation_clak', 'idle');
+    col.setDepth(g.depth + 1).setAlpha(0);
+    if (col.anims) col.anims.pause();
+    scene.tweens.add({ targets: col, alpha: 1, duration: 260 });
+    glow = a2Glow(scene, tx, groundY - 120, 220, 0xfff6e0, 0, g.depth);
+    scene.tweens.add({ targets: glow, alpha: 0.55, duration: 600 });
+    a2Float(scene, tx, groundY - 280, '!', '#ffffff', { size: 26, ms: 900 });
+    a2Fx(scene, 'motes', tx, groundY - 120, { count: 14, color: 0xfff6e0, spread: 60 });
+    await a2Wait(scene, 450);
+    if (!alive()) return;
+    if (col.anims) col.anims.resume();
+    await a2Wait(scene, GERALT_INVOCATION.telegraphMs - 750);
+    if (!alive()) return;
+    // 3. Pic d'énergie.
+    scene.cameras.main.flash(220, 255, 250, 235);
+    scene.cameras.main.shake(260, 0.006);
+    if (typeof juiceShockRing === 'function') juiceShockRing(scene, tx, groundY - 130, { size: 170, color: 0xfff6e0 });
+    a2Float(scene, ov.x, ov.y - 120, 'CRABE… ANCESTRAL !', '#fff6e0', { size: 18 });
+    await a2Wait(scene, 300);
+    if (!alive()) return;
+    // 4. Dissipation : la colonne s'efface, Clak reste suspendu un instant…
+    if (clak) {
+      scene.tweens.killTweensOf(clak);
+      // Fondu croisé avec le Clak de la colonne (même hauteur) : pas de doublon.
+      clak.setPosition(tx, groundY - 140).setAlpha(0).setVisible(true);
+      setNpcFacing(clak, -dir);
+      clak.playManifest('idle');
+      scene.tweens.add({ targets: clak, alpha: 1, duration: 220 });
+    }
+    const fading = [col, glow];
+    col = null;
+    glow = null;
+    scene.tweens.add({ targets: fading, alpha: 0, duration: 260, onComplete: () => fading.forEach((o) => o.destroy()) });
+    await a2Wait(scene, 380);
+    if (!alive()) return;
+    // 5. … puis retombe lourdement. Agarica encore dessous : bousculée.
+    if (clak) await a2Tween(scene, { targets: clak, y: groundY, duration: 300, ease: 'Quad.easeIn' });
+    if (!alive()) return;
+    scene.cameras.main.shake(160, 0.006);
+    a2Fx(scene, 'land', tx, groundY, { power: 0.8 });
+    if (clak) clak.playManifest('snap', false);
+    const pl = scene.player;
+    if (Math.abs(pl.x - tx) < GERALT_INVOCATION.hitHalfW && pl.body.bottom > groundY - 90) {
+      const away = pl.x >= tx ? 1 : -1;
+      pl.setVelocity(away * 320, -360);
+      a2Float(scene, pl.x, pl.y - 90, 'Pincée !', '#ffb0b0');
+    } else {
+      a2Float(scene, tx, groundY - 40, 'Clac… ?', '#ff9f70', { size: 14 });
+    }
+    // 6. Fin de transe : les yeux reviennent, Geralt redescend sur la surface.
+    bob.stop();
+    if (ov.anims) ov.anims.resume();
+    await a2Tween(scene, { targets: ov, y: groundY, duration: 420, ease: 'Quad.easeIn' });
+    if (!alive()) return;
+    a2Fx(scene, 'land', ov.x, groundY, { power: 0.4 });
+    a2Float(scene, ov.x, groundY - 100, 'Il est lourd, cet ancêtre…', '#ffd27a');
+    await a2Wait(scene, 600);
+    if (clak && alive()) {
+      clak.playManifest('scuttle');
+      const back = Phaser.Math.Clamp(ov.x - dir * 55, GERALT_DUEL.minX + 50, GERALT_DUEL.maxX - 50);
+      setNpcFacing(clak, back > clak.x ? 1 : -1);
+      await a2Tween(scene, { targets: clak, x: back, duration: 500 });
+      clak.playManifest('idle');
+    }
+  } finally {
+    d.trance = null;
+    if (col && col.active) col.destroy();
+    if (glow && glow.active) glow.destroy();
+    if (ov.active) ov.destroy();
+    if (g.active) {
+      g.setVisible(true).setY(groundY);
+      g.playManifest('idle');
+    }
+    if (clak && clak.active) {
+      scene.tweens.killTweensOf(clak);
+      clak.setAlpha(1).setVisible(true).setY(groundY);
+    }
+  }
+}
+
 async function a2GeraltTechnique(scene, d, g, tech) {
   const clak = a2Npc(scene, 'clak');
   const dir = a2GeraltDir(scene, g);
   setNpcFacing(g, dir);
   const clampX = (x) => Phaser.Math.Clamp(x, GERALT_DUEL.minX + 50, GERALT_DUEL.maxX - 50);
-  if (tech === 'fleche') {
+  if (tech === 'invocation') {
+    await a2GeraltInvocation(scene, d, g, dir);
+  } else if (tech === 'fleche') {
     a2Float(scene, g.x, g.y - 85, 'Flèche du Héron Silencieux !', '#ffd27a');
     g.playManifest('attack_miss', false);
     await a2Wait(scene, 750);
@@ -519,37 +656,13 @@ async function a2DuelFinish(scene, reason) {
   await runCutscene(scene, 'geralt_fin_duel');
 }
 
-// Brume du bas qui se déchire et lumière du jour qui grandit en montant.
-function a2Ff1Atmosphere(scene) {
-  const { width, height } = scene.scale;
-  const st = scene.__a2;
-  st.sky = a2SkyWash(scene, 0x9fd3ff, 0);
-  st.mist = scene.add.rectangle(0, 0, width, height, 0xd6dcef, 0.32).setOrigin(0).setScrollFactor(0).setDepth(880);
-  st.sun = a2Glow(scene, width - 150, 70, 260, 0xfff1c0, 0, 881).setScrollFactor(0);
-  st.puffs = [];
-  for (let i = 0; i < 9; i++) {
-    const puff = scene.add.ellipse(300 + i * 380, 380 - (i % 3) * 90, 420, 120, 0xe8ecff, 0.18)
-      .setScrollFactor(0.6).setDepth(882);
-    st.puffs.push(puff);
-  }
-}
-
-function a2Ff1AtmosphereUpdate(scene) {
-  const st = scene.__a2;
-  if (!st.mist) return;
-  const t = Phaser.Math.Clamp((scene.player.x - 1700) / 1500, 0, 1);
-  st.mist.setAlpha(0.32 * (1 - t));
-  st.sky.setAlpha(0.55 * t);
-  st.sun.setAlpha(0.75 * t);
-  st.puffs.forEach((pf, i) => pf.setAlpha(0.18 * (1 - t) + (i % 2 ? 0.02 : 0)));
-}
-
 ZONE_SCRIPTS.acte2_ff1 = {
-  create(scene) {
-    a2Ceiling(scene);
+  create(scene, data) {
+    // La montée vers le ciel (caméra verticale, `skyReveal` : LevelKit)
+    // remplace l'ancienne brume dessinée ici et le plafond à y = 0.
+    if (!(data && data.camera && data.camera.vertical)) a2Ceiling(scene);
     scene.__a2 = { duel: null, walls: null };
     a2InteractReset(scene);
-    a2Ff1Atmosphere(scene);
     if (storyGet('geraltMet')) {
       // Revisite : Geralt au pied de la corniche, plongé dans sa carte.
       const g = a2Npc(scene, 'geralt');
@@ -561,7 +674,6 @@ ZONE_SCRIPTS.acte2_ff1 = {
   update(scene) {
     const st = scene.__a2;
     if (!st) return;
-    a2Ff1AtmosphereUpdate(scene);
     if (!storyGet('geraltMet') && !st.encounterStarted && scene.player.x > 920 && scene.player.x < 1500) {
       st.encounterStarted = true;
       a2Ff1Encounter(scene).catch((e) => { if (scene.sys.isActive() && scene.player) console.error('rencontre Geralt', e); });
@@ -577,11 +689,6 @@ Object.assign(DIALOGUES, {
   ff2_totem_poche: [
     { who: 'agarica', text: 'Qu\'est-ce que c\'est ? Un petit totem… fendu en deux, et tout froid.' },
     { who: 'xara', text: 'Ancien. Les gardiens en portaient sur eux. Garde-le : les vieilles choses ont la mémoire longue.' },
-  ],
-  amanite_apres: [
-    { who: 'agarica', text: 'Amanite, attends !' },
-    { who: 'agarica', text: '… Elle n\'était pas comme ça, avant. Elle voulait aider, elle aussi.', pose: 'sad' },
-    { who: 'xara', text: 'Elle veut toujours sauver la forêt. C\'est bien ce qui m\'inquiète.' },
   ],
   ff2_envol: [
     { who: 'agarica', text: 'Xara, là, en contrebas ! Ce cercle vert, au milieu de la mousse… La plante !' },
@@ -602,16 +709,11 @@ DIALOGUES.amanite_rencontre = () => {
       { who: 'agarica', text: 'Je t\'avais suppliée de la reposer. Ils m\'ont bannie quand même.' },
       { who: 'amanite', text: 'Tu ne m\'as pas dénoncée aux gardes. Pour eux, c\'était pareil. Je suis désolée.' },
     ]),
-    { who: 'agarica', text: 'Où est l\'idole ?' },
-    { who: 'amanite', text: 'En sécurité. Avec moi, elle sert enfin à quelque chose.' },
     { who: 'agarica', text: 'Et cette bête… tu l\'as tuée. Elle était malade ! Kainati aussi l\'était : je l\'ai épargné, et la mousse l\'a quitté.' },
-    { who: 'amanite', text: 'Un singe qui a eu de la chance. Celle-là, il n\'y avait plus rien à sauver dedans.' },
     { who: 'amanite', text: 'On arrache la mauvaise herbe, Agarica. On ne la console pas.' },
     { who: 'agarica', text: 'Ce ne sont pas des mauvaises herbes. Ce sont les animaux de notre forêt !' },
     { who: 'amanite', text: 'Tu as toujours eu le cœur trop grand. C\'est pour ça que je t\'aime bien… et pour ça que la forêt te dévorera.' },
-    { who: 'amanite', text: 'Et ça ? Une araignée ? Tu voyages avec une araignée, maintenant ?' },
-    { who: 'xara', text: 'Enchantée, moi aussi.' },
-    { who: 'amanite', text: '… Je vais jusqu\'à la source de la mousse. Seule. Ne te mets pas en travers de mon chemin.' },
+    { who: 'amanite', text: 'Je vais jusqu\'à la source de la mousse. Seule. Ne te mets pas en travers de mon chemin.' },
   ];
 };
 
@@ -642,16 +744,27 @@ CUTSCENES.amanite_rencontre = (scene) => {
     { npcFace: { npc: 'amanite', dir: 'player' } },
     { say: 'amanite_rencontre' },
     { call: (sc) => a2AmaniteLeaves(sc) },
-    { say: 'amanite_apres' },
     { set: { amaniteMet: true } },
-    // L'indice du totem : en bulle, après le dialogue.
-    { call: (sc) => storyBulles(sc, ['Plus haut, sur l\'île au-dessus de nous : un totem t\'attend. Le bond du singe devrait suffire.']) },
+    // Après son départ : remarques et indice du totem en bulles.
+    { call: (sc) => storyBulles(sc, [
+      { who: 'agarica', text: '… Elle n\'était pas comme ça, avant. Elle voulait aider, elle aussi.' },
+      'Elle veut toujours sauver la forêt. C\'est bien ce qui m\'inquiète.',
+      'Plus haut, sur l\'île au-dessus de nous : un totem t\'attend. Le bond du singe devrait suffire.',
+    ]) },
     { cameraFollow: true },
   ];
 };
 
-// Petite bête de mousse dessinée (Amanite l'abat à l'arrivée d'Agarica).
+// Petite bête de mousse qu'Amanite abat à l'arrivée d'Agarica : l'art de la
+// créature de mousse (manifest `mousse_creature`, posée sur le sol, tournée
+// vers Amanite) ; le dessin par code ne reste qu'en repli sans l'art.
 function a2DrawMossBeast(scene, x, y) {
+  if (hasManifestArt(scene, 'mousse_creature')) {
+    const spr = addManifestSprite(scene, x, storyStandY(scene, x, y), 'mousse_creature', 'idle');
+    spr.setFlipX(true);
+    storyPutBehindPlayer(scene, spr);
+    return spr;
+  }
   const g = scene.add.graphics({ x, y });
   g.fillStyle(0x2f5a2a, 1);
   g.fillEllipse(0, -22, 64, 44);
@@ -681,7 +794,8 @@ async function a2AmaniteStrike(scene, st) {
     const m = scene.add.circle(beast.x + Phaser.Math.Between(-30, 30), beast.y - 30, Phaser.Math.Between(3, 7), 0x6fae3a);
     scene.tweens.add({ targets: m, y: beast.y - 2, x: m.x + Phaser.Math.Between(-30, 30), alpha: 0, duration: 600, onComplete: () => m.destroy() });
   }
-  await a2Tween(scene, { targets: beast, scaleY: 0.25, alpha: 0.55, duration: 500, ease: 'Quad.easeIn' });
+  if (beast.anims && hasManifestArt(scene, 'mousse_creature', 'death')) beast.playManifest('death', false);
+  await a2Tween(scene, { targets: beast, scaleY: beast.scaleY * 0.25, alpha: 0.55, duration: 500, ease: 'Quad.easeIn' });
   await showDialogue(scene, ['Sur la grande île, une silhouette rouge vient d\'abattre sa lance sur une bête couverte de mousse.']);
   a.playManifest('idle');
 }
@@ -703,32 +817,14 @@ async function a2AmaniteLeaves(scene) {
   a.destroy();
 }
 
-// Décor : ruines de gardiens, îlots lointains, forêt malade à l'horizon.
-function a2Ff2Decor(scene) {
-  const st = scene.__a2;
-  st.sky = a2SkyWash(scene, 0x9fd3ff, 0.55);
-  a2Glow(scene, scene.scale.width - 140, 80, 300, 0xfff1c0, 0.7, 881).setScrollFactor(0);
-  // Îlots lointains (parallaxe lente) et horizon malade, vers la droite.
-  const far = scene.add.graphics().setScrollFactor(0.25);
-  const bg = scene.children.list.find((o) => o.type === 'TileSprite');
-  far.fillStyle(0x6f8fb0, 0.55);
-  [[200, 150, 140], [520, 230, 90], [900, 120, 170], [1250, 210, 110]].forEach(([x, y, w]) => {
-    far.fillEllipse(x, y, w, w * 0.28);
-    far.fillTriangle(x - w * 0.35, y + 4, x + w * 0.35, y + 4, x, y + w * 0.45);
-  });
-  far.fillStyle(0x1f3a1a, 0.85);
-  far.fillEllipse(1500, 470, 900, 160);
-  far.fillStyle(0x6fdc3a, 0.25);
-  far.fillEllipse(1500, 440, 500, 60);
-  if (bg) a2PlaceAbove(scene, far, st.sky);
-}
-
 ZONE_SCRIPTS.acte2_ff2 = {
-  create(scene) {
-    a2Ceiling(scene);
+  create(scene, data) {
+    // Caméra verticale + ciel révélé (donnée de zone) : plus de plafond à
+    // y = 0, ni de voile de ciel, d'îles lointaines ou d'horizon sombre
+    // dessinés ici (formes provisoires retirées).
+    if (!(data && data.camera && data.camera.vertical)) a2Ceiling(scene);
     scene.__a2 = { hadEagle: !!storyGet('hasEagleForm'), revealQueued: false, beast: null };
     a2InteractReset(scene);
-    a2Ff2Decor(scene);
     if (!storyGet('amaniteMet')) scene.__a2.beast = a2DrawMossBeast(scene, 2070, 384 + GROUND_STAND_SINK);
     else {
       // Trace du passage d'Amanite : une flaque de mousse morte.
@@ -777,9 +873,7 @@ Object.assign(DIALOGUES, {
     { who: 'xara', text: 'Sage. Les racines restent, la fleur repoussera.' },
   ],
   plante_apres: [
-    { who: 'agarica', text: 'Merci, petite plante. Je te promets d\'en prendre soin.' },
     { who: 'xara', text: 'Une guérisseuse saurait quoi en faire. Il y en a une, pas loin d\'ici… je sens ses papillons.' },
-    { who: 'agarica', text: 'Ses papillons ?' },
     { who: 'xara', text: 'Les voilà. Suis-les.' },
   ],
   plante_revue: [
@@ -966,7 +1060,6 @@ Object.assign(DIALOGUES, {
   ],
   morgat_fleur: [
     { who: 'agarica', text: 'Une fleur de la plante. Je n\'en ai pris qu\'une, promis. Elle est pour vous.' },
-    'Agarica tend la fleur. Les papillons s\'y posent un instant, comme pour la saluer.',
     { who: 'morgat', text: 'Une seule, et cueillie avec respect. Tu as de bonnes mains. Laisse-moi faire.' },
   ],
   morgat_repulsif: [
@@ -974,26 +1067,19 @@ Object.assign(DIALOGUES, {
     { who: 'morgat', text: 'En bas, dans la forêt sombre, un mur de mousse étouffe un vieux passage depuis des lunes. Le sentier, là-bas, y descend.' },
   ],
   morgat_antidote: [
-    { who: 'morgat', text: 'Le reste de la fleur, je le garde. Il me faut du temps pour un vrai antidote.' },
-    { who: 'agarica', text: 'Un antidote ? Pour… les animaux ?' },
-    { who: 'morgat', text: 'Pour ceux qui peuvent encore être sauvés. Pas tous. Mes papillons sentent la différence.' },
+    { who: 'morgat', text: 'Le reste de la fleur, je le garde : il me faut du temps pour un vrai antidote. Pour les bêtes qu\'on peut encore sauver.' },
     { who: 'agarica', text: 'On peut les sauver… Je le savais !' },
   ],
   morgat_totem: [
-    { who: 'morgat', text: 'Qu\'est-ce qui dépasse de ta besace ? Montre… Un totem de poche. Fendu.' },
-    { who: 'morgat', text: 'Regarde mes petites : elles tournent autour. Il les reconnaît… ou elles le reconnaissent.' },
-    { who: 'morgat', text: 'Je ne sais pas le réparer. Ce n\'est pas de l\'herboristerie : c\'est plus vieux que moi.' },
+    { who: 'morgat', text: 'Qu\'est-ce qui dépasse de ta besace ? Un totem de poche, fendu… Regarde mes petites : elles tournent autour.' },
+    { who: 'morgat', text: 'Je ne sais pas le réparer. C\'est plus vieux que moi.' },
   ],
   morgat_promesse: [
-    { who: 'morgat', text: 'Quand l\'antidote sera prêt, mes papillons te le porteront. Où que tu sois.' },
-    { who: 'agarica', text: 'Même au cœur de la mousse ?' },
-    { who: 'morgat', text: 'Surtout là.' },
+    { who: 'morgat', text: 'Quand l\'antidote sera prêt, mes papillons te le porteront. Où que tu sois. Même au cœur de la mousse.' },
   ],
   morgat_xara_vol: [
-    { who: 'xara', text: 'Le temps presse. À pied, il nous faudrait des jours pour rejoindre le cœur de la mousse.' },
-    { who: 'xara', text: 'Mais par les airs… Depuis la falaise, à l\'est de la hutte, tu pourrais planer droit vers lui.' },
+    { who: 'xara', text: 'À pied, il nous faudrait des jours. Mais depuis la falaise, à l\'est, tu pourrais planer droit vers le cœur de la mousse.' },
     { who: 'agarica', text: 'Planer aussi loin ? Je viens à peine d\'apprendre !' },
-    { who: 'xara', text: 'Alors c\'est le moment d\'apprendre vite.' },
     { who: 'morgat', text: 'Les apprentis tombent toujours, la première fois. Tâche de tomber sur quelque chose de mou.' },
   ],
   morgat_apres: [
@@ -1014,10 +1100,8 @@ Object.assign(DIALOGUES, {
     },
   ],
   crash_depart: [
-    { who: 'agarica', text: 'Bon. La falaise. Le vide. Et la forêt malade, tout au bout.' },
-    { who: 'xara', text: 'Je me tiens à toi. Saute, ouvre les ailes, et vise le cœur sombre, droit devant.' },
-    { who: 'agarica', text: 'Xara… et si je n\'y arrive pas ?' },
-    { who: 'xara', text: 'Alors tu tomberas plus près qu\'en marchant. C\'est déjà ça.' },
+    { who: 'agarica', text: 'Bon. La falaise. Le vide. Et la forêt malade, tout au bout. Xara… et si je n\'y arrive pas ?' },
+    { who: 'xara', text: 'Alors tu tomberas plus près qu\'en marchant. C\'est déjà ça. Saute, et vise le cœur sombre.' },
   ],
 });
 
@@ -1248,14 +1332,10 @@ ZONE_SCRIPTS.acte2_hutte = {
     const cfg = data.hutte || { x: 1000, sentierX: 420, rampeX: 2688 };
     scene.__a2 = { cfg };
     a2InteractReset(scene);
-    const sky = a2SkyWash(scene, 0x9fd3ff, 0.5);
-    // Forêt malade à l'horizon, vers l'est : la destination du vol.
-    const far = scene.add.graphics().setScrollFactor(0.3);
-    far.fillStyle(0x1f3a1a, 0.9);
-    far.fillEllipse(1500, 500, 1100, 200);
-    far.fillStyle(0x6fdc3a, 0.22);
-    far.fillEllipse(1500, 460, 640, 70);
-    a2PlaceAbove(scene, far, sky);
+    // (L'ancien horizon de forêt malade, une ellipse sombre dessinée par
+    // code, est retiré : forme provisoire. La brume du vide est la clé
+    // `liquidFloor` de la donnée.)
+    a2SkyWash(scene, 0x9fd3ff, 0.5);
     a2DrawHutte(scene, cfg.x);
     a2DrawRampe(scene, cfg.rampeX);
     a2AddInteract(scene, {
@@ -1292,7 +1372,6 @@ Object.assign(DIALOGUES, {
     { who: 'xara', text: 'Agarica ? … Agarica !' },
     { who: 'agarica', text: 'Mmh… Xara ? J\'ai… atterri ?' },
     { who: 'xara', text: 'On peut appeler ça comme ça. Tu as surtout labouré la mousse avec ton nez.' },
-    { who: 'agarica', text: 'Aïe. Tout tourne…' },
   ],
   fc1_reveil_2: [
     { who: 'agarica', text: 'Où sommes-nous ? Les arbres sont tout tordus… et la mousse respire.' },
@@ -1302,9 +1381,8 @@ Object.assign(DIALOGUES, {
     'Un campement abandonné. Sous une pierre, une page arrachée, couverte d\'une écriture pressée.',
     '« Jour 23. La mousse est plus épaisse ici que partout ailleurs. Elle pousse en spirale, autour de quelque chose. »',
     '« Les bêtes malades tournent en rond près de l\'antre. Elles ne mangent plus. Elles gardent. »',
-    '« Je n\'irai pas plus loin seul. Clak refuse aussi. Si tu lis ceci, c\'est que je suis passé par là. Ou que je l\'ai perdue. »',
-    { who: 'agarica', text: 'Geralt est venu jusqu\'ici… à pied !' },
-    { who: 'xara', text: 'Et il a vu juste. Les bêtes « gardent ». Reste à savoir quoi.' },
+    '« Je n\'irai pas plus loin seul. Clak refuse aussi. »',
+    { who: 'xara', text: 'Geralt est venu jusqu\'ici, à pied… et il a vu juste. Les bêtes « gardent ». Reste à savoir quoi.' },
   ],
   fc1_avant_arene: [
     { who: 'agarica', text: 'Ce grondement… On dirait une respiration.' },
@@ -1486,6 +1564,11 @@ ZONE_SCRIPTS.acte2_fc1 = {
     const st = scene.__a2;
     if (!st) return;
     a2UpdateMossTufts(scene, time);
+    // Points de réapparition (mort = cœurs à 0) : passé le mur de mousse qui
+    // se referme (x 420), puis aux deux feux de camp. Sans ça, une mort
+    // ramenait au cratère, DERRIÈRE le mur refermé : coincée pour de bon
+    // (trouvé au clavier simulé, chemin critique).
+    acte1RespawnAfter(scene, [{ x: 700, y: 448 }, { x: 1400, y: 448 }, { x: 3700, y: 448 }]);
     if (!storyGet('fc1MousseFermee') && scene.player.x > 640 && scene.player.x < 1000) {
       storySet('fc1MousseFermee', true);
       a2Fc1CloseBehind(scene, true);
@@ -1500,13 +1583,10 @@ ZONE_SCRIPTS.acte2_fc1 = {
 // ===========================================================================
 Object.assign(DIALOGUES, {
   ghilt_intro: [
-    { who: 'xara', text: 'Agarica… le sol vibre. Quelque chose d\'énorme respire sous la mousse.' },
     { who: 'ghilt', text: 'GRRRROOOOAAAAH !' },
     { who: 'agarica', text: 'Un tapir… gigantesque. La mousse lui coule du museau comme de la bave.' },
-    { who: 'xara', text: 'Ghil\'t, le Fléau de la Forêt. Voilà ce que les bêtes de Geralt « gardaient ».' },
-    { who: 'xara', text: 'Méfie-toi de ses charges, de son souffle… et ne marche pas dans ce qu\'il crache !' },
-    { who: 'agarica', text: 'Il souffre, Xara. Je l\'entends dans sa voix.' },
-    { who: 'agarica', text: 'Je ne fuirai pas. Mais je ne veux pas le tuer.' },
+    { who: 'xara', text: 'Ghil\'t, le Fléau de la Forêt. Méfie-toi de ses charges, de son souffle… et de ce qu\'il crache !' },
+    { who: 'agarica', text: 'Il souffre, Xara. Je ne fuirai pas… mais je ne veux pas le tuer.' },
   ],
   ghilt_chute: [
     { who: 'xara', text: 'Il aspire toute la mousse de l\'arène… Agarica, recule !' },
@@ -1519,9 +1599,7 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: 'Cette fois, je ne viens pas te combattre. Je viens te soigner.' },
   ],
   trou_reveil: [
-    { who: 'agarica', text: '… Où… où suis-je ? Il fait si noir…' },
-    { who: 'xara', text: 'Je suis là, Agarica. Ne bouge pas trop vite, tu as fait une longue chute.' },
-    { who: 'agarica', text: 'Ghil\'t… il était trop fort. Je n\'ai rien pu faire.' },
+    { who: 'agarica', text: '… Où suis-je ? Il fait si noir… Ghil\'t était trop fort.' },
     { who: 'xara', text: 'Chut. Respire. Regarde, là-haut… tu vois ces petites lumières ?' },
   ],
   trou_papillons: [
@@ -1531,11 +1609,9 @@ Object.assign(DIALOGUES, {
   ],
   trou_totem: [
     { who: 'agarica', text: 'Il y en a si peu… Je devrais le boire ? Ou le lancer sur Ghil\'t ?' },
-    { who: 'xara', text: 'Ni l\'un ni l\'autre. Bu, il ne soignerait que toi. Lancé, la mousse l\'avalerait.' },
-    { who: 'xara', text: 'Ton totem de poche… il brille depuis que les papillons sont là. Verse l\'antidote dedans.' },
+    { who: 'xara', text: 'Ni l\'un ni l\'autre. Ton totem de poche brille depuis que les papillons sont là : verse l\'antidote dedans.' },
     { who: 'agarica', text: 'Comment tu sais ça, toi ?' },
     { who: 'xara', text: 'Disons que j\'ai déjà vu de vieilles choses se réveiller. Doucement, maintenant.' },
-    { who: 'agarica', text: 'D\'accord… goutte à goutte.' },
   ],
   trou_sortie: [
     { who: 'agarica', text: 'Le totem est tout chaud… Je sens les papillons, comme s\'ils faisaient partie de moi.' },
@@ -1543,13 +1619,9 @@ Object.assign(DIALOGUES, {
     { who: 'agarica', text: 'Ils montent vers la lumière… Ils nous montrent le chemin.' },
   ],
   ghilt_soin: [
-    { who: 'agarica', text: 'Regarde, Xara… la mousse se retire !' },
-    { who: 'xara', text: 'Il respire… doucement. Il n\'a plus rien d\'un fléau.' },
-    { who: 'ghilt', text: '… Mmmh…' },
+    { who: 'agarica', text: 'Regarde, Xara… la mousse se retire ! Il respire, doucement.' },
     { who: 'agarica', text: 'Tu n\'étais pas un monstre. Tu étais malade, comme la forêt.' },
-    { who: 'xara', text: 'Cette marque, sur son flanc…' },
-    { who: 'agarica', text: 'Quelle marque ?' },
-    { who: 'xara', text: 'Rien. Plus tard.' },
+    { who: 'xara', text: 'Cette marque, sur son flanc… Rien. Plus tard.' },
   ],
   ghilt_amanite: [
     { who: 'agarica', text: 'Amanite ?! NON !' },
@@ -1562,10 +1634,8 @@ Object.assign(DIALOGUES, {
   ],
   ghilt_geralt: [
     { who: 'geralt', text: 'Par toutes les racines… j\'arrive trop tard, hein ?' },
-    { who: 'clak', text: 'Clac…' },
     { who: 'agarica', text: 'Geralt… je l\'avais soigné. Amanite l\'a achevé sous mes yeux.' },
-    { who: 'geralt', text: 'J\'ai vu les papillons de loin. Et j\'ai vu la mousse reculer. Ça, petite, personne ne l\'avait jamais fait.' },
-    { who: 'geralt', text: 'Regarde-le : la mousse le rongeait de l\'intérieur. Il était malade, pas la maladie. La source est ailleurs.' },
+    { who: 'geralt', text: 'J\'ai vu la mousse reculer. Ça, petite, personne ne l\'avait jamais fait. Il était malade, pas la maladie : la source est ailleurs.' },
     { who: 'geralt', text: 'Viens. On rentre au bosquet. Ton père doit entendre la vérité… de ma bouche, s\'il le faut.' },
   ],
 });

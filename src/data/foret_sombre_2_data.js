@@ -104,6 +104,7 @@ const FORET_SOMBRE_2_DATA = {
     { type: 'foret_sombre_fougere_sombre', x: 4980, y: 192, scale: 0.26 },
     { type: 'foret_sombre_pierre_runique', x: 4620, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.32 }, // la poche secrète
     { type: 'foret_sombre_champignons_lumineux', x: 4900, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.26 },
+    { type: 'foret_sombre_racine_arche', x: 5050, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.34 },   // le vieux sentier de la hutte
     { type: 'foret_sombre_racine_arche', x: 5580, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.45 }, // vers les racines
   ],
   enemies: [

@@ -21,6 +21,14 @@ const FORET_FLOTTANTE_2_DATA = {
   tileset: 'tuiles_flottantes',
   levelWidth: 4096,
   levelHeight: 540,
+  // Au-dessus de la canopée, dans la continuité de la montée de la forêt
+  // flottante 1 : plein jour (ciel déjà révélé), caméra qui suit l'aigle en
+  // hauteur (zone morte), plus de forêt procédurale (on est au-dessus).
+  camera: { vertical: true, deadzoneTop: 0.35, deadzoneBottom: 0.7, lerp: 0.08, lookAhead: 60 },
+  skyReveal: { start: -1, end: 0, leaves: false },
+  largeTrees: false,
+  // Brume du vide sous les îles (bande devant le fond, derrière le sol).
+  liquidFloor: { y: 520, style: 'brume' },
   groundCells: [
     ...groundRow(0, 6, [5, 6]),     // I0 arrivée (surface 320)
     ...groundRow(8, 11, [6]),       // I1 (surface 384)

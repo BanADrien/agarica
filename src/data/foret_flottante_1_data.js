@@ -1,18 +1,26 @@
 // Zone « foret_flottante_1 » — le chemin des hauteurs (étape 8 de PLAN_DEV.md).
-// Logique (rencontre de Geralt, duel comique, carte, brume qui se déchire) :
+// Logique (rencontre de Geralt, duel comique, carte, vue sur le ciel) :
 // ZONE_SCRIPTS.acte2_ff1 dans src/story/acte2.js.
 //
-// Plan (grille 64, surface d'une rangée gy = 64*gy, pieds d'Agarica
-// + GROUND_STAND_SINK) :
-//   x 0-1600     grosse branche d'arrivée depuis le grand arbre + camp de Geralt
-//                (feu de camp, duel entre x 640 et 1600)
-//   x 1600-2176  fin de la branche ; corniche P1 (gy 4, +3 rangées) : il faut
-//                le bond du singe (2e saut en l'air) — Geralt, lui, n'y arrive pas
-//   x 2240-3584  branches suspendues au-dessus du vide (chute = 1 cœur),
-//                corbeaux, courant d'air encore inutilisable, belvédère P5
-//                d'où l'on voit le jour, sortie vers les îles flottantes.
-// Sauts : simple ≈ 172 px (2 rangées) ; le singe (obligatoire pour venir ici,
-// cf. barrière de l'arène) double jusqu'à ≈ 264 px (3 rangées).
+// VRAIE MONTÉE vers le ciel (2026-10-23, demande utilisateur) : la caméra
+// suit la montée (`camera.vertical`, zone morte), le ciel se révèle au-dessus
+// des cimes (`skyReveal`, forêt du fond posée en bas du monde), puis les îles
+// flottantes (sortie en HAUT à droite).
+// Plan (grille 64, surface d'une rangée gy = 64*gy) :
+//   x 0-2176     grosse branche d'arrivée depuis le grand arbre + camp de
+//                Geralt (feu de camp, duel entre x 660 et 1560)
+//   P1 x 1920-2112 (gy 4, +3 rangées) : la corniche de Geralt, il faut le
+//                bond du singe (2e saut en l'air) — Geralt, lui, n'y arrive pas
+//   P2-P9        l'ascension en zigzag au-dessus du vide (chute = 1 cœur et
+//                retour au dernier appui), de 256 à -896 (1 150 px) :
+//                marches de 2 rangées (saut simple) et 2 marches de 3 rangées
+//                (2e saut du singe, de l'aigle ou dash du papillon), écarts
+//                horizontaux de 128 px ; deux corbeaux qui ne piquent que sur
+//                une Agarica posée ; P9 = belvédère au-dessus des cimes, en
+//                plein jour (vue, créature), sortie vers les îles à droite.
+// Sauts : simple ≈ 172 px (2 rangées) ; singe ≈ 264 px, aigle ≈ 284 px
+// (3 rangées). Pas de liane ici : le chemin reste faisable avec n'importe
+// quelle forme aérienne (retours depuis les îles avec l'aigle ou le papillon).
 const FORET_FLOTTANTE_1_DATA = {
   zoneName: 'Le chemin des hauteurs',
   zoneSub: 'Forêt flottante',
@@ -20,25 +28,38 @@ const FORET_FLOTTANTE_1_DATA = {
   tileset: 'tuiles_ecorce',
   levelWidth: 3584,
   levelHeight: 540,
+  // Monde et caméra jusqu'à y -1200 : le belvédère (-896) garde du ciel au-dessus.
+  levelTop: -1200,
+  camera: { vertical: true, deadzoneTop: 0.35, deadzoneBottom: 0.7, lerp: 0.08, lookAhead: 60 },
+  // Le ciel se découvre entre 10 % et 85 % de la course verticale de la caméra.
+  skyReveal: { start: 0.1, end: 0.85 },
+  // Forêt du fond posée sous la grosse branche (bas du monde), voilée de brume
+  // au-dessus du vide.
+  backgroundBaseline: 540,
+  liquidFloor: { y: 500, style: 'brume' },
   groundCells: [
     // (groundRow : borne de fin exclue)
     ...groundRow(0, 34, [7, 8]),   // branche maîtresse (x 0-2176)
     ...groundRow(30, 33, [4]),     // P1 : la corniche de Geralt (x 1920-2112, surface 256)
-    ...groundRow(35, 38, [3]),     // P2 (x 2240-2432, surface 192)
-    ...groundRow(40, 42, [5]),     // P3 (x 2560-2688, surface 320)
-    ...groundRow(43, 46, [3]),     // P4 (x 2752-2944, surface 192)
-    ...groundRow(47, 56, [2]),     // P5 belvédère (x 3008-3584, surface 128)
+    ...groundRow(35, 38, [2]),     // P2 (x 2240-2432, surface 128)
+    ...groundRow(40, 43, [-1]),    // P3 (x 2560-2752, surface -64) : 3 rangées
+    ...groundRow(45, 48, [-3]),    // P4 (x 2880-3072, surface -192)
+    ...groundRow(40, 43, [-5]),    // P5 (x 2560-2752, surface -320) : demi-tour, point de reprise
+    ...groundRow(35, 38, [-7]),    // P6 (x 2240-2432, surface -448)
+    ...groundRow(40, 43, [-10]),   // P7 (x 2560-2752, surface -640) : 3 rangées
+    ...groundRow(45, 48, [-12]),   // P8 (x 2880-3072, surface -768)
+    ...groundRow(50, 56, [-14]),   // P9 belvédère au-dessus des cimes (x 3200-3584, surface -896)
   ],
   avoidRanges: [[2176, 3584]],
   playerSpawn: { x: 110, y: 412 },
   fall: { y: 600, mode: 'hurt' },
   campfires: [{ x: 820, y: 448 }],
   // Points de reprise (mort = retour ici, pas au tout début de la zone) :
-  // sur la corniche de Geralt et à l'entrée du belvédère, après les corbeaux.
-  checkpoints: [{ x: 2050, y: 256 }, { x: 3060, y: 128 }],
+  // corniche de Geralt, demi-tour P5, belvédère.
+  checkpoints: [{ x: 2050, y: 256 }, { x: 2600, y: -320 }, { x: 3260, y: -896 }],
   // Décors de la forêt flottante (`foret_flottante`) : le camp de Geralt (sa
   // tente, son panneau couvert de notes, ses caisses et sa bûche), puis des
-  // fleurs en approchant de la lumière.
+  // fleurs en montant vers la lumière.
   props: [
     { type: 'foret_flottante_arbre_jeune', x: 300, y: 448, scale: 0.45 },
     { type: 'foret_flottante_panneau_geralt', x: 600, y: 448, scale: 0.36 },
@@ -48,11 +69,12 @@ const FORET_FLOTTANTE_1_DATA = {
     { type: 'bosquet_tree_stump', x: 1500, y: 448, scale: 0.35 },
     { type: 'foret_flottante_fleurs_hautes', x: 1700, y: 448, scale: 0.3 },
     { type: 'foret_flottante_pissenlit_geant', x: 1840, y: 448, scale: 0.32 },
-    { type: 'foret_flottante_fleurs_hautes', x: 3430, y: 128, scale: 0.28 },       // le belvédère
-    // Ruines d'anciens totems animaux sur le belvédère (remplacent les
-    // piliers dessinés par le script).
-    { type: 'bosquet_standing_stone', x: 3120, y: 128, scale: 0.34 },
-    { type: 'bosquet_standing_stone', x: 3260, y: 128, scale: 0.24 },
+    { type: 'foret_flottante_fleurs_hautes', x: 3010, y: -192, scale: 0.24 },     // P4
+    { type: 'foret_flottante_pissenlit_geant', x: 2290, y: -448, scale: 0.26 },   // P6
+    { type: 'foret_flottante_fleurs_hautes', x: 3540, y: -896, scale: 0.28 },     // le belvédère
+    // Ruines d'anciens totems animaux sur le belvédère.
+    { type: 'bosquet_standing_stone', x: 3340, y: -896, scale: 0.34 },
+    { type: 'bosquet_standing_stone', x: 3396, y: -896, scale: 0.24 },
   ],
   npcs: [
     // Avant le duel, Geralt n'a rien à dire (le script lance la rencontre).
@@ -61,32 +83,33 @@ const FORET_FLOTTANTE_1_DATA = {
   ],
   triggers: [
     { id: 'intro', x: 330, w: 64, cutscene: 'ff1_intro' },
-    // Juste après le point de reprise du belvédère, hors de portée de la
-    // créature de mousse (correctif : elle frappait à la fin de la cinématique).
-    { id: 'vue', x: 3090, w: 64, cutscene: 'ff1_vue' },
+    // Sur le belvédère, juste après son point de reprise et hors de portée de
+    // la créature de mousse : le ciel en plein jour.
+    { id: 'vue', x: 3290, y: -940, w: 64, h: 160, cutscene: 'ff1_vue' },
   ],
   enemies: [
-    // Corbeaux adoucis (playtest : trop agressifs sur P3-P5) : piqué moins
-    // profond et plus lent, pause plus longue entre deux piqués ; le 2e ne
-    // survole plus l'entrée du belvédère (point de reprise x 3060). Ils ne
-    // piquent que sur Agarica posée (diveGroundedOnly, cf. Corbeau.js) : un
-    // coup en plein saut au-dessus du vide coûtait 2 cœurs (coup + chute) ;
-    // patrouilles resserrées au-dessus de P3 et P4 : hors de l'arc des sauts
-    // P2->P3 et P4->P5 (un corbeau qui patrouille blesse aussi au contact).
-    { type: 'corbeau', x: 2620, y: 110, patrolMinX: 2600, patrolMaxX: 2720, diveDepth: 175, diveSpeed: 240, diveCooldown: 3400, diveGroundedOnly: true },
-    { type: 'corbeau', x: 2880, y: 60, patrolMinX: 2790, patrolMaxX: 2900, diveDepth: 140, diveSpeed: 240, diveCooldown: 3400, diveGroundedOnly: true },
-    { type: 'mousse_creature', x: 3400, y: 100, patrolMinX: 3330, patrolMaxX: 3460 },
+    // Corbeaux adoucis : ils ne piquent que sur Agarica posée
+    // (diveGroundedOnly, cf. Corbeau.js) -- un coup en plein saut au-dessus
+    // du vide coûtait 2 cœurs (coup + chute) ; patrouilles au-dessus du milieu
+    // de P4 et de P6, hors de l'arc des sauts qui y arrivent ou en partent
+    // (bot : au-dessus de P7, un corbeau heurtait le double saut P6 → P7 ; au-
+    // dessus de P8, il frappait au moment du saut vers le belvédère).
+    { type: 'corbeau', x: 2980, y: -420, patrolMinX: 2935, patrolMaxX: 3025, diveDepth: 150, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
+    { type: 'corbeau', x: 2330, y: -650, patrolMinX: 2285, patrolMaxX: 2375, diveDepth: 160, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
+    { type: 'mousse_creature', x: 3480, y: -940, patrolMinX: 3420, patrolMaxX: 3540 },
   ],
   // Visible mais inutilisable sans l'aigle (il n'agit que sur le plané) : on le
-  // remarque ici, on s'en sert dans les îles flottantes.
-  windCurrents: [{ x: 2470, y: 60, w: 70, h: 480, force: 300 }],
+  // remarque ici, on s'en sert dans les îles flottantes (au retour, il remonte
+  // l'aigle le long de l'ascension).
+  windCurrents: [{ x: 3120, y: -760, w: 60, h: 1240, force: 300 }],
   entries: [
     { id: 'from_arbre', x: 110, y: 400, height: 128 },
-    { id: 'from_ff2', x: 3490, y: 70, height: 120 },
+    { id: 'from_ff2', x: 3490, y: -950, height: 120 },
   ],
   exits: [
     { x: 16, y: 400, height: 128, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_foret_flottante' } },
-    { x: 3568, y: 70, height: 140, targetScene: 'ForetFlottante2Scene', data: { enterId: 'from_ff1' } },
+    // En haut à droite, au bout du belvédère : les îles flottantes.
+    { x: 3568, y: -960, height: 160, targetScene: 'ForetFlottante2Scene', data: { enterId: 'from_ff1' } },
   ],
   script: 'acte2_ff1',
 };

@@ -53,7 +53,19 @@ const MONDE_SPIRITUEL_DATA = {
     { x: 1470, y: 384 },
     { x: 2400, y: MONDE_SPIRITUEL_SURFACE_Y }, // là où l'on marche après l'atterrissage
   ],
+  // Décors sobres du grand arbre (section `grand_arbre`), loin des lianes et
+  // des lanternes : lucioles à l'arrivée, champignons sur l'îlot, autel du
+  // peuple singe au pied de l'arbre spirituel.
+  props: [
+    { type: 'grand_arbre_lanterne_lucioles', x: 120, y: MONDE_SPIRITUEL_SURFACE_Y, scale: 0.26 },
+    { type: 'grand_arbre_champignon_etagere', x: 1390, y: 384, scale: 0.24 },
+    { type: 'grand_arbre_autel_singe', x: 2700, y: MONDE_SPIRITUEL_SURFACE_Y, scale: 0.3 },
+  ],
   fall: { y: 520, mode: 'respawn' },
+  // Brume d'esprit au fond des vides : cache le pied des arbres du fond, posés
+  // sur la même ligne (LevelKit, clés liquidFloor / backgroundBaseline).
+  backgroundBaseline: 500,
+  liquidFloor: { y: 486, style: 'brume', color: 0x1d4a5a },
   triggers: [
     { id: 'fin', x: 2420, w: 60, cutscene: 'esprit_fin' },
   ],

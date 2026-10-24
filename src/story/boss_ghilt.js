@@ -368,11 +368,15 @@ function ghiltArenaWalls(scene) {
   const walls = scene.physics.add.staticGroup();
   const gy = ghArenaGroundY(scene, 300);
   for (const x of [GHILT_ARENA.wallLeft, GHILT_ARENA.wallRight]) {
-    const g = scene.add.graphics();
-    g.fillStyle(0x2f5d1f, 1);
-    g.fillRoundedRect(x - 26, gy - 300, 52, 300, 18);
-    g.fillStyle(0x6fae3a, 1);
-    for (let i = 0; i < 6; i++) g.fillCircle(x + ((i % 2) ? 10 : -10), gy - 30 - i * 48, 16);
+    // Art `mousse_mur` (comme le mur qui se referme en forêt corrompue) via
+    // drawMossVisual (StoryKit), qui garde un dessin par code en repli.
+    if (typeof drawMossVisual === 'function') {
+      drawMossVisual(scene, x, gy - 150, 60, 300, 'mousse_mur', true);
+    } else {
+      const g = scene.add.graphics();
+      g.fillStyle(0x2f5d1f, 1);
+      g.fillRoundedRect(x - 26, gy - 300, 52, 300, 18);
+    }
     const z = scene.add.zone(x, gy - 300, 40, 600);
     scene.physics.add.existing(z, true);
     walls.add(z);

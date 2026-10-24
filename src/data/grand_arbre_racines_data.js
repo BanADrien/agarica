@@ -9,7 +9,7 @@
 //                son toit (y=192) est un chemin de racines (singe corrompu)
 //   x 1344-1600  butte de racine (y=320, marches y=384), marche vers le toit
 //   x 1344-1728  BRANCHE DE LA FOURCHE (y=64) : feu de camp. Deux routes :
-//     à gauche   branche d'élan (y=-128) → 3 LIANES au-dessus du vide → corniche
+//     à gauche   branche d'élan (y=-128) → 2 LIANES au-dessus du vide → corniche
 //                (x 0-320, y=-128) et fente de l'ÉPREUVE DU SINGE. Sans singe,
 //                le vide (640 px) est infranchissable : on retombe sur le toit.
 //     à droite   branche y=0 → GRANDE BRANCHE HAUTE (y=-192, x 2176-3200) :
@@ -53,19 +53,21 @@ const GRAND_ARBRE_RACINES_DATA = {
     ...groundRow(0, 5, [-2]),       // corniche de l'épreuve du singe (x 0-320, y=-128)
     ...groundRow(29, 32, [-1]),     // branche intermédiaire (x 1856-2048, y=0)
     ...groundRow(34, 50, [-3]),     // grande branche haute (x 2176-3200, y=-192)
-    ...groundRow(13, 14, [-7]), ...groundRow(8, 9, [-7]), // accroches des deux lianes
+    ...groundRow(13, 14, [-7]), ...groundRow(6, 7, [-7]), // accroches des deux lianes
   ],
   // Le tronc (x ~1540-2120) est dessiné par le script de zone, derrière les branches.
   playerSpawn: { x: 110, y: 412 },
   // Lianes de l'épreuve : décor sans la forme singe (Xara le remarque).
   // (x, y = attache en haut ; bas à ~110 px au-dessus de la branche d'élan.)
-  // Une sur deux retirée (celle du milieu) : 320 px d'écart, il faut lâcher
-  // avec l'élan (demande utilisateur).
+  // Une sur deux retirée (celle du milieu), puis écart porté à 448 px pour le
+  // lâcher puissant (2026-10-23) : fenêtre de lâcher ~630 ms vers la 2e liane,
+  // ~850 ms vers la corniche ; la 1re seule n'atteint jamais la corniche (bot
+  // de liane, cf. compte rendu Niveaux 2).
   // Chaque liane pend sous un bloc (rangée -7, au ras du haut du monde :
   // au-dessus de la tête d'Agarica quand elle saute depuis la branche d'élan).
   vines: [
     { x: 864, y: -384, length: 244 },
-    { x: 544, y: -384, length: 244 },
+    { x: 416, y: -384, length: 244 },
   ],
   enemies: [
     // Dans le tunnel : la mousse qui remonte vers le tronc.

@@ -112,8 +112,8 @@ const BOSQUET_DATA = {
   ],
   triggers: [
     { id: 'intro', x: 150, w: 200, cutscene: 'bosquet_intro' },
-    { id: 'tuto_saut', x: 520, w: 40, cutscene: [{ toast: 'Espace : sauter' }] },
-    { id: 'tuto_parler', x: 760, w: 40, cutscene: [{ toast: 'E : parler aux habitants.' }] },
+    { id: 'tuto_saut', x: 520, w: 40, cutscene: 'bosquet_tuto_saut' },
+    { id: 'tuto_parler', x: 760, w: 40, cutscene: 'bosquet_tuto_parler' },
     { id: 'aide', x: 1760, w: 40, cutscene: 'bosquet_aide_debut' },
     // Barrières douces (rejouables) : on ne saute pas une étape de l'histoire.
     { id: 'barriere_aide', x: 2400, w: 30, once: false, forbids: { aideFaite: true }, cutscene: 'bosquet_barriere_aide' },
