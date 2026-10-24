@@ -51,17 +51,45 @@ function a2Float(scene, x, y, text, color = '#ffe9f5', { size = 16, ms = 1400 } 
 }
 
 // Murs invisibles (zones statiques pleine hauteur) : arène du duel, porte fermée.
+// Chaque mur : un x (mur de 32 px centré sur x) ou { x, out } : épaissi à
+// A2_WALL_THICK px vers l'extérieur (out = -1 : vers la gauche, +1 : vers la
+// droite) sans bouger son bord intérieur (x ∓ 16). Pourquoi : au départ du
+// sprint, la boîte du loup saute d'~40 px vers le mur ; elle chevauchait plus
+// de la moitié d'un mur de 32 px et la physique la poussait DEHORS (sortie de
+// l'arène en plein duel). Épais, le mur la renvoie toujours dedans.
+const A2_WALL_THICK = 400;
 function a2Walls(scene, xs) {
   const group = scene.physics.add.staticGroup();
-  for (const x of xs) {
-    const z = scene.add.zone(x, 0, 32, 1400);
+  group.__a2Inner = [];
+  for (const w of xs) {
+    const spec = typeof w === 'number' ? { x: w } : w;
+    const width = spec.out ? A2_WALL_THICK : 32;
+    const cx = spec.out ? spec.x - spec.out * 16 + (spec.out * width) / 2 : spec.x;
+    const z = scene.add.zone(cx, 0, width, 1400);
     scene.physics.add.existing(z, true);
     group.add(z);
+    if (spec.out) group.__a2Inner.push({ edge: spec.x - spec.out * 16, out: spec.out });
   }
   // Le collider est gardé sur le groupe : le détruire AVANT le groupe (un
   // collider orphelin fait planter la physique au pas suivant).
   group.__a2Collider = scene.physics.add.collider(scene.player, group);
   return group;
+}
+
+// Garde-fou des murs épaissis (à appeler à chaque image) : la physique
+// ignore un chevauchement plus grand que le déplacement de l'image ; si la
+// boîte du loup s'enfonce d'un coup trop loin (départ du sprint collé au
+// mur), elle traversait même un mur épais. Centre de la boîte passé de
+// l'autre côté du bord intérieur : Agarica est remise de son côté.
+function a2HoldWalls(scene, group) {
+  const p = scene.player;
+  if (!group || !group.__a2Inner || !p || !p.body) return;
+  for (const { edge, out } of group.__a2Inner) {
+    const cx = p.body.center.x;
+    if ((cx - edge) * out <= 0) continue;
+    const tx = edge - out * (p.body.width / 2 + 2);
+    p.body.reset(p.x + (tx - cx), p.y);
+  }
 }
 
 function a2DestroyWalls(group) {
@@ -172,17 +200,18 @@ Object.assign(DIALOGUES, {
     { who: 'geralt', text: 'HALTE ! Pas un pas de plus, porteuse de mousse !' },
     { who: 'agarica', text: 'Porteuse de… quoi ? Je ne porte rien du tout !' },
     { who: 'geralt', text: 'C\'est exactement ce que dirait quelqu\'un qui porte de la mousse. Ou qui vient voler mes notes.' },
-    { who: 'geralt', text: 'Geralt, ranger des marches boisées. Et voici Clak, mon totem. Tremble.' },
-    { who: 'clak', text: 'Clac clac.' },
+    // Clak n'est PAS là avant l'invocation (demande utilisateur) : Geralt
+    // parle de son totem absent, qui viendra au milieu du duel.
+    { who: 'geralt', text: 'Geralt, ranger des marches boisées. Et gardien du Crabe Ancestral, mon totem. Tremble.' },
+    { who: 'agarica', text: 'Je ne vois aucun crabe.' },
+    { who: 'geralt', text: 'Il n\'est pas là. Il viendra quand je l\'appellerai. Prie pour que je n\'aie pas à l\'appeler.' },
     { who: 'geralt', text: 'En garde ! Un duel, et la vérité éclatera !' },
   ],
   geralt_rendu_victoire: [
     { who: 'geralt', text: 'Ouille… D\'accord, d\'accord ! Je me rends. Stratégiquement.' },
+    { who: 'clak', text: 'Clac clac.' },
+    { who: 'geralt', text: 'Il dit que tu te bats bien. Il dit beaucoup de bêtises.' },
     { who: 'geralt', text: 'Rien de cassé. Juste ma réputation : Clak la recollera.' },
-  ],
-  geralt_rendu_temps: [
-    { who: 'xara', text: 'Ça suffit, vous deux. Vous allez finir par vous faire mal… lui, surtout.' },
-    { who: 'geralt', text: 'Pff. Je la tenais. Clak, dis-lui que je la tenais.' },
   ],
   geralt_paix: [
     { who: 'xara', text: 'Ranger, vous cherchez l\'origine de la mousse. Elle aussi. Vous auriez pu commencer par là.' },
@@ -227,10 +256,12 @@ CUTSCENES.ff1_vue = [
   { cameraFollow: true },
 ];
 
-// Premier contact : Geralt bondit hors de son camp.
+// Premier contact : Geralt bondit hors de son camp. La caméra se pose
+// ensuite sur l'arène (un écran de large) pour tout le duel.
 CUTSCENES.geralt_rencontre = (scene) => {
   const p = scene.player;
-  const gx = Phaser.Math.Clamp(p.x + 240, 900, 1400);
+  const gx = Phaser.Math.Clamp(p.x + 240, GERALT_ARENA.minX + 200, GERALT_ARENA.maxX - 300);
+  const midY = scene.cameras.main.midPoint.y;
   return [
     { npcMove: { npc: 'geralt', toX: gx, speed: 260 } },
     { npcFace: { npc: 'geralt', dir: 'player' } },
@@ -238,15 +269,17 @@ CUTSCENES.geralt_rencontre = (scene) => {
     { shake: { ms: 200, intensity: 0.004 } },
     { say: 'geralt_rencontre' },
     { npcAnim: { npc: 'geralt', anim: 'idle' } },
-    { toast: 'Duel ! Touche Geralt trois fois (K ou clic)… sans trop lui faire mal.' },
+    { camera: { x: (GERALT_ARENA.minX + GERALT_ARENA.maxX) / 2, y: midY, ms: 600 } },
+    { call: (sc) => a2ArenaCamera(sc, true) },
+    { toast: 'Duel ! Esquive ses flèches et ses collets, et frappe Geralt (K ou clic).' },
   ];
 };
 
-CUTSCENES.geralt_fin_duel = (scene) => {
-  const st = scene.__a2 || {};
+CUTSCENES.geralt_fin_duel = () => {
   return [
     { npcFace: { npc: 'geralt', dir: 'player' } },
-    { say: st.duelEnd === 'temps' ? 'geralt_rendu_temps' : 'geralt_rendu_victoire' },
+    { npcFace: { npc: 'clak', dir: 'player' } },
+    { say: 'geralt_rendu_victoire' },
     { say: 'geralt_paix' },
     { npcAnim: { npc: 'geralt', anim: 'map_reading' } },
     { playerPose: 'receive_item' },
@@ -326,332 +359,167 @@ async function a2GeraltComicJump(scene) {
   await a2Wait(scene, 700);
 }
 
+// Fin du duel : murs, barre de vie et caméra de l'arène retirés (appelée
+// aussi par la cinématique de fin : sans effet la 2e fois).
 function a2Ff1EndDuel(scene) {
   const st = scene.__a2;
   if (st && st.walls) { a2DestroyWalls(st.walls); st.walls = null; }
   hideBossBar(scene);
+  a2ArenaCamera(scene, false);
 }
 
-// --- Duel comique : Geralt enchaîne des « techniques » qui ratent toutes ---
-// L'invocation ouvre le duel (sinon, trois coups rapides et on ne la voyait
-// jamais) : c'est la seule vraie attaque, esquivable et sans dégât.
-const GERALT_DUEL = { minX: 660, maxX: 1560, hits: 3, timeoutMs: 40000, pauseMs: 1500 };
-const GERALT_TECHNIQUES = ['invocation', 'fleche', 'bond', 'piege', 'charge'];
-// Remarques de Xara (bulles) après la première fois de certaines techniques.
-const GERALT_XARA_BULLES = {
-  invocation: 'Un crabe… ancestral. Évidemment.',
-  fleche: 'Il vise très bien… le crabe.',
-  charge: 'Je crois que le crabe est de ton côté.',
+// --- Le duel (mécanique : src/entities/GeraltDuel.js) ---------------------
+// Un vrai combat (refonte du 2026-10-24) : flèches en cloche et droites, saut
+// avec tir plongeant puis réception ratée, collets, invocation de Clak au 4e
+// coup, phase 2 avec Clak, 8 coups pour gagner ; dernier cœur perdu = le duel
+// recommence dans l'arène. Arène : murs x 880 et 1840, soit un écran de
+// large — la caméra s'y cale (flèches, collets et Clak toujours visibles). Le
+// feu de camp (x 820) reste dehors : pas de soin en plein duel.
+const GERALT_ARENA = { minX: 880, maxX: 1840 };
+
+// Bornes horizontales de la caméra calées sur l'arène pendant le duel (la
+// montée vers le ciel garde ses bornes verticales), rendues ensuite.
+function a2ArenaCamera(scene, on) {
+  const st = scene.__a2;
+  if (!st) return;
+  const cam = scene.cameras.main;
+  if (on) {
+    if (st.camBounds) return;
+    const b = cam.getBounds();
+    st.camBounds = [b.x, b.y, b.width, b.height];
+    cam.setBounds(GERALT_ARENA.minX, b.y, GERALT_ARENA.maxX - GERALT_ARENA.minX, b.height);
+  } else if (st.camBounds) {
+    cam.setBounds(...st.camBounds);
+    st.camBounds = null;
+  }
+}
+
+// Remarques pendant le duel (bulles, rien ne se fige) : Xara conseille,
+// Geralt fanfaronne. Une fois par visite chacune.
+const GERALT_DUEL_BULLES = {
+  lob: ['xara', 'Regarde le sol : sa flèche tombe là où ça rougeoie !'],
+  shot: ['xara', 'Une flèche droite : saute, ou coupe-la en vol !'],
+  trap: ['xara', 'Un collet. Saute par-dessus… et attire-le dessus !'],
+  crash: ['xara', 'Il s\'est étalé ! Frappe, vite !'],
+  'player-trapped': ['xara', 'Ses collets ne pardonnent pas : regarde où tu marches.'],
+  'geralt-trapped': ['xara', 'Pris à son propre piège. Classique.'],
+  parry: ['geralt', 'Hé ! Elle m\'a coûté cher, celle-là !'],
+  'column-hit': ['geralt', 'Ha ! L\'ancêtre ne rate jamais. Enfin… rarement.'],
+  'clak-stunned': ['geralt', 'Clak ! Debout, tu es un totem !'],
 };
+// Reprise après une défaite : une courte bulle, pas de dialogue d'intro.
+const GERALT_DUEL_REPRISE = [
+  'Debout, porteuse de mousse ! On reprend. Et je ne retiens plus mes flèches.',
+  'Encore ? Bien. Cette fois, je suis échauffé.',
+  'Tu es têtue. Moi aussi. En garde !',
+];
 
 async function a2Ff1Encounter(scene) {
   const st = scene.__a2;
-  st.walls = a2Walls(scene, [GERALT_DUEL.minX, GERALT_DUEL.maxX]);
+  // Murs épaissis vers l'extérieur (bords intérieurs inchangés : 896 et 1824).
+  st.walls = a2Walls(scene, [{ x: GERALT_ARENA.minX, out: -1 }, { x: GERALT_ARENA.maxX, out: 1 }]);
   await runCutscene(scene, 'geralt_rencontre');
-  if (!scene.player || scene.__a2 !== st) return;
-  const g = a2Npc(scene, 'geralt');
-  st.duel = {
-    active: true, hits: 0, busy: false, tech: 0, startAt: scene.time.now,
-    nextAt: scene.time.now + 900, invulUntil: 0, lastToken: null, gy: g.y,
-  };
-  showBossBar(scene, 'Geralt, ranger des marches boisées', () => 1 - (st.duel ? st.duel.hits : 0) / GERALT_DUEL.hits);
+  if (!scene.player || scene.__a2 !== st || !scene.sys.isActive()) return;
+  a2DuelStart(scene);
 }
 
-function a2DuelUpdate(scene) {
+// Plages de l'arène où Geralt ne pose pas de collet : devant les fleurs
+// hautes (décor de la donnée, x 1700), le collet brun s'y perdait tout à fait
+// (playtest). Lu sur les décors posés : suit le décor s'il est déplacé à
+// l'éditeur. Largeur : celle de l'image affichée, resserrée de 10 % de chaque
+// côté (marges transparentes de la planche).
+function a2ArenaNoTrap(scene) {
+  const out = [];
+  for (const img of scene.props || []) {
+    if (img.propType !== 'foret_flottante_fleurs_hautes') continue;
+    if (img.x < GERALT_ARENA.minX || img.x > GERALT_ARENA.maxX) continue;
+    const w = img.displayWidth * 0.8;
+    out.push([Math.round(img.x - w / 2), Math.round(img.x + w / 2)]);
+  }
+  return out;
+}
+
+function a2DuelStart(scene) {
   const st = scene.__a2;
-  const d = st.duel;
   const g = a2Npc(scene, 'geralt');
-  const p = scene.player;
-  if (!d || !d.active || !g) return;
-  const now = scene.time.now;
-  // Coups d'Agarica (mêlée ou piqué), un seul par attaque.
-  const atk = p.getAttackHitbox && p.getAttackHitbox();
-  // En transe (invocation), Geralt est « protégé par ses ancêtres » : les
-  // coups rebondissent (une fois par attaque).
-  if (atk && d.trance && Phaser.Geom.Intersects.RectangleToRectangle(atk, d.trance.getBounds())) {
-    const token = `t-${p.attackEndTime}`;
-    if (token !== d.tranceToken) {
-      d.tranceToken = token;
-      a2Float(scene, d.trance.x, d.trance.y - 100, 'Ping !', '#fff6e0', { size: 14, ms: 700 });
-    }
-  }
-  if (atk && !d.trance && now >= d.invulUntil && Phaser.Geom.Intersects.RectangleToRectangle(atk, g.getBounds())) {
-    const token = p.isAttacking ? `m-${p.attackEndTime}` : `d-${Math.floor(now / 400)}`;
-    if (token !== d.lastToken) {
-      d.lastToken = token;
-      a2GeraltHit(scene, d, g);
-    }
-  }
-  if (d.hits >= GERALT_DUEL.hits) { a2DuelFinish(scene, 'victoire'); return; }
-  if (now - d.startAt > GERALT_DUEL.timeoutMs) { a2DuelFinish(scene, 'temps'); return; }
-  if (!d.busy && now >= d.nextAt) {
-    d.busy = true;
-    const tech = GERALT_TECHNIQUES[d.tech % GERALT_TECHNIQUES.length];
-    d.tech += 1;
-    a2GeraltTechnique(scene, d, g, tech)
-      // Zone quittée en plein duel : pas d'erreur (scène éteinte).
-      .catch((e) => { if (scene.sys.isActive() && scene.player) console.error('duel Geralt', e); })
-      .finally(() => {
-        if (!scene.sys.isActive() || !scene.player) return;
-        d.busy = false;
-        d.nextAt = scene.time.now + GERALT_DUEL.pauseMs;
-        if (d.tech <= GERALT_TECHNIQUES.length && GERALT_XARA_BULLES[tech]) storyBulle(scene, 'xara', GERALT_XARA_BULLES[tech], 2400);
-      });
-  }
+  if (!g || typeof GeraltDuel !== 'function') return;
+  const groundY = g.y;
+  st.duelSeen = new Set();
+  st.reprises = 0;
+  st.duel = new GeraltDuel(scene, {
+    geralt: g,
+    minX: GERALT_ARENA.minX,
+    maxX: GERALT_ARENA.maxX,
+    groundY,
+    // Réapparition après le dernier cœur : dans l'arène, côté gauche.
+    spawn: { x: GERALT_ARENA.minX + 110, y: groundY - 20 },
+    resetX: GERALT_ARENA.maxX - 260,
+    noTrap: a2ArenaNoTrap(scene),
+    onEvent: (name, data) => a2DuelEvent(scene, name, data),
+  });
+  showBossBar(scene, 'Geralt, ranger des marches boisées', () => (st.duel ? st.duel.ratio() : 0));
+  st.duel.start();
 }
 
-const GERALT_OUCH = ['Ouille !', 'Aïe, mon orgueil !', 'Pas le visage !'];
-
-function a2GeraltHit(scene, d, g) {
-  d.hits += 1;
-  d.invulUntil = scene.time.now + 700;
-  if (scene.player.gainEnergy) scene.player.gainEnergy(ENERGY_PER_HIT);
-  g.setTint(0xffffff);
-  scene.time.delayedCall(140, () => g.active && g.setTint(0xffb0b0));
-  scene.time.delayedCall(320, () => g.active && g.clearTint());
-  scene.cameras.main.shake(90, 0.003);
-  a2Float(scene, g.x, g.y - 90, GERALT_OUCH[(d.hits - 1) % GERALT_OUCH.length], '#ffb0b0');
+// PNJ créé en cours de visite (Clak, à l'invocation) : invite « E : parler »
+// comme les PNJ de la donnée (son `talk` ne répond qu'après geraltMet).
+function a2RegisterNpc(scene, npc) {
+  const list = scene.__story && scene.__story.interactables;
+  if (!npc || !list || list.some((it) => it.npc === npc)) return;
+  list.push({ kind: 'npc', npc });
 }
 
-function a2GeraltDir(scene, g) {
-  return scene.player.x >= g.x ? 1 : -1;
-}
-
-// Invocation du Crabe Ancestral (art Codex `geralt_invocation` + colonne de
-// lumière `vfx_invocation_clak` ; montage de docs/production/controles/
-// invocation_clak_2026-10-23) : Geralt s'élève en transe, une colonne
-// blanche s'abat sur la position d'Agarica et Clak s'y matérialise, pic
-// d'énergie, dissipation… et Clak retombe. Seule vraie attaque du duel :
-// esquivable (~1,8 s pour sortir de la colonne) et sans dégât (Agarica est
-// juste bousculée). Geralt redescend ensuite sur son sol (`d.gy`).
-const GERALT_INVOCATION = { lift: 46, telegraphMs: 1800, hitHalfW: 46 };
-
-// Effets « juice » (LevelKit) s'ils existent : purement visuels.
-function a2Fx(scene, kind, x, y, opts) {
-  if (typeof spawnFx === 'function') spawnFx(scene, kind, x, y, opts);
-}
-
-async function a2GeraltInvocation(scene, d, g, dir) {
-  const clak = a2Npc(scene, 'clak');
-  const p = scene.player;
-  const alive = () => scene.sys.isActive() && !!scene.player && g.active;
-  const groundY = d.gy;
-  a2Float(scene, g.x, g.y - 90, 'Invocation du Crabe Ancestral !', '#ffd27a', { ms: 1800 });
-  // Pose d'invocation par-dessus le PNJ (caché le temps de la technique),
-  // ramenée à la même taille visible que Geralt.
-  const ov = addManifestSprite(scene, g.x, groundY, 'geralt_invocation', 'rise');
-  const gb = typeof objectVisibleBox === 'function' ? objectVisibleBox(g) : null;
-  const ob = typeof objectVisibleBox === 'function' ? objectVisibleBox(ov) : null;
-  if (gb && ob && ob.bottom > ob.top) ov.setScale(ov.scaleX * ((gb.bottom - gb.top) / (ob.bottom - ob.top)));
-  if (hasManifestArt(scene, 'geralt_invocation')) ov.setFlipX(dir < 0);
-  ov.setDepth(g.depth);
-  g.setVisible(false);
-  d.trance = ov;
-  // Cible : là où se tient Agarica quand la colonne apparaît.
-  const tx = Phaser.Math.Clamp(p.x, GERALT_DUEL.minX + 60, GERALT_DUEL.maxX - 60);
-  let col = null;
-  let glow = null;
-  try {
-    // 1. Préparation puis élévation (Geralt flotte, pieds relâchés).
-    await a2Wait(scene, 250);
-    await a2Tween(scene, { targets: ov, y: groundY - GERALT_INVOCATION.lift, duration: 650, ease: 'Sine.easeOut' });
-    if (!alive()) return;
-    const bob = scene.tweens.add({ targets: ov, y: groundY - GERALT_INVOCATION.lift - 6, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    // 2. Canalisation (yeux blancs, bras levés) et colonne de lumière sur
-    // Agarica : Clak s'efface à côté de Geralt… pour se matérialiser dedans.
-    ov.playManifest('channel', false);
-    scene.time.delayedCall(330, () => { if (ov.active && ov.anims) ov.anims.pause(); });
-    if (clak) scene.tweens.add({ targets: clak, alpha: 0, duration: 300 });
-    col = addManifestSprite(scene, tx, groundY + 2, 'vfx_invocation_clak', 'idle');
-    col.setDepth(g.depth + 1).setAlpha(0);
-    if (col.anims) col.anims.pause();
-    scene.tweens.add({ targets: col, alpha: 1, duration: 260 });
-    glow = a2Glow(scene, tx, groundY - 120, 220, 0xfff6e0, 0, g.depth);
-    scene.tweens.add({ targets: glow, alpha: 0.55, duration: 600 });
-    a2Float(scene, tx, groundY - 280, '!', '#ffffff', { size: 26, ms: 900 });
-    a2Fx(scene, 'motes', tx, groundY - 120, { count: 14, color: 0xfff6e0, spread: 60 });
-    await a2Wait(scene, 450);
-    if (!alive()) return;
-    if (col.anims) col.anims.resume();
-    await a2Wait(scene, GERALT_INVOCATION.telegraphMs - 750);
-    if (!alive()) return;
-    // 3. Pic d'énergie.
-    scene.cameras.main.flash(220, 255, 250, 235);
-    scene.cameras.main.shake(260, 0.006);
-    if (typeof juiceShockRing === 'function') juiceShockRing(scene, tx, groundY - 130, { size: 170, color: 0xfff6e0 });
-    a2Float(scene, ov.x, ov.y - 120, 'CRABE… ANCESTRAL !', '#fff6e0', { size: 18 });
-    await a2Wait(scene, 300);
-    if (!alive()) return;
-    // 4. Dissipation : la colonne s'efface, Clak reste suspendu un instant…
-    if (clak) {
-      scene.tweens.killTweensOf(clak);
-      // Fondu croisé avec le Clak de la colonne (même hauteur) : pas de doublon.
-      clak.setPosition(tx, groundY - 140).setAlpha(0).setVisible(true);
-      setNpcFacing(clak, -dir);
-      clak.playManifest('idle');
-      scene.tweens.add({ targets: clak, alpha: 1, duration: 220 });
-    }
-    const fading = [col, glow];
-    col = null;
-    glow = null;
-    scene.tweens.add({ targets: fading, alpha: 0, duration: 260, onComplete: () => fading.forEach((o) => o.destroy()) });
-    await a2Wait(scene, 380);
-    if (!alive()) return;
-    // 5. … puis retombe lourdement. Agarica encore dessous : bousculée.
-    if (clak) await a2Tween(scene, { targets: clak, y: groundY, duration: 300, ease: 'Quad.easeIn' });
-    if (!alive()) return;
-    scene.cameras.main.shake(160, 0.006);
-    a2Fx(scene, 'land', tx, groundY, { power: 0.8 });
-    if (clak) clak.playManifest('snap', false);
-    const pl = scene.player;
-    if (Math.abs(pl.x - tx) < GERALT_INVOCATION.hitHalfW && pl.body.bottom > groundY - 90) {
-      const away = pl.x >= tx ? 1 : -1;
-      pl.setVelocity(away * 320, -360);
-      a2Float(scene, pl.x, pl.y - 90, 'Pincée !', '#ffb0b0');
-    } else {
-      a2Float(scene, tx, groundY - 40, 'Clac… ?', '#ff9f70', { size: 14 });
-    }
-    // 6. Fin de transe : les yeux reviennent, Geralt redescend sur la surface.
-    bob.stop();
-    if (ov.anims) ov.anims.resume();
-    await a2Tween(scene, { targets: ov, y: groundY, duration: 420, ease: 'Quad.easeIn' });
-    if (!alive()) return;
-    a2Fx(scene, 'land', ov.x, groundY, { power: 0.4 });
-    a2Float(scene, ov.x, groundY - 100, 'Il est lourd, cet ancêtre…', '#ffd27a');
-    await a2Wait(scene, 600);
-    if (clak && alive()) {
-      clak.playManifest('scuttle');
-      const back = Phaser.Math.Clamp(ov.x - dir * 55, GERALT_DUEL.minX + 50, GERALT_DUEL.maxX - 50);
-      setNpcFacing(clak, back > clak.x ? 1 : -1);
-      await a2Tween(scene, { targets: clak, x: back, duration: 500 });
-      clak.playManifest('idle');
-    }
-  } finally {
-    d.trance = null;
-    if (col && col.active) col.destroy();
-    if (glow && glow.active) glow.destroy();
-    if (ov.active) ov.destroy();
-    if (g.active) {
-      g.setVisible(true).setY(groundY);
-      g.playManifest('idle');
-    }
-    if (clak && clak.active) {
-      scene.tweens.killTweensOf(clak);
-      clak.setAlpha(1).setVisible(true).setY(groundY);
-    }
-  }
-}
-
-async function a2GeraltTechnique(scene, d, g, tech) {
-  const clak = a2Npc(scene, 'clak');
-  const dir = a2GeraltDir(scene, g);
-  setNpcFacing(g, dir);
-  const clampX = (x) => Phaser.Math.Clamp(x, GERALT_DUEL.minX + 50, GERALT_DUEL.maxX - 50);
-  if (tech === 'invocation') {
-    await a2GeraltInvocation(scene, d, g, dir);
-  } else if (tech === 'fleche') {
-    a2Float(scene, g.x, g.y - 85, 'Flèche du Héron Silencieux !', '#ffd27a');
-    g.playManifest('attack_miss', false);
-    await a2Wait(scene, 750);
-    // La flèche part… Clak se jette devant et l'attrape au vol.
-    const arrow = scene.add.rectangle(g.x + dir * 20, g.y - 45, 30, 4, 0x8a6a3e).setDepth(g.depth + 1);
-    const midX = (g.x + scene.player.x) / 2;
-    if (clak) {
-      clak.playManifest('scuttle');
-      setNpcFacing(clak, dir);
-      scene.tweens.add({ targets: clak, x: midX, duration: 260 });
-    }
-    await a2Tween(scene, { targets: arrow, x: midX, duration: 300 });
-    if (clak) { clak.playManifest('snap', false); a2Float(scene, clak.x, clak.y - 30, 'Clac !', '#ff9f70', { size: 14 }); }
-    await a2Tween(scene, { targets: arrow, y: arrow.y + 30, angle: 70, alpha: 0, duration: 400 });
-    arrow.destroy();
-    a2Float(scene, g.x, g.y - 85, 'Clak ! Rends-moi ça !', '#ffd27a');
-    await a2Wait(scene, 700);
-    if (clak) { clak.playManifest('idle'); await a2Tween(scene, { targets: clak, x: clampX(g.x - dir * 55), duration: 400 }); }
-  } else if (tech === 'bond') {
-    a2Float(scene, g.x, g.y - 85, 'Bond du Blaireau Furieux !', '#ffd27a');
-    await a2Tween(scene, { targets: g, scaleY: g.scaleY * 0.85, duration: 220, yoyo: true });
-    const dist = Math.max(0, Math.abs(scene.player.x - g.x) - 130);
-    const tx = clampX(g.x + dir * Math.min(dist, 230));
-    scene.tweens.add({ targets: g, x: tx, duration: 520 });
-    await a2Tween(scene, { targets: g, y: d.gy - 70, duration: 260, ease: 'Quad.easeOut' });
-    await a2Tween(scene, { targets: g, y: d.gy, duration: 260, ease: 'Quad.easeIn' });
-    g.playManifest('trip_fall', false);
-    await a2Tween(scene, { targets: g, angle: a2GeraltFallAngle(scene, dir * 85), duration: 200 });
-    a2Float(scene, g.x, g.y - 50, 'Le sol… a bougé.', '#ffd27a');
-    await a2Wait(scene, 1100);
-    await a2Tween(scene, { targets: g, angle: 0, duration: 250 });
-    g.playManifest('idle');
-  } else if (tech === 'piege') {
-    a2Float(scene, g.x, g.y - 85, 'Piège du Ranger !', '#ffd27a');
-    // Il pose le piège… derrière lui, sans regarder.
-    const trapX = clampX(g.x - dir * 45);
-    const trap = scene.add.graphics({ x: trapX, y: d.gy }).setDepth(g.depth);
-    trap.lineStyle(3, 0xc9a26b, 1);
-    trap.strokeEllipse(0, -3, 34, 10);
-    await a2Wait(scene, 500);
-    a2Float(scene, g.x, g.y - 85, 'Approche, si tu l\'oses !', '#ffd27a');
-    await a2Wait(scene, 700);
-    setNpcFacing(g, dir);
-    await a2Tween(scene, { targets: g, x: trapX, duration: 380 });
-    // Le collet se referme : Geralt pend la tête en bas.
-    trap.destroy();
-    // Origine du sprite aux pieds : retourné à 180°, il s'étend VERS LE BAS
-    // depuis ses pieds. On remonte donc les pieds d'une hauteur de sprite
-    // pour qu'il pende tête en bas au-dessus du sol (et non la tête dans la terre).
-    const feetY = d.gy - g.displayHeight - 24;
-    const rope = scene.add.graphics().setDepth(g.depth);
-    rope.lineStyle(2, 0xc9a26b, 1);
-    rope.lineBetween(trapX, -10, trapX, feetY);
-    scene.cameras.main.shake(100, 0.004);
-    await a2Tween(scene, { targets: g, y: feetY, angle: 180, duration: 260, ease: 'Back.easeOut' });
-    a2Float(scene, g.x, g.y - 110, 'Ce n\'était PAS prévu.', '#ffd27a');
-    await a2Wait(scene, 1400);
-    rope.destroy();
-    await a2Tween(scene, { targets: g, y: d.gy, angle: 0, duration: 280, ease: 'Quad.easeIn' });
-    a2Float(scene, g.x, g.y - 60, 'Aïe.', '#ffd27a');
-    await a2Wait(scene, 300);
-  } else {
-    a2Float(scene, g.x, g.y - 85, 'Charge du Sanglier Solitaire !', '#ffd27a');
-    a2Float(scene, g.x, g.y - 115, '!', '#ff6b6b', { size: 24, ms: 700 });
-    await a2Wait(scene, 600);
-    // Clak se met en travers, Geralt trébuche dessus.
-    const cx = clampX(g.x + dir * 70);
-    if (clak) {
-      clak.playManifest('scuttle');
-      await a2Tween(scene, { targets: clak, x: cx, duration: 220 });
-      clak.playManifest('idle');
-    }
-    g.playManifest('walk');
-    await a2Tween(scene, { targets: g, x: clampX(cx - dir * 20), duration: 260, ease: 'Quad.easeIn' });
-    g.playManifest('trip_fall', false);
-    if (clak) a2Float(scene, clak.x, clak.y - 30, 'Clac.', '#ff9f70', { size: 14 });
-    await a2Tween(scene, { targets: g, x: clampX(g.x + dir * 90), angle: a2GeraltFallAngle(scene, dir * 95), duration: 380, ease: 'Quad.easeOut' });
-    a2Float(scene, g.x, g.y - 50, 'CLAK !', '#ffd27a');
-    await a2Wait(scene, 1000);
-    await a2Tween(scene, { targets: g, angle: 0, duration: 250 });
-    g.playManifest('idle');
-    if (clak) await a2Tween(scene, { targets: clak, x: clampX(g.x - dir * 55), duration: 350 });
-  }
-}
-
-async function a2DuelFinish(scene, reason) {
+function a2DuelEvent(scene, name, data) {
   const st = scene.__a2;
-  const d = st.duel;
-  if (!d || !d.active) return;
-  d.active = false;
-  st.duelEnd = reason;
-  // Laisse finir la technique en cours (bornée), puis remet Geralt d'aplomb.
-  for (let i = 0; i < 40 && d.busy; i++) await a2Wait(scene, 100);
+  if (!st || !scene.sys.isActive()) return;
+  if (name === 'clak-spawned') { a2RegisterNpc(scene, data.clak); return; }
+  if (name === 'victory') {
+    a2DuelFinish(scene).catch((e) => { if (scene.sys.isActive() && scene.player) console.error('fin du duel', e); });
+    return;
+  }
+  // Clak posé au sol, après la colonne (une bulle de Xara plus tôt la
+  // masquait : elle se tient près d'Agarica, juste sous la lumière).
+  if (name === 'clak-landed') {
+    if (st.duelSeen.has(name)) return;
+    st.duelSeen.add(name);
+    storyBulles(scene, [
+      'Un crabe… ancestral. Évidemment.',
+      'Étourdis le crabe si tu veux, mais c\'est Geralt qu\'il faut vaincre !',
+    ], null, 400);
+    return;
+  }
+  if (name === 'restart') {
+    storyBulle(scene, 'geralt', GERALT_DUEL_REPRISE[st.reprises++ % GERALT_DUEL_REPRISE.length], undefined, { replace: true });
+    return;
+  }
+  const b = GERALT_DUEL_BULLES[name];
+  if (!b || st.duelSeen.has(name)) return;
+  st.duelSeen.add(name);
+  storyBulle(scene, b[0], b[1], undefined, { replace: true });
+}
+
+async function a2DuelFinish(scene) {
+  const st = scene.__a2;
+  const duel = st && st.duel;
+  if (!duel || st.finishing) return;
+  st.finishing = true;
+  // Geralt à terre, sonné, « Je me rends ! » : le temps de le voir.
+  await a2Wait(scene, 1300);
+  if (!scene.sys.isActive() || !scene.player || scene.__a2 !== st) return;
+  duel.destroy({ keepActors: true });
+  st.duel = null;
   const g = a2Npc(scene, 'geralt');
   if (g) {
     scene.tweens.killTweensOf(g);
-    g.setAngle(0).setY(d.gy).clearTint();
+    g.setAngle(0).clearTint();
     g.playManifest('idle');
   }
-  hideBossBar(scene);
-  // Les murs du duel tombent AVANT la cinématique : elle fait marcher Agarica
-  // jusqu'à x 1680, au-delà du mur droit (x 1560) — elle s'y bloquait.
+  // Clak est là depuis l'invocation ; filet de sécurité pour la cinématique.
+  if (g && !a2Npc(scene, 'clak')) {
+    a2RegisterNpc(scene, createStoryNpc(scene, { id: 'clak', x: g.x - 55, talk: [{ requires: { geraltMet: true }, talk: 'clak_camp' }] }));
+  }
+  // Murs, caméra et barre retirés AVANT la cinématique : elle fait marcher
+  // Agarica jusqu'à x 1680, et la caméra va jusqu'à la corniche.
   a2Ff1EndDuel(scene);
   await runCutscene(scene, 'geralt_fin_duel');
 }
@@ -661,7 +529,10 @@ ZONE_SCRIPTS.acte2_ff1 = {
     // La montée vers le ciel (caméra verticale, `skyReveal` : LevelKit)
     // remplace l'ancienne brume dessinée ici et le plafond à y = 0.
     if (!(data && data.camera && data.camera.vertical)) a2Ceiling(scene);
-    scene.__a2 = { duel: null, walls: null };
+    const st = { duel: null, walls: null };
+    scene.__a2 = st;
+    // Zone quittée en plein duel (titre, chargement) : écouteurs retirés.
+    scene.events.once('shutdown', () => { if (st.duel) st.duel.destroy(); st.duel = null; });
     a2InteractReset(scene);
     if (storyGet('geraltMet')) {
       // Revisite : Geralt au pied de la corniche, plongé dans sa carte.
@@ -671,14 +542,15 @@ ZONE_SCRIPTS.acte2_ff1 = {
       if (c) c.x = 1790;
     }
   },
-  update(scene) {
+  update(scene, time, delta) {
     const st = scene.__a2;
     if (!st) return;
     if (!storyGet('geraltMet') && !st.encounterStarted && scene.player.x > 920 && scene.player.x < 1500) {
       st.encounterStarted = true;
       a2Ff1Encounter(scene).catch((e) => { if (scene.sys.isActive() && scene.player) console.error('rencontre Geralt', e); });
     }
-    a2DuelUpdate(scene);
+    a2HoldWalls(scene, st.walls);
+    if (st.duel) st.duel.update(delta);
   },
 };
 
@@ -1016,7 +888,8 @@ ZONE_SCRIPTS.acte2_clairiere = {
     st.exitHutte = scene.__exits.find((e) => e.targetScene === 'HutteMorgatScene');
     if (!picked && !inventoryHas('fleur_resistante')) {
       scene.__exits = scene.__exits.filter((e) => e !== st.exitHutte);
-      st.gate = a2Walls(scene, [2200]);
+      // Épaissie vers la hutte (cf. a2Walls : le loup traversait les murs fins).
+      st.gate = a2Walls(scene, [{ x: 2200, out: 1 }]);
     } else {
       a2ClairiereOpenPath(scene, false);
     }
@@ -1039,6 +912,7 @@ ZONE_SCRIPTS.acte2_clairiere = {
       runCutscene(scene, 'clairiere_arrivee');
       return;
     }
+    a2HoldWalls(scene, st.gate);
     if (st.gate && p.x > 2120 && scene.time.now > (st.gateToastAt || 0)) {
       st.gateToastAt = scene.time.now + 3000;
       storyBulle(scene, 'xara', 'La plante d\'abord, Agarica.', 2200);

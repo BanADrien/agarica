@@ -1,6 +1,7 @@
 // Zone « foret_flottante_1 » — le chemin des hauteurs (étape 8 de PLAN_DEV.md).
-// Logique (rencontre de Geralt, duel comique, carte, vue sur le ciel) :
-// ZONE_SCRIPTS.acte2_ff1 dans src/story/acte2.js.
+// Logique (rencontre de Geralt, duel, carte, vue sur le ciel) :
+// ZONE_SCRIPTS.acte2_ff1 dans src/story/acte2.js ; mécanique du duel dans
+// src/entities/GeraltDuel.js.
 //
 // VRAIE MONTÉE vers le ciel (2026-10-23, demande utilisateur) : la caméra
 // suit la montée (`camera.vertical`, zone morte), le ciel se révèle au-dessus
@@ -8,7 +9,8 @@
 // flottantes (sortie en HAUT à droite).
 // Plan (grille 64, surface d'une rangée gy = 64*gy) :
 //   x 0-2176     grosse branche d'arrivée depuis le grand arbre + camp de
-//                Geralt (feu de camp, duel entre x 660 et 1560)
+//                Geralt (feu de camp x 820 ; arène du duel entre les murs
+//                x 880 et 1840 = un écran, feu dehors : GERALT_ARENA, acte2.js)
 //   P1 x 1920-2112 (gy 4, +3 rangées) : la corniche de Geralt, il faut le
 //                bond du singe (2e saut en l'air) — Geralt, lui, n'y arrive pas
 //   P2-P9        l'ascension en zigzag au-dessus du vide (chute = 1 cœur et
@@ -79,7 +81,9 @@ const FORET_FLOTTANTE_1_DATA = {
   npcs: [
     // Avant le duel, Geralt n'a rien à dire (le script lance la rencontre).
     { id: 'geralt', x: 1180, facing: 'left', talk: [{ requires: { geraltMet: true }, talk: 'geralt_camp' }] },
-    { id: 'clak', x: 1240, facing: 'left', talk: [{ requires: { geraltMet: true }, talk: 'clak_camp' }] },
+    // Clak n'apparaît qu'à l'invocation, au milieu du duel (GeraltDuel.js) :
+    // présent dès la donnée seulement une fois Geralt rencontré.
+    { id: 'clak', x: 1240, facing: 'left', requires: { geraltMet: true }, talk: [{ requires: { geraltMet: true }, talk: 'clak_camp' }] },
   ],
   triggers: [
     { id: 'intro', x: 330, w: 64, cutscene: 'ff1_intro' },
