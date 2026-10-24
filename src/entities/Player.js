@@ -832,6 +832,11 @@ const HURT_POSE_MS = 300;
 const HIT_INVULN_MS = 950;
 const HIT_BLINK_MS = 90;
 const HIT_BLINK_ALPHA = 0.35;
+// Chute dans le vide (cf. startFallOut, et updateStoryFall dans StoryKit) :
+// vitesse de chute minimale une fois la chute engagée, pour qu'Agarica sorte
+// franchement par le bas de l'écran (en plané d'aigle ou au sortir d'un dash
+// papillon, elle le traversait sinon au ralenti).
+const FALL_OUT_MIN_VY = 520;
 const THROW_POSE_MS = 220;
 // Compétences « avec la forme » (cf. startSkillFormPose) : durées des phases
 // transfo -> geste -> transfo inverse (ms) ; `releaseAt` = fraction du geste
@@ -1502,6 +1507,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.monkeyReleasePoseUntil = 0;
     this.hurtPoseUntil = 0;
     this.throwPoseUntil = 0;
+    // Chute dans le vide engagée (cf. startFallOut) : plus de contrôle ni de
+    // collision jusqu'à la reprise (endFallOut).
+    this.fallingOut = false;
     // Compétence « avec la forme » en cours (cf. startSkillFormPose) ou null.
     this.skillFormPose = null;
     // Compétence dont la hitbox (getSkillHitbox) est active, ex. 'ours' --
@@ -1662,6 +1670,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
   update() {
     this.justJumped = false;
+    // Chute dans le vide engagée : le monde est gelé (cf. updateStoryFall),
+    // ce garde-fou couvre un dégel imprévu -- ni touche ni changement de
+    // forme ne doit la rattraper avant la reprise.
+    if (this.fallingOut) return;
     this.syncFormSlots();
     const left = this.cursors.left.isDown || this.keys.left.isDown;
     const right = this.cursors.right.isDown || this.keys.right.isDown;
@@ -3617,6 +3629,105 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.registry.set('energy', this.energy);
   }
 
+  // --- Chute dans le vide (retour utilisateur : « quand on tombe dans le
+  // vide on doit passer dans le sol pour mourir, pas s'allonger en bas de
+  // l'écran ») ------------------------------------------------------------
+  // Appelée par updateStoryFall (StoryKit) dès que la ligne de chute de la
+  // zone est franchie : Agarica continue de tomber et sort par le bas de
+  // l'écran. Plus de liane, de dash ni de plané ; collisions coupées (sol,
+  // ennemis) pour qu'aucun rebord sous la ligne de chute ne la rattrape ; le
+  // monde est gelé par StoryKit (ni touche ni ennemi), la physique continue.
+  startFallOut() {
+    if (this.fallingOut) return;
+    const now = this.scene.time.now;
+    if (this.vine) this.releaseVine(false, now);
+    if (this.butterflyPhase) this.endButterflyDash();
+    this.endSkillFormPose(true);
+    this.fallingOut = true;
+    this.isAttacking = false;
+    this.slashDir = null;
+    this.attackDashActive = false;
+    this.eagleDiving = false;
+    this.formTransitionActive = false;
+    this.vineFlight = false;
+    this.wolfSprintActive = false;
+    this.resetVineArtAnchor();
+    this.setRotation(0);
+    const b = this.body;
+    b.checkCollision.none = true;
+    b.setAllowGravity(true);
+    this.setAcceleration(0, 0);
+    b.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
+    b.gravity.y = this.fallGravityBonus;
+    this.setVelocity(b.velocity.x * 0.6, Math.max(b.velocity.y, FALL_OUT_MIN_VY));
+    this.applyFallOutPose();
+  }
+
+  // Pose de chute de la forme en cours, posée une fois (update() ne tourne
+  // plus pendant la chute) ; jamais la pose `death` couchée.
+  applyFallOutPose() {
+    const facingRight = this.facingDir >= 0;
+    // Papillon : hors dash, Agarica retombe en forme humaine (cf. update()).
+    if (this.form === 'butterfly') this.setForm('agarica');
+    if (this.form === 'agarica') {
+      if (hasManifestArt(this.scene, 'agarica_extra', 'jump_fall')) {
+        this.applyAgaricaExtraPose('jump_fall');
+      } else {
+        this.anims.stop();
+        this.setTexture(JUMP_FALL_TEXTURE);
+        this.applyBodyForScale(JUMP_SCALE, FORMS.agarica.body);
+        this.setFlipX(facingRight);
+      }
+    } else if (this.form === 'wolf') {
+      this.anims.stop();
+      this.setTexture(WOLF_JUMP_FALL_TEXTURE);
+      this.applyBodyForScale(WOLF_JUMP_SCALE, FORMS.wolf.body);
+      this.setFlipX(!facingRight);
+    } else if (this.form === 'eagle') {
+      if (this.scene.anims.exists(ANIM_PIAF_DIVE_KEY)) this.anims.play(ANIM_PIAF_DIVE_KEY, true);
+      this.setFlipX(!facingRight);
+    } else if (this.form === 'monkey') {
+      // Relancée : playManifestOn garde la texture en place si 'singe-jump'
+      // a déjà fini (pose de liane restée affichée après un lâcher).
+      if (this.scene.anims.exists('singe-jump')) this.anims.play('singe-jump');
+      else playManifestOn(this, 'singe', 'jump');
+      const mc = agaricaSheetPoseConfig(this.scene, 'singe', 'jump', { method: 'area' });
+      this.applyBodyForScale(mc.scale, mc.body);
+      this.setFlipX(MONKEY_FACES_RIGHT ? !facingRight : facingRight);
+    }
+  }
+
+  // Reprise après la chute (StoryKit, sous le fondu au noir, AVANT de
+  // replacer Agarica) : debout, en forme humaine, collisions rétablies.
+  // Forme humaine imposée : sans ça, une chute en aigle, singe ou loup
+  // rejouait la transformation de sortie au point de reprise.
+  endFallOut() {
+    if (!this.fallingOut) return;
+    this.fallingOut = false;
+    const b = this.body;
+    b.checkCollision.none = false;
+    b.setAllowGravity(true);
+    b.gravity.y = 0;
+    b.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
+    this.setAcceleration(0, 0);
+    this.setVelocity(0, 0);
+    this.setRotation(0);
+    this.jumpsUsed = 0;
+    this.airJumpForm = null;
+    this.wolfJumpCarry = false;
+    this.vineMomentumSpeed = 0;
+    this.monkeyReleasePoseUntil = 0;
+    this.jumpBufferedAt = -Infinity;
+    this.setForm('agarica');
+    this.anims.play(ANIM_IDLE_KEY, true);
+    this.applyBodyForScale(FORMS.agarica.scale, FORMS.agarica.body);
+    // Ni éclat de transformation ni « gros atterrissage » (vitesse d'avant
+    // la chute) en se reposant au point de reprise (cf. updateJuice).
+    this.juicePrevForm = this.form;
+    this.juicePrevVy = 0;
+    this.wasOnGround = true;
+  }
+
   // Appelé par la scène quand un ennemi touche Agarica hors fenêtre
   // d'attaque : perd 1 cœur avec un court flash d'invulnérabilité ; seul
   // un cœur tombé à 0 renvoie au point de départ de la zone (et restaure
@@ -3624,8 +3735,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // bouge plus Agarica de place, contrairement à l'ancien comportement
   // (retour systématique, avant l'introduction d'une vraie vie à
   // plusieurs points).
-  hitByEnemy() {
-    if (this.isInvulnerable) return;
+  // `opts.fall` : perte de cœur due à une chute dans le vide (cf.
+  // updateStoryFall), appelée au point de reprise, sous le fondu.
+  hitByEnemy(opts = {}) {
+    if (this.isInvulnerable || this.fallingOut) return;
     this.isInvulnerable = true;
     if (this.vine) this.releaseVine(false, this.scene.time.now);
     if (this.butterflyPhase) this.endButterflyDash();
@@ -3654,27 +3767,63 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // du combat). Le registre seul ne suffit pas : son 1er `set('hearts')`
     // émet 'setdata' et non 'changedata-hearts'.
     if (depleted) this.scene.events.emit('player-depleted', this);
+    // Chute fatale : réapparition tout de suite (sous le fondu de la chute),
+    // pas 300 ms plus tard -- elle aurait sinon été vue au point de reprise
+    // puis ramenée en arrière alors qu'elle a déjà repris la main.
+    if (depleted && opts.fall) this.reviveAtSpawn();
+    // Dernier cœur perdu EN L'AIR dans une zone à vide (règle `fall`) : la
+    // pose couchée est réservée aux morts au sol -- en l'air au-dessus du
+    // trou, elle traversait le bas de l'écran couchée puis réapparaissait
+    // d'un coup, sans fondu. StoryKit (storyWatchAirDeath) prend la suite,
+    // monde gelé : posée → fin du coup ci-dessous (pose couchée au sol) ;
+    // ligne de chute franchie → chute dans le vide (sortie par le bas de
+    // l'écran, fondu, réapparition au point de reprise, sans 2e cœur perdu).
+    // (Pas dans l'eau : la Pieuvre nage sans gravité, mort sur place comme avant.)
+    const swimming = this.hasOctopusForm && this.formEquipped('octopus')
+      && (this.scene.time.now - this.lastInWaterTime < this.waterGraceMs);
+    if (depleted && !opts.fall && !this.body.blocked.down && !swimming
+      && typeof storyWatchAirDeath === 'function' && storyWatchAirDeath(this.scene)) {
+      // update() ne tourne plus (monde gelé) : gravité rendue ici (liane ou
+      // dash papillon la coupent, update() la rétablissait), plus de plané,
+      // et pose de coup tenue pendant la chute.
+      this.body.setAllowGravity(true);
+      this.body.gravity.y = this.fallGravityBonus;
+      this.body.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
+      this.setAcceleration(0, 0);
+      this.eagleDiving = false;
+      this.endSkillFormPose(true);
+      if (this.form === 'agarica' && hasManifestArt(this.scene, 'agarica_extra', 'hurt')) this.applyAgaricaExtraPose('hurt');
+      return;
+    }
+    this.finishHit(depleted, opts);
+  }
+
+  // Fin d'un coup reçu (cf. hitByEnemy) : flash, invulnérabilité et, cœurs à
+  // 0, pose `death` puis réapparition. Appelée aussi par StoryKit
+  // (storyWatchAirDeath) quand Agarica, touchée à mort en l'air, retombe au sol.
+  finishHit(depleted, opts = {}) {
     // Dernier cœur perdu : pose `death` (art Codex agarica_extra) tenue un
     // instant avant la réapparition, monde gelé via __cutsceneLock pour que
     // ni les ennemis ni les touches n'interfèrent. Sans art : comme avant.
-    const deathPose = depleted && this.form === 'agarica' && hasManifestArt(this.scene, 'agarica_extra', 'death');
+    // Pose couchée réservée aux morts par dégâts : une chute fatale ne
+    // l'affiche jamais (elle est déjà sortie par le bas de l'écran).
+    const deathPose = depleted && !opts.fall && this.form === 'agarica' && hasManifestArt(this.scene, 'agarica_extra', 'death');
     if (deathPose) {
       this.storyPose = 'death';
       this.applyAgaricaExtraPose('death');
       this.scene.__cutsceneLock = (this.scene.__cutsceneLock || 0) + 1;
     }
+    const respawnLater = depleted && !opts.fall;
     const flashMs = deathPose ? 1100 : 300;
     this.scene.time.delayedCall(flashMs, () => {
       if (deathPose) {
         this.storyPose = null;
         this.scene.__cutsceneLock = Math.max(0, (this.scene.__cutsceneLock || 0) - 1);
       }
-      if (depleted) {
-        this.hearts = this.maxHearts;
-        this.scene.registry.set('hearts', this.hearts);
-        this.setPosition(this.spawnX, this.spawnY);
-      }
-      this.setVelocity(0, 0);
+      if (respawnLater) this.reviveAtSpawn();
+      // Pas après une chute (elle a déjà repris la main au point de reprise)
+      // ni en pleine chute dans le vide (elle doit sortir de l'écran).
+      if (!opts.fall && !this.fallingOut) this.setVelocity(0, 0);
       this.clearTint();
       // Correctif : 300 ms d'invulnérabilité laissaient une salve (pierres de
       // Kainati) enlever 3 cœurs d'affilée. Elle dure maintenant
@@ -3692,5 +3841,24 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.isInvulnerable = false;
       });
     });
+  }
+
+  // Réapparition après le dernier cœur : cœurs rechargés au point de reprise
+  // (départ de zone, ou dernière lanterne allumée, cf. updateStoryCheckpoints).
+  reviveAtSpawn() {
+    this.hearts = this.maxHearts;
+    this.scene.registry.set('hearts', this.hearts);
+    this.setPosition(this.spawnX, this.spawnY);
+  }
+
+  // Mort en l'air finie dans le vide (StoryKit, sous le fondu, après
+  // endFallOut) : même réapparition que la mort au sol (finishHit), sans
+  // pose couchée ni 2e cœur perdu ; fin de l'invulnérabilité du coup.
+  reviveAfterAirDeath() {
+    this.reviveAtSpawn();
+    this.storyPose = null;
+    this.clearTint();
+    this.setAlpha(1);
+    this.isInvulnerable = false;
   }
 }

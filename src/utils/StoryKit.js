@@ -1934,6 +1934,12 @@ function resetStoryState(scene, data) {
   scene.__story = {
     interactables: [], triggers: [], mossBlocks: [], mossWalls: [], checkpoints: [],
     fall: null, safePos: null, checkpoint: null, prompt: null, mossGroup: null, keys: null,
+    // Chute dans le vide en cours (cf. startStoryFallOut) et bornes du monde
+    // propres au joueur, ouvertes vers le bas (cf. syncStoryFallBounds) ;
+    // surface de la bande `liquidFloor` où elle s'enfonce (cf. storyFallSinkMask).
+    fallOut: null, fallBounds: null, liquid: null,
+    // Dernier cœur perdu en l'air, en attente de la suite (cf. storyWatchAirDeath).
+    airDeath: null,
   };
 }
 
@@ -2178,6 +2184,14 @@ LEVEL_DATA_HANDLERS.mossWalls = (scene, list) => {
 
 LEVEL_DATA_HANDLERS.fall = (scene, fall) => {
   scene.__story.fall = { mode: 'hurt', y: scene.scale.height + 60, ...fall };
+};
+
+// La bande elle-même est dessinée par LevelKit (addLiquidFloor) ; retenue ici
+// pour la chute : Agarica s'y enfonce au lieu de passer devant (cf.
+// storyFallSinkMask). Sans `x1`/`x2`, elle couvre toute la zone.
+LEVEL_DATA_HANDLERS.liquidFloor = (scene, cfg) => {
+  if (!cfg || cfg.y == null) return;
+  scene.__story.liquid = { y: cfg.y, x1: cfg.x1 ?? -Infinity, x2: cfg.x2 ?? Infinity };
 };
 
 // Lanternes de reprise : art `decor_lanterne_eteinte` / `_allumee` (lot
@@ -2579,10 +2593,109 @@ function updateStoryCheckpoints(scene) {
   }
 }
 
+// --- Chute dans le vide (clé de zone `fall`) --------------------------------
+// Retour utilisateur : « quand on tombe dans le vide on doit passer dans le
+// sol pour mourir, pas s'allonger en bas de l'écran ». Avant, le bas du monde
+// physique (levelHeight) servait de sol invisible au joueur : Agarica s'y
+// posait, était ramenée sur-le-champ au point sûr et, sur son dernier cœur, y
+// jouait la pose couchée `death` -- souvent retombée au fond depuis un point
+// sûr pris au ras du bord. Maintenant (règles de reprise inchangées) :
+//   1. tant que la zone a une règle `fall`, le joueur n'a plus de bord bas
+//      (bornes propres, cf. syncStoryFallBounds) : il traverse le bas du monde ;
+//   2. ligne de chute franchie (mêmes seuils qu'avant) : chute engagée, monde
+//      gelé, plus de contrôle ni de collision (Player.startFallOut) ; la caméra
+//      reste dans ses bornes, donc au bas du niveau ;
+//   3. Agarica sortie par le bas de l'écran : fondu au noir, la reprise
+//      d'avant (cœur perdu au point sûr, lanterne, départ de zone ou
+//      changement de scène), puis fondu d'ouverture.
+const STORY_FALL_BOUNDS_EXTRA = 4000;
+// Garde-fou : fondu même si elle n'a jamais quitté l'écran (caméra déplacée...).
+const STORY_FALL_MAX_MS = 1400;
+const STORY_FALL_FADE_OUT_MS = 220;
+const STORY_FALL_FADE_IN_MS = 320;
+// Ligne où elle disparaît dans une bande de liquide : un peu sous sa crête.
+const STORY_FALL_LIQUID_SINK = 6;
+
+// Bornes du joueur = celles du monde (relues à chaque image : des scripts les
+// changent, cf. a2Ceiling), prolongées vers le bas s'il y a une règle `fall`.
+function syncStoryFallBounds(scene, player, open) {
+  const st = scene.__story;
+  const body = player.body;
+  const world = scene.physics.world.bounds;
+  if (!open) {
+    if (body.customBoundsRectangle !== world) body.setBoundsRectangle(null);
+    return;
+  }
+  if (!st.fallBounds) st.fallBounds = new Phaser.Geom.Rectangle();
+  st.fallBounds.setTo(world.x, world.y, world.width, world.height + STORY_FALL_BOUNDS_EXTRA);
+  if (body.customBoundsRectangle !== st.fallBounds) body.setBoundsRectangle(st.fallBounds);
+}
+
+// Point sûr : TOUTE la largeur des pieds (forme humaine, celle de la reprise)
+// doit reposer sur un corps statique (sol, plateforme, mousse ; pas l'eau).
+// Avec `blocked.down` seul, il était pris au ras du bord, le corps à moitié
+// dans le vide : Agarica reprenait sur la lèvre du trou (et y retombait
+// parfois aussitôt -- un cœur perdu par boucle jusqu'à la mort). Demi-largeur
+// testée : corps humain (25 px) décalé au plus de AGARICA_BODY_FORWARD_SHIFT
+// (14 px, cf. Player.js) vers l'avant, soit ~27 px de part et d'autre du centre.
+const STORY_SAFE_FEET_HALF = 28;
+function storyFeetSupported(scene, player) {
+  return storyStandOk(scene, player.x, player.body.bottom);
+}
+
+// Agarica (forme humaine) tiendrait debout ici : appui sous toute la largeur
+// des pieds.
+function storyStandOk(scene, x, feetY) {
+  return storySupportedAt(scene, x - STORY_SAFE_FEET_HALF, feetY)
+    && storySupportedAt(scene, x, feetY)
+    && storySupportedAt(scene, x + STORY_SAFE_FEET_HALF, feetY);
+}
+
+function storySupportedAt(scene, x, feetY) {
+  if (typeof scene.physics.overlapRect !== 'function') return true;
+  const water = scene.water || [];
+  return scene.physics.overlapRect(x - 1, feetY - 2, 2, 8, false, true)
+    .some((b) => !water.includes(b.gameObject));
+}
+
+// Haut du premier appui statique sous (x, y), à `maxDrop` px au plus (null
+// sinon) : le départ de zone est souvent posé un peu au-dessus du sol.
+function storyGroundYBelow(scene, x, y, maxDrop = 160) {
+  if (typeof scene.physics.overlapRect !== 'function') return null;
+  const water = scene.water || [];
+  let best = null;
+  for (const b of scene.physics.overlapRect(x - 1, y - 4, 2, maxDrop, false, true)) {
+    if (water.includes(b.gameObject) || b.top < y - 4) continue;
+    if (best === null || b.top < best) best = b.top;
+  }
+  return best;
+}
+
+// Rien de solide juste au-dessus des pieds (pas dans un mur ou une marche).
+function storyClearAt(scene, x, feetY) {
+  if (typeof scene.physics.overlapRect !== 'function') return true;
+  return scene.physics.overlapRect(x - 1, feetY - 40, 2, 32, false, true).length === 0;
+}
+
+// Xara posée à son ancre au sol (x + XARA_GROUND_OFFSET_X, à gauche
+// d'Agarica) y tient debout : appui sous elle, pas de mur.
+const STORY_XARA_HALF = 12;
+function storyXaraAnchorX(x) {
+  return x + (typeof XARA_GROUND_OFFSET_X === 'number' ? XARA_GROUND_OFFSET_X : -46);
+}
+function storyXaraStandOk(scene, x, feetY) {
+  return storySupportedAt(scene, x - STORY_XARA_HALF, feetY)
+    && storySupportedAt(scene, x + STORY_XARA_HALF, feetY)
+    && storyClearAt(scene, x, feetY);
+}
+
 function updateStoryFall(scene) {
   const player = scene.player;
   const st = scene.__story;
   const fall = st.fall;
+  if (st.fallOut) return;
+  syncStoryFallBounds(scene, player, !!fall);
+  const worldBottom = scene.physics.world.bounds.bottom;
   // Dernier appui sûr (pas le bas du monde, pas déjà sous la ligne de chute).
   // `blocked.down` SEUL (correctif FF1) : `touching.down` est aussi levé par
   // un simple overlap (corbeau en piqué, ennemi...) -- le point sûr était
@@ -2591,21 +2704,304 @@ function updateStoryFall(scene) {
   // appuis réels (sol, plateformes, murs de mousse) sont statiques et lèvent
   // `blocked.down`.
   const onGround = player.body.blocked.down;
-  const atWorldBottom = player.body.bottom >= scene.physics.world.bounds.bottom - 1;
-  if (onGround && !atWorldBottom && (!fall || player.y < fall.y - 40)) st.safePos = { x: player.x, y: player.y };
-  // Le bas du monde physique vaut `levelHeight` (540) : posé dessus, le joueur
-  // n'atteint jamais `fall.y` (600 par défaut) et resterait coincé au fond du
-  // vide. Toucher le bas du monde compte donc aussi comme une chute.
-  if (!fall || (player.y <= fall.y && !atWorldBottom)) return;
-  if (fall.mode === 'scene' && fall.scene) {
-    const entry = storyZoneEntry(fall.scene);
-    goToScene(scene, entry ? entry.scene : fall.scene, fall.data);
+  const atWorldBottom = player.body.bottom >= worldBottom - 1;
+  if (onGround && !atWorldBottom && (!fall || player.y < fall.y - 40) && storyFeetSupported(scene, player)) {
+    st.safePos = { x: player.x, y: player.y };
+  }
+  if (!fall) return;
+  // Mêmes seuils qu'avant : la ligne `fall.y`, ou le bas du monde physique
+  // (`levelHeight`, 540, plus haut que `fall.y` = 600 dans plusieurs zones).
+  // `player.y` (pieds) et non le corps : celui-ci n'est recalé qu'au pas de
+  // physique suivant une téléportation (reprise, réapparition).
+  if (player.y <= Math.min(fall.y, worldBottom - 1)) return;
+  // Mort par dégâts en cours (cœurs à 0) : sa réapparition ramène Agarica
+  // (en l'air, cf. storyWatchAirDeath, qui lance lui-même la chute).
+  if (player.hearts <= 0) return;
+  startStoryFallOut(scene);
+}
+
+// `opts.dead` : dernier cœur déjà perdu en l'air (cf. storyWatchAirDeath) --
+// la reprise est alors celle de la mort (départ ou lanterne, cœurs rechargés).
+function startStoryFallOut(scene, opts = {}) {
+  const st = scene.__story;
+  const fo = {
+    phase: 'plunge', t: 0, visit: scene.__storyVisit, scripted: !!scene.__playerScripted, done: false, dead: !!opts.dead,
+  };
+  st.fallOut = fo;
+  // Monde gelé le temps de la chute et du fondu (ennemis, déclencheurs,
+  // lanternes, sorties, touches) ; `__playerScripted` garde son élan
+  // horizontal (cf. freezeWorldBodies). Les hooks étant gelés, la suite est
+  // menée par l'événement 'postupdate' de la scène : APRÈS le report du corps
+  // sur le sprite (postUpdate d'Arcade). Téléportée avant, Agarica recevait
+  // en plus le déplacement de sa chute (~15 px à 900 px/s), se retrouvait
+  // enfoncée dans le sol du point de reprise et passait au travers.
+  scene.__cutsceneLock = (scene.__cutsceneLock || 0) + 1;
+  scene.__playerScripted = true;
+  hideStoryPrompt(scene);
+  scene.player.startFallOut();
+  storyFallSinkMask(scene, fo);
+  fo.tick = (time, delta) => stepStoryFallOut(scene, fo, delta);
+  fo.cleanup = () => stopStoryFallOut(scene, fo);
+  scene.events.on('postupdate', fo.tick);
+  scene.events.once('shutdown', fo.cleanup);
+}
+
+// Bande `liquidFloor` sous elle (mousse toxique, brume du vide) : la partie
+// d'Agarica passée sous la crête est masquée, elle s'enfonce dedans au lieu
+// de tomber devant (la bande est dessinée derrière les personnages).
+function storyFallSinkMask(scene, fo) {
+  const liquid = scene.__story.liquid;
+  const player = scene.player;
+  if (!liquid || player.x < liquid.x1 || player.x > liquid.x2) return;
+  const y = liquid.y + STORY_FALL_LIQUID_SINK;
+  const g = scene.make.graphics({ x: 0, y: 0, add: false });
+  g.fillStyle(0xffffff, 1);
+  g.fillRect(-100000, y - 200000, 200000, 200000);
+  fo.maskGfx = g;
+  fo.vanishY = y;
+  player.setMask(g.createGeometryMask());
+}
+
+function storyFallClearMask(scene, fo) {
+  if (!fo.maskGfx) return;
+  if (scene.player && scene.player.active) scene.player.clearMask(true);
+  fo.maskGfx.destroy();
+  fo.maskGfx = null;
+}
+
+function stopStoryFallOut(scene, fo) {
+  scene.events.off('postupdate', fo.tick);
+  scene.events.off('shutdown', fo.cleanup);
+  storyFallClearMask(scene, fo);
+  if (fo.done) return;
+  fo.done = true;
+  if (scene.__story && scene.__story.fallOut === fo) scene.__story.fallOut = null;
+  if (scene.__storyVisit !== fo.visit) return;
+  scene.__cutsceneLock = Math.max(0, (scene.__cutsceneLock || 0) - 1);
+  scene.__playerScripted = fo.scripted;
+}
+
+function stepStoryFallOut(scene, fo, delta) {
+  const player = scene.player;
+  if (fo.done || fo.visit !== scene.__storyVisit || !player || !player.active || !player.body) {
+    stopStoryFallOut(scene, fo);
     return;
   }
-  const back = (fall.mode === 'respawn' && st.checkpoint) || st.safePos || { x: player.spawnX, y: player.spawnY };
-  player.setVelocity(0, 0);
-  player.setPosition(back.x, back.y - 4);
-  if (fall.mode === 'hurt') player.hitByEnemy();
+  fo.t += Math.min(delta || 16, 50);
+  const cam = scene.cameras.main;
+  storyFallHoldXara(scene);
+  if (fo.phase === 'plunge') {
+    // Sortie par le bas de l'écran : le haut de la silhouette passe sous le
+    // bas de la caméra (restée au bas du niveau, cf. ses bornes), ou sous la
+    // crête du liquide où elle s'enfonce.
+    const vanishY = Math.min(cam.worldView.bottom, fo.vanishY ?? Infinity);
+    const gone = player.getBounds().top >= vanishY;
+    if (!gone && fo.t < STORY_FALL_MAX_MS) return;
+    const fall = scene.__story.fall;
+    // Morte (cœurs à 0) : jamais vers une autre zone, réapparition sur place.
+    if (!fo.dead && fall && fall.mode === 'scene' && fall.scene) {
+      const entry = storyZoneEntry(fall.scene);
+      goToScene(scene, entry ? entry.scene : fall.scene, fall.data);
+      // Fondu de sortie de zone lancé : rien d'autre à faire ici.
+      if (scene.__transitioningAway) { stopStoryFallOut(scene, fo); return; }
+    }
+    fo.phase = 'fade';
+    fo.t = 0;
+    cam.fadeOut(STORY_FALL_FADE_OUT_MS, ...FADE_COLOR);
+    return;
+  }
+  // Écran noir : reprise et fondu d'ouverture. La main (et les hooks) ne
+  // reviennent qu'une fois le corps physique recalé sur le point de reprise
+  // (phase 'settle') : avant, update() et les hooks voyaient encore l'ancien
+  // corps, sous l'écran.
+  if (fo.phase === 'fade') {
+    if (fo.t < STORY_FALL_FADE_OUT_MS + 30) return;
+    storyFallClearMask(scene, fo);
+    storyFallRespawn(scene, fo);
+    cam.fadeIn(STORY_FALL_FADE_IN_MS, ...FADE_COLOR);
+    fo.phase = 'settle';
+    fo.t = 0;
+    return;
+  }
+  // Recalage au pas de physique suivant, plus tard si le micro-arrêt du cœur
+  // perdu (juiceHitStop) a mis la physique en pause.
+  const synced = !scene.physics.world.isPaused && Math.abs(player.body.bottom - player.y) < 8;
+  if (!synced && fo.t < 400) return;
+  stopStoryFallOut(scene, fo);
+}
+
+// Xara pendant la chute : comme les ennemis gelés (cf. freezeWorldBodies),
+// plus d'élan horizontal -- sinon elle continuait de marcher vers le vide.
+function storyFallHoldXara(scene) {
+  const xara = scene.xara;
+  if (xara && xara.active && xara.body) xara.body.setVelocityX(0);
+}
+
+// Xara remise au sol, posée en (x, feetY) : état 'ground' imposé, quel que
+// soit son état. Sans ça, en balancier (Agarica en loup, singe, aigle ou
+// papillon au moment de la chute), la reprise en forme humaine la faisait
+// basculer vers le sol en tombant SUR PLACE (Xara.update, `fallingInPlace`),
+// c'est-à-dire au-dessus du vide. Historique oublié : elle visait la
+// position d'Agarica d'il y a 300 ms, encore au bord du trou.
+// `reset` : téléportation pendant update() (avant le report du corps sur le
+// sprite, cf. startStoryFallOut) -- body.reset annule le déplacement du pas.
+function storyPlaceXaraOnGround(scene, x, feetY, { reset = false } = {}) {
+  const xara = scene.xara;
+  if (!xara || !xara.active || !xara.body) return;
+  xara.transitionActive = false;
+  xara.transitionTarget = null;
+  xara.state = 'ground';
+  xara.swingPivotX = null;
+  xara.swingBlendFromX = null;
+  xara.swingPeakConsumed = false;
+  xara.climbUntil = 0;
+  xara.bigHeightGapSince = null;
+  xara.airVelX = 0;
+  if (Array.isArray(xara.history)) xara.history.length = 0;
+  xara.setRotation(0);
+  if (typeof xara.drawThread === 'function') xara.drawThread(0);
+  if (typeof xara.drawBubble === 'function') xara.drawBubble(0);
+  xara.body.setAllowGravity(true);
+  if (reset) xara.body.reset(x, feetY - 2);
+  else xara.setPosition(x, feetY - 2);
+  xara.body.setVelocity(0, 0);
+}
+
+// Reprise de Xara avec Agarica, sous le fondu : posée à son ancre au sol (où
+// elle ne bouge plus) si elle y tient, sinon à côté d'Agarica, du côté où il
+// y a un appui.
+function storyFallRegroupXara(scene, player, feetY) {
+  const xara = scene.xara;
+  if (!xara || !xara.active || !xara.body) return;
+  const ax = storyXaraAnchorX(player.x);
+  const mirror = player.x + (player.x - ax);
+  const x = [ax, mirror, player.x].find((sx) => storyXaraStandOk(scene, sx, feetY)) ?? player.x;
+  storyPlaceXaraOnGround(scene, x, feetY);
+}
+
+// Point de reprise décalé (vers la droite, de 72 px au plus, sur le même
+// appui) pour que l'ancre de Xara, 46 px à GAUCHE d'Agarica, ne tombe pas
+// au-dessus du vide : point sûr ou lanterne au ras d'un bord gauche, Xara
+// partait sinon vers son ancre et sautait dans le trou.
+const STORY_XARA_NUDGE_MAX = 72;
+function storyFallNudgeForXara(scene, player, feetY) {
+  const xara = scene.xara;
+  if (!xara || !xara.active || !xara.visible) return;
+  const ok = (x) => storyStandOk(scene, x, feetY) && storyClearAt(scene, x, feetY)
+    && storyXaraStandOk(scene, storyXaraAnchorX(x), feetY);
+  if (ok(player.x)) return;
+  for (let d = 4; d <= STORY_XARA_NUDGE_MAX; d += 4) {
+    if (ok(player.x + d)) { player.setPosition(player.x + d, player.y); return; }
+  }
+}
+
+// Reprise d'avant, inchangée : 'respawn' → dernière lanterne, sinon dernier
+// point sûr, sinon départ ; 'hurt' → un cœur de moins au point sûr (rien
+// pendant l'invulnérabilité d'un coup récent) et, sur le dernier cœur,
+// réapparition au point de reprise (lanterne ou départ), sans pose couchée.
+// Morte en l'air (`fo.dead`, cf. storyWatchAirDeath) : réapparition de la
+// mort (départ ou lanterne, cœurs rechargés), sans 2e cœur perdu.
+function storyFallRespawn(scene, fo = {}) {
+  const st = scene.__story;
+  const player = scene.player;
+  const fall = st.fall || {};
+  const hurt = fall.mode === 'hurt';
+  player.endFallOut();
+  if (fo.dead) {
+    player.reviveAfterAirDeath();
+  } else {
+    const fatal = hurt && !player.isInvulnerable && player.hearts <= 1;
+    const back = fatal ? { x: player.spawnX, y: player.spawnY + 4 }
+      : (fall.mode === 'respawn' && st.checkpoint) || st.safePos || { x: player.spawnX, y: player.spawnY };
+    player.setPosition(back.x, back.y - 4);
+    if (hurt) player.hitByEnemy({ fall: true });
+  }
+  // Sol sous le point de reprise (le départ de zone peut être en l'air).
+  const feetY = storyGroundYBelow(scene, player.x, player.y) ?? player.y;
+  storyFallNudgeForXara(scene, player, feetY);
+  storyFallRegroupXara(scene, player, feetY);
+  // Caméra recadrée d'un coup sur Agarica (zone morte verticale comprise).
+  if (typeof cameraFollowPlayer === 'function') cameraFollowPlayer(scene, { snap: true });
+  else scene.cameras.main.startFollow(player, true, 1, 1);
+}
+
+// --- Dernier cœur perdu en l'air (zone avec règle `fall`) -------------------
+// Appelée par Player.hitByEnemy : la pose couchée `death` est réservée aux
+// morts au sol. Monde gelé (ni ennemi ni touche), Agarica retombe dans sa pose
+// de coup ; posée → fin du coup habituelle (Player.finishHit : pose couchée au
+// sol puis réapparition) ; ligne de chute franchie (mêmes seuils que
+// updateStoryFall) → chute dans le vide, reprise de la mort sous le fondu.
+// Renvoie false (comportement d'avant) hors zone à vide ou chute déjà engagée.
+// Garde-fou : ni posée ni tombée au bout de STORY_AIR_DEATH_MAX_MS → fin du
+// coup sur place, comme avant.
+const STORY_AIR_DEATH_MAX_MS = 2500;
+function storyWatchAirDeath(scene) {
+  const st = scene.__story;
+  const player = scene.player;
+  if (!st || !st.fall || st.fallOut || st.airDeath || !player || !player.body) return false;
+  const ad = { t: 0, visit: scene.__storyVisit, done: false };
+  st.airDeath = ad;
+  scene.__cutsceneLock = (scene.__cutsceneLock || 0) + 1;
+  hideStoryPrompt(scene);
+  ad.tick = (time, delta) => stepStoryAirDeath(scene, ad, delta);
+  ad.cleanup = () => stopStoryAirDeath(scene, ad);
+  scene.events.on('postupdate', ad.tick);
+  scene.events.once('shutdown', ad.cleanup);
+  return true;
+}
+
+function stopStoryAirDeath(scene, ad) {
+  scene.events.off('postupdate', ad.tick);
+  scene.events.off('shutdown', ad.cleanup);
+  if (ad.done) return;
+  ad.done = true;
+  if (scene.__story && scene.__story.airDeath === ad) scene.__story.airDeath = null;
+  if (scene.__storyVisit !== ad.visit) return;
+  scene.__cutsceneLock = Math.max(0, (scene.__cutsceneLock || 0) - 1);
+}
+
+function stepStoryAirDeath(scene, ad, delta) {
+  const player = scene.player;
+  const fall = scene.__story && scene.__story.fall;
+  if (ad.done || ad.visit !== scene.__storyVisit || !player || !player.active || !player.body) {
+    stopStoryAirDeath(scene, ad);
+    return;
+  }
+  ad.t += Math.min(delta || 16, 50);
+  storyFallHoldXara(scene);
+  const worldBottom = scene.physics.world.bounds.bottom;
+  if (fall && player.y > Math.min(fall.y, worldBottom - 1)) {
+    stopStoryAirDeath(scene, ad);
+    startStoryFallOut(scene, { dead: true });
+    return;
+  }
+  if (player.body.blocked.down || ad.t >= STORY_AIR_DEATH_MAX_MS || !fall) {
+    stopStoryAirDeath(scene, ad);
+    player.finishHit(true);
+  }
+}
+
+// --- Filet de sécurité : Xara tombée dans le vide ---------------------------
+// Xara n'a pas de bord bas (elle n'est pas retenue par les bornes du monde) :
+// tombée dans un trou (saut raté, ancre au-dessus du vide...), elle tombait
+// sans fin et ne revenait jamais. Une fois loin sous le niveau, elle est
+// reposée à son ancre au sol dès qu'Agarica est posée, en forme humaine, et
+// que l'ancre a un appui (sinon elle y retomberait aussitôt) ; d'ici là, elle
+// reste hors de vue. En balancier ou en bulle, elle revient d'elle-même.
+const STORY_XARA_RESCUE_BELOW = 100;
+function updateStoryXaraRescue(scene) {
+  const xara = scene.xara;
+  const player = scene.player;
+  if (!xara || !xara.active || !xara.body || !xara.visible) return;
+  if (xara.state !== 'ground' || xara.transitionActive) return;
+  if (xara.y <= scene.physics.world.bounds.bottom + STORY_XARA_RESCUE_BELOW) return;
+  if (!player.body.blocked.down || player.form !== 'agarica' || player.fallingOut) return;
+  const ax = storyXaraAnchorX(player.x);
+  if (!storyXaraStandOk(scene, ax, player.y)) return;
+  storyPlaceXaraOnGround(scene, ax, player.y, { reset: true });
+  if (typeof spawnFx === 'function') {
+    spawnFx(scene, 'motes', ax, player.y - 14, { count: 8, spread: 10, power: 1.2, color: [STORY_UI.vineLight, 0xe8fff2] });
+  }
 }
 
 function updateStoryKeys(scene) {
@@ -2635,6 +3031,7 @@ function openMap(scene) { openStoryOverlay(scene, 'MapScene'); }
 function storyUpdateHook(scene, time, delta) {
   if (!scene.__story || !scene.player || !scene.player.body) return;
   updateStoryFall(scene);
+  updateStoryXaraRescue(scene);
   updateStoryCheckpoints(scene);
   updateStoryMossBlocks(scene);
   updateStoryTriggers(scene);
