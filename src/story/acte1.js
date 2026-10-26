@@ -14,19 +14,58 @@
 // ---------------------------------------------------------------------------
 // Petits utilitaires communs
 // ---------------------------------------------------------------------------
-function acte1Particles(scene, x, y, { count = 12, colors = [0x3e7a2c, 0x9bff5a], spread = 50, rise = 40, size = [3, 7] } = {}) {
+// Gerbe de particules. Option `fx` (lot n°8, contrat PLAN_INTEGRATION_LOT_8
+// §3.3, utilisée aussi par acte1_arbre.js) : liste d'images `fx_*` du
+// manifeste, prises en alternance, à la taille du disque qu'elles remplacent
+// (2r × 1,3 : l'image normalisée à 128 px a un peu de marge), tournées au
+// hasard. Seule la braise est en ADD (lumière) ; éclats, mottes et pétales
+// ont un contour sombre, illisible en ADD. Les ids absents sont ignorés ;
+// sans aucune image (ou sans l'option) : les disques de couleur d'avant.
+function acte1Particles(scene, x, y, { count = 12, colors = [0x3e7a2c, 0x9bff5a], spread = 50, rise = 40, size = [3, 7], fx = null } = {}) {
+  const arts = (fx || []).filter((id) => scene.textures.exists(`item-${id}`));
   for (let i = 0; i < count; i++) {
-    const p = scene.add.circle(x, y, Phaser.Math.Between(size[0], size[1]), colors[i % colors.length], 1).setDepth(1040);
+    const r = Phaser.Math.Between(size[0], size[1]);
+    let p;
+    if (arts.length) {
+      const id = arts[i % arts.length];
+      p = scene.add.image(x, y, `item-${id}`).setDepth(1040).setAngle(Phaser.Math.Between(0, 359));
+      p.setScale((2 * r * 1.3) / Math.max(p.width, p.height, 1));
+      if (id === 'fx_braise') p.setBlendMode(Phaser.BlendModes.ADD);
+    } else {
+      p = scene.add.circle(x, y, r, colors[i % colors.length], 1).setDepth(1040);
+    }
     scene.tweens.add({
       targets: p,
       x: x + Phaser.Math.Between(-spread, spread),
       y: y - Phaser.Math.Between(0, rise) + Phaser.Math.Between(-10, 20),
+      // Les images tournoient un peu en retombant (un disque n'a pas de sens).
+      ...(arts.length ? { angle: p.angle + Phaser.Math.Between(-120, 120) } : {}),
       alpha: 0,
       duration: Phaser.Math.Between(450, 800),
       ease: 'Quad.easeOut',
       onComplete: () => p.destroy(),
     });
   }
+}
+
+// Particules du lot n°8 par usage (A1-7) : mousse grattée ou qui éclate,
+// lueur chaude du talisman, graine de chêne-cœur.
+const ACTE1_FX_MOUSSE = ['fx_eclat_mousse', 'fx_motte_mousse'];
+const ACTE1_FX_TALISMAN = ['fx_braise', 'fx_petale_rose'];
+const ACTE1_FX_GRAINE = ['fx_petale_rose', 'fx_petale_blanc'];
+
+// Halo peint `fx_halo_doux` (lot n°8, dégradé radial depuis l'import M04) de
+// `size` px, teinté, en ADD ; null si l'image manque (l'appelant garde son
+// cercle dessiné). `__base` = échelle de repos : les tweens visent
+// `__base × facteur` (règle des tweens relatifs : `scale: 1.3` sur une image
+// de 435 px la ferait exploser).
+function acte1HaloImage(scene, x, y, size, tint, alpha) {
+  if (!scene.textures.exists('item-fx_halo_doux')) return null;
+  const img = scene.add.image(x, y, 'item-fx_halo_doux').setTint(tint).setAlpha(alpha)
+    .setBlendMode(Phaser.BlendModes.ADD);
+  img.__base = size / Math.max(img.width, img.height, 1);
+  img.setScale(img.__base);
+  return img;
 }
 
 // Fait apparaître un ennemi du registre en cours de visite (mêmes réglages
@@ -122,8 +161,44 @@ function cutsceneBulles(lines, toast, delay = 0) {
   };
 }
 
+// Plaques (à gratter, puis traces) DEVANT les décors de la zone, toujours
+// derrière les personnages (profondeur 10) : storyPutBehindPlayer les
+// glissait sous le joueur, or les décors (`props`) sont créés APRÈS lui --
+// la plaque du milieu (x 2050) disparaissait entièrement derrière la hutte
+// `bosquet_hutte_mousse`, alors qu'il faut la gratter.
+function acte1PutAboveProps(scene, obj) {
+  let last = null;
+  let lastIdx = -1;
+  for (const p of scene.props || []) {
+    if (!p || !p.active || p.depth !== obj.depth) continue;
+    const i = scene.children.getIndex(p);
+    if (i > lastIdx) { lastIdx = i; last = p; }
+  }
+  if (last) scene.children.moveAbove(obj, last);
+  else storyPutBehindPlayer(scene, obj);
+}
+
 // Plaque de mousse « grattable » (bosquet) : simple dessin + PV, sans corps.
+// Lot n°8 (A1-2) : plaque peinte `decor_mousse_plaque_intacte`, posée par le
+// pied (origine (0.5, 1)) et large de `w` (0,216 pour 70 px : la largeur de
+// grattage). Ses coulures dépassent de 2 px sous la base : bas visible 3 px
+// sous `y`, enfoncé dans l'herbe. `__base` (échelle de repos) sert aux
+// tweens et aux changements d'état (grattée, repoussée). Le rectangle de
+// grattage (x, y, w, h) ne change pas. Sans l'image : le dessin d'avant.
+const ACTE1_PATCH_SINK = 3;
+function acte1PatchImage(scene, x, y, w, state) {
+  const key = `item-decor_mousse_plaque_${state}`;
+  if (!scene.textures.exists(key)) return null;
+  const img = scene.add.image(x, y, key).setOrigin(0.5, 1);
+  img.__base = w / Math.max(img.width, 1);
+  img.setScale(img.__base);
+  setVisibleBottomY(img, y + ACTE1_PATCH_SINK);
+  return img;
+}
+
 function acte1MossPatch(scene, x, y, w = 70) {
+  const art = acte1PatchImage(scene, x, y, w, 'intacte');
+  if (art) return { x, y, w, h: 30, g: art, art: true, hp: 2, lastToken: null, done: false };
   const g = scene.add.graphics({ x, y });
   const rnd = new Phaser.Math.RandomDataGenerator([`patch${x}`]);
   g.fillStyle(0x1d3a1a, 1).fillEllipse(0, -6, w, 18);
@@ -215,10 +290,10 @@ CUTSCENES.bosquet_mousse_revient = [
   { playerMove: { toX: BOSQUET_SOURCE_X - 80 } },
   { playerFace: 'right' },
   { npcAnim: { npc: 'druide_orme', anim: 'idle' } },
-  { call: (scene) => { acte1Particles(scene, BOSQUET_SOURCE_X - 30, 400, { count: 8 }); } },
+  { call: (scene) => { acte1Particles(scene, BOSQUET_SOURCE_X - 30, 400, { count: 8, fx: ACTE1_FX_MOUSSE }); } },
   { shake: { ms: 200, intensity: 0.006 } },
   { wait: 250 },
-  { call: (scene) => { acte1Particles(scene, BOSQUET_SOURCE_X - 30, 400, { count: 8 }); } },
+  { call: (scene) => { acte1Particles(scene, BOSQUET_SOURCE_X - 30, 400, { count: 8, fx: ACTE1_FX_MOUSSE }); } },
   { shake: { ms: 200, intensity: 0.006 } },
   { say: [
     { who: 'agarica', text: 'Aïe ! Elle est dure comme de la pierre…' },
@@ -392,6 +467,23 @@ function acte1BosquetRegrow(scene) {
   const st = scene.__acte1;
   if (!st) return;
   // Une des plaques grattées repousse sous les yeux d'Agarica (échec partiel).
+  // Lot n°8 : la trace grattée de cette plaque fond, et la plaque peinte
+  // `…_repoussee` sort de terre à sa place (70 px de large, pied enfoncé de
+  // 3 px). Tween d'échelle relatif : vers `__base`, pas vers 1.
+  const regrow = acte1PatchImage(scene, BOSQUET_PATCH_XS[1], 448, 70, 'repoussee');
+  if (regrow) {
+    const old = st.patches[1] && st.patches[1].art ? st.patches[1].g : null;
+    if (old && old.active) {
+      scene.tweens.killTweensOf(old);
+      scene.tweens.add({ targets: old, alpha: 0, duration: 600, onComplete: () => old.destroy() });
+    }
+    acte1PutAboveProps(scene, regrow);
+    const base = regrow.__base;
+    regrow.setAlpha(0).setScale(base, base * 0.2);
+    scene.tweens.add({ targets: regrow, alpha: 1, scaleY: base, duration: 1200, ease: 'Sine.easeOut' });
+    st.regrown = { g: regrow, art: true };
+    return;
+  }
   const p = acte1MossPatch(scene, BOSQUET_PATCH_XS[1], 448, 60);
   p.g.setAlpha(0).setScale(0.2, 0.2);
   scene.tweens.add({ targets: p.g, alpha: 1, scaleX: 1, scaleY: 1, duration: 1200, ease: 'Sine.easeOut' });
@@ -400,7 +492,7 @@ function acte1BosquetRegrow(scene) {
 
 function acte1BosquetSpawnCreature(scene) {
   const st = scene.__acte1;
-  acte1Particles(scene, BOSQUET_SOURCE_X, 400, { count: 16, spread: 70 });
+  acte1Particles(scene, BOSQUET_SOURCE_X, 400, { count: 16, spread: 70, fx: ACTE1_FX_MOUSSE });
   // Elle jaillit DERRIÈRE l'amas (côté droit) : Agarica a le temps de se retourner.
   st.creature = acte1SpawnEnemy(scene, 'mousse_creature', BOSQUET_SOURCE_X + 90, 400, {
     patrolMinX: 1950, patrolMaxX: BOSQUET_SOURCE_X + 100, hp: 2,
@@ -455,8 +547,19 @@ ZONE_SCRIPTS.bosquet = {
     // L'idole sur son autel (lueur douce), tant qu'elle n'a pas été volée.
     if (!storyGet('idoleVolee')) {
       st.idol = storyPlaceOnProp(scene, addItemIcon(scene, 0, 0, 'idole', 40), BOSQUET_IDOLE.x, BOSQUET_IDOLE.autel, BOSQUET_IDOLE.y);
-      st.idolGlow = scene.add.circle(st.idol.x, st.idol.y, 26, 0x8fe3b8, 0.25);
-      scene.tweens.add({ targets: st.idolGlow, alpha: 0.08, scale: 1.3, duration: 1400, yoyo: true, repeat: -1 });
+      // Lot n°8 (A1-9) : halo peint (le disque dessiné de 52 px n'a pas de
+      // dégradé) ; même respiration, en échelle relative. 100 px à 0,32 et
+      // non 90 px à 0,25 (plan) : le dégradé porte moins de lumière qu'un
+      // disque plein (énergie moyenne 0,18 contre 0,79), à 90 px il ne se
+      // voyait plus ; 100 x 100 x 0,18 x 0,32 ≈ 52 x 52 x 0,79 x 0,25.
+      const halo = acte1HaloImage(scene, st.idol.x, st.idol.y, 100, 0x8fe3b8, 0.32);
+      if (halo) {
+        st.idolGlow = halo;
+        scene.tweens.add({ targets: halo, alpha: 0.1, scaleX: halo.__base * 1.3, scaleY: halo.__base * 1.3, duration: 1400, yoyo: true, repeat: -1 });
+      } else {
+        st.idolGlow = scene.add.circle(st.idol.x, st.idol.y, 26, 0x8fe3b8, 0.25);
+        scene.tweens.add({ targets: st.idolGlow, alpha: 0.08, scale: 1.3, duration: 1400, yoyo: true, repeat: -1 });
+      }
       storyPutBehindPlayer(scene, st.idolGlow);
       storyPutBehindPlayer(scene, st.idol);
     }
@@ -466,7 +569,15 @@ ZONE_SCRIPTS.bosquet = {
     storyPutBehindPlayer(scene, st.sourceMoss);
     if (!storyGet('aideFaite')) {
       st.patches = BOSQUET_PATCH_XS.map((x) => acte1MossPatch(scene, x, 448));
-      st.patches.forEach((p) => storyPutBehindPlayer(scene, p.g));
+      st.patches.forEach((p) => acte1PutAboveProps(scene, p.g));
+    } else {
+      // Partie rechargée après l'aide : les traces restent (H10), comme à la
+      // fin de la scène -- deux plaques grattées et celle qui a repoussé.
+      // Simple décor (aucune plaque à gratter). Sans les images : rien, comme avant.
+      BOSQUET_PATCH_XS.forEach((x, i) => {
+        const trace = acte1PatchImage(scene, x, 448, 70, i === 1 ? 'repoussee' : 'grattee');
+        if (trace) acte1PutAboveProps(scene, trace);
+      });
     }
     // Rechargement en plein vol : on enchaîne sur le jugement.
     if (storyGet('idoleVolee')) scene.time.delayedCall(300, () => runCutscene(scene, 'bosquet_bannissement'));
@@ -485,10 +596,25 @@ ZONE_SCRIPTS.bosquet = {
         if (!Phaser.Geom.Intersects.RectangleToRectangle(hit, r)) continue;
         patch.lastToken = p.attackEndTime;
         patch.hp -= 1;
-        acte1Particles(scene, patch.x, patch.y - 10, { count: 6, spread: 30 });
+        acte1Particles(scene, patch.x, patch.y - 10, { count: 6, spread: 30, fx: ACTE1_FX_MOUSSE });
         if (patch.hp <= 0) {
           patch.done = true;
-          scene.tweens.add({ targets: patch.g, alpha: 0, scaleY: 0.2, duration: 300, onComplete: () => patch.g.destroy() });
+          if (patch.art && scene.textures.exists('item-decor_mousse_plaque_grattee')) {
+            // Lot n°8 : la plaque grattée RESTE comme trace (H10), avec un
+            // petit tassement (échelle relative, pied fixe : origine en bas).
+            const g = patch.g;
+            g.clearTint().setTexture('item-decor_mousse_plaque_grattee');
+            g.__base = patch.w / Math.max(g.width, 1);
+            g.setScale(g.__base, g.__base * 0.8);
+            setVisibleBottomY(g, patch.y + ACTE1_PATCH_SINK);
+            scene.tweens.add({ targets: g, scaleY: g.__base, duration: 150, ease: 'Quad.easeOut' });
+          } else {
+            scene.tweens.add({ targets: patch.g, alpha: 0, scaleY: 0.2, duration: 300, onComplete: () => patch.g.destroy() });
+          }
+        } else if (patch.art) {
+          // 1er coup : la plaque peinte pâlit (teinte) au lieu de devenir
+          // translucide (on verrait l'herbe au travers).
+          patch.g.setTint(0xbfcfb8);
         } else {
           patch.g.setAlpha(0.6);
         }
@@ -498,7 +624,7 @@ ZONE_SCRIPTS.bosquet = {
         const amas = new Phaser.Geom.Rectangle(BOSQUET_SOURCE_X - 60, 352, 120, 96);
         if (Phaser.Geom.Intersects.RectangleToRectangle(hit, amas)) {
           st.lastAmasToken = p.attackEndTime;
-          acte1Particles(scene, BOSQUET_SOURCE_X - 40, 400, { count: 4, spread: 20 });
+          acte1Particles(scene, BOSQUET_SOURCE_X - 40, 400, { count: 4, spread: 20, fx: ACTE1_FX_MOUSSE });
           if (!st.amasToastShown) { st.amasToastShown = true; showToast(scene, 'L\'amas est bien trop dense : ta lame rebondit dessus.', 2000); }
         }
       }
@@ -615,24 +741,48 @@ CUTSCENES.fs1_mousse_partout = cutsceneBulles([
 ]);
 
 // Lueur du talisman de l'ours autour d'Agarica (anneaux chauds qui pulsent).
+// Lot n°8 (A1-8) : la frame FIXE n° 2 de la rangée `talisman` de
+// `vfx_anneau_choc` (anneau ambre à feuilles, recentré par l'import M06),
+// agrandie par tween comme les cercles d'avant -- pas l'anim : jouée en
+// 290 ms, elle ne suivrait ni la durée (900 ms) ni Agarica. `base` cale son
+// cercle (~197 px de diamètre dans la frame) sur le cercle dessiné de 36 px.
+// ADD obligatoire (anneau déjà coloré, intérieur noir). Repli : les cercles.
+const ACTE1_TALISMAN_RING_FRAME = 'vfx_anneau_choc-talisman-2';
+const ACTE1_TALISMAN_RING_DIAM = 197;
 function acte1TalismanGlow(scene) {
   const p = scene.player;
   if (!p) return;
+  const art = scene.textures.exists(ACTE1_TALISMAN_RING_FRAME);
+  const base = 36 / ACTE1_TALISMAN_RING_DIAM;
   for (let i = 0; i < 3; i++) {
-    const ring = scene.add.circle(p.x, p.y - 40, 18, 0xffc36b, 0.5).setDepth(1040).setBlendMode(Phaser.BlendModes.ADD);
+    const ring = art
+      ? scene.add.image(p.x, p.y - 40, ACTE1_TALISMAN_RING_FRAME).setScale(base).setAlpha(0.9)
+      : scene.add.circle(p.x, p.y - 40, 18, 0xffc36b, 0.5);
+    ring.setDepth(1040).setBlendMode(Phaser.BlendModes.ADD);
     scene.tweens.add({
-      targets: ring, scale: 4, alpha: 0, duration: 900, delay: i * 320, ease: 'Quad.easeOut',
+      targets: ring, ...(art ? { scaleX: base * 4, scaleY: base * 4 } : { scale: 4 }), alpha: 0, duration: 900, delay: i * 320, ease: 'Quad.easeOut',
       onUpdate: () => { if (scene.player) ring.setPosition(scene.player.x, scene.player.y - 40); },
       onComplete: () => ring.destroy(),
     });
   }
-  acte1Particles(scene, p.x, p.y - 40, { count: 14, colors: [0xffc36b, 0xff9fc9], spread: 60, rise: 70 });
+  acte1Particles(scene, p.x, p.y - 40, { count: 14, colors: [0xffc36b, 0xff9fc9], spread: 60, rise: 70, fx: ACTE1_FX_TALISMAN });
 }
 
 // Indice Maexxna : une petite araignée s'écarte devant Xara.
+// Lot n°8 (A1-10) : araignée peinte `araignee_petite_0..2` (24 px, tournée
+// vers la droite, vers Xara ; même ligne de base pour les 3 poses), posée
+// par les pieds (origine (0.5, 1), footOffset 0). Pendant l'arrêt devant
+// Xara : `_1` (elle se ramasse), `_2` 120 ms plus tard (la révérence), `_1`
+// en se relevant, `_0` pour repartir ; elle recule sans se retourner. Mêmes
+// trajets et mêmes durées. Repli : le dessin d'avant.
+const ACTE1_SPIDER_POSES = ['araignee_petite_0', 'araignee_petite_1', 'araignee_petite_2'];
 function acte1Fs1LittleSpider(scene) {
   const xara = scene.npcs && scene.npcs.xara;
   const x0 = (xara ? xara.x : FS1_XARA_X) - 50;
+  if (ACTE1_SPIDER_POSES.every((id) => scene.textures.exists(`item-${id}`))) {
+    acte1Fs1LittleSpiderArt(scene, x0);
+    return;
+  }
   // Pattes (≈ 5 px sous le centre) sur la surface de marche, puis le relief
   // suivi pendant la fuite (elle descend du bloc de la souche).
   const FOOT = 5;
@@ -663,11 +813,68 @@ function acte1Fs1LittleSpider(scene) {
   });
 }
 
+function acte1Fs1LittleSpiderArt(scene, x0) {
+  const pose = (i) => `item-${ACTE1_SPIDER_POSES[i]}`;
+  const g = scene.add.image(x0, storyStandY(scene, x0), pose(0)).setOrigin(0.5, 1);
+  g.setScale((getItemManifest().araignee_petite_0 || {}).scale || 0.1);
+  let lastX = x0;
+  const follow = () => {
+    if (!g.active) { scene.events.off('update', follow); return; }
+    const dir = Math.sign(g.x - lastX);
+    lastX = g.x;
+    storyFollowGround(scene, g, storyFrameDt(scene), { dir, speed: 160, footOffset: 0 });
+  };
+  scene.events.on('update', follow);
+  storyPutBehindPlayer(scene, g);
+  const setPose = (i) => { if (g.active) g.setTexture(pose(i)); };
+  scene.tweens.chain({
+    targets: g,
+    tweens: [
+      { x: x0 + 25, duration: 500, ease: 'Sine.easeOut' },
+      {
+        x: x0 + 20, duration: 250, yoyo: true,
+        onStart: () => { setPose(1); scene.time.delayedCall(120, () => setPose(2)); },
+        onYoyo: () => setPose(1),
+        onComplete: () => setPose(0),
+      },
+      { x: x0 - 140, alpha: 0, duration: 900, ease: 'Quad.easeIn' },
+    ],
+    onComplete: () => g.destroy(),
+  });
+}
+
 // Taches de mousse lumineuse sur les troncs/le sol : la mousse est partout.
+// Lot n°8 (A1-3) : chaque tache est [x, y, r, kind?, flipX?] ; `kind` =
+// 'sol' | 'petite' | 'tronc' | 'plafond' (par défaut : 'petite' si r < 20,
+// sinon 'sol') choisit `decor_mousse_lumineuse_<kind>`, large d'environ
+// 2,6·r (le tronc garde 0,2 : il épouse la face d'un mur, pas une tache).
+// Sol et petite : posées par le bas visible sur la surface de marche la plus
+// proche de `y` (+ 2 px, enfoncées dans l'herbe) ; tronc : centrée sur
+// (x, y) ; plafond : pendue par son bord haut en y. Sans l'image : le dessin
+// d'avant, au même endroit.
+const ACTE1_MOSS_DECOR_WIDTH = { sol: 287, petite: 149, plafond: 318 };
 function acte1DrawMossDecor(scene, spots) {
-  for (const [x, y, r] of spots) {
-    const g = scene.add.graphics({ x, y });
+  for (const [x, y, r, kindIn, flipX] of spots) {
+    const kind = kindIn || (r < 20 ? 'petite' : 'sol');
+    const key = `item-decor_mousse_lumineuse_${kind}`;
     const rnd = new Phaser.Math.RandomDataGenerator([`decor${x},${y}`]);
+    if (scene.textures.exists(key)) {
+      const img = scene.add.image(x, y, key).setFlipX(!!flipX);
+      const srcW = ACTE1_MOSS_DECOR_WIDTH[kind];
+      img.setScale(srcW ? (2.6 * r) / srcW : 0.2);
+      if (kind === 'tronc') {
+        img.setOrigin(0.5, 0.5);
+      } else if (kind === 'plafond') {
+        img.setOrigin(0.5, 0);
+      } else {
+        img.setOrigin(0.5, 1);
+        setVisibleBottomY(img, storyStandY(scene, x, y) + 2);
+      }
+      storyPutBehindPlayer(scene, img);
+      scene.tweens.add({ targets: img, alpha: 0.7, duration: rnd.between(1400, 2200), yoyo: true, repeat: -1 });
+      continue;
+    }
+    const g = scene.add.graphics({ x, y });
     for (let i = 0; i < 6; i++) {
       g.fillStyle(i % 2 ? 0x2f5a2a : 0x3e7a2c, 0.9);
       g.fillCircle(rnd.realInRange(-r, r), rnd.realInRange(-r / 2, r / 4), rnd.realInRange(r * 0.3, r * 0.6));
@@ -694,10 +901,15 @@ ZONE_SCRIPTS.foret_sombre_1 = {
   create(scene) {
     const st = { amasDone: !!storyGet('moss_foret_sombre_1_amas_racines'), nextRefill: 0 };
     scene.__acte1 = st;
+    // Lot n°8 (A1-3, PLAN_INTEGRATION_LOT_8 §5) : mousse collée aux deux
+    // faces exposées du mur de racines (x 2688 et 2816, bord plat contre la
+    // racine) et pendue sous lui, au-dessus de l'amas ; au sol, des taches
+    // qui évitent la souche aux champignons (2925), le bord du tronc couché
+    // (664) et les champignons lumineux (3775). Plus aucune tache en l'air.
     acte1DrawMossDecor(scene, [
-      [2690, 70, 22], [2810, 170, 20], [2730, 240, 16],
-      [2980, 448, 30], [3150, 448, 24], [3420, 448, 34], [3700, 448, 22],
-      [640, 448, 14], [1900, 448, 18],
+      [2672, 192, 20, 'tronc', true], [2832, 192, 20, 'tronc'], [2730, 254, 22, 'plafond'],
+      [2925, 448, 30], [3150, 448, 24], [3420, 448, 34],
+      [664, 448, 14], [1900, 448, 18], [3775, 448, 18],
     ]);
   },
 
@@ -814,22 +1026,87 @@ CUTSCENES.fs2_grand_arbre = cutsceneBulles([
 
 // Mare préservée (décor pur, pas de clé `water`) : eau sous un vieux pont de
 // bois ; les trois poissons (clé `animals`, profondeur 4) nagent entre les deux couches.
+// Lot n°8 (A1-1) : chaque élément prend son image s'il l'a, sinon garde son
+// dessin d'avant (élément par élément). Aucun corps physique : on marche
+// sur le sol solide, sous le pont.
+//   eau    : fond `liquide_mare_fond` (profondeur 3) à l'échelle k = 88/140
+//            (une seule rangée de tuile jusqu'au bas de l'écran), voile
+//            `liquide_mare_voile` (5) translucide qui respire et dérive,
+//            ligne de surface `liquide_mare_surface_0..3` (5) animée à 8 i/s,
+//            sa ligne claire (rangées 26-31) juste sous le tronc ;
+//   berges : `decor_mare_berge` (4,5 : devant les poissons, derrière le
+//            voile), hors du tween d'alpha ; rive droite en miroir ;
+//   roseaux: `decor_mare_roseaux` (6,5 : DEVANT le pont, sinon cachés à 80 %,
+//            mais derrière les personnages, profondeur 10) ;
+//   pont   : `decor_pont_tronc` étiré en (w + 44) x 26 (R2 : à ses
+//            proportions, le fût ne fait que 8 px et se lit comme une
+//            branche), le dessus du fût (rangée 34/90) sur la marche.
+const FS2_MARE_SURFACE_FRAMES = ['liquide_mare_surface_0', 'liquide_mare_surface_1', 'liquide_mare_surface_2', 'liquide_mare_surface_3'];
 function acte1Fs2DrawMare(scene) {
   const { x, w, y } = FS2_MARE;
-  const back = scene.add.graphics().setDepth(3);
-  back.fillStyle(0x0d2a3a, 1).fillRect(x, y, w, 540 - y);
-  back.fillStyle(0x1c5f6e, 0.8).fillRect(x + 6, y + 4, w - 12, 540 - y - 4);
-  const front = scene.add.graphics().setDepth(5);
-  front.fillStyle(0x9fe6e0, 0.18).fillRect(x, y, w, 540 - y);
-  front.fillStyle(0xbff6ef, 0.7).fillRect(x, y, w, 3);
-  // Roseaux et pierres des berges.
-  for (const [bx, s] of [[x - 6, -1], [x + w + 6, 1]]) {
-    front.fillStyle(0x3a3550, 1).fillEllipse(bx, y + 4, 26, 14);
-    front.fillStyle(0x2d6b3a, 1);
-    for (let i = 0; i < 4; i++) front.fillRect(bx + s * (6 + i * 5), y - 26 + i * 4, 3, 30 - i * 4);
+  const H = 540 - y;
+  const has = (id) => scene.textures.exists(`item-${id}`);
+  const breathing = [];
+  // Eau.
+  if (has('liquide_mare_fond')) {
+    const k = H / 140;
+    scene.add.tileSprite(x, y, w, H, 'item-liquide_mare_fond').setOrigin(0, 0).setTileScale(k, k).setDepth(3);
+    if (has('liquide_mare_voile')) {
+      const veil = scene.add.tileSprite(x, y, w, H, 'item-liquide_mare_voile').setOrigin(0, 0).setTileScale(k, k)
+        .setDepth(5).setAlpha(0.3);
+      scene.tweens.add({ targets: veil, alpha: 0.2, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      scene.tweens.add({ targets: veil, tilePositionX: { from: 0, to: -1536 }, duration: 45000, repeat: -1 });
+    }
+    const frames = FS2_MARE_SURFACE_FRAMES.filter(has);
+    if (frames.length) {
+      const line = scene.add.tileSprite(x, y + 8 - 26 * k, w, 35 * k, `item-${frames[0]}`).setOrigin(0, 0)
+        .setTileScale(k, k).setDepth(5);
+      let fi = 0;
+      scene.time.addEvent({
+        delay: 125, loop: true,
+        callback: () => { if (!line.active) return; fi = (fi + 1) % frames.length; line.setTexture(`item-${frames[fi]}`); },
+      });
+    }
+  } else {
+    const back = scene.add.graphics().setDepth(3);
+    back.fillStyle(0x0d2a3a, 1).fillRect(x, y, w, H);
+    back.fillStyle(0x1c5f6e, 0.8).fillRect(x + 6, y + 4, w - 12, H - 4);
+    const front = scene.add.graphics().setDepth(5);
+    front.fillStyle(0x9fe6e0, 0.18).fillRect(x, y, w, H);
+    front.fillStyle(0xbff6ef, 0.7).fillRect(x, y, w, 3);
+    breathing.push(front);
   }
-  scene.tweens.add({ targets: front, alpha: 0.75, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  // Berges et roseaux.
+  const bergeArt = has('decor_mare_berge');
+  const roseauArt = has('decor_mare_roseaux');
+  if (bergeArt) {
+    addItemImage(scene, x + 14, y + 10, 'decor_mare_berge', { origin: [1, 1] }).setDepth(4.5);
+    addItemImage(scene, x + w - 14, y + 10, 'decor_mare_berge', { origin: [0, 1] }).setFlipX(true).setDepth(4.5);
+  }
+  if (roseauArt) {
+    addItemImage(scene, x + 6, y + 5, 'decor_mare_roseaux', { origin: [0.5, 1] }).setDepth(6.5);
+    addItemImage(scene, x + w - 6, y + 5, 'decor_mare_roseaux', { origin: [0.5, 1] }).setFlipX(true).setDepth(6.5);
+  }
+  if (!bergeArt || !roseauArt) {
+    // Roseaux et pierres des berges dessinés (ceux dont l'image manque).
+    const banks = scene.add.graphics().setDepth(5);
+    for (const [bx, s] of [[x - 6, -1], [x + w + 6, 1]]) {
+      if (!bergeArt) banks.fillStyle(0x3a3550, 1).fillEllipse(bx, y + 4, 26, 14);
+      if (!roseauArt) {
+        banks.fillStyle(0x2d6b3a, 1);
+        for (let i = 0; i < 4; i++) banks.fillRect(bx + s * (6 + i * 5), y - 26 + i * 4, 3, 30 - i * 4);
+      }
+    }
+    breathing.push(banks);
+  }
+  if (breathing.length) scene.tweens.add({ targets: breathing, alpha: 0.75, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   // Le pont : un tronc couché (on marche dessus, le sol solide est dessous).
+  if (has('decor_pont_tronc')) {
+    const cx = x + w / 2;
+    scene.add.image(cx, storyStandY(scene, cx, 448) - 2, 'item-decor_pont_tronc')
+      .setOrigin(0.5, 34 / 90).setDisplaySize(w + 44, 26).setDepth(6);
+    return;
+  }
   const log = scene.add.graphics().setDepth(6);
   log.fillStyle(0x3b2a20, 1).fillRoundedRect(x - 20, y - 8, w + 40, 16, 7);
   log.fillStyle(0x5a4030, 1).fillRoundedRect(x - 16, y - 7, w + 32, 5, 3);
@@ -839,10 +1116,32 @@ function acte1Fs2DrawMare(scene) {
 // La plante qui repousse la mousse, sur sa haute branche (case gy 1), avec
 // un halo doux et une lueur qui bat lentement. (L'ancien tronc d'arbre mort
 // dessiné par code, un pilier sombre, a été retiré : il faisait placeholder.)
+// Lot n°8 (A1-5, H9) : la plante résistante peinte, réduite à 0,1 (blanche,
+// 5 pétales) -- la MÊME plante que celle de la clairière (acte 2), pour que
+// le joueur la reconnaisse quand il la retrouve ; `decor_fleur_perchee` en
+// second choix. Posée par le bas visible (+3 px dans l'herbe de la branche),
+// même balancement autour du pied. Halo peint de 150 px recentré sur la
+// fleur, tween relatif. Repli : halo et fleur dessinés.
+const FS2_PLANTE_ART = [['decor_plante_resistante_fleurie', 0.1], ['decor_fleur_perchee', null]];
 function acte1Fs2DrawPlante(scene) {
   const { x, y } = FS2_PLANTE;
-  const halo = scene.add.circle(x, y - 26, 46, 0xffe9f5, 0.12).setBlendMode(Phaser.BlendModes.ADD);
-  scene.tweens.add({ targets: halo, scale: 1.25, alpha: 0.05, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  // Alpha 0,26 (0,2 au plan) : à 0,2, au creux de la respiration, le halo
+  // ne se voyait plus sur la frondaison claire derrière la branche.
+  const halo = acte1HaloImage(scene, x, y - 32, 150, 0xffe9f5, 0.26);
+  if (halo) {
+    scene.tweens.add({ targets: halo, scaleX: halo.__base * 1.25, scaleY: halo.__base * 1.25, alpha: 0.1, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  } else {
+    const disc = scene.add.circle(x, y - 26, 46, 0xffe9f5, 0.12).setBlendMode(Phaser.BlendModes.ADD);
+    scene.tweens.add({ targets: disc, scale: 1.25, alpha: 0.05, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+  const art = FS2_PLANTE_ART.find(([id]) => scene.textures.exists(`item-${id}`));
+  if (art) {
+    const img = addItemImage(scene, x, y, art[0], { origin: [0.5, 1] });
+    if (art[1]) img.setScale(art[1]);
+    setVisibleBottomY(img, y + 3);
+    scene.tweens.add({ targets: img, angle: 3, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return;
+  }
   const g = scene.add.graphics({ x, y });
   g.fillStyle(0x3f8f4a, 1).fillRect(-2, -34, 4, 34);
   g.fillStyle(0x4fae5a, 1).fillEllipse(-9, -14, 14, 6).fillEllipse(9, -20, 14, 6);
@@ -856,7 +1155,26 @@ function acte1Fs2DrawPlante(scene) {
 
 // Empreintes boueuses du sentier de chasse (toujours visibles ; les pistes
 // lumineuses `tracks` ne se voient, elles, qu'en forme de loup).
+// Lot n°8 (A1-4, R4) : `decor_empreinte_boue`, livrée en vue de dessus,
+// écrasée à 0,5 en Y (21x6 px, vue rasante) et centrée 2-3 px sous la
+// surface de marche RÉELLE sous chaque x (avant : toutes à y fixe, donc
+// dans le vide ou sur la face des marches). Une empreinte au bord d'une
+// marche (sol différent à ± 8 px) ou au pied du totem est sautée. Les pistes
+// `tracks` ne changent pas. Repli : le dessin d'avant.
+const FS2_MUD_PRINT_SKIP = [{ x: FS2_TOTEM.x, r: 40 }];
 function acte1Fs2DrawMudPrints(scene, x0, x1, y) {
+  if (scene.textures.exists('item-decor_empreinte_boue')) {
+    const s = (getItemManifest().decor_empreinte_boue || {}).scale || 0.08;
+    for (let x = x0, i = 0; x < x1; x += 46, i++) {
+      const sy = storyStandY(scene, x, y);
+      if (storyStandY(scene, x - 8, y) !== sy || storyStandY(scene, x + 8, y) !== sy) continue;
+      if (FS2_MUD_PRINT_SKIP.some((k) => Math.abs(x - k.x) < k.r)) continue;
+      const img = addItemImage(scene, x, sy + 2 + (i % 2), 'decor_empreinte_boue');
+      img.setScale(s, s * 0.5).setAlpha(0.85);
+      storyPutBehindPlayer(scene, img);
+    }
+    return;
+  }
   const g = scene.add.graphics();
   for (let x = x0, i = 0; x < x1; x += 46, i++) {
     const py = y - 3 + (i % 2 ? 3 : 0);
@@ -866,14 +1184,26 @@ function acte1Fs2DrawMudPrints(scene, x0, x1, y) {
   storyPutBehindPlayer(scene, g);
 }
 
+// Lot n°8 (A1-6) : graine peinte `objet_graine_coeur` (27x22 px) et halo
+// peint ; mêmes tweens (le halo en échelle relative). Halo de 80 px à 0,35
+// (plan : 64 px à 0,2, qui portait trois fois moins de lumière que le disque
+// dessiné : la graine perdait son éclat de secret). Repli : le cœur et le
+// disque dessinés. Le ramassage ne change pas.
 function acte1Fs2DrawCoeur(scene) {
   const { x, y } = FS2_COEUR;
-  const glow = scene.add.circle(x, y, 26, 0xff9fc9, 0.2).setBlendMode(Phaser.BlendModes.ADD);
-  const g = scene.add.graphics({ x, y });
-  g.fillStyle(0xff6fa8, 1).fillCircle(-6, -3, 8).fillCircle(6, -3, 8).fillTriangle(-13, 0, 13, 0, 0, 15);
-  g.fillStyle(0xffd0e4, 1).fillCircle(-7, -6, 3);
+  const halo = acte1HaloImage(scene, x, y, 80, 0xff9fc9, 0.35);
+  const glow = halo || scene.add.circle(x, y, 26, 0xff9fc9, 0.2).setBlendMode(Phaser.BlendModes.ADD);
+  let g;
+  if (scene.textures.exists('item-objet_graine_coeur')) {
+    g = addItemImage(scene, x, y, 'objet_graine_coeur');
+  } else {
+    g = scene.add.graphics({ x, y });
+    g.fillStyle(0xff6fa8, 1).fillCircle(-6, -3, 8).fillCircle(6, -3, 8).fillTriangle(-13, 0, 13, 0, 0, 15);
+    g.fillStyle(0xffd0e4, 1).fillCircle(-7, -6, 3);
+  }
   scene.tweens.add({ targets: [g, glow], y: y - 8, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-  scene.tweens.add({ targets: glow, scale: 1.4, alpha: 0.08, duration: 900, yoyo: true, repeat: -1 });
+  if (halo) scene.tweens.add({ targets: halo, scaleX: halo.__base * 1.4, scaleY: halo.__base * 1.4, alpha: 0.14, duration: 900, yoyo: true, repeat: -1 });
+  else scene.tweens.add({ targets: glow, scale: 1.4, alpha: 0.08, duration: 900, yoyo: true, repeat: -1 });
   storyPutBehindPlayer(scene, glow);
   storyPutBehindPlayer(scene, g);
   return { g, glow };
@@ -882,7 +1212,17 @@ function acte1Fs2DrawCoeur(scene) {
 // Le vieux sentier vers la hutte, au fond de la poche : une lueur rose qui
 // descend des hauteurs (l'arche de racines est un décor de la donnée ; les
 // anciennes « marches » dessinées par code, des formes sombres, sont retirées).
+// Lot n°8 (A1-9) : rai peint `fx_rai_lumiere` rose, posé par le bas sur le
+// sol de la poche, en ADD. Son haut est net : il passe derrière le sol, et
+// le surplomb (bas des cases en y 256) le cache. Repli : le triangle dessiné.
 function acte1Fs2DrawSentier(scene) {
+  if (scene.textures.exists('item-fx_rai_lumiere')) {
+    const ray = scene.add.image(5090, 448, 'item-fx_rai_lumiere').setOrigin(0.5, 1).setDisplaySize(90, 200)
+      .setTint(0xff9fc9).setAlpha(0.35).setBlendMode(Phaser.BlendModes.ADD);
+    if (typeof sendBehindFrontGround === 'function' && scene.__frontGroundFirstImage) sendBehindFrontGround(scene, [ray]);
+    else storyPutBehindPlayer(scene, ray);
+    return;
+  }
   const g = scene.add.graphics();
   g.fillStyle(0xff9fc9, 0.12).fillTriangle(5050, 448, 5120, 448, 5120, 256);
   storyPutBehindPlayer(scene, g);
@@ -905,8 +1245,10 @@ function acte1Fs2TakeCoeur(scene) {
       onComplete: () => { st.coeur.g.destroy(); st.coeur.glow.destroy(); },
     });
   }
-  acte1Particles(scene, FS2_COEUR.x, FS2_COEUR.y, { count: 14, colors: [0xff9fc9, 0xffe9f5], spread: 50, rise: 60 });
-  showStoryBanner(scene, { kicker: 'Secret', title: 'Graine de chêne-cœur', desc: '+1 cœur maximum.', color: STORY_UI.pink });
+  acte1Particles(scene, FS2_COEUR.x, FS2_COEUR.y, { count: 14, colors: [0xff9fc9, 0xffe9f5], spread: 50, rise: 60, fx: ACTE1_FX_GRAINE });
+  // Icône de la bannière : la graine peinte (sans elle, pas d'icône, comme avant).
+  const itemId = scene.textures.exists('item-objet_graine_coeur') ? 'objet_graine_coeur' : null;
+  showStoryBanner(scene, { kicker: 'Secret', title: 'Graine de chêne-cœur', desc: '+1 cœur maximum.', itemId, color: STORY_UI.pink });
   runCutscene(scene, [{ wait: 1400 }, { say: CUTSCENES.fs2_coeur[0].say }]);
 }
 
@@ -918,7 +1260,11 @@ ZONE_SCRIPTS.foret_sombre_2 = {
     acte1Fs2DrawMare(scene);
     acte1Fs2DrawPlante(scene);
     acte1Fs2DrawSentier(scene);
-    acte1DrawMossDecor(scene, [[1700, 448, 22], [2500, 448, 26], [4300, 140, 22], [4900, 130, 26], [5500, 448, 30]]);
+    // Lot n°8 (A1-3, §5) : sous le surplomb contre le mur de mousse (4280,
+    // pendue ; remplace la tache qui flottait en 4300, 140), SUR le surplomb
+    // (4900, refY 192 ; remplaçait 4900, 130), et au sol en évitant le
+    // buisson épineux (2440). Jamais dans la poche secrète.
+    acte1DrawMossDecor(scene, [[1700, 448, 22], [2440, 448, 26], [4280, 254, 22, 'plafond'], [4900, 192, 26], [5500, 448, 30]]);
     if (!st.coeurTaken) st.coeur = acte1Fs2DrawCoeur(scene);
     // Arrivée par le sentier de la hutte avec le mur encore fermé.
     const p = scene.player;

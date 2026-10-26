@@ -125,8 +125,9 @@ function ensurePiafAnimations(scene) {
   // Jouées une fois au moment du double-saut, avant de basculer sur les
   // vraies frames Aigle (cf. eagleTransformDuration dans le constructeur) —
   // 2 frames calées pour tenir pile dans cette durée (frameRate = 2 /
-  // durée-en-secondes).
-  scene.anims.create({
+  // durée-en-secondes). Créées seulement avec leurs images chargées (cf.
+  // createAnimIfLoaded, plus bas) : sans image, pas de transfo dessinée.
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_RISE_KEY,
     frames: [
       { key: TRANSFO_RISE_START_KEY },
@@ -135,7 +136,7 @@ function ensurePiafAnimations(scene) {
     frameRate: EAGLE_TRANSFO_FRAME_RATE,
     repeat: 0,
   });
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_FALL_KEY,
     frames: [
       { key: TRANSFO_FALL_START_KEY },
@@ -144,7 +145,7 @@ function ensurePiafAnimations(scene) {
     frameRate: EAGLE_TRANSFO_FRAME_RATE,
     repeat: 0,
   });
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_TO_HUMAN_FROM_EAGLE_KEY,
     frames: [
       { key: TRANSFO_STEP2_KEY },
@@ -156,7 +157,7 @@ function ensurePiafAnimations(scene) {
 
   // Flash Loup -> Aigle (voir TRANSFO_WOLF_EAGLE_* plus haut) : une seule
   // pose, jouée sans boucle le temps du double-saut.
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_WOLF_TO_EAGLE_KEY,
     frames: [{ key: TRANSFO_WOLF_EAGLE_TEXTURE_KEY }],
     frameRate: 10,
@@ -232,6 +233,53 @@ const TRANSFO_WOLF_SCALE = 0.0675;
 
 function transfoWolfFrames(indices) {
   return indices.map((i) => ({ key: `transfo-wolf-${i}` }));
+}
+
+// --- Anims de transformation : seulement les images chargées ---------------
+// Bug corrigé : la transfo Loup cite 4 images (transfo-wolf-0..3) dont seules
+// la 1 et la 2 existent sur disque -- Phaser écrivait « Texture
+// transfo-wolf-0 / transfo-wolf-3 not found » à chaque création, et si les
+// deux images restantes manquaient aussi (chargement raté), l'anim n'avait
+// AUCUNE frame : la transfo affichait alors la texture précédente à
+// l'échelle de la transfo (0,0675 : Agarica quasi invisible, 18x11 px), puis
+// une erreur JS (« reading 'duration' »). Désormais : anim créée avec ses
+// seules images chargées, pas d'anim du tout sans image, et pas de transfo
+// dessinée quand son anim n'est pas jouable (cf. beginFormTransition) -- la
+// forme change alors net, comme sans art.
+function loadedAnimFrames(scene, frames) {
+  return frames.filter((f) => scene.textures.exists(f.key));
+}
+
+function createAnimIfLoaded(scene, config) {
+  const frames = loadedAnimFrames(scene, config.frames);
+  if (!frames.length) return null;
+  return scene.anims.create({ ...config, frames });
+}
+
+function animPlayable(scene, key) {
+  const anim = key && scene.anims.exists(key) ? scene.anims.get(key) : null;
+  return !!(anim && anim.frames.length);
+}
+
+// Images de transformation dont la planche n'a pas été dessinée à la même
+// échelle que les autres (calibrage visuel : pas de saut de taille d'une pose
+// à l'autre). transfoloup_2 (loup encore capé, 1536x1024) sortait à
+// TRANSFO_WOLF_SCALE 25 % plus petite que le loup qui suit (51 px de haut
+// contre 64-68) : elle prend la même surface visible que loup-run-0 à
+// WOLF_SCALE. Hitbox inchangée (même gabarit humain, cf. transfoBodyConfig).
+const TRANSFO_FRAME_CALIBRATION = {
+  'transfo-wolf-2': { refKey: 'loup-run-0', refScale: WOLF_SCALE },
+};
+const TRANSFO_FRAME_SCALE_CACHE = new Map();
+function transfoFrameScale(scene, key) {
+  const cal = TRANSFO_FRAME_CALIBRATION[key];
+  if (!cal || typeof calibratedScale !== 'function') return null;
+  if (TRANSFO_FRAME_SCALE_CACHE.has(key)) return TRANSFO_FRAME_SCALE_CACHE.get(key);
+  const res = calibratedScale(scene, [key], { refKey: cal.refKey, refScale: cal.refScale, method: 'area' });
+  const scale = res ? res.scale : null;
+  // Pas de mise en cache d'un échec de lecture (pixels pas encore lisibles).
+  if (scale) TRANSFO_FRAME_SCALE_CACHE.set(key, scale);
+  return scale;
 }
 
 // Transformation Loup -> Aigle en plein vol (double-saut déclenché alors
@@ -475,15 +523,17 @@ function ensurePlayerAnimations(scene) {
     repeat: 0,
   });
 
-  // Transformation Loup, aller et retour (mêmes 4 frames, ordre inversé) —
+  // Transformation Loup, aller et retour (mêmes frames, ordre inversé) —
   // jouées une fois à l'entrée/sortie du sprint (cf. WOLF_TRANSFORM_DURATION).
-  scene.anims.create({
+  // Seules les images 1 et 2 existent (cf. createAnimIfLoaded) : la transfo
+  // joue donc hybride -> loup capé (~133 ms), comme avant, sans avertissement.
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_TO_WOLF_KEY,
     frames: transfoWolfFrames([0, 1, 2, 3]),
     frameRate: 15,
     repeat: 0,
   });
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_TO_HUMAN_FROM_WOLF_KEY,
     frames: transfoWolfFrames([3, 2, 1, 0]),
     frameRate: 15,
@@ -492,13 +542,13 @@ function ensurePlayerAnimations(scene) {
 
   // Transformation Pieuvre, aller et retour (mêmes 4 frames, ordre inversé)
   // — jouée à l'entrée/sortie de l'eau (cf. octopusTransformDuration).
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_TO_OCTOPUS_KEY,
     frames: transfoPieuvreFrames([0, 1, 2, 3]),
     frameRate: 15,
     repeat: 0,
   });
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_TO_HUMAN_FROM_OCTOPUS_KEY,
     frames: transfoPieuvreFrames([3, 2, 1, 0]),
     frameRate: 15,
@@ -728,6 +778,8 @@ const BUTTERFLY_TRANSFO_MS = 130;
 // Poussière lumineuse de la pose (centrée sur le buste, pas aux pieds).
 const BUTTERFLY_CENTER_ABOVE_FEET = 38;
 const BUTTERFLY_DUST_COLORS = [0x9ff3ff, 0x6fd8ff, 0xffb3f0, 0xfff6a0];
+// Taille à l'écran d'une étincelle peinte `fx_etincelle_papillon` (px).
+const BUTTERFLY_SPARKLE_ART_SIZE = 16;
 const BUTTERFLY_PH_KEY = 'butterfly-ph';
 const ANIM_BUTTERFLY_PH_KEY = 'butterfly-ph-flap';
 const BUTTERFLY_PH_SIZE = { w: 60, h: 52 };
@@ -810,6 +862,12 @@ const VINE_ART_TILT = 0.55;
 // le dessin remontant de 3 px au plus fort de la traction (repli sans art `climb`).
 const VINE_CLIMB_STEP_PX = 18;
 const VINE_CLIMB_BOB_PX = 3;
+// Pose de grimpe tenue tant que les mains ont bougé dans ce délai (ms) : plus
+// long que l'écart entre deux pas de physique (16,7 ms, parfois une image de
+// plus), pour couvrir les images affichées sans pas de physique (cf.
+// stepVinePhysics) ; assez court pour que la pose suspendue revienne net à
+// l'arrêt en haut ou en bas de la liane.
+const VINE_CLIMB_POSE_HOLD_MS = 50;
 // Passage pose suspendue (1 bras, anim lente) <-> poses de balancement (2 bras,
 // choisies selon la phase) : seuils d'entrée et de sortie distincts, sinon la
 // pose clignote quand le balancement s'éteint.
@@ -1508,8 +1566,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.vineMomentumSpeed = 0;
     // Vol après un lâcher avec Espace (cf. releaseVine) : jusqu'au sol/liane.
     this.vineFlight = false;
-    this.vineClimbLastR = null;
+    // Grimpe : distance parcourue (rythme des mains) et heure du dernier pas
+    // de physique qui a fait bouger les mains (cf. stepVinePhysics).
     this.vineClimbDist = 0;
+    this.vineClimbMovedAt = -Infinity;
     this.monkeyReleasePoseUntil = 0;
     this.hurtPoseUntil = 0;
     this.throwPoseUntil = 0;
@@ -2217,6 +2277,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // pendant la transfo (décalage/enfoncement dans le sol observé).
         this.applyBodyForScale(this.formTransitionScale, this.formTransitionBody);
         this.anims.play(this.formTransitionAnimKey, true);
+        // Image dessinée à une autre échelle que ses voisines (cf.
+        // TRANSFO_FRAME_CALIBRATION) : sa propre échelle, et la hitbox du même
+        // gabarit recentrée sur SON canvas -- taille monde du corps inchangée.
+        const frameScale = transfoFrameScale(this.scene, this.texture.key);
+        if (frameScale) {
+          this.applyBodyForScale(frameScale, transfoBodyConfig(this.frame.realWidth, this.frame.realHeight, frameScale));
+        }
       }
     }
 
@@ -2595,6 +2662,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // Pieuvre, flash Loup->Aigle) — factorisé pour ne pas risquer d'en oublier
   // un en ajoutant un futur cas.
   beginFormTransition(now, animKey, duration, scale, body, facesRight) {
+    // Anim de transfo absente ou vide (images non chargées, cf.
+    // createAnimIfLoaded) : changement de forme net plutôt qu'une silhouette
+    // précédente rétrécie à l'échelle de la transfo.
+    if (!animPlayable(this.scene, animKey)) return;
     this.formTransitionActive = true;
     this.formTransitionAnimKey = animKey;
     this.formTransitionEndTime = now + duration;
@@ -2879,9 +2950,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.vineLook = 0;
     this.vineSwingPose = false;
     // Montée/descente : distance parcourue le long de la liane (rythme des
-    // mains, cf. applyVinePose).
-    this.vineClimbLastR = null;
+    // mains, cf. stepVinePhysics / applyVinePose).
     this.vineClimbDist = 0;
+    this.vineClimbMovedAt = -Infinity;
     // Une transfo en cours (saut du singe juste avant la prise) s'afficherait
     // ancrée aux pieds, sous la liane : la pose suspendue prend la main tout de suite.
     this.formTransitionActive = false;
@@ -2920,7 +2991,19 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Mur dans le sens du balancement : renvoi (une fois, pas à chaque pas
     // de la même image -- `blocked` n'est remis à zéro qu'au 1er pas).
     if ((b.blocked.right && vine.omega > 0) || (b.blocked.left && vine.omega < 0)) vine.bounceOffWall();
+    const r0 = vine.swingR;
     const target = vine.stepSwing(this, this.vineDir, delta, this.vineClimb || 0);
+    // Grimpe (Z/S) mesurée ICI, au pas de physique, et non d'une image
+    // affichée à l'autre : sur un écran à plus de 60 Hz, une image sur deux ou
+    // trois n'a aucun pas de physique, les mains n'y bougent pas, et la pose
+    // retombait sur la pose suspendue -- les deux poses alternaient à chaque
+    // image (bug signalé : « superpose la pose de base et en basse opacité
+    // l'animation de montée »). applyVinePose lit vineClimbMovedAt.
+    const dr = Math.abs(vine.swingR - r0);
+    if (this.vineClimb && dr > 0.01) {
+      this.vineClimbDist += dr;
+      this.vineClimbMovedAt = this.scene.time.now;
+    }
     // Pieds = bas-centre du corps (invariant de toutes les hitbox du joueur,
     // cf. FORMS et applyVineArtAnchor) ; `this.x/y` ne sont resynchronisés
     // sur le corps qu'en fin d'image.
@@ -2978,17 +3061,28 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // été retirée : le papillon n'est plus qu'une compétence, cf. AIR_FORM_IDS.)
 
   // Poussière lumineuse (pose de soin sans art de transformation).
+  // Art : étincelles `fx_etincelle_papillon` (lot n°8, déjà rose et cyan, non
+  // teintées) à 16 px -- leur taille utile --, rétrécies en RELATIF (× 0,3,
+  // comme les points de repli) ; repli : points colorés dessinés.
   spawnButterflySparkles(count) {
     const sc = this.scene;
     const cx = this.x;
     const cy = this.y - BUTTERFLY_CENTER_ABOVE_FEET;
+    const art = sc.textures.exists('item-fx_etincelle_papillon');
     for (let i = 0; i < count; i++) {
       const a = Math.random() * Math.PI * 2;
-      const dot = sc.add.circle(cx, cy, Phaser.Math.Between(2, 4), BUTTERFLY_DUST_COLORS[i % BUTTERFLY_DUST_COLORS.length], 1)
-        .setDepth(this.depth + 1).setBlendMode(Phaser.BlendModes.ADD);
+      let base = 1;
+      let dot;
+      if (art) {
+        base = (BUTTERFLY_SPARKLE_ART_SIZE * Phaser.Math.FloatBetween(0.75, 1)) / 128;
+        dot = sc.add.image(cx, cy, 'item-fx_etincelle_papillon').setScale(base).setRotation(Math.random() * 0.6 - 0.3);
+      } else {
+        dot = sc.add.circle(cx, cy, Phaser.Math.Between(2, 4), BUTTERFLY_DUST_COLORS[i % BUTTERFLY_DUST_COLORS.length], 1);
+      }
+      dot.setDepth(this.depth + 1).setBlendMode(Phaser.BlendModes.ADD);
       sc.tweens.add({
         targets: dot, x: cx + Math.cos(a) * Phaser.Math.Between(18, 42), y: cy + Math.sin(a) * Phaser.Math.Between(14, 34),
-        alpha: 0, scale: 0.3, duration: Phaser.Math.Between(260, 420), ease: 'Quad.easeOut', onComplete: () => dot.destroy(),
+        alpha: 0, scale: base * 0.3, duration: Phaser.Math.Between(260, 420), ease: 'Quad.easeOut', onComplete: () => dot.destroy(),
       });
     }
   }
@@ -3026,12 +3120,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
     // Montée / descente (Z/↑, S/↓) : mains l'une après l'autre au rythme de
     // la distance parcourue le long de la liane (une prise tous les
-    // VINE_CLIMB_STEP_PX) -- anim `climb` du manifest `singe` si l'art existe,
-    // sinon les poses suspendues `liane_hang` + un léger mouvement de traction.
-    const dr = this.vineClimbLastR == null ? 0 : vine.swingR - this.vineClimbLastR;
-    this.vineClimbLastR = vine.swingR;
-    this.vineClimbDist += Math.abs(dr);
-    if (this.vineClimb && Math.abs(dr) > 0.05) {
+    // VINE_CLIMB_STEP_PX) -- anim `climb` (`singe_extra`, sinon `singe`) si
+    // l'art existe, sinon les poses suspendues `liane_hang` + un léger
+    // mouvement de traction. « Grimpe » = touche tenue ET mains qui ont bougé
+    // dans les VINE_CLIMB_POSE_HOLD_MS (cf. stepVinePhysics) : la même pose à
+    // CHAQUE image affichée, avec ou sans pas de physique ; arrêtée en haut ou
+    // en bas de la liane, la pose suspendue revient.
+    const climbing = this.vineClimb && this.scene.time.now - this.vineClimbMovedAt <= VINE_CLIMB_POSE_HOLD_MS;
+    if (climbing) {
       this.applyVineClimbPose(theta);
       return;
     }
@@ -3047,7 +3143,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.anims.stop();
       this.setTexture(swingFrames[idx].textureKey);
     } else if (hasManifestArt(sc, 'singe', 'liane_hang')) {
-      playManifestOn(this, 'singe', 'liane_hang');
+      this.playVineHangAnim();
     } else if (hasManifestArt(sc, 'agarica_extra', 'liane_hang')) {
       this.applyAgaricaExtraPose('liane_hang');
       return;
@@ -3056,6 +3152,18 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
     this.setFlipX(MONKEY_FACES_RIGHT ? this.vineLook < 0 : this.vineLook > 0);
     this.applyVineArtAnchor(-theta * VINE_ART_TILT);
+  }
+
+  // Pose suspendue `singe-liane_hang` (boucle lente). `play(key, true)` et non
+  // playManifestOn : la grimpe et les poses de balancement arrêtent l'anim
+  // pour poser leurs images une à une (setTexture), et playManifestOn garde
+  // alors l'image figée d'une anim arrêtée (garde prévue pour les anims non
+  // bouclées) -- la dernière image de GRIMPE restait affichée au repos, à
+  // l'échelle de la pose suspendue (plus petite d'un cinquième). Ici l'anim
+  // repart dès qu'elle n'est plus en cours ; sinon elle continue.
+  playVineHangAnim() {
+    if (this.scene.anims.exists('singe-liane_hang')) this.anims.play('singe-liane_hang', true);
+    else playManifestOn(this, 'singe', 'liane_hang');
   }
 
   // Pose de grimpe (cf. applyVinePose) : frame choisie d'après la distance
@@ -3081,6 +3189,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       if (hang && hang.length && hasManifestArt(sc, 'singe', 'liane_hang')) {
         this.anims.stop();
         this.setTexture(hang[step % hang.length].textureKey);
+      } else if (hasManifestArt(sc, 'agarica_extra', 'liane_hang')) {
+        // Sans art singe mais avec Agarica suspendue : même pose qu'au repos
+        // (cf. applyVinePose), plutôt que le placeholder du singe.
+        this.applyAgaricaExtraPose('liane_hang');
+        return;
       } else {
         playManifestOn(this, 'singe', 'liane_hang');
       }
@@ -3225,7 +3338,18 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       const k = progress(p.inEnd, p.actEnd);
       // Lancer : `singe_extra` (lot n°8), sinon `singe` (ancien emplacement).
       const throwId = ['singe_extra', 'singe'].find((id) => hasManifestArt(sc, id, 'throw'));
-      if (throwId && frameAt(`${throwId}-throw`, k)) {
+      // `singe_extra` : les 3 premières images (prise, élan, bras tendu, pierre
+      // en main) se partagent le geste AVANT le lâcher, la 4e (main vide) vient
+      // pile quand la pierre part (releaseAt) -- avant, l'image vide tombait au
+      // milieu du geste et la pierre semblait partir de nulle part. Horaire du
+      // lâcher et position du projectile inchangés.
+      let kThrow = k;
+      if (throwId === 'singe_extra') {
+        const rel = SKILL_FORM_POSE_MS.pierre.releaseAt;
+        const i = k < rel ? Math.min(2, Math.floor((k / rel) * 3)) : 3;
+        kThrow = (i + 0.5) / 4;
+      }
+      if (throwId && frameAt(`${throwId}-throw`, kThrow)) {
         const cfg = agaricaSheetPoseConfig(sc, throwId, 'throw', { method: 'area' });
         this.applyBodyForScale(cfg.scale, cfg.body);
         return true;
@@ -3250,10 +3374,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       if (!this.butterflyTransfoKey || !frameAt(this.butterflyTransfoKey, k, p.phase === 'out')) return false;
       cfg = agaricaSheetPoseConfig(sc, 'transfo_papillon', 'transform');
     } else if (hasManifestArt(sc, 'forme_papillon_extra', 'cast')) {
-      // Incantation du soin : `forme_papillon_extra` (lot n°8), même échelle
-      // que forme_papillon (calibrée sur sa propre feuille).
+      // Incantation du soin : `forme_papillon_extra` (lot n°8). Calibrée sur
+      // sa SEULE feuille (ailes repliées en incantation : moins de surface),
+      // elle sortait 12 % plus petite que le papillon qu'elle prolonge ; elle
+      // prend donc l'échelle de `forme_papillon` (FORMS.butterfly) -- sans cet
+      // art, FORMS.butterfly est le placeholder à l'échelle 1 : on garde alors
+      // la calibration propre. Hitbox : même gabarit humain, recentré.
       playManifestOn(this, 'forme_papillon_extra', 'cast');
-      cfg = agaricaSheetPoseConfig(sc, 'forme_papillon_extra', 'cast', { method: 'area' });
+      const c = agaricaSheetPoseConfig(sc, 'forme_papillon_extra', 'cast', { method: 'area' });
+      const s = this.butterflyArt ? FORMS.butterfly.scale : c.scale;
+      cfg = { ...c, scale: s, body: transfoBodyConfig(c.frameWidth, c.frameHeight, s) };
     } else if (this.butterflyArt) {
       const anim = ['cast', 'glide', 'flap'].find((a) => hasManifestArt(sc, 'forme_papillon', a));
       if (anim) {
@@ -3284,6 +3414,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const sc = this.scene;
     const cx = this.x;
     const cy = this.y - 40;
+    // Gerbe de feuilles commune du juice (art `fx_feuille`), comme la prise de
+    // liane ; repli : les ellipses vertes ci-dessous.
+    if (typeof spawnFx === 'function') {
+      spawnFx(sc, 'leaves', cx, cy, { count: 8, power: 0.9 });
+      return;
+    }
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2 + Math.random() * 0.5;
       const leaf = sc.add.ellipse(cx, cy, 9, 5, i % 2 ? 0x6fbf5a : 0xa8e07a, 0.95)

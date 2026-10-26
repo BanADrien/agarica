@@ -12,6 +12,12 @@ const SINGE_WIDTH = 44;
 const SINGE_HEIGHT = 58; // marge au-dessus de la tête pour la pierre levée
 const SINGE_BODY_W = 24;
 const SINGE_BODY_H = 36;
+// Pierre lancée : rayon de collision (px monde) et taille de l'art `pierre`.
+const SINGE_STONE_RADIUS = 5;
+const SINGE_STONE_ART_SIZE = 12;
+const SINGE_STONE_ART_TINT = 0xc8f09a;
+// Singe guéri peint (lot n°8) : se redresse (idle) puis détale (run).
+const SINGE_HEALED_RUN_DELAY_MS = 220;
 
 // Dessine un singe de profil (face à droite). `moss` : plaques de mousse
 // toxique ; `armUp` : bras levé tenant une pierre (pose de lancer).
@@ -93,8 +99,21 @@ function ensureSingeTextures(scene) {
 // pile sur la cible avec la gravité du monde.
 function throwSingeStone(scene, x, y, targetX, targetY) {
   ensureSingeTextures(scene);
-  const stone = scene.physics.add.image(x, y, SINGE_STONE_TEXTURE_KEY);
-  stone.setCircle(5, 1, 1);
+  // Art `pierre` (déjà livré, jamais affiché par le singe) à 12 px, comme la
+  // pierre dessinée ; collision gardée à un cercle de 5 px MONDE (le rayon
+  // du corps se compte en px de texture, d'où r = 5 / échelle). Teinte verte :
+  // pierre ennemie, distincte des pierres grises d'Agarica.
+  const art = scene.textures.exists('item-pierre');
+  const stone = scene.physics.add.image(x, y, art ? 'item-pierre' : SINGE_STONE_TEXTURE_KEY);
+  if (art) {
+    const s = SINGE_STONE_ART_SIZE / Math.max(stone.width, stone.height);
+    stone.setScale(s);
+    const r = SINGE_STONE_RADIUS / s;
+    stone.body.setCircle(r, stone.width / 2 - r, stone.height / 2 - r);
+    stone.setTint(SINGE_STONE_ART_TINT);
+  } else {
+    stone.setCircle(SINGE_STONE_RADIUS, 1, 1);
+  }
   stone.setDepth(6);
   const g = scene.physics.world.gravity.y || 1300;
   const dx = targetX - x;
@@ -106,8 +125,13 @@ function throwSingeStone(scene, x, y, targetX, targetY) {
   const colliders = [];
   const shatter = () => {
     if (!stone.active) return;
+    // Éclats : art `fx_eclat_pierre` à 8 px (net dès cette taille), même
+    // gerbe ; repli : petits carrés gris.
+    const chipArt = scene.textures.exists('item-fx_eclat_pierre');
     for (let i = 0; i < 5; i++) {
-      const chip = scene.add.rectangle(stone.x, stone.y, 3, 3, 0x8a857a).setDepth(6);
+      const chip = chipArt
+        ? scene.add.image(stone.x, stone.y, 'item-fx_eclat_pierre').setScale(8 / 128).setRotation(Math.random() * Math.PI * 2).setDepth(6)
+        : scene.add.rectangle(stone.x, stone.y, 3, 3, 0x8a857a).setDepth(6);
       scene.tweens.add({
         targets: chip,
         x: chip.x + Phaser.Math.Between(-16, 16),
@@ -265,8 +289,27 @@ class SingeCorrompu extends Phaser.Physics.Arcade.Sprite {
     return purifyCorruptedEnemy(this, {
       onClean: (e) => {
         e.anims.stop();
+        const gap = typeof corruptedFeetGap === 'function' ? corruptedFeetGap(e) : null;
+        const keepFeet = () => { if (typeof corruptedKeepFeet === 'function') corruptedKeepFeet(e, gap); };
+        if (hasManifestArt(e.scene, 'singe_gueri')) {
+          // Art « singe guéri » (lot n°8), distinct de la forme singe
+          // d'Agarica. `e.play` (et non playManifest, lié à singe_corrompu).
+          // Toutes ses frames ont le même bas visible : un seul recalage des
+          // pieds par anim suffit.
+          ensureManifestAnims(e.scene, 'singe_gueri');
+          e.setScale((getAssetManifest().singe_gueri || {}).scale || 0.28);
+          e.play('singe_gueri-idle');
+          keepFeet();
+          e.scene.time.delayedCall(SINGE_HEALED_RUN_DELAY_MS, () => {
+            if (!e.active) return;
+            e.play('singe_gueri-run');
+            keepFeet();
+          });
+          return;
+        }
         e.setTexture(SINGE_HEALED_TEXTURE_KEY);
         e.setScale(1);
+        keepFeet();
       },
       fleeDistance: 260,
     });

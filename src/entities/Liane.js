@@ -5,7 +5,8 @@
 // stepSwing() chaque pas de physique (pendule : gravité + pompe gauche/droite,
 // montée/descente le long de la liane avec Z/↑ et S/↓).
 // Visuel : item `liane` du manifest étiré (si l'art existe), sinon tracé
-// procédural vert (Graphics). Événements scène : 'vine-grab' / 'vine-release'.
+// procédural vert (Graphics), qui part de l'intérieur du bloc d'accroche
+// (cf. VINE_TOP_TUCK, vineBlockAbove). Événements scène : 'vine-grab' / 'vine-release'.
 
 // Distance pieds -> mains d'Agarica suspendue (le point qui suit la liane).
 const VINE_HANG_OFFSET = 58;
@@ -53,6 +54,21 @@ const VINE_CLIMB_TOP_R = 28;
 const VINE_MIN_SWING_FRACTION = 0.6;
 const VINE_COLOR = 0x3f7a3a;
 const VINE_LEAF_COLOR = 0x6fbf5a;
+// Attache DESSINÉE (retour utilisateur 2026-10-25, capture : « les lianes ne
+// sont pas rattachées au bloc ») : le point d'attache des données est le bas
+// de la CASE (haut + 64), mais l'image du bloc est plus courte que la case
+// (jeux de biome remontés de AUTOTILE_BLOB_VISUAL_LIFT, île dessinée dans sa
+// case avec une marge transparente) -- mesuré : ~18-20 px de vide entre le
+// bas visible de l'écorce et le haut de la liane. Le DESSIN de la liane part
+// donc de l'intérieur du bloc (VINE_TOP_TUCK px au-dessus de son bas visible,
+// mesuré sur les pixels du bloc), derrière lui pour que son bout ne se voie
+// pas ; la physique (attache, longueur utile, balancement, grimpe) reste
+// celle des données, au pixel près.
+const VINE_TOP_TUCK = 12;
+// Ne jamais dépasser par le HAUT du bloc (bloc très fin) : marge sous son haut visible.
+const VINE_TOP_KEEP_INSIDE = 6;
+// Demi-largeur de liane sondée (bloc mesuré au centre et aux deux bords).
+const VINE_PROBE_HALF_W = 8;
 
 class Liane {
   constructor(scene, cfg) {
@@ -70,19 +86,49 @@ class Liane {
     this.twangAmp = 0;
     this.twangAt = 0;
 
+    // Haut DESSINÉ de la liane : `drawLift` px au-dessus de l'attache, dans le
+    // bloc qui la porte (cf. VINE_TOP_TUCK) ; 0 sans bloc mesurable au-dessus
+    // (liane posée ailleurs : dessin d'avant).
+    const block = vineBlockAbove(scene, this.x, this.y);
+    this.drawLift = 0;
+    if (block) {
+      const top = Math.max(block.bottom - VINE_TOP_TUCK, block.top + VINE_TOP_KEEP_INSIDE);
+      this.drawLift = Math.max(0, this.y - top);
+    }
+
     if (scene.textures.exists('item-liane')) {
-      this.image = scene.add.image(this.x, this.y, 'item-liane').setOrigin(0.5, 0);
+      this.image = scene.add.image(this.x, this.y - this.drawLift, 'item-liane').setOrigin(0.5, 0);
       const def = getItemManifest().liane || {};
       const sx = def.scale || 1;
-      this.image.setScale(sx, this.length / this.image.height);
+      // Longueur dessinée = longueur utile + bout caché dans le bloc.
+      this.image.setScale(sx, (this.length + this.drawLift) / this.image.height);
       this.imageScaleX = sx;
     } else {
       this.gfx = scene.add.graphics();
     }
-    // Derrière le joueur (créé avant les handlers de données de zone).
+    // Derrière le joueur (créé avant les handlers de données de zone) ; avec
+    // un bloc au-dessus, derrière le SOL de premier plan (le bloc cache le bout
+    // de la liane, et le joueur, créé après, reste devant).
     const obj = this.image || this.gfx;
-    if (scene.player && scene.children.moveBelow) scene.children.moveBelow(obj, scene.player);
+    if (block && scene.__frontGroundFirstImage && typeof sendBehindFrontGround === 'function') {
+      sendBehindFrontGround(scene, [obj]);
+    } else if (scene.player && scene.children.moveBelow) {
+      scene.children.moveBelow(obj, scene.player);
+    }
     this.draw(0);
+  }
+
+  // Pivot DESSINÉ (haut visible, dans le bloc) et angle du dessin : la droite
+  // tracée depuis ce pivot passe par les MAINS (liane tenue) ou par le bout
+  // physique de la liane (libre) -- la main reste pile sur la liane dessinée
+  // alors que le pendule physique tourne autour de l'attache des données,
+  // drawLift px plus bas. Sans drawLift : angle physique, comme avant.
+  drawPose(a = this.displayAngle) {
+    const px = this.x;
+    const py = this.y - this.drawLift;
+    if (!this.drawLift) return { px, py, angle: a };
+    const p = this.pointAt(this.grabbedBy ? this.swingR : this.length, a);
+    return { px, py, angle: Math.atan2(p.x - px, p.y - py) };
   }
 
   // Tenue : angle qui correspond à la position ACTUELLE du corps du joueur
@@ -113,25 +159,31 @@ class Liane {
   }
 
   draw(time) {
-    const a = this.displayAngle;
+    // Tracé depuis le pivot dessiné (cf. drawPose) ; longueur = longueur
+    // utile + bout caché dans le bloc.
+    const { px, py, angle: a } = this.drawPose();
     if (this.image) {
       this.image.setRotation(-a);
       return;
     }
     const g = this.gfx;
     g.clear();
-    const steps = Math.max(4, Math.round(this.length / 16));
+    const lift = this.drawLift;
+    const total = this.length + lift;
+    const steps = Math.max(4, Math.round(total / 16));
+    const ux = Math.sin(a);
+    const uy = Math.cos(a);
     const nx = Math.cos(a);
     const ny = -Math.sin(a);
     const t = (time || 0) / 1000;
     const pts = [];
     for (let i = 0; i <= steps; i++) {
-      const r = (this.length * i) / steps;
-      const p = this.pointAt(r, a);
+      const d = (total * i) / steps;
       // Petite ondulation organique perpendiculaire, nulle à l'attache, plus
-      // la vibration de prise/lâcher (twang).
-      const w = Math.sin(i * 1.3 + t * 2 + this.phase) * 2.5 * (i / steps) + this.twangOffset(r);
-      pts.push({ x: p.x + nx * w, y: p.y + ny * w });
+      // la vibration de prise/lâcher (twang, sur la distance à l'attache
+      // PHYSIQUE : nulle dans le bloc).
+      const w = Math.sin(i * 1.3 + t * 2 + this.phase) * 2.5 * (i / steps) + this.twangOffset(Math.max(0, d - lift));
+      pts.push({ x: px + ux * d + nx * w, y: py + uy * d + ny * w });
     }
     g.lineStyle(6, 0x1d3a1f, 1);
     g.strokePoints(pts, false);
@@ -143,7 +195,7 @@ class Liane {
       g.fillEllipse(pts[i].x + nx * 5 * side, pts[i].y + ny * 5 * side, 9, 5);
     }
     g.fillStyle(0x2a1d14, 1);
-    g.fillCircle(this.x, this.y, 5);
+    g.fillCircle(px, py, 5);
   }
 
   // Distance du point des mains à la liane : { r, dist } (r le long de la liane).
@@ -275,6 +327,67 @@ class Liane {
     if (this.image) this.image.destroy();
     if (this.gfx) this.gfx.destroy();
   }
+}
+
+// Bloc de terrain qui porte une liane : { top, bottom } VISIBLES (px monde)
+// des images du sol de premier plan juste au-dessus de l'attache (x, y),
+// mesurés sur leurs pixels (frameAlphaMap, LevelKit) au centre et aux deux
+// bords de la liane : `bottom` = le plus haut des bas (la liane doit monter
+// au-dessus partout), `top` = le plus bas des hauts. Marche avec tous les
+// jeux de tuiles (images `autotile-*` : défaut 'tuiles' en atlas, jeux des
+// biomes remontés, plateformes recalées sur leur mousse) puisqu'on mesure le
+// dessin tel qu'il est posé, pas la grille. Pixels illisibles : boîte de
+// l'image. Null sans bloc (liane hors d'un bloc : dessin d'avant).
+function vineBlockAbove(scene, x, y) {
+  const anchor = scene.__frontGroundFirstImage;
+  if (!anchor || !scene.children) return null;
+  const list = scene.children.list;
+  const start = list.indexOf(anchor);
+  if (start < 0) return null;
+  const alphaMin = typeof VISIBLE_ALPHA_MIN === 'number' ? VISIBLE_ALPHA_MIN : 40;
+  // Bloc dont le bas visible tombe dans la case au-dessus de l'attache
+  // (GROUND_TILE_SIZE = 64), à quelques px près sous elle (case pleine).
+  const tile = typeof GROUND_TILE_SIZE === 'number' ? GROUND_TILE_SIZE : 64;
+  const minBottom = y - tile - 8;
+  const maxBottom = y + 8;
+  const probes = [x - VINE_PROBE_HALF_W, x, x + VINE_PROBE_HALF_W];
+  const cols = probes.map(() => ({ bottom: null, top: null }));
+  for (let i = start; i < list.length; i++) {
+    const o = list[i];
+    if (o.type !== 'Image' || !o.visible || !o.frame || !o.texture || o.texture.key.indexOf('autotile-') < 0) continue;
+    const f = o.frame;
+    const sx = Math.abs(o.scaleX);
+    const sy = Math.abs(o.scaleY);
+    if (!sx || !sy) continue;
+    const left = o.x - o.displayOriginX * sx;
+    const top = o.y - o.displayOriginY * sy;
+    if (x + VINE_PROBE_HALF_W < left || x - VINE_PROBE_HALF_W > left + f.cutWidth * sx) continue;
+    const map = typeof frameAlphaMap === 'function' ? frameAlphaMap(f) : null;
+    probes.forEach((cx, k) => {
+      let col = Math.floor((cx - left) / sx);
+      if (col < 0 || col >= f.cutWidth) return;
+      if (o.flipX) col = f.cutWidth - 1 - col;
+      let r0 = 0;
+      let r1 = f.cutHeight - 1;
+      if (map) {
+        r0 = -1;
+        for (let r = 0; r < map.h; r++) {
+          if (map.alpha[r * map.w + col] > alphaMin) { if (r0 < 0) r0 = r; r1 = r; }
+        }
+        if (r0 < 0) return;
+      }
+      if (o.flipY) { const t = f.cutHeight - 1 - r1; r1 = f.cutHeight - 1 - r0; r0 = t; }
+      const wt = top + r0 * sy;
+      const wb = top + (r1 + 1) * sy;
+      if (wb < minBottom || wb > maxBottom) return;
+      const c = cols[k];
+      c.bottom = c.bottom == null ? wb : Math.max(c.bottom, wb);
+      c.top = c.top == null ? wt : Math.min(c.top, wt);
+    });
+  }
+  const found = cols.filter((c) => c.bottom != null);
+  if (!found.length) return null;
+  return { bottom: Math.min(...found.map((c) => c.bottom)), top: Math.max(...found.map((c) => c.top)) };
 }
 
 // Liane la plus proche des mains du joueur, dans le rayon d'accroche.

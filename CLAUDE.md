@@ -47,13 +47,15 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
 
 ## Gameplay et histoire (démo, voir docs/production/PLAN_DEV.md)
 
-- Démo complète en **16 zones** (2 actes) : bosquet → forêt sombre 1-2 → racines du grand
-  arbre (totem du singe) → monde spirituel (forme singe) → arène de Kainati par les lianes
-  (boss épargné) → épreuve du singe (optionnelle, depuis les racines) → forêt flottante 1-2
+- Démo complète en **15 zones** (2 actes) : bosquet → forêt sombre 1-2 → racines du grand
+  arbre (totem du singe allumé = forme singe, comme les autres totems) → arène de Kainati
+  par les lianes (boss épargné) → épreuve du singe (optionnelle, depuis les racines) → forêt
+  flottante 1-2
   → clairière de la plante → hutte de Morgat → forêt corrompue →
   arène de Ghil't (défaite imposée) → trou sombre → Ghil't phase 2 (soin) → retour au
-  bosquet → écran de fin. Anciennes zones de test (Zone1-5, SousGrotte, ZoneAquatique,
-  Zonetest) intactes, via le titre « Zones de test ».
+  bosquet → écran de fin. Le monde spirituel n'est plus sur le chemin (décision du
+  2026-10-25 : pas de phase avec l'esprit simien) ; ses fichiers restent. Anciennes zones de
+  test (Zone1-5, SousGrotte, ZoneAquatique, Zonetest) intactes, via le titre « Zones de test ».
 - Contrôles : flèches / QD, saut **Espace seul** (un seul saut sans forme aérienne), Z/↑ viser en
   haut, S/↓ viser en bas en l'air (coup vers le bas = rebond), Shift sprint (loup), K ou clic
   attaque en arc dans la direction visée, E interagir, A/F/R compétences, I inventaire, M carte,

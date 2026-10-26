@@ -1,39 +1,100 @@
 // Dialogues, cinématiques et scripts des zones du grand arbre — agent Acte 1 (arbre).
 //
 // Zones (cf. docs/production/PLAN_DEV.md, progression 4 à 7) — ordre décidé
-// par l'utilisateur (2026-10-24) :
+// par l'utilisateur (2026-10-25 : « pas de phase avec singe ancestral,
+// allume juste le totem à l'origine comme les autres ») :
 //   foret_sombre_2 → grand_arbre_racines : TOTEM DU SINGE au bout de la
-//   grande branche (E) → monde_spirituel (l'esprit simien ancestral éprouve
-//   Agarica et lui donne la forme singe) → retour au totem → lianes de la
-//   cime (forme singe obligatoire) → grand_arbre_arene (Kainati,
-//   src/story/boss_kainati.js, épargné) → foret_flottante_1 (acte 2).
+//   grande branche (E : il s'allume et donne DIRECTEMENT la forme singe,
+//   comme les totems du loup et de l'aigle -- clé de zone `totems`,
+//   addAbilityShrine) → lianes de la cime (forme singe obligatoire) →
+//   grand_arbre_arene (Kainati, src/story/boss_kainati.js, épargné) →
+//   foret_flottante_1 (acte 2).
 //   Optionnel : racines ⇄ epreuve_singe (talisman du singe), par les lianes
 //   de la branche d'élan, en forme singe (avant ou après Kainati).
+//   Le monde spirituel (esprit simien ancestral) n'est PLUS sur le chemin :
+//   zone gardée telle quelle (réversible), atteinte seulement depuis
+//   « Zones de test » ; une ancienne sauvegarde qui s'y était arrêtée
+//   retombe devant le totem des racines (ZONE_SCRIPTS.monde_spirituel).
 // Chargé APRÈS boss_kainati.js : les textes de Kainati (`kainati_intro`,
 // `kainati_victoire`, `kainati_calme`) remplacent ceux par défaut.
 //
-// Flags posés ici : totemSingeActif (totem éveillé), mondeSpirituelFini,
-// talismanSinge (+ compétence pierre), hasMonkeyForm (via l'étape `form`) ;
-// + flags automatiques de StoryKit (trig_*, pickup_*).
+// Flags posés ici : totemSingeActif (totem allumé, posé avec hasMonkeyForm),
+// talismanSinge (+ compétence pierre) ; hasMonkeyForm est posé par le totem
+// (LevelKit) ; mondeSpirituelFini ne l'est plus que par la zone de test et
+// ne bloque plus rien ; + flags automatiques de StoryKit (trig_*, pickup_*).
 
 // ---------------------------------------------------------------------------
 // Petits utilitaires
 // ---------------------------------------------------------------------------
-function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0) {
-  // Fente lumineuse dans l'écorce (même langage visuel que le passage du totem de l'arène).
+// Fente lumineuse dans l'écorce (passage vers l'épreuve, raccourci du
+// sommet, retour du monde spirituel). Contrat PLAN_INTEGRATION_LOT_8 §3.3 :
+//   arbreGlowPassage(scene, x, y, h = 120, color, open = true)
+//     → { glow, core, art, setOpen(v) }
+// `y` = centre de l'ancienne amande dessinée ; avec l'art Codex
+// (`decor_fente_ouverte` / `_fermee`, 440 px source), l'écorce est POSÉE sur
+// la surface sous ce centre (bas en storyStandY + 2 : on la voit sortir du
+// bois, pas flotter), `h` px de haut, devant un halo doux `fx_halo_doux`
+// teinté `color` qui respire. `glow` et `core` portent `__sx` / `__sy`
+// (échelles de repos) : les appelants tweenent scaleX / scaleY, jamais
+// `scale` (l'image est à h / 440 : `scale: 1` la gonflerait à 440 px).
+// Le cœur n'est jamais teinté (R11 : au monde spirituel, seul le halo est
+// cyan, l'écorce garde sa couleur). Sans l'art : les ellipses d'avant
+// (rien pour une fente fermée) et un setOpen() sans effet.
+function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true) {
+  const key = open ? 'item-decor_fente_ouverte' : 'item-decor_fente_fermee';
+  if (scene.textures.exists(key)) {
+    const by = storyStandY(scene, x, y + h / 2) + 2;
+    const ht = typeof juiceTexture === 'function' ? juiceTexture(scene, 'fx_halo_doux', 'juice-glow') : null;
+    let glow = null;
+    if (ht) {
+      // Halo peint (réimport M04) : ~25 % de lumière en moins qu'un disque
+      // plein à taille égale -- même compensation que les halos de LevelKit.
+      const boost = ht.art && typeof JUICE_HALO_ART_BOOST === 'number' ? JUICE_HALO_ART_BOOST : 1;
+      glow = scene.add.image(x, by - h / 2, ht.key).setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(color).setDisplaySize(h * 0.9 * boost, h * 1.1 * boost).setAlpha(0.3);
+      glow.__sx = glow.scaleX;
+      glow.__sy = glow.scaleY;
+      storyPutBehindPlayer(scene, glow);
+      scene.tweens.add({ targets: glow, alpha: 0.65, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+    const core = scene.add.image(x, by, key).setOrigin(0.5, 1).setScale(h / 440);
+    core.__sx = core.scaleX;
+    core.__sy = core.scaleY;
+    // Après le halo : le cœur passe devant lui (et toujours sous Agarica).
+    storyPutBehindPlayer(scene, core);
+    return {
+      glow, core, art: true,
+      setOpen(v) {
+        const k = v ? 'item-decor_fente_ouverte' : 'item-decor_fente_fermee';
+        if (core.active && scene.textures.exists(k)) core.setTexture(k);
+      },
+    };
+  }
+  if (!open) return { glow: null, core: null, art: false, setOpen() {} };
   const glow = scene.add.ellipse(x, y, 70, h, color, 0.3);
   const core = scene.add.ellipse(x, y, 40, h - 24, 0x1a1428, 0.9);
+  glow.__sx = 1; glow.__sy = 1; core.__sx = 1; core.__sy = 1;
   storyPutBehindPlayer(scene, glow);
   storyPutBehindPlayer(scene, core);
   scene.tweens.add({ targets: glow, alpha: 0.65, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-  return { glow, core };
+  return { glow, core, art: false, setOpen() {} };
 }
 
 // Lucioles / poussières de lumière qui montent lentement (décor, en boucle).
+// Grain peint `fx_grain_lumiere` (livré blanc pour être teinté) en ADD, à
+// 2,6 × le diamètre de l'ancien point : le grain n'occupe qu'une partie de
+// son canevas de 128 px (halo, éclats). Sans l'art : le point dessiné.
 function arbreMotes(scene, x1, x2, y1, y2, count, colors) {
+  const art = scene.textures.exists('item-fx_grain_lumiere');
   for (let i = 0; i < count; i++) {
-    const m = scene.add.circle(Phaser.Math.Between(x1, x2), Phaser.Math.Between(y1, y2),
-      Phaser.Math.FloatBetween(1.5, 3.5), colors[i % colors.length], 0.7).setDepth(3);
+    const x = Phaser.Math.Between(x1, x2);
+    const y = Phaser.Math.Between(y1, y2);
+    const r = Phaser.Math.FloatBetween(1.5, 3.5);
+    const color = colors[i % colors.length];
+    const m = art
+      ? scene.add.image(x, y, 'item-fx_grain_lumiere').setScale((2 * r * 2.6) / 128).setTint(color)
+        .setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.7).setDepth(3)
+      : scene.add.circle(x, y, r, color, 0.7).setDepth(3);
     scene.tweens.add({
       targets: m,
       y: m.y - Phaser.Math.Between(60, 160),
@@ -48,8 +109,27 @@ function arbreMotes(scene, x1, x2, y1, y2, count, colors) {
   }
 }
 
-// Plaques de mousse décoratives (tunnel des racines), sans corps.
+// Plaques de mousse décoratives (tunnel des racines), sans corps. Art Codex :
+// - sol (`decor_mousse_lumineuse_sol`, 287 px source) : `w` px de large,
+//   bas sur la surface de marche réelle (+2 : posée dans l'herbe) ;
+// - plafond (`flip`, `decor_mousse_lumineuse_plafond`, 318 px) : accrochée
+//   par son haut en `y` (le dessous VISIBLE du toit du tunnel, 302) ;
+// - petite touffe des branches (w ≤ 50, `decor_mousse_lumineuse_petite`) à
+//   0,3 (45 px) : la plaque du sol, réduite, s'écrasait en tache.
+// Sans l'art : les pastilles dessinées d'avant.
 function arbreMossDecor(scene, x, y, w, flip = false) {
+  const id = flip ? 'decor_mousse_lumineuse_plafond' : w <= 50 ? 'decor_mousse_lumineuse_petite' : 'decor_mousse_lumineuse_sol';
+  if (scene.textures.exists(`item-${id}`)) {
+    const img = scene.add.image(x, y, `item-${id}`);
+    if (flip) {
+      img.setOrigin(0.5, 0).setScale(w / 318);
+    } else {
+      img.setOrigin(0.5, 1).setScale(id === 'decor_mousse_lumineuse_petite' ? 0.3 : w / 287);
+      img.y = storyStandY(scene, x, y) + 2;
+    }
+    storyPutBehindPlayer(scene, img);
+    return img;
+  }
   const g = scene.add.graphics({ x, y });
   storyPutBehindPlayer(scene, g);
   const rnd = new Phaser.Math.RandomDataGenerator([`arbre${x},${y}`]);
@@ -67,15 +147,30 @@ function arbreMossDecor(scene, x, y, w, flip = false) {
 // Pierre qui tombe des branches supérieures, télégraphiée par une ombre qui
 // grandit sur la branche (`surfaceY`). Tout en tweens : la démo de la
 // cinématique fonctionne monde gelé ; les dégâts, eux, attendent le dégel.
+// Ombre qui annonce une pierre (racines et épreuve) : ellipse peinte
+// `fx_ombre_sol` (bord doux) à la taille de l'ancienne ellipse, ou l'ellipse
+// dessinée sans l'art. Renvoie l'objet et les cibles du télégraphe, RELATIVES
+// à l'échelle de base de l'image (§3.1 : `scaleX: 3` sur une image à 0,17
+// l'aurait gonflée à 380 px) ; avec l'art, alpha cible × 1,3 (plafonné à 1) :
+// le bord doux éclaircit l'ombre, qui doit rester lisible sur l'herbe.
+// Taille, durée et position inchangées : seul le dessin change.
+function arbreRockShadow(scene, x, y, w, h, alpha, growX, growY, alphaTo) {
+  if (scene.textures.exists('item-fx_ombre_sol')) {
+    const s = scene.add.image(x, y, 'item-fx_ombre_sol').setDisplaySize(w, h).setAlpha(alpha).setDepth(990);
+    return { obj: s, to: { scaleX: s.scaleX * growX, scaleY: s.scaleY * growY, alpha: Math.min(1, alphaTo * 1.3) } };
+  }
+  const s = scene.add.ellipse(x, y, w, h, 0x12000c, 1).setAlpha(alpha).setDepth(990);
+  return { obj: s, to: { scaleX: growX, scaleY: growY, alpha: alphaTo } };
+}
+
 function arbreDropRock(scene, x, surfaceY, telegraph = 1000) {
   // Opacité portée par l'objet (pas par le remplissage) : le tween d'alpha
   // ci-dessous la fait monter jusqu'à 0,6 (avant : ~0,15, invisible sur l'herbe).
-  const shadow = scene.add.ellipse(x, surfaceY - 3, 22, 8, 0x12000c, 1).setAlpha(0.25).setDepth(990);
+  const sh = arbreRockShadow(scene, x, surfaceY - 3, 22, 8, 0.25, 3, 2.2, 0.6);
+  const shadow = sh.obj;
   scene.tweens.add({
     targets: shadow,
-    scaleX: 3,
-    scaleY: 2.2,
-    alpha: 0.6,
+    ...sh.to,
     duration: telegraph,
     ease: 'Sine.easeIn',
     onComplete: () => {
@@ -160,112 +255,52 @@ CUTSCENES.racines_cime = cutsceneBulles([
   'Il dort. Pose ta main dessus : ce bois-là a une âme.',
 ], 'Le totem du singe : approche-toi et appuie sur E.');
 
-// Retour du monde spirituel, forme singe en main : la cime.
+// Forme singe déjà en main en arrivant au bout de la branche (ancienne
+// sauvegarde : forme reçue au monde spirituel, avant la décision du
+// 2026-10-25) : rappel des lianes de la cime. Le totem allumé pendant la
+// visite joue `racines_singe_eveil` à la place (et coche ce déclencheur).
 CUTSCENES.racines_cime_singe = cutsceneBulles([
   'Tes mains de singe, maintenant. Les lianes te porteront jusqu\'à la cime.',
-  { who: 'agarica', text: 'Et là-haut, le roi. L\'esprit m\'a demandé de l\'épargner.' },
+  { who: 'agarica', text: 'Et là-haut, le roi des singes. Je ne veux pas me battre contre lui.' },
   'Prends de l\'élan, lâche quand la liane remonte.',
 ], 'Lianes : ← → pour se balancer · Espace pour lâcher · Z/S pour monter/descendre');
 
-// Totem du singe (au bout de la grande branche) : art `totem_monkey_dim`,
-// puis `totem_monkey_lit` une fois éveillé ; il ouvre le monde spirituel.
-CUTSCENES.totem_singe_eveil = [
-  (scene) => CUTSCENE_STEP_HANDLERS.playerFace(scene, scene.player.x <= GRAND_ARBRE_RACINES_DATA.totemSinge.x ? 'right' : 'left'),
-  { say: [
-    { who: 'agarica', text: 'Un totem… sculpté en singe. Le bois est tiède, comme une peau.' },
-  ] },
-  { call: (scene) => arbreTotemSingeEveil(scene) },
-  { wait: 1100 },
-  { say: [
-    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Enfant des bois… Tes mains cherchent une prise qu\'elles n\'ont pas.' },
-    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Entre dans l\'arbre d\'avant. Nous verrons ce que vaut ton cœur.' },
-    { who: 'xara', text: 'Vas-y. Moi, je t\'attends ici, près du totem.' },
-  ] },
-  { flash: { ms: 450, color: 0xbfe8a0 } },
-  { goto: { scene: 'MondeSpirituelScene', data: { enterId: 'from_racines' } } },
-];
+// Totem du singe allumé (E, clé de zone `totems` -> addAbilityShrine, comme
+// le loup et l'aigle) : la forme est donnée sur-le-champ, avec l'éclat et la
+// bannière du totem. Ensuite, une seule bulle de Xara et le rappel des
+// lianes, APRÈS la bannière (~2,6 s, même délai que le loup en forêt
+// sombre 2) : la route des lianes de la cime mène à l'arène.
+CUTSCENES.racines_singe_eveil = cutsceneBulles([
+  'Les mains du peuple singe ! En l\'air, approche-toi d\'une liane : elle te portera jusqu\'à la cime.',
+], { text: 'Lianes : ← → se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5200 }, 2600);
 
-// Totem déjà éveillé : il rouvre le passage (s'exercer avec l'esprit).
-CUTSCENES.totem_singe_retour = [
-  { flash: { ms: 350, color: 0xbfe8a0 } },
-  { goto: { scene: 'MondeSpirituelScene', data: { enterId: 'from_racines' } } },
-];
+// Le totem lui-même est une donnée de zone (`totems`, grand_arbre_racines_data.js) :
+// art `totem_monkey_dim`, puis `totem_monkey_lit` une fois la forme prise
+// (addAbilityShrine, totems qui « s'éveillent »), invite « E : se recueillir »
+// maintenue dans l'écran (le totem est haut sur la branche).
 
-const ARBRE_TOTEM_RANGE_X = 70;
-const ARBRE_TOTEM_RANGE_Y = 110;
-
-// Totem du singe des racines : image au sol (bas visible sur la branche),
-// halo qui respire une fois éveillé, invite « E », touche E (événement
-// clavier : ne consomme pas le JustDown du joueur ni des PNJ).
-function arbreTotemSinge(scene, cfg) {
-  const lit = !!storyGet('totemSingeActif');
-  const img = addItemImage(scene, cfg.x, cfg.y, lit ? 'totem_monkey_lit' : 'totem_monkey_dim', { origin: [0.5, 1] });
-  if (typeof anchorVisibleFeet === 'function') anchorVisibleFeet(img);
-  placeOnGround(scene, img, cfg.x, { refY: cfg.y, sink: GROUND_CONTACT_SINK });
-  storyPutBehindPlayer(scene, img);
-  const t = { img, cfg, lit, halo: null, busy: false };
-  scene.__totemSinge = t;
-  if (lit) arbreTotemHalo(scene, t);
-  t.prompt = scene.add.text(cfg.x, img.y - img.displayHeight - 10, '', {
-    fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5', backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
-  }).setOrigin(0.5, 1).setDepth(1050).setVisible(false);
-  t.near = () => {
-    const p = scene.player;
-    return !!(p && p.body && Math.abs(p.x - cfg.x) < ARBRE_TOTEM_RANGE_X && Math.abs(p.y - img.y) < ARBRE_TOTEM_RANGE_Y && p.body.blocked.down);
-  };
-  t.onKeyE = () => {
-    if (t.busy || scene.__totemSinge !== t || !t.prompt.visible || isWorldFrozen(scene)) return;
-    t.busy = true;
-    t.prompt.setVisible(false);
-    runCutscene(scene, t.lit ? 'totem_singe_retour' : 'totem_singe_eveil').finally(() => { t.busy = false; });
-  };
-  scene.input.keyboard.on('keydown-E', t.onKeyE);
-  scene.events.once('shutdown', () => scene.input.keyboard.off('keydown-E', t.onKeyE));
-  return t;
-}
-
-function arbreTotemHalo(scene, t) {
-  if (t.halo || typeof juiceTexture !== 'function') return;
-  const ht = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
-  const hs = (t.img.displayHeight * 1.1) / ht.size;
-  t.halo = scene.add.image(t.cfg.x, t.img.y - t.img.displayHeight * 0.55, ht.key)
-    .setBlendMode(Phaser.BlendModes.ADD).setTint(0x8fe3b8).setAlpha(0.3).setScale(hs);
-  scene.children.moveBelow(t.halo, t.img);
-  scene.tweens.add({ targets: t.halo, alpha: { from: 0.18, to: 0.45 }, scale: { from: hs * 0.92, to: hs * 1.06 }, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-}
-
-// Le totem s'éveille (dans la cinématique) : bois qui s'allume, éclat, anneau.
-function arbreTotemSingeEveil(scene) {
-  const t = scene.__totemSinge;
-  if (!t) return;
-  storySet('totemSingeActif', true);
-  t.lit = true;
-  const bottom = visibleBottomY(t.img);
-  if (scene.textures.exists('item-totem_monkey_lit')) t.img.setTexture('item-totem_monkey_lit');
-  setVisibleBottomY(t.img, bottom);
-  const cy = t.img.y - t.img.displayHeight * 0.55;
-  juiceFlash(t.img, 0xffffff, 160);
-  juiceBurstImage(scene, 'glow', t.cfg.x, cy, { size: t.img.displayHeight * 2.4, from: 0.3, to: 1.2, ms: 560, color: 0xe8fff2, alpha: 0.9 });
-  juiceShockRing(scene, t.cfg.x, cy, { size: t.img.displayHeight * 2, ms: 560, color: 0x8fe3b8 });
-  spawnFx(scene, 'motes', t.cfg.x, cy, { count: 22, spread: 26, power: 2.2, color: [0x8fe3b8, 0xe8fff2, 0xff9fc9] });
-  juiceShake(scene, 'medium');
-  playSfx('totem_activate', { form: 'monkey' });
-  arbreTotemHalo(scene, t);
-}
-
-function arbreUpdateTotem(scene, t, time) {
-  const show = !t.busy && t.near() && !isWorldFrozen(scene);
-  t.prompt.setText(t.lit ? 'E : entrer dans l\'arbre d\'avant' : 'E : éveiller le totem').setVisible(show);
-  // Lueurs qui montent du totem éveillé.
-  if (t.lit && time >= (t.moteAt || 0)) {
-    t.moteAt = time + (show ? 260 : 600);
-    spawnFx(scene, 'motes', t.cfg.x + Phaser.Math.Between(-16, 16), t.img.y - t.img.displayHeight * Phaser.Math.FloatBetween(0.3, 0.8), { count: 1, color: [0x8fe3b8, 0xe8fff2, 0xff9fc9] });
+// Lumière de la cime : rai peint `fx_rai_lumiere` (bas en 3170, -192, au
+// milieu du vide des lianes ; 120x240), teinté miel, en ADD, qui respire.
+// Sans l'art : l'ellipse d'avant, au-dessus de la corniche de la cime.
+function arbreCimeLight(scene, levelWidth) {
+  if (scene.textures.exists('item-fx_rai_lumiere')) {
+    const ray = scene.add.image(3170, -192, 'item-fx_rai_lumiere').setOrigin(0.5, 1).setDisplaySize(120, 240)
+      .setTint(0xffe9a8).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.2);
+    storyPutBehindPlayer(scene, ray);
+    scene.tweens.add({ targets: ray, alpha: 0.4, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return ray;
   }
+  const cime = scene.add.ellipse(levelWidth - 50, -300, 120, 220, 0xffe9a8, 0.12);
+  storyPutBehindPlayer(scene, cime);
+  scene.tweens.add({ targets: cime, alpha: 0.25, duration: 1600, yoyo: true, repeat: -1 });
+  return cime;
 }
 
 ZONE_SCRIPTS.grand_arbre_racines = {
   create(scene, data) {
-    const st = { cfg: (data && data.rockfall) || null, timer: 600 };
+    // `hadMonkey` : forme singe déjà là en arrivant ; sinon, le totem
+    // (LevelKit) la donne pendant la visite -> bulle de Xara (cf. update).
+    const st = { cfg: (data && data.rockfall) || null, timer: 600, hadMonkey: !!storyGet('hasMonkeyForm') };
     scene.__arbre = st;
     const levelWidth = (data && data.levelWidth) || 3840;
     // Plus de tronc au premier plan (retour utilisateur) : ni le tronc
@@ -284,25 +319,33 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     if (scene.enemies) scene.physics.add.collider(scene.enemies, wall);
     // La fente de l'épreuve du singe, au bout des lianes (corniche gauche).
     arbreGlowPassage(scene, 40, -190, 120);
-    // Lumière de la cime, en haut à droite (sortie vers l'arène, au bout de
-    // la corniche de la cime, après les lianes).
-    const cime = scene.add.ellipse(levelWidth - 50, -300, 120, 220, 0xffe9a8, 0.12);
-    storyPutBehindPlayer(scene, cime);
-    scene.tweens.add({ targets: cime, alpha: 0.25, duration: 1600, yoyo: true, repeat: -1 });
-    // La mousse dense qui remonte le tunnel (sol et plafond).
-    [420, 560, 900, 1040].forEach((x, i) => arbreMossDecor(scene, x, 448, 70 + (i % 2) * 20));
-    [500, 760, 1120].forEach((x) => arbreMossDecor(scene, x, 320, 60, true));
-    [1500, 1950, 2420, 2560].forEach((x, i) => arbreMossDecor(scene, x, i === 0 ? 64 : -192, 50));
+    // Lumière de la cime, au-dessus du vide des lianes (route de l'arène).
+    arbreCimeLight(scene, levelWidth);
+    // La mousse dense qui remonte le tunnel (sol et plafond), puis quelques
+    // touffes sur les branches (§5 : 330 et 1110 évitent l'écorce et les
+    // pierres ; 1950 est sur la branche intermédiaire, le tronc dessiné qui
+    // la portait à -192 a été retiré).
+    [330, 560, 900, 1110].forEach((x, i) => arbreMossDecor(scene, x, 448, 70 + (i % 2) * 20));
+    [500, 760, 1120].forEach((x) => arbreMossDecor(scene, x, 302, 60, true));
+    [[1530, 64], [1950, -64], [2420, -192], [2560, -192]].forEach(([x, y]) => arbreMossDecor(scene, x, y, 50));
     arbreMotes(scene, 1300, levelWidth - 100, -500, 400, 18, [0x9bff5a, 0xbfe8a0, 0xff9ad5]);
-    // Le totem du singe, au bout de la grande branche.
-    if (data && data.totemSinge) st.totem = arbreTotemSinge(scene, data.totemSinge);
+    // (Le totem du singe, au bout de la grande branche, est la clé de zone
+    // `totems` : LevelKit le pose et le gère comme les autres totems.)
   },
 
   update(scene, time, delta) {
     const st = scene.__arbre;
     const cfg = st && st.cfg;
     const p = scene.player;
-    if (st && st.totem && p && p.body) arbreUpdateTotem(scene, st.totem, time);
+    // Totem du singe allumé pendant la visite (LevelKit pose hasMonkeyForm) :
+    // le totem reste allumé (`totemSingeActif`, gardé pour les sauvegardes et
+    // les chapitres), Xara rappelle les lianes ; le rappel du bout de la
+    // branche (`cime_singe`) n'a plus lieu d'être.
+    if (st && !st.hadMonkey && storyGet('hasMonkeyForm')) {
+      st.hadMonkey = true;
+      storySet({ totemSingeActif: true, trig_grand_arbre_racines_cime_singe: true });
+      runCutscene(scene, 'racines_singe_eveil');
+    }
     // Le feu de camp de la fourche sert aussi de point de reprise : une
     // chute de cœurs plus haut ne renvoie pas tout en bas de l'arbre.
     if (st && p && !st.forkSpawn && p.body.blocked.down && p.x > 1344 && p.x < 1728 && p.y < 100 && p.y > 0) {
@@ -333,7 +376,7 @@ ZONE_SCRIPTS.grand_arbre_racines = {
 // des hauteurs.
 DIALOGUES.kainati_intro = [
   { who: 'kainati', text: 'Halte, enfant d\'en bas ! Qui t\'a appris à courir sur mes lianes ?' },
-  { who: 'agarica', text: 'L\'esprit de tes ancêtres. Il m\'a confié ses mains, dans l\'arbre d\'avant.' },
+  { who: 'agarica', text: 'Le totem de ton peuple, au bout de la grande branche. Il s\'est allumé sous ma main.' },
   { who: 'kainati', text: 'Mensonge ! Tu portes l\'odeur de la mousse… Elle grimpe le long de mon arbre depuis des lunes, et voilà qu\'elle t\'envoie.' },
   { who: 'xara', text: 'Agarica, regarde ses yeux. Ce n\'est pas lui qui parle : c\'est la mousse.' },
   { who: 'kainati', text: 'Assez ! Ma colère va secouer cet arbre jusqu\'aux racines. Reste au sol, si tu l\'oses !' },
@@ -343,7 +386,7 @@ DIALOGUES.kainati_victoire = [
   { who: 'kainati', text: '…' },
   { who: 'kainati', text: 'Le bourdonnement… s\'est tu. La brume quitte mes yeux.' },
   { who: 'kainati', text: 'Tu aurais pu me jeter au bas de mon arbre. Tu ne l\'as pas fait.' },
-  { who: 'agarica', text: 'Tes ancêtres m\'ont demandé de t\'épargner. Ce n\'était pas toi, c\'était la mousse. Je la combats : elle ronge toute la forêt.' },
+  { who: 'agarica', text: 'Ce n\'était pas toi, c\'était la mousse. Je la combats : elle ronge toute la forêt.' },
   { who: 'kainati', text: 'Alors nous avons le même ennemi. Elle s\'était glissée en moi comme la sève dans le bois… et j\'ai pris une enfant des bois pour une ennemie.' },
   { who: 'kainati', text: 'Tu portes bien les mains de mon peuple. Pardonne au vieux roi.' },
   { who: 'kainati', text: 'La route des hauteurs continue vers l\'est, au-delà de ma cime. Elle est à toi.' },
@@ -355,7 +398,7 @@ DIALOGUES.kainati_victoire = [
 CUTSCENES.arene_sans_singe = [
   { call: (scene) => storyBulles(scene, [
     'Attends. Là-haut, les branches s\'écartent de trois bonnes longueurs… Tes jambes n\'y suffiront pas.',
-    'Le totem du singe, au bout de la grande branche des racines : son peuple t\'attend.',
+    'Le totem du singe, au bout de la grande branche des racines : pose ta main dessus.',
   ], 'Le totem du singe : dans les racines, au bout de la grande branche.') },
   { playerFace: 'left' },
   { playerMove: { toX: 1640 } },
@@ -445,8 +488,25 @@ DIALOGUES.esprit_revisite = [
   espritDit('Souviens-toi : on lâche la liane quand elle monte, jamais quand elle retombe.'),
 ];
 
+// Le monde spirituel n'est plus sur le chemin de l'histoire (décision du
+// 2026-10-25 : le totem des racines donne directement la forme singe). La
+// zone est gardée telle quelle (réversible) et reste jouable depuis
+// « Zones de test » ou le harnais, qui l'ouvrent SANS point d'entrée. Une
+// arrivée AVEC un point d'entrée vient de l'histoire d'avant (« Continuer »
+// d'une sauvegarde arrêtée ici : lastEnterId = from_racines) : elle retombe
+// aussitôt devant le totem des racines (entrée `totem_singe`), où la forme
+// se prend (ou est déjà prise) -- rien n'attend plus mondeSpirituelFini.
+const MONDE_SPIRITUEL_RETOUR = { scene: 'GrandArbreRacinesScene', enterId: 'totem_singe' };
+
 ZONE_SCRIPTS.monde_spirituel = {
   create(scene) {
+    const sd = (scene.sys.settings && scene.sys.settings.data) || {};
+    if (sd.enterId) {
+      // Démarrage direct (pas de fondu sur une zone qu'on ne doit pas voir) :
+      // l'arrêt de cette scène et le démarrage des racines passent à l'image suivante.
+      scene.scene.start(MONDE_SPIRITUEL_RETOUR.scene, { enterId: MONDE_SPIRITUEL_RETOUR.enterId });
+      return;
+    }
     const done = storyGet('mondeSpirituelFini');
     // (L'arbre spirituel provisoire, dessiné en formes translucides, a été
     // retiré : le fond `fond_monde_spirituel` suffit.)
@@ -528,7 +588,7 @@ CUTSCENES.epreuve_s5 = cutsceneBulles([
 
 CUTSCENES.epreuve_sans_singe = cutsceneBulles([
   'Ces lianes filent jusqu\'au bout des branches… mais sans la forme du singe, elles ne te porteront pas.',
-  'Le totem du singe, au bout de la grande branche des racines : ses esprits t\'apprendront leurs secrets.',
+  'Le totem du singe, au bout de la grande branche des racines : pose ta main dessus, il te donnera les mains de son peuple.',
 ]);
 
 CUTSCENES.epreuve_forme_aigle = [
@@ -561,13 +621,37 @@ const EPREUVE_SINGE_SOMMET_X = 12088;
 const EPREUVE_SINGE_SOMMET_Y = -128;
 const EPREUVE_SINGE_SORTIE_SOMMET = { x: 12272, y: -186, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
 
+// Fente du sommet : posée FERMÉE dès l'arrivée tant que le talisman n'est
+// pas pris (option H7 : on voit de loin qu'un passage attend au bout du
+// sommet), ouverte d'un éclat à la prise du talisman. Sans l'art (pas de
+// fente fermée dessinée), l'amande ouverte pousse comme avant, à son échelle
+// de repos (__sx / __sy) : tweener `scale` vers 1 la gonflait à 440 px.
+const EPREUVE_SINGE_FENTE = { x: 12256, y: -186, h: 110 };
+
 function epreuveOuvrirSommet(scene, instant) {
   if (scene.__epreuveSommet) return;
   scene.__epreuveSommet = true;
   scene.__exits = scene.__exits || [];
   scene.__exits.push(EPREUVE_SINGE_SORTIE_SOMMET);
-  const p = arbreGlowPassage(scene, 12256, -186, 110);
-  if (!instant) [p.glow, p.core].forEach((o) => { o.setScale(0.1); scene.tweens.add({ targets: o, scale: 1, duration: 900, ease: 'Back.Out' }); });
+  const f = EPREUVE_SINGE_FENTE;
+  const closed = scene.__sommetFente;
+  if (closed && closed.art && closed.core && closed.core.active) {
+    closed.setOpen(true);
+    if (!instant) {
+      const cy = closed.core.y - f.h / 2;
+      juiceFlash(closed.core, 0xffffff, 160);
+      juiceBurstImage(scene, 'glow', f.x, cy, { size: f.h * 2, from: 0.3, to: 1.1, ms: 520, color: 0xe8fff2, alpha: 0.85 });
+      spawnFx(scene, 'motes', f.x, cy, { count: 16, spread: 22, power: 2, color: [0xbfe8a0, 0xe8fff2, 0xff9fc9] });
+    }
+    return;
+  }
+  const p = arbreGlowPassage(scene, f.x, f.y, f.h);
+  if (!instant) {
+    [p.glow, p.core].filter(Boolean).forEach((o) => {
+      o.setScale(o.__sx * 0.1, o.__sy * 0.1);
+      scene.tweens.add({ targets: o, scaleX: o.__sx, scaleY: o.__sy, duration: 900, ease: 'Back.Out' });
+    });
+  }
 }
 
 // Plateformes d'écorce qui s'effritent (donnée `crumble`) : ~0,6 s après
@@ -575,21 +659,44 @@ function epreuveOuvrirSommet(scene, instant) {
 const EPREUVE_CRUMBLE_DELAY_MS = 600;
 const EPREUVE_CRUMBLE_RESPAWN_MS = 2600;
 const EPREUVE_CRUMBLE_H = 22;
+// Art Codex de la branche (lot 8), un état par phase : intacte (posée),
+// fissurée (elle tremble sous les pieds), brisée (elle cède et tombe).
+const EPREUVE_CRUMBLE_ART = { ok: 'decor_plateforme_ecorce_intacte', shake: 'decor_plateforme_ecorce_fissuree', gone: 'decor_plateforme_ecorce_brisee' };
+// Rangée (px source, image de 104 px) du dessus de la mousse : posée sur la
+// surface de la hitbox, pour que les pieds touchent la mousse peinte.
+const EPREUVE_CRUMBLE_ART_TOP = 8;
+
+// Pose l'image de l'état `state` (largeur de la hitbox + 6 px : la mousse
+// déborde un peu des bords, comme sur l'ancien dessin) ; sans effet sur le
+// repli dessiné (Graphics, sans setTexture) ou si l'image manque.
+function epreuveCrumbleArt(scene, k, state) {
+  const key = `item-${EPREUVE_CRUMBLE_ART[state]}`;
+  if (!k.g.setTexture || !scene.textures.exists(key)) return;
+  k.g.setTexture(key);
+  k.g.setOrigin(0.5, EPREUVE_CRUMBLE_ART_TOP / k.g.height).setScale((k.w + 6) / k.g.width);
+}
 
 function epreuveCreateCrumbles(scene, list) {
   return (list || []).map((c) => {
     const w = c.w || 128;
-    const g = scene.add.graphics({ x: c.x, y: c.y });
-    g.fillStyle(0x4a3021, 1).fillRoundedRect(-w / 2, 0, w, EPREUVE_CRUMBLE_H, 7);
-    g.fillStyle(0x6b4a33, 1).fillRoundedRect(-w / 2 + 4, 2, w - 8, 8, 4);
-    g.fillStyle(0x3e7a2c, 1).fillRoundedRect(-w / 2 + 2, -3, w - 4, 7, 3);
-    g.lineStyle(2, 0x21140d, 1);
-    for (const dx of [-w * 0.28, w * 0.05, w * 0.3]) g.lineBetween(dx, 3, dx + 7, EPREUVE_CRUMBLE_H - 3);
+    let g;
+    if (scene.textures.exists(`item-${EPREUVE_CRUMBLE_ART.ok}`)) {
+      g = scene.add.image(c.x, c.y, `item-${EPREUVE_CRUMBLE_ART.ok}`);
+    } else {
+      g = scene.add.graphics({ x: c.x, y: c.y });
+      g.fillStyle(0x4a3021, 1).fillRoundedRect(-w / 2, 0, w, EPREUVE_CRUMBLE_H, 7);
+      g.fillStyle(0x6b4a33, 1).fillRoundedRect(-w / 2 + 4, 2, w - 8, 8, 4);
+      g.fillStyle(0x3e7a2c, 1).fillRoundedRect(-w / 2 + 2, -3, w - 4, 7, 3);
+      g.lineStyle(2, 0x21140d, 1);
+      for (const dx of [-w * 0.28, w * 0.05, w * 0.3]) g.lineBetween(dx, 3, dx + 7, EPREUVE_CRUMBLE_H - 3);
+    }
     storyPutBehindPlayer(scene, g);
     const zone = scene.add.zone(c.x, c.y + EPREUVE_CRUMBLE_H / 2, w, EPREUVE_CRUMBLE_H);
     scene.physics.add.existing(zone, true);
     scene.physics.add.collider(scene.player, zone);
-    return { c, w, g, zone, state: 'ok', until: 0 };
+    const k = { c, w, g, zone, state: 'ok', until: 0 };
+    epreuveCrumbleArt(scene, k, 'ok');
+    return k;
   });
 }
 
@@ -599,7 +706,11 @@ function epreuveUpdateCrumbles(scene, list, now) {
     const top = k.c.y;
     if (k.state === 'ok') {
       const on = p.body.blocked.down && Math.abs(p.body.bottom - top) < 4 && Math.abs(p.x - k.c.x) < k.w / 2 + 16;
-      if (on) { k.state = 'shake'; k.until = now + EPREUVE_CRUMBLE_DELAY_MS; }
+      if (on) {
+        k.state = 'shake';
+        k.until = now + EPREUVE_CRUMBLE_DELAY_MS;
+        epreuveCrumbleArt(scene, k, 'shake');
+      }
     } else if (k.state === 'shake') {
       k.g.x = k.c.x + Phaser.Math.Between(-2, 2);
       if (now >= k.until) {
@@ -607,7 +718,10 @@ function epreuveUpdateCrumbles(scene, list, now) {
         k.until = now + EPREUVE_CRUMBLE_RESPAWN_MS;
         k.zone.body.enable = false;
         k.g.x = k.c.x;
-        if (typeof acte1Particles === 'function') acte1Particles(scene, k.c.x, top + 6, { count: 10, colors: [0x6b4a33, 0x3e7a2c], spread: k.w / 2, rise: -40 });
+        epreuveCrumbleArt(scene, k, 'gone');
+        // Éclats d'écorce et de mousse peints (option `fx` d'acte1Particles,
+        // contrat du lot A1 : ignorée tant qu'elle n'existe pas).
+        if (typeof acte1Particles === 'function') acte1Particles(scene, k.c.x, top + 6, { count: 10, colors: [0x6b4a33, 0x3e7a2c], spread: k.w / 2, rise: -40, fx: ['fx_eclat_ecorce', 'fx_eclat_mousse'] });
         scene.tweens.add({ targets: k.g, y: top + 40, alpha: 0, duration: 380, ease: 'Quad.easeIn' });
       }
     } else if (k.state === 'gone' && now >= k.until) {
@@ -617,6 +731,7 @@ function epreuveUpdateCrumbles(scene, list, now) {
       k.state = 'ok';
       k.zone.body.enable = true;
       scene.tweens.killTweensOf(k.g);
+      epreuveCrumbleArt(scene, k, 'ok');
       k.g.setPosition(k.c.x, top).setAlpha(0);
       scene.tweens.add({ targets: k.g, alpha: 1, duration: 300 });
     }
@@ -635,9 +750,10 @@ function epreuveUpdateCrumbles(scene, list, now) {
 function epreuveDropRock(scene, x, surfaceY, telegraph, topY) {
   const top = topY != null ? topY : surfaceY - 320;
   const fallMs = Math.round(340 * Math.sqrt(Math.max(1, surfaceY - 12 - top) / 308));
-  const shadow = scene.add.ellipse(x, surfaceY - 5, 24, 8, 0x12000c, 1).setAlpha(0.3).setDepth(990);
+  const sh = arbreRockShadow(scene, x, surfaceY - 5, 24, 8, 0.3, 3, 2, 0.8);
+  const shadow = sh.obj;
   scene.tweens.add({
-    targets: shadow, scaleX: 3, scaleY: 2, alpha: 0.8, duration: telegraph, ease: 'Sine.easeIn',
+    targets: shadow, ...sh.to, duration: telegraph, ease: 'Sine.easeIn',
     onComplete: () => {
       if (!scene.sys || !scene.sys.isActive()) return;
       const rock = typeof addKainatiStoneImage === 'function'
@@ -696,10 +812,31 @@ function epreuveUpdateRhythms(scene, list, time, delta) {
 // Marée de mousse toxique (donnée `tides`) : une nappe qui monte sur un
 // passage bas puis reflue, en boucle (phases bas / montée / haut / descente,
 // en ms). La toucher = retour à la dernière lanterne, comme une chute.
+// Avec l'art : la même nappe peinte que le lac du fond (`liquide_mousse_toxique`,
+// à l'échelle du manifeste), en bande qui défile, crête médiane (rangée 82,
+// comme LIQUID_IMAGE_ANCHOR_ROW de LevelKit) calée sur le haut de la marée,
+// un aplat de la couleur du bas de l'image dessous ; un peu translucide (on
+// devine le passage). Seul le dessin change : cycle, hauteurs et test de
+// mort (`top + 10`) sont ceux de la donnée.
+const EPREUVE_TIDE_ART = 'liquide_mousse_toxique';
+const EPREUVE_TIDE_CREST_ROW = 82;
+
 function epreuveCreateTide(scene, t) {
-  const g = scene.add.graphics();
-  storyPutBehindPlayer(scene, g);
-  const tide = { ...t, g, phase: 0, t: 0, top: t.low };
+  const tide = { ...t, phase: 0, t: 0, top: t.low };
+  const key = `item-${EPREUVE_TIDE_ART}`;
+  if (scene.textures.exists(key)) {
+    const src = scene.textures.get(key).getSourceImage();
+    const k = (getItemManifest()[EPREUVE_TIDE_ART] || {}).scale || 0.3;
+    tide.crest = EPREUVE_TIDE_CREST_ROW * k;
+    tide.band = src.height * k;
+    tide.fill = scene.add.rectangle(t.x, 0, t.w, 120, textureEdgeColor(scene, key, 'bottom', 0x16280f)).setOrigin(0, 0).setAlpha(0.92);
+    tide.img = scene.add.tileSprite(t.x, 0, t.w, tide.band, key).setOrigin(0, 0).setTileScale(k, k).setAlpha(0.92);
+    storyPutBehindPlayer(scene, tide.fill);
+    storyPutBehindPlayer(scene, tide.img);
+  } else {
+    tide.g = scene.add.graphics();
+    storyPutBehindPlayer(scene, tide.g);
+  }
   epreuveDrawTide(tide, 0);
   return tide;
 }
@@ -707,6 +844,13 @@ function epreuveCreateTide(scene, t) {
 // Nappe un peu translucide (on devine le passage dessous), crête bosselée
 // qui ondule et liseré de bulles toxiques : la même mousse que celle du fond.
 function epreuveDrawTide(tide, time) {
+  if (tide.img) {
+    const y = tide.top - tide.crest;
+    tide.img.setY(y);
+    tide.img.tilePositionX = time * 0.02;
+    tide.fill.setY(y + tide.band - 1);
+    return;
+  }
   const g = tide.g;
   g.clear();
   const top = tide.top;
@@ -751,13 +895,25 @@ function epreuveUpdateTides(scene, list, time, delta) {
 ZONE_SCRIPTS.epreuve_singe = {
   create(scene, data) {
     scene.__epreuveSommet = false;
+    scene.__sommetFente = null;
     const sx = EPREUVE_SINGE_SOMMET_X;
     // Au sommet : un rai de lumière au-dessus de l'autel (décor
     // `grand_arbre_autel_singe` de la donnée), visible de loin. L'ancien
-    // socle dessiné par code est retiré : il doublait l'autel.
-    const beam = scene.add.rectangle(sx, EPREUVE_SINGE_SOMMET_Y - 150, 64, 240, 0xffe9a8, 0.12);
-    storyPutBehindPlayer(scene, beam);
-    scene.tweens.add({ targets: beam, alpha: 0.28, duration: 1300, yoyo: true, repeat: -1 });
+    // socle dessiné par code est retiré : il doublait l'autel. Rai peint
+    // `fx_rai_lumiere` (bas sur le sommet, 110x300), sinon le rectangle.
+    if (scene.textures.exists('item-fx_rai_lumiere')) {
+      const beam = scene.add.image(sx, EPREUVE_SINGE_SOMMET_Y, 'item-fx_rai_lumiere').setOrigin(0.5, 1)
+        .setDisplaySize(110, 300).setTint(0xffe9a8).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.25);
+      storyPutBehindPlayer(scene, beam);
+      scene.tweens.add({ targets: beam, alpha: 0.5, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else {
+      const beam = scene.add.rectangle(sx, EPREUVE_SINGE_SOMMET_Y - 150, 64, 240, 0xffe9a8, 0.12);
+      storyPutBehindPlayer(scene, beam);
+      scene.tweens.add({ targets: beam, alpha: 0.28, duration: 1300, yoyo: true, repeat: -1 });
+    }
+    // Côté arrivée (option H8) : la même fente que celle de la corniche des
+    // racines, au bord gauche, là où la sortie redescend vers elles.
+    arbreGlowPassage(scene, 40, 390, 120);
     const w = (data && data.levelWidth) || scene.levelWidth || 12288;
     arbreMotes(scene, 0, w, -380, 420, 60, [0xbfe8a0, 0xffe9a8, 0x9bff5a]);
     // (La mousse toxique du fond est la bande `liquidFloor` de la donnée,
@@ -770,6 +926,10 @@ ZONE_SCRIPTS.epreuve_singe = {
       tides: ((data && data.tides) || []).map((t) => epreuveCreateTide(scene, t)),
     };
     if (storyGet('talismanSinge')) epreuveOuvrirSommet(scene, true);
+    else {
+      const f = EPREUVE_SINGE_FENTE;
+      scene.__sommetFente = arbreGlowPassage(scene, f.x, f.y, f.h, undefined, false);
+    }
   },
 
   update(scene, time, delta) {

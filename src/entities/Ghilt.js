@@ -30,6 +30,23 @@ const GHILT_PLAYER_HURT_COOLDOWN = 750;
 const GHILT_PUDDLE_HURT_COOLDOWN = 1200;
 const GHILT_MAX_PUDDLES = 6;
 const GHILT_MAX_MINIONS = 2;
+// Souffle : longueur de la zone de dégâts (cf. breathTriangle) et pixels
+// VISIBLES de l'art `vfx_souffle_toxique` (rangée idle : x 4-358, y 4-273
+// d'une frame de 395x278). L'art est étiré sur la vraie zone de dégâts
+// (décision Q8 du lot n°8) ; la zone elle-même ne change pas.
+const GHILT_BREATH_LEN = 330;
+const GHILT_BREATH_ART_W = 354;
+const GHILT_BREATH_ART_H = 269;
+// Bouffées du souffle (cf. drawBreath) : réserve d'images `fx_bouffee_toxique`.
+const GHILT_BREATH_PUFFS = 10;
+// Crachat : corps de la boule `vfx_mousse_toxique` (rangée 'boule', traîne à
+// gauche) centré en (0,65 ; 0,51) de la frame, ~140 px source de diamètre,
+// affiché à 22 px = le diamètre de la hitbox (cercle de rayon 11).
+const GHILT_BALL_RADIUS = 11;
+const GHILT_BALL_ART_ORIGIN = [0.65, 0.51];
+const GHILT_BALL_ART_DIAMETER = 140;
+// Anim de coup (rangée `hit`, 3 frames à 10 fps) : jouée hors attaque.
+const GHILT_HIT_ANIM_MS = 300;
 
 // Placeholder dessiné à la main (tapir reconnaissable, museau du côté où
 // regarde l'art) tant que les vraies frames Codex n'existent pas. Même clé
@@ -231,15 +248,17 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
     switch (this.state) {
       case 'idle': {
         const dx = player.x - this.x;
+        // Anim de coup en cours (cf. takeHit) : on ne la coupe pas.
+        const hitAnim = now < (this.hitAnimUntil || 0);
         // Avance lourdement vers Agarica sans la coller (le contact blesse).
         if (Math.abs(dx) > 260) {
           this.facing = dx > 0 ? 1 : -1;
           this.applyFacing();
           this.setVelocityX(this.facing * 55 / this.tempo);
-          this.playAnim('walk');
+          if (!hitAnim) this.playAnim('walk');
         } else {
           this.setVelocityX(0);
-          this.playAnim('idle');
+          if (!hitAnim) this.playAnim('idle');
         }
         if (now >= this.nextAttackAt) this.beginTelegraph(player, this.chooseAttack(player, now), now);
         break;
@@ -268,6 +287,12 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
         break;
       case 'recover':
         this.setVelocityX(0);
+        // Fin de l'anim de coup (non bouclée) pendant la récupération : retour
+        // à l'idle plutôt que de rester figé sur la dernière frame du coup.
+        if (this.hitAnimUntil && now >= this.hitAnimUntil) {
+          this.hitAnimUntil = 0;
+          this.playAnim('idle');
+        }
         if (now >= this.stateEnd) {
           this.state = 'idle';
           this.clearTint();
@@ -407,23 +432,47 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
   // ---------------------------------------------------------------------------
   addBreath(now, ms) {
     const gfx = this.scene.add.graphics().setDepth(this.depth + 1);
-    const hz = { kind: 'breath', until: now + ms, start: now, gfx, facing: this.facing, sprite: null };
-    // Vrai art du souffle (start → idle) en plus du cône dessiné ; sans art,
-    // le cône procédural suffit (plus lisible qu'un rectangle placeholder).
+    const hz = { kind: 'breath', until: now + ms, start: now, gfx, facing: this.facing, sprite: null, puffs: null };
+    // Bouffées en images `fx_bouffee_toxique` (lot n°8) si l'art existe, sous
+    // le souffle (créées avant lui) ; sinon cercles dessinés (drawBreath).
+    if (this.scene.textures.exists('item-fx_bouffee_toxique')) {
+      hz.puffs = Array.from({ length: GHILT_BREATH_PUFFS }, () => this.scene.add.image(0, 0, 'item-fx_bouffee_toxique')
+        .setDepth(this.depth + 1).setAlpha(0));
+    }
+    // Vrai art du souffle (start → idle), étiré sur la zone de dégâts (cf.
+    // layoutBreathSprite) ; sans art, le cône procédural suffit (plus lisible
+    // qu'un rectangle placeholder).
     if (hasManifestArt(this.scene, 'vfx_souffle_toxique')) {
       const s = this.snout();
-      hz.sprite = addManifestSprite(this.scene, s.x, s.y, 'vfx_souffle_toxique', 'start', { origin: [0, 0.5] });
-      hz.sprite.setFlipX(this.facing < 0).setDepth(this.depth + 1); // flipX miroite autour de l'origine
+      // Art dessiné face à DROITE, bouche à gauche du cadre. flipX retourne
+      // l'image DANS son cadre (Phaser) : vers la gauche, l'origine passe au
+      // bord droit pour que la bouche reste sur le museau.
+      const left = this.facing < 0;
+      hz.sprite = addManifestSprite(this.scene, s.x, s.y, 'vfx_souffle_toxique', 'start', { origin: [left ? 1 : 0, 0.5] });
+      hz.sprite.setFlipX(left).setDepth(this.depth + 1);
       hz.sprite.once('animationcomplete', () => hz.sprite.active && hz.sprite.playManifest('idle'));
+      this.layoutBreathSprite(hz, this.breathTriangle(hz));
     }
     this.hazards.push(hz);
   }
 
   breathTriangle(hz) {
     const s = this.snout();
-    const len = 330;
+    const len = GHILT_BREATH_LEN;
     const far = s.x + hz.facing * len;
     return new Phaser.Geom.Triangle(s.x, s.y, far, s.y - 120, far, Math.max(s.y + 40, this.groundY + 10));
+  }
+
+  // Art du souffle calé sur le triangle de dégâts : longueur visible = 330 px,
+  // hauteur visible = hauteur du bord éloigné, axe tourné vers le milieu de
+  // ce bord (le triangle descend un peu vers le sol). Purement visuel.
+  layoutBreathSprite(hz, tri) {
+    const spr = hz.sprite;
+    if (!spr || !spr.active) return;
+    spr.setPosition(tri.x1, tri.y1);
+    spr.setScale(GHILT_BREATH_LEN / GHILT_BREATH_ART_W, Math.abs(tri.y3 - tri.y2) / GHILT_BREATH_ART_H);
+    const dy = (tri.y2 + tri.y3) / 2 - tri.y1;
+    spr.setRotation(hz.facing * Math.atan2(dy, GHILT_BREATH_LEN));
   }
 
   addSpitBall(targetX) {
@@ -432,7 +481,17 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
     const t = 0.95 * this.tempo;
     const vx = (targetX - s.x) / t;
     const vy = (this.groundY - s.y - 0.5 * g * t * t) / t;
-    const obj = this.scene.add.circle(s.x, s.y, 11, 0x6bbf3a).setStrokeStyle(3, 0x1d3312).setDepth(this.depth + 1);
+    let obj;
+    if (hasManifestArt(this.scene, 'vfx_mousse_toxique', 'boule')) {
+      // Boule de mousse peinte (lot n°8), corps centré sur obj.x/obj.y (la
+      // hitbox) et à sa taille ; la traîne suit la trajectoire (rotation).
+      obj = addManifestSprite(this.scene, s.x, s.y, 'vfx_mousse_toxique', 'boule', { origin: GHILT_BALL_ART_ORIGIN })
+        .setScale((2 * GHILT_BALL_RADIUS) / GHILT_BALL_ART_DIAMETER)
+        .setRotation(Math.atan2(vy, vx));
+    } else {
+      obj = this.scene.add.circle(s.x, s.y, GHILT_BALL_RADIUS, 0x6bbf3a).setStrokeStyle(3, 0x1d3312);
+    }
+    obj.setDepth(this.depth + 1);
     this.hazards.push({ kind: 'ball', obj, vx, vy, g });
   }
 
@@ -467,7 +526,7 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
         if (now >= hz.until || this.locked) { hz.done = true; continue; }
         const tri = this.breathTriangle(hz);
         this.drawBreath(hz, tri, now);
-        if (hz.sprite) { const s = this.snout(); hz.sprite.setPosition(s.x, s.y); }
+        if (hz.sprite) this.layoutBreathSprite(hz, tri);
         // + un bloc au pied du museau : collée à lui, Agarica ne passe pas sous le cône.
         const near = new Phaser.Geom.Rectangle(
           hz.facing > 0 ? tri.x1 - 40 : tri.x1 - 100, tri.y1 - 30, 140, Math.max(40, this.groundY - tri.y1 + 30),
@@ -478,7 +537,9 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
         hz.vy += hz.g * dt;
         hz.obj.x += hz.vx * dt;
         hz.obj.y += hz.vy * dt;
-        if (Phaser.Geom.Intersects.CircleToRectangle(new Phaser.Geom.Circle(hz.obj.x, hz.obj.y, 11), playerRect)) {
+        // Art : la traîne suit la trajectoire en cloche (sans effet sur le cercle).
+        if (hz.obj.anims) hz.obj.setRotation(Math.atan2(hz.vy, hz.vx));
+        if (Phaser.Geom.Intersects.CircleToRectangle(new Phaser.Geom.Circle(hz.obj.x, hz.obj.y, GHILT_BALL_RADIUS), playerRect)) {
           this.hurtPlayer(player, now);
           hz.done = true;
         } else if (hz.vy > 0 && hz.obj.y >= this.groundY - 6) {
@@ -508,16 +569,28 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
     const g = hz.gfx;
     g.clear();
     const life = Phaser.Math.Clamp((now - hz.start) / 200, 0, 1);
-    g.fillStyle(0x7fdc5a, 0.22 * life);
-    g.fillTriangle(tri.x1, tri.y1, tri.x2, tri.y2, tri.x3, tri.y3);
+    // Cône translucide = repère de la zone de dégâts, seulement sans l'art :
+    // l'art du souffle couvre maintenant toute la zone (décision Q8).
+    if (!hz.sprite) {
+      g.fillStyle(0x7fdc5a, 0.22 * life);
+      g.fillTriangle(tri.x1, tri.y1, tri.x2, tri.y2, tri.x3, tri.y3);
+    }
     // Bouffées qui s'éloignent du museau (déterministes, pas de particules).
-    for (let i = 0; i < 10; i++) {
-      const t = ((now / 650) + i / 10) % 1;
+    for (let i = 0; i < GHILT_BREATH_PUFFS; i++) {
+      const t = ((now / 650) + i / GHILT_BREATH_PUFFS) % 1;
       const px = tri.x1 + (tri.x2 - tri.x1) * t;
       const spread = ((i * 37) % 10) / 10 - 0.45;
       const py = tri.y1 + spread * 150 * t;
-      g.fillStyle(i % 2 ? 0x9cff6b : 0x4f9a2c, 0.5 * (1 - t) * life);
-      g.fillCircle(px, py, 8 + t * 24);
+      const r = 8 + t * 24;
+      const a = 0.5 * (1 - t) * life;
+      const puff = hz.puffs && hz.puffs[i];
+      if (puff) {
+        // Même rayon que le cercle de repli (image de 128 px : diamètre / 128).
+        puff.setPosition(px, py).setScale((2 * r) / 128).setAlpha(a).setRotation(i + t * 1.5);
+      } else {
+        g.fillStyle(i % 2 ? 0x9cff6b : 0x4f9a2c, a);
+        g.fillCircle(px, py, r);
+      }
     }
   }
 
@@ -525,6 +598,7 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
     if (hz.gfx) hz.gfx.destroy();
     if (hz.obj) hz.obj.destroy();
     if (hz.sprite) hz.sprite.destroy();
+    if (hz.puffs) hz.puffs.forEach((p) => p.destroy());
   }
 
   clearHazards() {
@@ -539,24 +613,46 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
   }
 
   spawnDust(x, y, n) {
+    // Art `fx_bouffee_poussiere` (lot n°8, brun naturel, non teinté) à la
+    // taille du cercle de repli ; échelle tweenée en RELATIF (×1,8 comme le
+    // cercle), l'image source faisant 128 px.
+    const art = this.scene.textures.exists('item-fx_bouffee_poussiere');
     for (let i = 0; i < n; i++) {
-      const d = this.scene.add.circle(x + Phaser.Math.Between(-30, 30), y - 6, Phaser.Math.Between(5, 10), 0x8a7a5a, 0.8);
+      const r = Phaser.Math.Between(5, 10);
+      const dx = x + Phaser.Math.Between(-30, 30);
+      let d;
+      let base = 1;
+      if (art) {
+        base = (2 * r) / 128;
+        d = this.scene.add.image(dx, y - 6, 'item-fx_bouffee_poussiere').setScale(base).setAlpha(0.8)
+          .setRotation(Math.random() * Math.PI * 2);
+      } else {
+        d = this.scene.add.circle(dx, y - 6, r, 0x8a7a5a, 0.8);
+      }
       this.scene.tweens.add({
-        targets: d, y: y - Phaser.Math.Between(20, 50), alpha: 0, scale: 1.8, duration: 600,
+        targets: d, y: y - Phaser.Math.Between(20, 50), alpha: 0, scale: base * 1.8, duration: 600,
         onComplete: () => d.destroy(),
       });
     }
   }
 
   // Aspiration : brins de mousse attirés vers le museau (télégraphe du souffle).
+  // Art : spores `fx_spore_toxique` (mode normal, 14 px : un télégraphe doit
+  // se lire sur les fonds corrompus), qui tournent en filant vers le museau.
   spawnInhale(ms) {
     const s = this.snout();
+    const art = this.scene.textures.exists('item-fx_spore_toxique');
     for (let i = 0; i < 8; i++) {
       const sx = s.x + this.facing * Phaser.Math.Between(80, 240);
       const sy = s.y + Phaser.Math.Between(-90, 70);
-      const p = this.scene.add.circle(sx, sy, 5, 0x9cff6b, 0.85).setDepth(this.depth + 1);
+      const p = art
+        ? this.scene.add.image(sx, sy, 'item-fx_spore_toxique').setScale(14 / 128).setAlpha(0.85)
+          .setRotation(Math.random() * Math.PI * 2)
+        : this.scene.add.circle(sx, sy, 5, 0x9cff6b, 0.85);
+      p.setDepth(this.depth + 1);
       this.scene.tweens.add({
         targets: p, x: s.x, y: s.y, alpha: 0.2, duration: ms * 0.9, delay: i * 30, ease: 'Quad.easeIn',
+        ...(art ? { rotation: p.rotation - this.facing * Math.PI * 2 } : {}),
         onComplete: () => p.destroy(),
       });
     }
@@ -606,6 +702,12 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
       else if (source.kind === 'skill' || source.type === 'skill' || source.skillId) dmg = 2;
     }
     this.flashHit();
+    // Anim de coup (rangée `hit`, jamais jouée jusqu'ici) : seulement hors
+    // attaque, pour ne jamais masquer un télégraphe ni une charge. Visuel seul.
+    if ((this.state === 'idle' || this.state === 'recover') && hasManifestArt(this.scene, 'ghilt', 'hit')) {
+      this.playAnim('hit');
+      this.hitAnimUntil = now + GHILT_HIT_ANIM_MS;
+    }
     if (this.state === 'weakened') {
       // PV plancher : les coups normaux ne l'achèvent pas, seul le soin conclut.
       return;

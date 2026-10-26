@@ -30,7 +30,8 @@ const CONTROLS_GROUPS = [
     title: 'Se déplacer',
     rows: [
       { keys: ['←', '→'], alt: ['Q', 'D'], text: 'Marcher' },
-      { keys: ['Espace'], text: 'Sauter (2e saut : Singe, Aigle ou Papillon)' },
+      // Le papillon n'est plus une forme aérienne, seulement une compétence.
+      { keys: ['Espace'], text: 'Sauter (2e saut : Singe ou Aigle)' },
       { keys: ['Shift'], text: 'Courir — forme du Loup (ou double appui ← / →)' },
       { keys: ['Z', '↑'], text: 'Viser vers le haut' },
       { keys: ['S', '↓'], text: "Viser en bas (en l'air, rebond) · piqué de l'Aigle · lâcher une liane" },
@@ -53,7 +54,7 @@ const CONTROLS_GROUPS = [
     ],
   },
 ];
-const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e saut = Singe, Aigle ou Papillon '
+const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e saut = Singe ou Aigle '
   + '(sans forme aérienne, un seul saut), eau = Pieuvre. Au feu de camp : soin, sauvegarde, formes et compétences.';
 // Rappel discret affiché en jeu si l'option est activée.
 const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Shift courir · E agir · A F R compétences · I sac · Échap pause';
@@ -87,14 +88,16 @@ const MENU_CHAPTERS = [
   },
   {
     id: 'grand_arbre', act: 'Acte I', name: 'Le grand arbre',
-    desc: 'Des racines immenses, un totem endormi… et un roi furieux au sommet.',
-    scene: 'GrandArbreRacinesScene', enterId: 'from_foret_sombre', zones: ['grand_arbre_racines', 'monde_spirituel', 'grand_arbre_arene', 'epreuve_singe'], color: 0x4a3420, bg: 'fond_grand_arbre',
-    // Ordre : totem du singe (racines) → monde spirituel (forme singe) → lianes
-    // de la cime → Kainati épargné (l'épreuve reste optionnelle : pas de talisman).
+    desc: 'Des racines immenses, un totem du singe endormi… et un roi furieux au sommet.',
+    scene: 'GrandArbreRacinesScene', enterId: 'from_foret_sombre', zones: ['grand_arbre_racines', 'grand_arbre_arene', 'epreuve_singe'], color: 0x4a3420, bg: 'fond_grand_arbre',
+    // Ordre (décision du 2026-10-25) : totem du singe allumé au bout de la
+    // grande branche (forme singe, directement) → lianes de la cime →
+    // Kainati épargné (l'épreuve reste optionnelle : pas de talisman). Le
+    // monde spirituel n'est plus sur le chemin : ni visité, ni requis.
     gives: {
       flags: {
-        visited_grand_arbre_racines: true, visited_monde_spirituel: true, visited_grand_arbre_arene: true,
-        totemSingeActif: true, hasMonkeyForm: true, mondeSpirituelFini: true, airForm: 'monkey',
+        visited_grand_arbre_racines: true, visited_grand_arbre_arene: true,
+        totemSingeActif: true, hasMonkeyForm: true, airForm: 'monkey',
         kainatiIntroSeen: true, kainatiDefeated: true,
       },
     },

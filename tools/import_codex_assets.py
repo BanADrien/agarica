@@ -31,6 +31,25 @@ garder en double ici). Trois tables y sont lues :
       square N   -> rognage alpha, padding carré, redimension NxN
       cover WxH  -> image opaque recadrée/redimensionnée pour couvrir WxH (fonds)
       trim       -> rognage alpha seul
+    Retouches mécaniques facultatives de `norm` (lot 8, cf.
+    docs/production/PLAN_INTEGRATION_LOT_8.md M03-M05), sauf en mode cover,
+    dans cet ordre :
+      trimAlpha N   -> seuil du rognage (alpha > N, défaut ALPHA_T = 10) ;
+                       0 garde la traîne d'alpha des grandes lueurs (sinon
+                       bord net à alpha ~11 sur les 4 côtés) ;
+      cropTop N     -> après le rognage, retire N rangées en haut puis rogne
+                       à nouveau (fx_lueur_sol : ellipse fantôme au-dessus) ;
+      (redimension du mode)
+      pad N         -> marge transparente de N px autour ;
+      falloff P     -> alpha *= clamp(1 - r, 0, 1)^P, r = distance au centre
+                       normalisée sur les demi-axes de l'image (après pad) :
+                       un halo peint en plateau devient un dégradé continu
+                       jusqu'à 0 au bord (fx_halo_doux, fx_halo_rayons) ;
+      desaturate    -> RGB en blanc, alpha gardé (image teintable par setTint).
+    Feuilles animées : `align: "ring"` centre chaque frame sur le cercle
+    ajusté de l'anneau (cf. ring_center) et non sur sa boîte, que les
+    débris décentrent ; canvas = le plus petit qui contient toutes les
+    frames ainsi centrées (ou `canvas` s'il est donné).
   * TILESET_MANIFEST -- 3 images (sol 4x4, plateformes 1x3, spéciaux 1x3)
     découpées vers les 21 noms de assets/decors/autotile_frames/ (disposition
     'blob' de LevelKit.js) : contour retiré sur les côtés intérieurs (pas de
@@ -211,8 +230,8 @@ def alpha_bbox(arr, thr=ALPHA_T):
     return xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
 
 
-def trim(arr, axis_x=True, axis_y=True):
-    bb = alpha_bbox(arr)
+def trim(arr, axis_x=True, axis_y=True, thr=ALPHA_T):
+    bb = alpha_bbox(arr, thr)
     if bb is None:
         return arr
     x0, y0, x1, y1 = bb
@@ -348,10 +367,41 @@ def grid_frames(arr, n_rows_img, row_local, n_frames, label):
     return frames
 
 
-def place(crop, cw, ch, align):
+def ring_center(crop, label):
+    """Centre (cx, cy) de l'anneau d'une frame, en px de la frame : cercle
+    ajusté par moindres carrés (méthode algébrique de Kåsa) sur les pixels
+    du trait lumineux (alpha > 150 et luminance > 200), en écartant à chaque
+    passe les points loin du cercle (feuilles, mottes, gouttes claires).
+    La boîte englobante ne convient pas : les débris d'un seul côté la
+    décalent jusqu'à 20 px (vfx_anneau_choc) ; le centre de masse non plus
+    (les mottes le tirent de 25 px). None si trop peu de points."""
+    rgb = crop[:, :, :3].astype(float)
+    lum = 0.299 * rgb[:, :, 0] + 0.587 * rgb[:, :, 1] + 0.114 * rgb[:, :, 2]
+    ys, xs = np.nonzero((crop[:, :, 3] > 150) & (lum > 200))
+    if len(xs) < 30:
+        warn(f'{label} : trop peu de pixels lumineux pour ajuster l anneau -> centre de la boîte')
+        return None
+    x, y = xs.astype(float) + 0.5, ys.astype(float) + 0.5
+    keep = np.ones(len(x), bool)
+    cx = cy = r = 0.0
+    for _ in range(4):
+        A = np.c_[2 * x[keep], 2 * y[keep], np.ones(keep.sum())]
+        (cx, cy, c), *_ = np.linalg.lstsq(A, x[keep] ** 2 + y[keep] ** 2, rcond=None)
+        r = float(np.sqrt(max(c + cx * cx + cy * cy, 0)))
+        near = np.abs(np.hypot(x - cx, y - cy) - r) < max(4.0, 0.12 * r)
+        if near.sum() < 30:
+            break
+        keep = near
+    return float(cx), float(cy)
+
+
+def place(crop, cw, ch, align, center=None):
     canvas = Image.new('RGBA', (cw, ch), (0, 0, 0, 0))
     im = Image.fromarray(crop, 'RGBA')
-    if align == 'center':
+    if align == 'ring' and center is not None:
+        # centre de l'anneau au centre du canvas (setOrigin(0.5, 0.5) en jeu)
+        x, y = round(cw / 2 - center[0]), round(ch / 2 - center[1])
+    elif align in ('center', 'ring'):
         x, y = (cw - im.width) // 2, (ch - im.height) // 2
     elif align == 'left':
         x, y = PAD, (ch - im.height) // 2
@@ -359,7 +409,10 @@ def place(crop, cw, ch, align):
         x, y = PAD, ch - PAD - im.height
     else:  # bottom
         x, y = (cw - im.width) // 2, ch - PAD - im.height
-    canvas.paste(im, (x, y), im)
+    # Collage SANS masque (le canvas est vide) : avec mask=im, PIL mélange
+    # aussi la couche alpha (alpha²/255) et assombrit le RGB des bords adoucis
+    # -- liseré sombre et lueurs affaiblies sur chaque frame.
+    canvas.paste(im, (x, y))
     return canvas
 
 
@@ -428,6 +481,25 @@ def import_anim(aid, e, force, dry):
             rows_out[g] = [np.array(Image.fromarray(c, 'RGBA').resize(
                 (max(1, round(c.shape[1] * k)), max(1, round(c.shape[0] * k))), Image.LANCZOS)) for c in rows_out[g]]
         cw, ch = fw, fh
+    align = e.get('align', 'bottom')
+    centers = {}
+    if align == 'ring':
+        # Centre de l'anneau de chaque frame (repli : centre de la boîte), puis
+        # plus petit canvas qui les contient toutes centrées sur ce point.
+        half_w = half_h = 0.0
+        for grow, crops in rows_out.items():
+            for i, crop in enumerate(crops):
+                h, w = crop.shape[:2]
+                c = ring_center(crop, f'{aid} rangée {grow} frame {i}') or (w / 2, h / 2)
+                centers[(grow, i)] = c
+                half_w = max(half_w, c[0], w - c[0])
+                half_h = max(half_h, c[1], h - c[1])
+        need_w, need_h = 2 * int(np.ceil(half_w)) + PAD * 2, 2 * int(np.ceil(half_h)) + PAD * 2
+        if e.get('canvas'):
+            if need_w > cw or need_h > ch:
+                warn(f'{aid} : anneaux centrés -> {need_w}x{need_h} requis, canvas imposé {cw}x{ch} (frames rognées)')
+        else:
+            cw, ch = need_w, need_h
     out_dir = ROOT / e['dir']
     out_dir.mkdir(parents=True, exist_ok=True)
     if force:
@@ -435,11 +507,10 @@ def import_anim(aid, e, force, dry):
             grow = int(re.match(rf"{re.escape(e['prefix'])}_row(\d+)_", f.name).group(1))
             if grow in rows_out:
                 f.unlink()
-    align = e.get('align', 'bottom')
     for grow in sorted(rows_out):
         name, nf = by_row[grow]
         for i, crop in enumerate(rows_out[grow]):
-            place(crop, cw, ch, align).save(out_dir / f"{e['prefix']}_row{grow}_{i}.png")
+            place(crop, cw, ch, align, centers.get((grow, i))).save(out_dir / f"{e['prefix']}_row{grow}_{i}.png")
         status = 'OK' if len(rows_out[grow]) == nf else f'ATTENDU {nf}'
         print(f'  rangée {grow} {name}: {len(rows_out[grow])} frame(s) [{status}]')
     print(f'  canvas uniforme {cw}x{ch} -> {rel(out_dir)}')
@@ -483,26 +554,54 @@ def normalize(arr, norm):
         im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
         x0, y0 = (im.width - W) // 2, (im.height - H) // 2
         return im.crop((x0, y0, x0 + W, y0 + H))
+    thr = norm.get('trimAlpha', ALPHA_T)
     if mode == 'height':
         # trim_x : liane tileable -> on ne rogne qu'horizontalement (raccord haut/bas intact)
-        arr = trim(arr, axis_x=True, axis_y=not norm.get('trim_x', False))
+        arr = trim(arr, axis_x=True, axis_y=not norm.get('trim_x', False), thr=thr)
         im = Image.fromarray(arr, 'RGBA')
         v = norm['value']
-        return im.resize((max(1, round(im.width * v / im.height)), v), Image.LANCZOS)
-    arr = trim(arr)
+        return retouch(im.resize((max(1, round(im.width * v / im.height)), v), Image.LANCZOS), norm)
+    arr = trim(arr, thr=thr)
+    if norm.get('cropTop'):
+        arr = trim(arr[int(norm['cropTop']):], thr=thr)
     im = Image.fromarray(arr, 'RGBA')
     if mode == 'fit':
         v = norm['value']
         s = v / max(im.width, im.height)
         if s < 1:
             im = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
-        return im
+        return retouch(im, norm)
     if mode == 'square':
         side = max(im.width, im.height)
         sq = Image.new('RGBA', (side, side), (0, 0, 0, 0))
         sq.paste(im, ((side - im.width) // 2, (side - im.height) // 2), im)
-        return sq.resize((norm['value'], norm['value']), Image.LANCZOS)
-    return im  # trim
+        return retouch(sq.resize((norm['value'], norm['value']), Image.LANCZOS), norm)
+    return retouch(im, norm)  # trim
+
+
+def retouch(im, norm):
+    """Retouches mécaniques facultatives après la redimension (cf. docstring
+    du module) : pad, falloff, desaturate. Sans ces clés, image inchangée."""
+    if not any(k in norm for k in ('pad', 'falloff', 'desaturate')):
+        return im
+    arr = np.array(im.convert('RGBA'))
+    pad = int(norm.get('pad', 0))
+    if pad > 0:
+        arr = np.pad(arr, ((pad, pad), (pad, pad), (0, 0)))
+    if 'falloff' in norm:
+        # Halo Codex peint en plateau (centre opaque, bord court) : lu comme un
+        # disque plein en jeu. On le multiplie par un cône radial, nul au bord
+        # de l'image : dégradé continu, comme les halos dessinés par le code.
+        h, w = arr.shape[:2]
+        yy, xx = np.mgrid[0:h, 0:w]
+        r = np.hypot((xx + 0.5 - w / 2) / (w / 2), (yy + 0.5 - h / 2) / (h / 2))
+        k = np.clip(1 - r, 0, 1) ** float(norm['falloff'])
+        arr[:, :, 3] = np.round(arr[:, :, 3] * k).astype(np.uint8)
+    if norm.get('desaturate'):
+        # Blanc pur : la couleur vient de setTint (une lueur cyan ne prend pas
+        # une teinte chaude, un setTint ne fait que multiplier).
+        arr[:, :, :3] = 255
+    return Image.fromarray(arr, 'RGBA')
 
 
 def import_item(iid, e, force, dry):

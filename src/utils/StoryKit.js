@@ -843,6 +843,96 @@ function addStoryVineFrame(scene, x, y, w, h, { scale = 0.3, container = null } 
   return { container: c, inner };
 }
 
+// Panneau d'interface Codex découpé (lot n°8 : bulle, invite, bannière,
+// touche, cadres des barres), contrat PLAN_INTEGRATION_LOT_8 §3.3 :
+//   addUiSliced(scene, id, x, y, w, h, { scale, depth, container, scrollFactor }) → Container | null
+// Bordures `nineSlice` {left, right, top, bottom} lues dans le manifeste, en
+// px SOURCE. Coins et bouts à l'échelle `scale` (défaut : celle du
+// manifeste), bords et centre étirés, jointures arrondies au pixel (pas de
+// liseré entre deux morceaux). `top = bottom = 0` : 3 morceaux horizontaux,
+// la hauteur vaut texH x scale et `h` est ignoré. Bornes minimales :
+// w ≥ (left + right) x scale, h ≥ (top + bottom) x scale. Origine en haut à
+// gauche ; `container` : le panneau y est ajouté ; `scrollFactor` vaut aussi
+// pour les morceaux. Null si la texture manque (l'appelant garde son dessin).
+// Pas de `scene.add.nineslice` : en Phaser 3.80 il ne marche qu'en WebGL, et
+// main.js est en Phaser.AUTO (repli Canvas possible).
+// Le panneau renvoyé porte `setUiSize(w, h)` (même règles, pour une invite
+// dont le texte change) et `uiW` / `uiH` (taille affichée réelle).
+function addUiSliced(scene, id, x, y, w, h, { scale, depth, container = null, scrollFactor } = {}) {
+  const key = `item-${id}`;
+  if (!scene || !scene.textures || !scene.textures.exists(key)) return null;
+  const def = getItemManifest()[id] || {};
+  const k = scale || def.scale || 1;
+  const ns = def.nineSlice || {};
+  const tex = scene.textures.get(key);
+  const src = tex.getSourceImage();
+  const tw = src.width;
+  const th = src.height;
+  // Bordures bornées à l'image (une valeur de manifeste trop grande ne doit
+  // pas produire de morceau de taille négative).
+  const L = Phaser.Math.Clamp(ns.left || 0, 0, tw);
+  const R = Phaser.Math.Clamp(ns.right || 0, 0, tw - L);
+  const T = Phaser.Math.Clamp(ns.top || 0, 0, th);
+  const B = Phaser.Math.Clamp(ns.bottom || 0, 0, th - T);
+  const three = !T && !B;
+  const cols = [0, L, tw - R, tw];
+  const rows = three ? [0, th] : [0, T, th - B, th];
+  const c = scene.add.container(x, y);
+  const pieces = [];
+  for (let j = 0; j < rows.length - 1; j++) {
+    for (let i = 0; i < cols.length - 1; i++) {
+      const sw = cols[i + 1] - cols[i];
+      const sh = rows[j + 1] - rows[j];
+      if (sw <= 0 || sh <= 0) continue;
+      const name = `slice_${id}_${cols[i]}_${rows[j]}_${sw}_${sh}`;
+      if (!tex.has(name)) tex.add(name, 0, cols[i], rows[j], sw, sh);
+      const img = scene.add.image(0, 0, key, name).setOrigin(0, 0);
+      c.add(img);
+      pieces.push({ img, i, j });
+    }
+  }
+  c.__ui = { k, L, R, T, B, th, three, pieces };
+  c.setUiSize = (w2, h2) => layoutUiSliced(c, w2, h2);
+  layoutUiSliced(c, w, h);
+  if (depth != null) c.setDepth(depth);
+  if (scrollFactor != null) {
+    c.setScrollFactor(scrollFactor);
+    for (const p of pieces) p.img.setScrollFactor(scrollFactor);
+  }
+  if (container) container.add(c);
+  return c;
+}
+
+// Échelle d'une image d'interface lue dans le manifeste (règle du lot n°8 :
+// pas de valeur en dur), avec la valeur du plan en repli si l'entrée manque.
+// Les mises en page qui en dépendent (rainure de la barre de boss, zone unie
+// de la bannière) ont été mesurées à ces échelles-là.
+function storyUiScale(id, fallback) {
+  return (getItemManifest()[id] || {}).scale || fallback;
+}
+
+// Place les morceaux d'un panneau addUiSliced pour la taille (w, h).
+function layoutUiSliced(c, w, h) {
+  const u = c && c.__ui;
+  if (!u) return c;
+  const r = Math.round;
+  const W = r(Math.max(Number(w) || 0, (u.L + u.R) * u.k));
+  const H = u.three ? r(u.th * u.k) : r(Math.max(Number(h) || 0, (u.T + u.B) * u.k));
+  const xs = [0, r(u.L * u.k), W - r(u.R * u.k), W];
+  xs[2] = Math.max(xs[2], xs[1]);
+  const ys = u.three ? [0, H] : [0, r(u.T * u.k), H - r(u.B * u.k), H];
+  if (!u.three) ys[2] = Math.max(ys[2], ys[1]);
+  for (const p of u.pieces) {
+    const pw = xs[p.i + 1] - xs[p.i];
+    const ph = ys[p.j + 1] - ys[p.j];
+    p.img.setVisible(pw > 0 && ph > 0);
+    if (pw > 0 && ph > 0) p.img.setPosition(xs[p.i], ys[p.j]).setDisplaySize(pw, ph);
+  }
+  c.uiW = W;
+  c.uiH = H;
+  return c;
+}
+
 // HUD — art Codex, appelé par drawHud (LevelKit.js) à chaque frame : cœurs
 // `hud_coeur` / `hud_coeur_vide` et icônes des compétences équipées
 // (`skill_icone_*`, lettre de la touche en pastille). Images créées une fois
@@ -851,6 +941,11 @@ function addStoryVineFrame(scene, x, y, w, h, { scale = 0.3, container = null } 
 // { hearts: bool, skills: [bool, bool, bool] } (repli dessiné sans l'art).
 const HUD_ART_HEART_H = 24;
 const HUD_ART_SKILL_SIZE = 40;
+// Pastille de touche peinte (`ui_touche`, bois clair) : 18 px sur les icônes
+// du HUD. Encre des lettres posées sur ce bois (une lettre claire n'y est
+// pas lisible) : la même pour les invites « E : … ».
+const HUD_ART_KEY_SIZE = 18;
+const STORY_UI_KEY_INK = '#2a1f45';
 
 function storyHudSkillIconKey(skillId) {
   return `item-${STORY_SKILL_ICON[skillId] || `skill_icone_${skillId}`}`;
@@ -891,40 +986,72 @@ function storyDrawHudArt(scene) {
   }
 
   const skillY = scene.scale.height - HUD_MARGIN - HUD_SKILL_SIZE / 2;
+  // Lot n°8 : case vide peinte `ui_case_competence` (34 px, la taille de la
+  // case dessinée) et pastille de touche en bois clair `ui_touche` (lettre
+  // sombre #2a1f45 : le bois est clair) sur les icônes équipées.
+  const caseArt = scene.textures.exists('item-ui_case_competence');
+  const keyArt = scene.textures.exists('item-ui_touche');
+  if (!art.cases) art.cases = [];
   HUD_SKILL_LABELS.forEach((label, i) => {
     const id = player.skillSlots[i];
     const def = id && typeof SKILL_DEFS !== 'undefined' ? SKILL_DEFS[id] : null;
     const key = def ? storyHudSkillIconKey(id) : null;
     const has = !!key && scene.textures.exists(key);
+    const cx = HUD_MARGIN + HUD_SKILL_SIZE / 2 + i * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
+    const text = scene.hudSkillTexts && scene.hudSkillTexts[i];
+    // Case vide : image peinte + lettre de drawHud, posées ICI (drawHud saute
+    // les cases signalées dans `result.skills` : sans cela, la lettre resterait
+    // en (0, 0)). L'image est cachée dès qu'une compétence est équipée.
+    const empty = !def && caseArt;
+    let box = art.cases[i];
+    if (empty && !box) {
+      // Sous la lettre (hudSkillTexts, 1001, créée avant) et au-dessus de
+      // hudGraphics (1000) : à profondeur égale, l'image cachait la lettre.
+      box = art.cases[i] = scene.add.image(0, 0, 'item-ui_case_competence').setScrollFactor(0).setDepth(1000.8);
+    }
+    if (box) box.setVisible(empty);
+    if (empty) {
+      box.setPosition(cx, skillY).setScale(HUD_SKILL_SIZE / Math.max(box.width, box.height));
+      if (text) text.setText(label).setPosition(cx, skillY).setAlpha(0.5).setVisible(true);
+      result.skills[i] = true;
+    }
     let slot = art.skills[i];
     if (has && !slot) {
-      const badge = scene.add.graphics().setScrollFactor(0).setDepth(1002);
-      badge.fillStyle(STORY_UI.night, 0.95);
-      badge.fillCircle(0, 0, 8);
-      badge.lineStyle(1.5, STORY_UI.vineLight, 0.9);
-      badge.strokeCircle(0, 0, 8);
+      let badge;
+      if (keyArt) {
+        badge = scene.add.image(0, 0, 'item-ui_touche').setScrollFactor(0).setDepth(1002);
+        badge.setScale(HUD_ART_KEY_SIZE / Math.max(badge.width, badge.height));
+      } else {
+        badge = scene.add.graphics().setScrollFactor(0).setDepth(1002);
+        badge.fillStyle(STORY_UI.night, 0.95);
+        badge.fillCircle(0, 0, 8);
+        badge.lineStyle(1.5, STORY_UI.vineLight, 0.9);
+        badge.strokeCircle(0, 0, 8);
+      }
       slot = art.skills[i] = {
         icon: scene.add.image(0, 0, key).setScrollFactor(0).setDepth(1001),
         badge,
         letter: scene.add.text(0, 0, label, {
-          fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#ffe9f5',
+          fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: keyArt ? STORY_UI_KEY_INK : '#ffe9f5',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(1003),
       };
     }
     if (slot) for (const o of [slot.icon, slot.badge, slot.letter]) o.setVisible(has);
-    const text = scene.hudSkillTexts && scene.hudSkillTexts[i];
-    if (text) text.setVisible(!has);
+    if (text && !empty) text.setVisible(!has);
     if (!has) return;
     result.skills[i] = true;
-    const cx = HUD_MARGIN + HUD_SKILL_SIZE / 2 + i * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
     if (slot.icon.texture.key !== key) slot.icon.setTexture(key);
     const pop = typeof juiceHudSkillScale === 'function' ? juiceHudSkillScale(scene, i) : 1;
     slot.icon.setPosition(cx, skillY).setScale((HUD_ART_SKILL_SIZE / Math.max(slot.icon.width, slot.icon.height)) * pop);
     // Même règle que drawHud : grisée en recharge ou sans assez d'énergie.
     const unavailable = scene.time.now < player.skillCooldownEndTime || player.energy < def.cost;
     slot.icon.setAlpha(unavailable ? HUD_SKILL_UNAVAILABLE_ALPHA : 1);
-    slot.badge.setPosition(cx + 14, skillY + 14);
-    slot.letter.setPosition(cx + 14, skillY + 14);
+    // Pastille peinte (18 px) un peu plus près de la case que le rond
+    // dessiné : elle reste dans la bande du HUD que les bulles et les
+    // invites évitent (WORLD_UI_HUD_ART_REACH = 22, LevelKit).
+    const off = keyArt ? 13 : 14;
+    slot.badge.setPosition(cx + off, skillY + off);
+    slot.letter.setPosition(cx + off, skillY + off);
   });
   return result;
 }
@@ -944,58 +1071,87 @@ function showSaveIndicator(scene) {
 // Bandeau « Objet obtenu / Compétence débloquée » : file d'attente par scène
 // pour ne jamais superposer deux bandeaux.
 const STORY_BANNER_MS = 2600;
+// Mise en page de la bannière (px depuis son bord haut / gauche). Peinte :
+// textes et reflet dans la zone unie des planches, MESURÉE à 128 px de haut
+// (y + 31 à y + 99 ; le plan estimait y + 23 à y + 106 : à y + 70, la 2e
+// ligne de description mordait sur la liane du bas), marge droite élargie
+// (lianes du bout) ; dessinée : valeurs d'avant le lot 8.
+const STORY_BANNER_ART_LAYOUT = {
+  h: 128, ringY: 64, icon: 46, textX: 52, kickY: 30, titleY: 41, descY: 66, padR: 34, shineTop: 30, shineBottom: 30,
+};
+const STORY_BANNER_DRAWN_LAYOUT = {
+  h: 104, ringY: 52, icon: 56, textX: 24, kickY: 14, titleY: 32, descY: 60, padR: 18, shineTop: 0, shineBottom: 0,
+};
 
 function showStoryBanner(scene, { kicker, title, desc = '', itemId = null, color = STORY_UI.pink }) {
   const now = scene.time.now;
   const startAt = Math.max(now, scene.__storyBannerFreeAt || 0);
   scene.__storyBannerFreeAt = startAt + STORY_BANNER_MS + 200;
   scene.time.delayedCall(startAt - now, () => {
+    // Lot n°8 : bannière peinte `ui_banniere` (128 px de haut : à 104, sa
+    // zone unie ne tenait pas 2 lignes de description, R6) et anneau peint
+    // `ui_anneau_objet` (disque intérieur 50x46 : icône de 46 px). Sans
+    // l'art : panneau et anneau dessinés, mise en page d'avant.
+    const art = scene.textures.exists('item-ui_banniere');
+    const L = art ? STORY_BANNER_ART_LAYOUT : STORY_BANNER_DRAWN_LAYOUT;
     const w = 460;
-    const h = 104;
+    const h = L.h;
     const x = (scene.scale.width - w) / 2;
     const y = 70;
     const c = scene.add.container(0, 0).setScrollFactor(0).setDepth(2100).setAlpha(0);
-    const g = scene.add.graphics();
-    drawStoryPanel(g, x, y, w, h, { seed: 3 });
-    c.add(g);
-    let textX = x + 24;
+    const bg = art ? addUiSliced(scene, 'ui_banniere', x, y, w, h, { scale: storyUiScale('ui_banniere', 0.65), scrollFactor: 0 }) : null;
+    if (bg) {
+      c.add(bg);
+    } else {
+      const g = scene.add.graphics();
+      drawStoryPanel(g, x, y, w, h, { seed: 3 });
+      c.add(g);
+    }
+    let textX = x + L.textX;
     // Juice : rayons qui tournent derrière l'icône, icône qui « pousse » avec
     // une gerbe d'étoiles, reflet qui balaie le panneau (cf. plus bas).
     let iconFx = null;
     if (itemId) {
       const ringX = x + 58;
-      const ringY = y + h / 2;
+      const ringY = y + L.ringY;
       const rays = scene.add.graphics().setPosition(ringX, ringY).setBlendMode(Phaser.BlendModes.ADD);
       for (let i = 0; i < 10; i++) {
         const a = (i / 10) * Math.PI * 2;
         rays.fillStyle(color, 0.16);
         rays.fillTriangle(0, 0, Math.cos(a - 0.12) * 52, Math.sin(a - 0.12) * 52, Math.cos(a + 0.12) * 52, Math.sin(a + 0.12) * 52);
       }
-      const ring = scene.add.graphics();
-      ring.fillStyle(STORY_UI.nightSoft, 1);
-      ring.fillCircle(ringX, ringY, 36);
-      ring.lineStyle(2, color, 0.9);
-      ring.strokeCircle(ringX, ringY, 36);
+      // Ordre gardé : anneau, rayons (ADD), icône.
+      let ring;
+      if (scene.textures.exists('item-ui_anneau_objet')) {
+        ring = scene.add.image(ringX, ringY, 'item-ui_anneau_objet');
+        ring.setScale(72 / Math.max(ring.width, ring.height));
+      } else {
+        ring = scene.add.graphics();
+        ring.fillStyle(STORY_UI.nightSoft, 1);
+        ring.fillCircle(ringX, ringY, 36);
+        ring.lineStyle(2, color, 0.9);
+        ring.strokeCircle(ringX, ringY, 36);
+      }
       c.add(ring);
       c.add(rays);
-      const icon = addItemIcon(scene, ringX, ringY, itemId, 56);
+      const icon = addItemIcon(scene, ringX, ringY, itemId, L.icon);
       c.add(icon);
       iconFx = { rays, icon, x: ringX, y: ringY, scale: icon.scale };
       icon.setScale(icon.scale * 0.2);
       textX = x + 110;
     }
-    const kick = scene.add.text(textX, y + 14, kicker.toUpperCase(), {
+    const kick = scene.add.text(textX, y + L.kickY, kicker.toUpperCase(), {
       fontFamily: 'sans-serif', fontSize: '12px', color: colorToHex(color), fontStyle: 'bold',
     });
     if (kick.setLetterSpacing) kick.setLetterSpacing(2);
     c.add(kick);
-    c.add(scene.add.text(textX, y + 32, title, {
+    c.add(scene.add.text(textX, y + L.titleY, title, {
       fontFamily: STORY_UI.serif, fontSize: '21px', color: STORY_UI.text, fontStyle: 'bold',
     }));
     if (desc) {
-      c.add(scene.add.text(textX, y + 60, desc, {
+      c.add(scene.add.text(textX, y + L.descY, desc, {
         fontFamily: 'sans-serif', fontSize: '12px', color: STORY_UI.textSoft,
-        wordWrap: { width: x + w - textX - 18 }, lineSpacing: 2,
+        wordWrap: { width: x + w - textX - L.padR }, lineSpacing: 2,
       }));
     }
     c.y = -34;
@@ -1008,10 +1164,13 @@ function showStoryBanner(scene, { kicker, title, desc = '', itemId = null, color
         if (typeof spawnFx === 'function') spawnFx(scene, 'uiStar', iconFx.x, iconFx.y, { count: 10, power: 1.2 });
       });
     }
-    // Reflet : bande claire qui traverse le panneau une fois.
+    // Reflet : bande claire qui traverse le panneau une fois (bannière
+    // peinte : seulement sur les planches, pas sur les lianes du bord).
     const shine = scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
     shine.fillStyle(0xffffff, 0.16);
-    shine.fillPoints([{ x: 0, y }, { x: 26, y }, { x: 6, y: y + h }, { x: -20, y: y + h }], true);
+    const sy0 = y + L.shineTop;
+    const sy1 = y + h - L.shineBottom;
+    shine.fillPoints([{ x: 0, y: sy0 }, { x: 26, y: sy0 }, { x: 6, y: sy1 }, { x: -20, y: sy1 }], true);
     shine.x = x + 24;
     c.add(shine);
     scene.tweens.add({ targets: shine, x: x + w - 30, alpha: { from: 1, to: 0.2 }, duration: 700, delay: 320, ease: 'Sine.easeInOut', onComplete: () => shine.setVisible(false) });
@@ -1029,12 +1188,28 @@ function showStoryBanner(scene, { kicker, title, desc = '', itemId = null, color
 // Sous le bord haut, entre le HUD (en haut à gauche) et les bandeaux (y 70).
 const STORY_TOAST_Y = 42;
 
+// Lot n°8 (SK-8) : posé sur le cadre peint des bulles (`ui_bulle`, même
+// famille que les bulles de parole) au lieu du fond violet plein ; même
+// conteneur pour les tweens. Sans l'art : le Text à fond violet d'avant.
+const STORY_TOAST_ART_PAD = { x: 16, y: 8 };
+
 function showToast(scene, text, ms = 2600) {
   if (scene.__storyToast && scene.__storyToast.active) scene.__storyToast.destroy();
-  const t = scene.add.text(scene.scale.width / 2, STORY_TOAST_Y, text, {
+  const art = scene.textures.exists('item-ui_bulle');
+  const style = {
     fontFamily: 'sans-serif', fontSize: '15px', color: STORY_UI.text, align: 'center',
-    backgroundColor: '#2a1f45', padding: { x: 12, y: 7 }, wordWrap: { width: 590 }, // ne déborde pas sur le HUD
-  }).setOrigin(0.5).setScrollFactor(0).setDepth(2050).setAlpha(0);
+    wordWrap: { width: 590 }, // ne déborde pas sur le HUD
+  };
+  if (!art) Object.assign(style, { backgroundColor: '#2a1f45', padding: { x: 12, y: 7 } });
+  let t = scene.add.text(scene.scale.width / 2, STORY_TOAST_Y, text, style).setOrigin(0.5);
+  if (art) {
+    const label = t.setPosition(0, 0);
+    const w = Math.ceil(label.width + STORY_TOAST_ART_PAD.x * 2);
+    const h = Math.ceil(label.height + STORY_TOAST_ART_PAD.y * 2);
+    const bg = addUiSliced(scene, 'ui_bulle', -Math.round(w / 2), -Math.round(h / 2), w, h, { scale: storyUiScale('ui_bulle', 0.2), scrollFactor: 0 });
+    t = scene.add.container(scene.scale.width / 2, STORY_TOAST_Y, [bg, label]);
+  }
+  t.setScrollFactor(0).setDepth(2050).setAlpha(0);
   scene.__storyToast = t;
   // Règle commune (LevelKit) : bulles et invites ne se posent pas dessous.
   if (typeof worldUiAddScreenObstacle === 'function') worldUiAddScreenObstacle(t);
@@ -1123,20 +1298,49 @@ function speechBubbleView(scene) {
   return { left: v.x + 8, top: v.y + 8, right: v.right - 8, bottom: v.bottom - 8 };
 }
 
+// Bulle peinte du lot n°8 (`ui_bulle` + `ui_bulle_pointe`) : marges
+// intérieures plus grandes (le liseré et les feuilles des coins mordent sur
+// le bord : à 9/6 le texte touchait les coins arrondis), tailles minimales
+// = les coins découpés (bornes d'addUiSliced). Échelles : 0,2 et 0,26 (le
+// liseré de la pointe raccorde celui de la bulle). La pointe entre de
+// `tailInset` px dans la bulle (`tailInsetSide` sur un bord latéral) : son
+// haut sombre recouvre le liseré du bord, qui s'ouvre sur elle. Sa base
+// reste à `tailMargin` px des coins (feuilles). Le Graphics reste le repli
+// sans l'art.
+const SPEECH_BUBBLE_ART = {
+  pad: { x: 12, y: 7 }, minW: 30, minH: 24, scale: 0.2, tailScale: 0.26, tailW: 18,
+  tailInset: 7, tailInsetSide: 5, tailMargin: { x: 21, y: 21 },
+};
+
 function buildSpeechBubble(scene, text) {
+  const A = SPEECH_BUBBLE_ART;
+  const art = scene.textures.exists('item-ui_bulle');
+  const pad = art ? A.pad : SPEECH_BUBBLE_PAD;
   const label = scene.add.text(0, 0, text, {
     fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.text, align: 'center', lineSpacing: 1,
-    wordWrap: { width: SPEECH_BUBBLE_MAX_W - SPEECH_BUBBLE_PAD.x * 2, useAdvancedWrap: true },
+    wordWrap: { width: SPEECH_BUBBLE_MAX_W - pad.x * 2, useAdvancedWrap: true },
   }).setOrigin(0.5, 1);
-  const w = Math.ceil(label.width + SPEECH_BUBBLE_PAD.x * 2);
-  const h = Math.ceil(label.height + SPEECH_BUBBLE_PAD.y * 2);
+  let w = Math.ceil(label.width + pad.x * 2);
+  let h = Math.ceil(label.height + pad.y * 2);
+  if (art) {
+    w = Math.max(A.minW, w);
+    h = Math.max(A.minH, h);
+  }
   // Origine du conteneur = CENTRE de la bulle : l'apparition (échelle 0,85 -> 1)
   // reste dans le rectangle final, donc dans l'écran (avant, l'origine était
   // le bout de la pointe et la bulle glissait vers le personnage en grandissant).
-  label.setPosition(0, h / 2 - SPEECH_BUBBLE_PAD.y);
+  label.setPosition(0, h / 2 - pad.y);
   const g = scene.add.graphics();
-  const c = scene.add.container(0, 0, [g, label]).setDepth(SPEECH_BUBBLE_DEPTH).setAlpha(0);
-  return { container: c, g, label, w, h };
+  const bg = art ? addUiSliced(scene, 'ui_bulle', -w / 2, -h / 2, w, h, { scale: storyUiScale('ui_bulle', A.scale) }) : null;
+  const tail = bg && scene.textures.exists('item-ui_bulle_pointe')
+    ? scene.add.image(0, 0, 'item-ui_bulle_pointe').setOrigin(0.5, 0).setScale(storyUiScale('ui_bulle_pointe', A.tailScale)).setVisible(false) : null;
+  // Fond, pointe (sur le liseré du bas), texte ; le Graphics ne sert plus
+  // qu'à la pointe dessinée si son image manque.
+  const parts = bg ? [bg, g, tail, label].filter(Boolean) : [g, label];
+  const c = scene.add.container(0, 0, parts).setDepth(SPEECH_BUBBLE_DEPTH).setAlpha(0);
+  const b = { container: c, g, label, w, h, bg, tail };
+  if (bg) b.tailMargin = A.tailMargin;
+  return b;
 }
 
 // Base de la pointe d'une bulle (w x h, centre en 0,0) vers `tip` (relatif
@@ -1145,16 +1349,47 @@ function buildSpeechBubble(scene, text) {
 // haut), même si le personnage déborde un peu de la bulle (bulle calée
 // contre le bord de l'écran). { beside, s, x, y } : `s` = sens du bord
 // (+1 droite/bas, -1 gauche/haut), (x, y) = milieu de la base SUR le bord.
-function speechBubbleTailBase(w, h, tip) {
+// `margin` : écart minimal entre la base et les coins (bulle peinte : ses
+// coins feuillus, cf. SPEECH_BUBBLE_ART), borné à la demi-taille.
+function speechBubbleTailBase(w, h, tip, margin = { x: 12, y: 9 }) {
   const hw = w / 2;
   const hh = h / 2;
+  const mx = Math.min(margin.x, hw);
+  const my = Math.min(margin.y, hh);
   const beside = Math.abs(tip.x) > hw && Math.abs(tip.y) <= hh;
   if (beside) {
     const s = tip.x > 0 ? 1 : -1;
-    return { beside, s, x: s * hw, y: Phaser.Math.Clamp(tip.y, -hh + 9, hh - 9) };
+    return { beside, s, x: s * hw, y: Phaser.Math.Clamp(tip.y, -hh + my, hh - my) };
   }
   const s = tip.y > 0 ? 1 : -1;
-  return { beside, s, x: Phaser.Math.Clamp(tip.x, -hw + 12, hw - 12), y: s * hh };
+  return { beside, s, x: Phaser.Math.Clamp(tip.x, -hw + mx, hw - mx), y: s * hh };
+}
+
+// Bulle peinte : panneau découpé + image de pointe orientée de sa base
+// (sur le bord, rentrée de tailInset px) vers `tip`, étirée à la longueur.
+function drawSpeechBubbleArt(b, tip) {
+  const A = SPEECH_BUBBLE_ART;
+  b.bg.setPosition(-b.w / 2, -b.h / 2);
+  b.g.clear();
+  if (!tip) {
+    if (b.tail) b.tail.setVisible(false);
+    return;
+  }
+  const base = speechBubbleTailBase(b.w, b.h, tip, A.tailMargin);
+  if (!b.tail) {
+    // Image de pointe absente : pointe dessinée sous la même règle.
+    b.g.fillStyle(STORY_UI.night, 0.93);
+    if (base.beside) b.g.fillTriangle(base.x - base.s * 3, base.y - 7, base.x - base.s * 3, base.y + 7, tip.x, tip.y);
+    else b.g.fillTriangle(base.x - 7, base.y - base.s * 3, base.x + 7, base.y - base.s * 3, tip.x, tip.y);
+    return;
+  }
+  const bx = base.beside ? base.x - base.s * A.tailInsetSide : base.x;
+  const by = base.beside ? base.y : base.y - base.s * A.tailInset;
+  const dx = tip.x - bx;
+  const dy = tip.y - by;
+  // L'image pointe vers le bas (+y) : rotation qui amène +y sur (dx, dy).
+  b.tail.setPosition(bx, by).setRotation(Math.atan2(-dx, dy))
+    .setDisplaySize(A.tailW, Math.max(1, Math.hypot(dx, dy))).setVisible(true);
 }
 
 // Fond sombre, liseré vert lunaire, pointe vers le personnage. `tip` : bout
@@ -1163,6 +1398,7 @@ function speechBubbleTailBase(w, h, tip) {
 // côté, quand la bulle a dû se poser ailleurs) et sa base glisse le long de
 // ce bord pour rester en face de lui.
 function drawSpeechBubble(b, tip) {
+  if (b.bg) { drawSpeechBubbleArt(b, tip); return; }
   const { g, w, h } = b;
   const hw = w / 2;
   const hh = h / 2;
@@ -1343,7 +1579,7 @@ function layoutSpeechBubble(b, view, ctx = {}) {
 function speechBubbleTailClear(b, blockers) {
   const tip = b.tip;
   if (!tip) return false;
-  const base = speechBubbleTailBase(b.w, b.h, tip);
+  const base = speechBubbleTailBase(b.w, b.h, tip, b.tailMargin);
   const x0 = b.container.x + base.x;
   const y0 = b.container.y + base.y;
   const x1 = b.container.x + tip.x;
@@ -1494,6 +1730,9 @@ function clearSpeechBubbles(scene, targetOrNpcId = null) {
 // qui se pose en montant (léger zoom arrière ; pas d'espacement de lettres
 // animé : avec un contour, Phaser décale le trait), filets qui se déploient
 // depuis le centre, losange qui pivote, quelques étincelles, sous-titre décalé.
+// Sous-titre sous l'ornement peint (qui descend jusqu'à ≈ y + 75).
+const STORY_TITLE_ORNAMENT_SUB_Y = 84;
+
 function showTitleCard(scene, title, sub, { hold = 1600 } = {}) {
   return new Promise((resolve) => {
     const { width } = scene.scale;
@@ -1512,23 +1751,39 @@ function showTitleCard(scene, title, sub, { hold = 1600 } = {}) {
     titleText.setShadow(0, 0, '#ff9fc9', 14, true, true);
     titleText.setScale(1.1);
     const half = Math.min(320, titleText.width / 2 + 40);
-    const lineL = scene.add.graphics().setPosition(width / 2 - 12, y + 30);
-    lineL.lineStyle(2, STORY_UI.vineLight, 0.8);
-    lineL.lineBetween(-(half - 12), 0, 0, 0);
-    const lineR = scene.add.graphics().setPosition(width / 2 + 12, y + 30);
-    lineR.lineStyle(2, STORY_UI.vineLight, 0.8);
-    lineR.lineBetween(0, 0, half - 12, 0);
-    lineL.scaleX = 0;
-    lineR.scaleX = 0;
-    const gem = scene.add.graphics().setPosition(width / 2, y + 30);
-    gem.fillStyle(STORY_UI.pink, 1);
-    gem.fillTriangle(0, -7, 7, 0, 0, 7);
-    gem.fillTriangle(0, -7, -7, 0, 0, 7);
-    gem.setScale(0).setAngle(-90);
-    c.add([band, lineL, lineR, gem, titleText]);
+    // Lot n°8 : ornement peint `ui_ornement_titre` (372x110, lune et lianes)
+    // à la place des filets et du losange, posé sous le titre sans le
+    // toucher (origine en haut) et déployé depuis le centre comme les
+    // filets ; le sous-titre descend d'autant. Sans l'art : filets + losange.
+    const ornament = scene.textures.exists('item-ui_ornement_titre');
+    const subY = ornament ? STORY_TITLE_ORNAMENT_SUB_Y : 52;
+    const sparkY = ornament ? 32 : 30;
+    if (ornament) {
+      const s = Phaser.Math.Clamp((2 * half) / 372, 0.4, 0.5);
+      const orn = scene.add.image(width / 2, y + 20, 'item-ui_ornement_titre').setOrigin(0.5, 0).setScale(0, s);
+      c.add([band, orn, titleText]);
+      scene.tweens.add({ targets: orn, scaleX: s, duration: 800, delay: 150, ease: 'Cubic.easeOut' });
+    } else {
+      const lineL = scene.add.graphics().setPosition(width / 2 - 12, y + 30);
+      lineL.lineStyle(2, STORY_UI.vineLight, 0.8);
+      lineL.lineBetween(-(half - 12), 0, 0, 0);
+      const lineR = scene.add.graphics().setPosition(width / 2 + 12, y + 30);
+      lineR.lineStyle(2, STORY_UI.vineLight, 0.8);
+      lineR.lineBetween(0, 0, half - 12, 0);
+      lineL.scaleX = 0;
+      lineR.scaleX = 0;
+      const gem = scene.add.graphics().setPosition(width / 2, y + 30);
+      gem.fillStyle(STORY_UI.pink, 1);
+      gem.fillTriangle(0, -7, 7, 0, 0, 7);
+      gem.fillTriangle(0, -7, -7, 0, 0, 7);
+      gem.setScale(0).setAngle(-90);
+      c.add([band, lineL, lineR, gem, titleText]);
+      scene.tweens.add({ targets: [lineL, lineR], scaleX: 1, duration: 800, delay: 150, ease: 'Cubic.easeOut' });
+      scene.tweens.add({ targets: gem, scale: 1, angle: 0, duration: 520, delay: 250, ease: 'Back.Out' });
+    }
     let subText = null;
     if (sub) {
-      subText = scene.add.text(width / 2, y + 58, sub, {
+      subText = scene.add.text(width / 2, y + subY + 6, sub, {
         fontFamily: STORY_UI.serif, fontSize: '17px', color: '#c9b8f0', fontStyle: 'italic',
         stroke: '#15101f', strokeThickness: 4,
       }).setOrigin(0.5).setAlpha(0);
@@ -1536,11 +1791,9 @@ function showTitleCard(scene, title, sub, { hold = 1600 } = {}) {
     }
     scene.tweens.add({ targets: c, alpha: 1, duration: 500, ease: 'Sine.easeOut' });
     scene.tweens.add({ targets: titleText, y, scale: 1, duration: 1000, ease: 'Cubic.easeOut' });
-    scene.tweens.add({ targets: [lineL, lineR], scaleX: 1, duration: 800, delay: 150, ease: 'Cubic.easeOut' });
-    scene.tweens.add({ targets: gem, scale: 1, angle: 0, duration: 520, delay: 250, ease: 'Back.Out' });
-    if (subText) scene.tweens.add({ targets: subText, alpha: 1, y: y + 52, duration: 600, delay: 380, ease: 'Sine.easeOut' });
+    if (subText) scene.tweens.add({ targets: subText, alpha: 1, y: y + subY, duration: 600, delay: 380, ease: 'Sine.easeOut' });
     scene.time.delayedCall(330, () => {
-      if (c.active && typeof spawnFx === 'function') spawnFx(scene, 'uiStar', width / 2, y + 30, { count: 6, power: 0.8 });
+      if (c.active && typeof spawnFx === 'function') spawnFx(scene, 'uiStar', width / 2, y + sparkY, { count: 6, power: 0.8 });
     });
     if (typeof playSfx === 'function') playSfx('title_card', { title });
     scene.tweens.add({
@@ -1551,13 +1804,30 @@ function showTitleCard(scene, title, sub, { hold = 1600 } = {}) {
 }
 
 // Barre de vie de boss (HUD, en bas au centre). `getRatio()` → 0..1, lue chaque frame.
+// Lot n°8 (Q6 : barre agrandie) : cadre peint `ui_boss_cadre` en 3 morceaux
+// (448x32 au lieu de 448x20 : la rainure peinte est fine), remplissage
+// `ui_boss_remplissage` affiché dans la rainure (378x8, à 35 px du bord du
+// cadre) et rogné par setCrop selon la vie ; le Graphics ne trace plus que la
+// traînée claire. Sans les deux images : le dessin d'avant.
+const BOSS_BAR_ART = { frameX: -4, frameY: -10, frameW: 448, scale: 0.5, grooveX: 31, grooveY: 2, grooveW: 378, grooveH: 8, labelY: -12 };
+
 function showBossBar(scene, name, getRatio) {
   hideBossBar(scene);
   const w = 440;
   const x = (scene.scale.width - w) / 2;
   const y = scene.scale.height - 40;
+  const A = BOSS_BAR_ART;
+  const frame = scene.textures.exists('item-ui_boss_remplissage')
+    ? addUiSliced(scene, 'ui_boss_cadre', x + A.frameX, y + A.frameY, A.frameW, null, { scale: storyUiScale('ui_boss_cadre', A.scale), scrollFactor: 0, depth: 1001.5 })
+    : null;
+  let fill = null;
+  if (frame) {
+    fill = scene.add.image(x + A.grooveX, y + A.grooveY, 'item-ui_boss_remplissage').setOrigin(0, 0)
+      .setScrollFactor(0).setDepth(1002.5);
+    fill.setDisplaySize(A.grooveW, A.grooveH);
+  }
   const g = scene.add.graphics().setScrollFactor(0).setDepth(1002);
-  const label = scene.add.text(scene.scale.width / 2, y - 8, name, {
+  const label = scene.add.text(scene.scale.width / 2, y + (frame ? A.labelY : -8), name, {
     fontFamily: STORY_UI.serif, fontSize: '16px', color: '#ffe9f5', fontStyle: 'bold',
     stroke: '#15101f', strokeThickness: 4,
   }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(1003);
@@ -1568,6 +1838,16 @@ function showBossBar(scene, name, getRatio) {
     try { ratio = Phaser.Math.Clamp(Number(getRatio()) || 0, 0, 1); } catch (e) { ratio = 0; }
     shown += (ratio - shown) * 0.15;
     g.clear();
+    if (fill) {
+      // Traînée (vie perdue qui se vide lentement) sous le remplissage.
+      if (shown > ratio + 0.002) {
+        g.fillStyle(0xffe9f5, 0.5);
+        g.fillRect(x + A.grooveX, y + A.grooveY, A.grooveW * shown, A.grooveH);
+      }
+      fill.setVisible(ratio > 0);
+      fill.setCrop(0, 0, fill.width * ratio, fill.height);
+      return;
+    }
     g.fillStyle(STORY_UI.woodDark, 1);
     g.fillRoundedRect(x - 4, y - 4, w + 8, 20, 6);
     g.fillStyle(0x2a1f45, 1);
@@ -1581,7 +1861,7 @@ function showBossBar(scene, name, getRatio) {
   };
   draw();
   scene.events.on('update', draw);
-  scene.__bossBar = { g, label, draw };
+  scene.__bossBar = { g, label, draw, frame, fill };
   return scene.__bossBar;
 }
 
@@ -1589,8 +1869,7 @@ function hideBossBar(scene) {
   const bar = scene.__bossBar;
   if (!bar) return;
   scene.events.off('update', bar.draw);
-  bar.g.destroy();
-  bar.label.destroy();
+  for (const o of [bar.g, bar.label, bar.frame, bar.fill]) if (o) o.destroy();
   scene.__bossBar = null;
 }
 
@@ -1715,16 +1994,28 @@ function storyNpcRest(npc) {
 function storyStopSpeakerTalk(scene, except) {
   for (const n of Object.values(scene.npcs || {})) {
     if (n && n !== except && n.__autoTalk) {
+      const anim = n.__autoTalkAnim || 'talk';
       n.__autoTalk = false;
-      if (n.active && n.currentManifestAnim === 'talk') storyNpcRest(n);
+      n.__autoTalkAnim = null;
+      if (n.active && n.currentManifestAnim === anim) storyNpcRest(n);
     }
   }
   const x = scene.xara;
   if (x && x !== except && x.__autoTalk) {
     x.__autoTalk = false;
+    x.__autoTalkAnim = null;
     if (x.__talkSprite) { x.__talkSprite.destroy(); x.__talkSprite = null; }
     if (x.active) x.setVisible(true);
   }
+}
+
+// Anim jouée pendant une réplique : `talk`, ou l'humeur de la réplique
+// (champ `mood`, contrat §3.3 du lot n°8 : `{ who: 'xara', mood: 'excited' }`
+// joue `xara_extra.excited`, Xara qui sautille de joie) si l'art la contient.
+function storySpeakerAnimFor(scene, id, line) {
+  const mood = line && line.mood;
+  if (mood && mood !== 'talk' && hasManifestArt(scene, id, mood)) return mood;
+  return hasManifestArt(scene, id, 'talk') ? 'talk' : null;
 }
 
 function storySpeakerTalkAnim(scene, line) {
@@ -1732,22 +2023,30 @@ function storySpeakerTalkAnim(scene, line) {
   const npc = line && line.who !== 'agarica' && line.who !== 'narrateur' ? storyFindSpeakerNpc(scene, line) : null;
   const companion = !npc && line && line.who === 'xara' && scene.xara && scene.xara.active ? scene.xara : null;
   storyStopSpeakerTalk(scene, npc || companion);
-  if (npc && npc.playManifest && hasManifestArt(scene, npc.manifestId, 'talk')
-    && (!npc.currentManifestAnim || npc.currentManifestAnim === 'idle' || npc.__restPaused)) {
+  const npcAnim = npc && npc.playManifest ? storySpeakerAnimFor(scene, npc.manifestId, line) : null;
+  if (npcAnim && (!npc.currentManifestAnim || npc.currentManifestAnim === 'idle' || npc.__restPaused
+    || (npc.__autoTalk && npc.currentManifestAnim === npc.__autoTalkAnim))) {
+    // (Même PNJ, réplique suivante : il peut changer d'humeur.)
     npc.__restPaused = false;
-    npc.playManifest('talk', false);
+    npc.playManifest(npcAnim, npc.currentManifestAnim === npcAnim);
     npc.__autoTalk = true;
-  } else if (companion && !companion.__autoTalk && hasManifestArt(scene, 'xara_extra', 'talk')) {
-    // Sprite de parole posé PAR-DESSUS le compagnon (caché le temps de la
-    // réplique) : changer la texture/l'échelle du compagnon lui-même modifiait
-    // son corps physique, qui s'enfonçait dans le sol et la faisait tomber.
-    const t = addManifestSprite(scene, companion.x, companion.y, 'xara_extra', 'talk');
-    t.setFlipX(companion.flipX).setDepth(companion.depth).setRotation(companion.rotation);
-    if (scene.children.moveAbove) scene.children.moveAbove(t, companion);
-    companion.__talkSprite = t;
-    companion.setVisible(false);
-    companion.__autoTalk = true;
+    npc.__autoTalkAnim = npcAnim;
+    return;
   }
+  const xAnim = companion ? storySpeakerAnimFor(scene, 'xara_extra', line) : null;
+  if (!xAnim) return;
+  if (companion.__autoTalk && companion.__autoTalkAnim === xAnim && companion.__talkSprite) return;
+  if (companion.__talkSprite) { companion.__talkSprite.destroy(); companion.__talkSprite = null; }
+  // Sprite de parole posé PAR-DESSUS le compagnon (caché le temps de la
+  // réplique) : changer la texture/l'échelle du compagnon lui-même modifiait
+  // son corps physique, qui s'enfonçait dans le sol et la faisait tomber.
+  const t = addManifestSprite(scene, companion.x, companion.y, 'xara_extra', xAnim);
+  t.setFlipX(companion.flipX).setDepth(companion.depth).setRotation(companion.rotation);
+  if (scene.children.moveAbove) scene.children.moveAbove(t, companion);
+  companion.__talkSprite = t;
+  companion.setVisible(false);
+  companion.__autoTalk = true;
+  companion.__autoTalkAnim = xAnim;
 }
 
 let storyDialogueChain = Promise.resolve();
@@ -2184,7 +2483,7 @@ function resetStoryState(scene, data) {
   scene.__bossBar = null;
   scene.npcs = {};
   scene.__story = {
-    interactables: [], triggers: [], mossBlocks: [], mossWalls: [], checkpoints: [],
+    interactables: [], triggers: [], mossBlocks: [], mossWalls: [], checkpoints: [], lights: [],
     fall: null, safePos: null, checkpoint: null, prompt: null, mossGroup: null, keys: null,
     // Chute dans le vide en cours (cf. startStoryFallOut) et bornes du monde
     // propres au joueur, ouvertes vers le bas (cf. syncStoryFallBounds) ;
@@ -2247,13 +2546,84 @@ function storyPutBehindPlayer(scene, obj) {
   if (scene.player && scene.children.moveBelow) scene.children.moveBelow(obj, scene.player);
 }
 
+// Invite « E : parler » peinte (lot n°8, contrat PLAN_INTEGRATION_LOT_8 §3.3) :
+//   createStoryPromptLabel(scene, { depth, originY }) → objet qui imite un Text
+// Pilule `ui_invite` en 3 morceaux (0,15 : 24 px de haut), pastille de touche
+// `ui_touche` de 19 px (lettre en gras de 12 px #2a1f45 : le bois est clair),
+// texte de 13 px #ffe9f5 ; largeur = 10 + 19 + 4 + texte + 12. `setText`
+// découpe « X : reste » en pastille + reste (sans touche : texte seul) et ne
+// fait rien si le libellé n'a pas changé (appelé à chaque image). Méthodes
+// setText / setPosition / setVisible / setDepth chaînables, setOrigin sans
+// effet (l'origine est fixée à la création : x au centre, `originY` en y),
+// propriétés visible / active / text. C'est un Container : getBounds marche
+// (règle « interface dans l'écran », keepWorldUiInView). Sans `ui_invite` :
+// le Text d'avant (fond violet), avec la même origine.
+const STORY_PROMPT_ART = { h: 24, padL: 10, key: 19, gap: 4, padR: 12, scale: 0.15 };
+
+function createStoryPromptLabel(scene, { depth = STORY_PROMPT_DEPTH, originY = 1 } = {}) {
+  if (!scene.textures.exists('item-ui_invite')) {
+    return scene.add.text(0, 0, '', {
+      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
+      backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
+    }).setOrigin(0.5, originY).setDepth(depth);
+  }
+  const A = STORY_PROMPT_ART;
+  const c = scene.add.container(0, 0).setDepth(depth);
+  const pill = addUiSliced(scene, 'ui_invite', 0, 0, 60, A.h, { scale: storyUiScale('ui_invite', A.scale) });
+  let key;
+  if (scene.textures.exists('item-ui_touche')) {
+    key = scene.add.image(0, 0, 'item-ui_touche');
+    key.setScale(A.key / Math.max(key.width, key.height));
+  } else {
+    // Pastille dessinée du même bois clair si l'image manque.
+    key = scene.add.graphics();
+    key.fillStyle(0xd8c08a, 1);
+    key.fillRoundedRect(-A.key / 2, -A.key / 2, A.key, A.key, 5);
+    key.lineStyle(1.5, 0x6b4a36, 1);
+    key.strokeRoundedRect(-A.key / 2, -A.key / 2, A.key, A.key, 5);
+  }
+  const keyText = scene.add.text(0, 0, '', {
+    fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: STORY_UI_KEY_INK,
+  }).setOrigin(0.5);
+  const label = scene.add.text(0, 0, '', {
+    fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.text,
+  }).setOrigin(0, 0.5);
+  c.add([pill, key, keyText, label]);
+  c.text = null;
+  c.setOrigin = function setOrigin() { return this; };
+  c.setText = function setText(value) {
+    const str = value == null ? '' : String(value);
+    if (str === this.text) return this;
+    this.text = str;
+    const m = /^([A-Z]) : (.*)$/.exec(str);
+    const hasKey = !!m;
+    keyText.setText(hasKey ? m[1] : '');
+    label.setText(hasKey ? m[2] : str);
+    key.setVisible(hasKey);
+    keyText.setVisible(hasKey);
+    const textX = hasKey ? A.padL + A.key + A.gap : A.padR;
+    const w = Math.ceil(textX + label.width + A.padR);
+    pill.setUiSize(w, A.h);
+    // Positions entières (texte net) ; x centré, y selon `originY`.
+    const left = -Math.round(w / 2);
+    const top = -Math.round(pill.uiH * originY);
+    const midY = top + Math.round(pill.uiH / 2);
+    pill.setPosition(left, top);
+    key.setPosition(left + A.padL + A.key / 2, midY);
+    keyText.setPosition(left + A.padL + A.key / 2, midY);
+    label.setPosition(left + textX, midY);
+    return this;
+  };
+  c.setText('');
+  return c;
+}
+
 function ensureStoryPrompt(scene) {
   const st = scene.__story;
   if (!st.prompt || !st.prompt.active) {
-    st.prompt = scene.add.text(0, 0, '', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
-      backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
-    }).setOrigin(0.5, 1).setDepth(STORY_PROMPT_DEPTH).setVisible(false);
+    // Invite peinte si `ui_invite` existe, sinon le Text d'avant (cf.
+    // createStoryPromptLabel) : même origine (bas, centre), même profondeur.
+    st.prompt = createStoryPromptLabel(scene, { depth: STORY_PROMPT_DEPTH, originY: 1 }).setVisible(false);
     // Règle commune (LevelKit) : invite toujours dans l'écran ; ancre au-dessus
     // du haut (grand PNJ, objet en hauteur) -> à hauteur de la tête d'Agarica.
     if (typeof keepWorldUiInView === 'function') keepWorldUiInView(st.prompt, { prompt: true });
@@ -2282,6 +2652,51 @@ function createStoryNpc(scene, n) {
   return npc;
 }
 
+// PNJ interactif créé en cours de visite (Clak à l'invocation du duel de
+// Geralt, PNJ d'une revisite…) : invite « E : parler » comme ceux de la
+// donnée `npcs`. Avant, les scripts poussaient eux-mêmes { kind: 'npc' }
+// dans scene.__story.interactables sans jamais l'en retirer : une entrée
+// morte de plus à chaque reprise du duel. Ici :
+// - pas de doublon (même sprite inscrit deux fois = une entrée) ;
+// - les entrées de PNJ détruits sont retirées au passage ;
+// - le PNJ doit être dans scene.npcs sous `npc.npcKey` (règle de
+//   updateStoryInteractables) : clé retrouvée dans scene.npcs, sinon prise
+//   sur l'id du manifest, et le PNJ y est inscrit si la place est libre.
+// Renvoie le PNJ (ou null).
+function registerStoryNpc(scene, npc) {
+  const st = scene && scene.__story;
+  if (!st || !npc || !npc.active) return null;
+  storyPruneInteractables(scene);
+  if (!scene.npcs) scene.npcs = {};
+  if (!npc.npcKey) {
+    const known = Object.keys(scene.npcs).find((k) => scene.npcs[k] === npc);
+    npc.npcKey = known || npc.manifestId || `npc_${st.interactables.length}`;
+  }
+  if (!scene.npcs[npc.npcKey] || !scene.npcs[npc.npcKey].active) scene.npcs[npc.npcKey] = npc;
+  if (!st.interactables.some((it) => it.npc === npc)) st.interactables.push({ kind: 'npc', npc });
+  return npc;
+}
+
+// Retire un objet interactif : PNJ (sprite), ramassable (son image ou sa
+// donnée), mur de mousse, ou l'entrée elle-même. Le PNJ reste dans
+// scene.npcs (c'est à son créateur de le détruire). Vrai si retiré.
+function unregisterStoryInteractable(scene, objOrNpc) {
+  const st = scene && scene.__story;
+  if (!st || !objOrNpc) return false;
+  const before = st.interactables.length;
+  st.interactables = st.interactables.filter((it) => it !== objOrNpc && it.npc !== objOrNpc
+    && it.img !== objOrNpc && it.data !== objOrNpc && it.wall !== objOrNpc);
+  return st.interactables.length !== before;
+}
+
+// Entrées de PNJ détruits (sprite sans scène) : jamais réutilisables.
+function storyPruneInteractables(scene) {
+  const st = scene.__story;
+  if (st.interactables.some((it) => it.kind === 'npc' && it.npc && !it.npc.scene)) {
+    st.interactables = st.interactables.filter((it) => !(it.kind === 'npc' && it.npc && !it.npc.scene));
+  }
+}
+
 LEVEL_DATA_HANDLERS.zoneName = (scene, name, data) => {
   showTitleCard(scene, name, data.zoneSub);
 };
@@ -2290,10 +2705,29 @@ LEVEL_DATA_HANDLERS.zoneName = (scene, name, data) => {
 // rien à faire ici, l'entrée existe pour documenter la clé.
 LEVEL_DATA_HANDLERS.background = () => {};
 
+// Voile d'ambiance (rectangle teinté, profondeur 900) et, lot n°8, vignette
+// peinte `couche_vignette` : bords assombris en MULTIPLY, plein écran.
+// `ambient.vignette` (contrat §3.3) : false = pas de vignette ; nombre entre
+// 0 et 1 = sa force (alpha) ; absente = 0,35 + darkness x 0,6, bornée à
+// [0,35 ; 0,85]. JAMAIS teintée (l'image est en niveaux de gris, la teinte
+// est déjà dans le voile). Profondeur 999,5 : sous `hudGraphics` (1000 :
+// barre d'énergie et cases de repli, dans le coin le plus sombre), au-dessus
+// des feuilles (999).
+const STORY_VIGNETTE_DEPTH = 999.5;
+
 LEVEL_DATA_HANDLERS.ambient = (scene, amb) => {
   const { width, height } = scene.scale;
   scene.ambientOverlay = scene.add.rectangle(0, 0, width, height, amb.tint ?? 0x000000, amb.darkness ?? 0.35)
     .setOrigin(0, 0).setScrollFactor(0).setDepth(900);
+  scene.ambientVignette = null;
+  const vig = amb.vignette ?? true;
+  if (vig !== false && scene.textures.exists('item-couche_vignette')) {
+    const force = typeof vig === 'number' ? Phaser.Math.Clamp(vig, 0, 1)
+      : Phaser.Math.Clamp(0.35 + (amb.darkness ?? 0.35) * 0.6, 0.35, 0.85);
+    scene.ambientVignette = scene.add.image(width / 2, height / 2, 'item-couche_vignette')
+      .setDisplaySize(width, height).setScrollFactor(0).setBlendMode(Phaser.BlendModes.MULTIPLY)
+      .setAlpha(force).setDepth(STORY_VIGNETTE_DEPTH);
+  }
 };
 
 LEVEL_DATA_HANDLERS.npcs = (scene, list) => {
@@ -2453,10 +2887,21 @@ LEVEL_DATA_HANDLERS.liquidFloor = (scene, cfg) => {
 // Codex n°8) s'il existe, sinon lanterne dessinée. Juice : halo qui respire
 // une fois allumée, éclat à l'allumage (cf. updateStoryCheckpoints).
 const STORY_LANTERN_ART = ['item-decor_lanterne_eteinte', 'item-decor_lanterne_allumee'];
+// Lot n°8 (R1 : lanternes à 0,15, 30x51) : centre MESURÉ du globe à 63 % de
+// la hauteur depuis le bas (0,55 visait le pied de la cage). Halo de 110 px
+// (plan : 64 -> 80, « à réajuster sur capture ») : le halo `fx_halo_doux`
+// réimporté en dégradé (M04) n'est plus un disque plein, et la lanterne en
+// cache le centre ; à 80 px il ne se voyait presque plus. Lueur au sol
+// `fx_lueur_sol` sous la lanterne allumée (vert lunaire ; alpha 0,45 au lieu
+// des 0,3 du plan, invisible sur l'herbe) : on voit d'un coup d'œil laquelle
+// est le point de reprise.
+const STORY_LANTERN_GLOBE_Y = 0.63;
+const STORY_LANTERN_HALO = 110;
+const STORY_LANTERN_POOL = { w: 90, h: 18, alpha: 0.45 };
 
 LEVEL_DATA_HANDLERS.checkpoints = (scene, list) => {
   const art = STORY_LANTERN_ART.every((k) => scene.textures.exists(k));
-  const scale = (getItemManifest().decor_lanterne_eteinte || {}).scale || 0.09;
+  const scale = (getItemManifest().decor_lanterne_eteinte || {}).scale || 0.15;
   for (const c of list || []) {
     const y = c.y != null ? c.y : storyGroundY(scene, c.x);
     let img = null;
@@ -2465,7 +2910,7 @@ LEVEL_DATA_HANDLERS.checkpoints = (scene, list) => {
     if (art) {
       img = scene.add.image(c.x, y, STORY_LANTERN_ART[0]).setOrigin(0.5, 1).setScale(scale);
       setVisibleBottomY(img, y + GROUND_CONTACT_SINK);
-      lampY = y - img.displayHeight * 0.55;
+      lampY = y - img.displayHeight * STORY_LANTERN_GLOBE_Y;
     } else {
       g = scene.add.graphics({ x: c.x, y });
     }
@@ -2473,9 +2918,14 @@ LEVEL_DATA_HANDLERS.checkpoints = (scene, list) => {
     if (typeof juiceTexture === 'function') {
       const ht = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
       halo = scene.add.image(c.x, lampY, ht.key).setBlendMode(Phaser.BlendModes.ADD)
-        .setTint(STORY_UI.vineLight).setScale(64 / ht.size).setAlpha(0).setVisible(false);
+        .setTint(STORY_UI.vineLight).setScale(STORY_LANTERN_HALO / ht.size).setAlpha(0).setVisible(false);
     }
+    const pool = scene.textures.exists('item-fx_lueur_sol')
+      ? scene.add.image(c.x, y, 'item-fx_lueur_sol').setBlendMode(Phaser.BlendModes.ADD).setTint(STORY_UI.vineLight)
+        .setDisplaySize(STORY_LANTERN_POOL.w, STORY_LANTERN_POOL.h).setAlpha(STORY_LANTERN_POOL.alpha).setVisible(false)
+      : null;
     const draw = (lit) => {
+      if (pool) pool.setVisible(lit);
       if (img) {
         img.setTexture(STORY_LANTERN_ART[lit ? 1 : 0]);
       } else {
@@ -2493,16 +2943,86 @@ LEVEL_DATA_HANDLERS.checkpoints = (scene, list) => {
       scene.tweens.killTweensOf(halo);
       halo.setVisible(lit);
       if (lit) {
-        const hs = 64 / juiceTexture(scene, 'fx_halo_doux', 'juice-glow').size;
+        const hs = STORY_LANTERN_HALO / juiceTexture(scene, 'fx_halo_doux', 'juice-glow').size;
         scene.tweens.add({ targets: halo, alpha: { from: 0.3, to: 0.55 }, scale: { from: hs * 0.9, to: hs * 1.1 }, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       }
     };
     draw(false);
+    // Ordre d'affichage : lueur au sol, halo, lanterne (puis le joueur).
+    if (pool) storyPutBehindPlayer(scene, pool);
     if (halo) storyPutBehindPlayer(scene, halo);
     storyPutBehindPlayer(scene, img || g);
     scene.__story.checkpoints.push({ x: c.x, y, draw, lit: false, lampY });
   }
 };
+
+// Lumières posées dans la donnée de zone (lot n°8, contrat §3.3) :
+//   lights: [{ id, x, y, w, h, tint, alpha, pulse?: [min, max, ms],
+//              layer: 'back' | 'aboveAmbient', requires?, forbids? }]
+// `id` : fx_rai_lumiere (rai : `y` = son BAS, posé sur le sol éclairé),
+// fx_lueur_sol, fx_halo_doux, fx_halo_rayons (`y` = centre). `w`/`h` : taille
+// affichée (défaut : échelle du manifeste). Images en ADD (elles ne font
+// qu'éclaircir) ; `layer` 'back' (défaut) : derrière les personnages ;
+// 'aboveAmbient' : profondeur 950, au-dessus du voile `ambient` (900) — un
+// filet de lumière qui doit percer l'obscurité (trou sombre). `pulse` :
+// l'alpha respire de min à max. Rien n'est affiché sans l'image (décor
+// facultatif). Une lumière à condition (`requires`/`forbids`) s'éteint ou se
+// rallume en fondu si le drapeau change pendant la visite (idole volée…).
+const STORY_LIGHT_IDS = ['fx_rai_lumiere', 'fx_lueur_sol', 'fx_halo_doux', 'fx_halo_rayons'];
+const STORY_LIGHT_ABOVE_AMBIENT_DEPTH = 950;
+const STORY_LIGHT_FADE_MS = 600;
+
+LEVEL_DATA_HANDLERS.lights = (scene, list) => {
+  for (const L of list || []) {
+    if (!L || !STORY_LIGHT_IDS.includes(L.id)) continue;
+    const key = `item-${L.id}`;
+    if (!scene.textures.exists(key)) continue;
+    const def = getItemManifest()[L.id] || {};
+    const img = scene.add.image(L.x, L.y, key).setOrigin(0.5, L.id === 'fx_rai_lumiere' ? 1 : 0.5)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    const k = def.scale || 1;
+    img.setDisplaySize(L.w ?? img.width * k, L.h ?? img.height * k);
+    if (L.tint != null) img.setTint(L.tint);
+    if (L.layer === 'aboveAmbient') img.setDepth(STORY_LIGHT_ABOVE_AMBIENT_DEPTH);
+    else storyPutBehindPlayer(scene, img);
+    const light = { data: L, img, on: storyAllowed(L), tween: null, conditional: !!(L.requires || L.forbids) };
+    storyLightApply(scene, light, true);
+    scene.__story.lights.push(light);
+  }
+};
+
+// Allume / éteint une lumière selon `light.on` (fondu sauf `instant`) ;
+// allumée avec `pulse`, son alpha respire en boucle.
+function storyLightApply(scene, light, instant = false) {
+  const { img, data: L } = light;
+  if (light.tween) { light.tween.remove(); light.tween = null; }
+  scene.tweens.killTweensOf(img);
+  const pulse = Array.isArray(L.pulse) && L.pulse.length >= 2 ? L.pulse : null;
+  const target = light.on ? (pulse ? pulse[0] : (L.alpha ?? 1)) : 0;
+  const breathe = () => {
+    if (!light.on || !pulse || !img.active) return;
+    light.tween = scene.tweens.add({
+      targets: img, alpha: { from: pulse[0], to: pulse[1] }, duration: pulse[2] || 1800,
+      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+  };
+  if (instant) {
+    img.setAlpha(target);
+    breathe();
+    return;
+  }
+  scene.tweens.add({ targets: img, alpha: target, duration: STORY_LIGHT_FADE_MS, ease: 'Sine.easeInOut', onComplete: breathe });
+}
+
+function updateStoryLights(scene) {
+  for (const light of scene.__story.lights) {
+    if (!light.conditional || !light.img.active) continue;
+    const on = storyAllowed(light.data);
+    if (on === light.on) continue;
+    light.on = on;
+    storyLightApply(scene, light);
+  }
+}
 
 LEVEL_DATA_HANDLERS.script = (scene, id, data) => {
   const script = ZONE_SCRIPTS[id];
@@ -2560,6 +3080,7 @@ function updateStoryTriggers(scene) {
 function updateStoryInteractables(scene) {
   const player = scene.player;
   const prompt = ensureStoryPrompt(scene);
+  storyPruneInteractables(scene);
   let best = null;
   let bestDist = Infinity;
   for (const it of scene.__story.interactables) {
@@ -2677,10 +3198,22 @@ function openMossWall(scene, wall) {
   const v = wall.visual;
   const baseY = wall.y + wall.h / 2;
   // Bulles roses de répulsif pendant que la mousse se dissout vers le bas.
-  for (let i = 0; i < 14; i++) {
-    const b = scene.add.circle(wall.x + Phaser.Math.Between(-wall.w / 2, wall.w / 2), baseY - Phaser.Math.Between(0, wall.h),
-      Phaser.Math.Between(3, 7), i % 2 ? STORY_UI.pink : 0xd0b060, 0.9).setDepth(STORY_PROMPT_DEPTH - 1);
-    scene.tweens.add({ targets: b, y: b.y - 50, alpha: 0, duration: 700 + i * 40, delay: i * 50, onComplete: () => b.destroy() });
+  // Avec les particules de Juice, la recette `melt` (plus bas) émet déjà ces
+  // bulles (`fx_bulle` teintée rose et or) : les dessiner en plus les
+  // doublait. Sans elles : bulles `fx_bulle` teintées (cercles sans l'art).
+  if (typeof spawnFx !== 'function') {
+    const bubbleArt = scene.textures.exists('item-fx_bulle');
+    for (let i = 0; i < 14; i++) {
+      const bx = wall.x + Phaser.Math.Between(-wall.w / 2, wall.w / 2);
+      const by = baseY - Phaser.Math.Between(0, wall.h);
+      const r = Phaser.Math.Between(3, 7);
+      const color = i % 2 ? STORY_UI.pink : 0xd0b060;
+      const b = bubbleArt
+        ? scene.add.image(bx, by, 'item-fx_bulle').setTint(color).setScale((2 * r * 1.2) / 128).setAlpha(0.9)
+        : scene.add.circle(bx, by, r, color, 0.9);
+      b.setDepth(STORY_PROMPT_DEPTH - 1);
+      scene.tweens.add({ targets: b, y: b.y - 50, alpha: 0, duration: 700 + i * 40, delay: i * 50, onComplete: () => b.destroy() });
+    }
   }
   if (v.setTint) v.setTint(0xb07ad0);
   // Juice : le mur frémit (dessin seulement), coule en gouttes et bulles
@@ -3288,6 +3821,7 @@ function storyUpdateHook(scene, time, delta) {
   updateStoryFall(scene);
   updateStoryXaraRescue(scene);
   updateStoryCheckpoints(scene);
+  updateStoryLights(scene);
   updateStoryMossBlocks(scene);
   updateStoryTriggers(scene);
   if (isWorldFrozen(scene)) return;

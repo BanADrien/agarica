@@ -830,6 +830,10 @@ const ASSET_MANIFEST = {
   // (épreuve du singe), boule de mousse crachée par Ghil't (en vol, boucle),
   // goutte toxique des ennemis corrompus (frames 0-1 pendant la chute,
   // 2-3 à l'impact).
+  // align "bottom" (et non "center") : la bulle naît posée sur le lac,
+  // setOrigin(0.5, 1) ; en "center" elle flottait jusqu'à 5 px au-dessus.
+  // La boule remplit presque tout le canvas (227x159) : son corps est en
+  // x 0,65 et y 0,5 de la frame dans les deux alignements.
   vfx_mousse_toxique: {
     dir: "assets/vfx/vfx_mousse_toxique_frames", prefix: "vfx_mousse_toxique",
     anims: {
@@ -843,10 +847,15 @@ const ASSET_MANIFEST = {
     sheets: [
       { file: "assets/vfx/vfx_mousse_toxique.png", rows: [0, 1, 2] },
     ],
-    cut: "grid", align: "center",
+    cut: "grid", align: "bottom",
   },
   // [P2] VFX - anneau de choc qui s'élargit : vert toxique (Ghil't) et ambre
-  // (réveil du talisman de l'ours). Mode ADD conseillé.
+  // (réveil du talisman de l'ours). Mode ADD obligatoire ; déjà coloré, NON
+  // teintable : réservé aux variantes toxique et talisman (ailleurs, anneau
+  // dessiné teinté, cf. juiceShockRing).
+  // align "ring" : chaque frame est centrée sur le cercle ajusté de l'anneau
+  // (son centre dérivait jusqu'à 20 px : les débris décentrent la boîte) ;
+  // setOrigin(0.5, 0.5) = centre de l'anneau. Canvas calculé par l'import.
   vfx_anneau_choc: {
     dir: "assets/vfx/vfx_anneau_choc_frames", prefix: "vfx_anneau_choc",
     anims: {
@@ -859,7 +868,7 @@ const ASSET_MANIFEST = {
     sheets: [
       { file: "assets/vfx/vfx_anneau_choc.png", rows: [0, 1] },
     ],
-    cut: "grid", align: "center",
+    cut: "grid", align: "ring",
   },
 };
 
@@ -1196,9 +1205,10 @@ const ITEM_MANIFEST = {
   },
   // ===== Lot Codex n°8 (2026-10-23, docs/production/PROMPT_CODEX_8.md) =====
   // Remplace les éléments dessinés par code (INVENTAIRE_DESSINS_CODE.md).
-  // Rien n'est encore branché : l'intégrateur remplace chaque dessin par
-  // l'image item-<id> une fois importée (placeholder sinon). Les bandes
-  // TUILABLES s'affichent en tileSprite (tileScale = scale).
+  // Branchés au fil de docs/production/PLAN_INTEGRATION_LOT_8.md (usage de
+  // chaque id, sections 4 et 5) : chaque usage teste la texture item-<id>
+  // et garde son dessin de repli si l'image manque. Les bandes TUILABLES
+  // s'affichent en tileSprite (tileScale = scale).
   // [P1] Mare préservée (forêt sombre 2) : 6 bandes TUILABLES en largeur
   // (tileSprite, tileScale = scale). fond = eau arrière (profondeur 3) ;
   // voile = eau avant, dessinée opaque, à afficher en alpha 0,2-0,35
@@ -1218,25 +1228,25 @@ const ITEM_MANIFEST = {
   },
   liquide_mare_surface_0: {
     path: "assets/decors/liquides/liquide_mare_surface_0.png", scale: 0.6,
-    placeholder: { w: 256, h: 10, color: 0xbff6ef, label: "Surface" },
+    placeholder: { w: 256, h: 21, color: 0xbff6ef, label: "Surface" },
     src: { planche: "assets/_codex_src/liquides_mare.png", grid: [1, 6], cell: 2, cut: "grid" },
     norm: { mode: "fit", value: 1536 },
   },
   liquide_mare_surface_1: {
     path: "assets/decors/liquides/liquide_mare_surface_1.png", scale: 0.6,
-    placeholder: { w: 256, h: 10, color: 0xbff6ef, label: "Surface" },
+    placeholder: { w: 256, h: 21, color: 0xbff6ef, label: "Surface" },
     src: { planche: "assets/_codex_src/liquides_mare.png", grid: [1, 6], cell: 3, cut: "grid" },
     norm: { mode: "fit", value: 1536 },
   },
   liquide_mare_surface_2: {
     path: "assets/decors/liquides/liquide_mare_surface_2.png", scale: 0.6,
-    placeholder: { w: 256, h: 10, color: 0xbff6ef, label: "Surface" },
+    placeholder: { w: 256, h: 21, color: 0xbff6ef, label: "Surface" },
     src: { planche: "assets/_codex_src/liquides_mare.png", grid: [1, 6], cell: 4, cut: "grid" },
     norm: { mode: "fit", value: 1536 },
   },
   liquide_mare_surface_3: {
     path: "assets/decors/liquides/liquide_mare_surface_3.png", scale: 0.6,
-    placeholder: { w: 256, h: 10, color: 0xbff6ef, label: "Surface" },
+    placeholder: { w: 256, h: 21, color: 0xbff6ef, label: "Surface" },
     src: { planche: "assets/_codex_src/liquides_mare.png", grid: [1, 6], cell: 5, cut: "grid" },
     norm: { mode: "fit", value: 1536 },
   },
@@ -1323,18 +1333,21 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 512 },
   },
   // [P1] Lanternes de reprise (éteinte / allumée, même cadrage ; halo =
-  // fx_halo_doux), fente lumineuse dans l'écorce (fermée / ouverte, même
-  // cadrage), spirale gravée (arbre malade, forêt corrompue 1), contour
-  // fantôme d'une plateforme cachée (forme loup, 192x64 ; setDisplaySize).
+  // fx_halo_doux ; centre du globe à 63 % de la hauteur depuis le bas ;
+  // 0,15 = 30x51 px, à 0,09 le globe était illisible), fente lumineuse dans
+  // l'écorce (fermée / ouverte, même cadrage ; échelle = hauteur / 440),
+  // spirale gravée (arbre malade, forêt corrompue 1), contour fantôme d'une
+  // plateforme cachée (forme loup) : contour des tirets en x 1-378, y 26-132
+  // du PNG, calé par le code sur la case pleine (pas d'échelle fixe).
   decor_lanterne_eteinte: {
-    path: "assets/decors/elements/decor_lanterne_eteinte.png", scale: 0.09,
-    placeholder: { w: 18, h: 30, color: 0x2b2440, label: "Lanterne" },
+    path: "assets/decors/elements/decor_lanterne_eteinte.png", scale: 0.15,
+    placeholder: { w: 30, h: 51, color: 0x2b2440, label: "Lanterne" },
     src: { planche: "assets/_codex_src/decor_lumineux.png", grid: [3, 2], cell: 0, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   decor_lanterne_allumee: {
-    path: "assets/decors/elements/decor_lanterne_allumee.png", scale: 0.09,
-    placeholder: { w: 18, h: 30, color: 0x8fe3b8, label: "Lanterne" },
+    path: "assets/decors/elements/decor_lanterne_allumee.png", scale: 0.15,
+    placeholder: { w: 30, h: 51, color: 0x8fe3b8, label: "Lanterne" },
     src: { planche: "assets/_codex_src/decor_lumineux.png", grid: [3, 2], cell: 1, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
@@ -1363,24 +1376,28 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 512 },
   },
   // [P1] Structures : plateforme d'écorce qui s'effrite (intacte / fissurée /
-  // brisée, même cadrage ; largeur réelle par setDisplaySize), rampe de
-  // lancement à fanion (hutte de Morgat), marches de racines (vieux sentier,
-  // forêt sombre 2), autel du sommet (épreuve ; colonne = fx_rai_lumiere).
+  // brisée, même cadrage et même largeur ; dessus de mousse à y = 8/104 ;
+  // échelle réelle (w + 6) / 451 pour coller à la hitbox w x 22, soit 0,29
+  // pour w = 128), rampe de lancement à fanion (hutte de Morgat ; base
+  // d'appui en x 5-189 du PNG), marches de racines (non utilisées : l'arche
+  // foret_sombre_racine_arche les remplace en forêt sombre 2), autel du
+  // sommet (épreuve ; 0,27 = même emprise que grand_arbre_autel_singe, qu'il
+  // peut remplacer ; colonne = fx_rai_lumiere).
   decor_plateforme_ecorce_intacte: {
-    path: "assets/decors/elements/decor_plateforme_ecorce_intacte.png", scale: 0.21,
-    placeholder: { w: 96, h: 22, color: 0x4a3021, label: "Ecorce" },
+    path: "assets/decors/elements/decor_plateforme_ecorce_intacte.png", scale: 0.29,
+    placeholder: { w: 128, h: 22, color: 0x4a3021, label: "Ecorce" },
     src: { planche: "assets/_codex_src/structures_ecorce.png", grid: [3, 2], cell: 0, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   decor_plateforme_ecorce_fissuree: {
-    path: "assets/decors/elements/decor_plateforme_ecorce_fissuree.png", scale: 0.21,
-    placeholder: { w: 96, h: 22, color: 0x6b4a33, label: "Ecorce" },
+    path: "assets/decors/elements/decor_plateforme_ecorce_fissuree.png", scale: 0.29,
+    placeholder: { w: 128, h: 22, color: 0x6b4a33, label: "Ecorce" },
     src: { planche: "assets/_codex_src/structures_ecorce.png", grid: [3, 2], cell: 1, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   decor_plateforme_ecorce_brisee: {
-    path: "assets/decors/elements/decor_plateforme_ecorce_brisee.png", scale: 0.21,
-    placeholder: { w: 100, h: 30, color: 0x6b4a33, label: "Ecorce" },
+    path: "assets/decors/elements/decor_plateforme_ecorce_brisee.png", scale: 0.29,
+    placeholder: { w: 128, h: 22, color: 0x6b4a33, label: "Ecorce" },
     src: { planche: "assets/_codex_src/structures_ecorce.png", grid: [3, 2], cell: 2, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
@@ -1397,14 +1414,18 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 512 },
   },
   decor_autel_sommet: {
-    path: "assets/decors/elements/decor_autel_sommet.png", scale: 0.14,
-    placeholder: { w: 56, h: 36, color: 0x4a4058, label: "Autel" },
+    path: "assets/decors/elements/decor_autel_sommet.png", scale: 0.27,
+    placeholder: { w: 107, h: 70, color: 0x4a4058, label: "Autel" },
     src: { planche: "assets/_codex_src/structures_ecorce.png", grid: [3, 2], cell: 5, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   // [P1] Grands éléments plats (une bande chacun, non tuilables) : pont en
-  // tronc couché sur la mare (forêt sombre 2), cratère du crash (forêt
-  // corrompue 1), trou de l'effondrement du sol (arène de Ghil't).
+  // tronc couché sur la mare (forêt sombre 2 ; affiché en setDisplaySize(w +
+  // 44, 26) pour se lire comme un tronc, dessus du fût à y = 34/90 ; 0,205
+  // = proportions exactes, il ressemble alors à une branche), cratère du
+  // crash (forêt corrompue 1 ; fond du creux à y = 185/280, sur la ligne de
+  // marche), trou de l'effondrement du sol (arène de Ghil't ; haut de la
+  // fosse à y = 90/255).
   decor_pont_tronc: {
     path: "assets/decors/elements/decor_pont_tronc.png", scale: 0.205,
     placeholder: { w: 296, h: 18, color: 0x3b2a20, label: "Pont" },
@@ -1425,7 +1446,12 @@ const ITEM_MANIFEST = {
   },
   // [P1] Couches lointaines tuilables en largeur (parallaxe 0,25-0,3) :
   // îlots flottants (forêt flottante 2), forêt malade à l'horizon (forêt
-  // flottante 2, hutte de Morgat).
+  // flottante 1-2, hutte de Morgat). Échelle, alpha et teinte sont portés
+  // par la clé de zone farLayers (îles à 0,4 et alpha 0,6). L'horizon malade
+  // garde l'image actuelle (style poison, trop claire), ASSOMBRIE par le
+  // code (teinte ~0x3c4e44, échelle 0,45) : la version peinte d'avant les
+  // retouches poison est opaque dès sa 10e rangée (boîte sombre sur le
+  // ciel), donc pas réimportable telle quelle.
   couche_iles_lointaines: {
     path: "assets/decors/fonds/couche_iles_lointaines.png", scale: 0.6,
     placeholder: { w: 922, h: 252, color: 0x6f8fb0, label: "Iles" },
@@ -1441,7 +1467,9 @@ const ITEM_MANIFEST = {
   // [P1] Mare et plantes : berge (miroir pour l'autre rive), roseaux, fleur
   // perchée (forêt sombre 2), plante résistante sur sa tige (fleurie, puis
   // bouton après cueillette, même cadrage ; la fleur cueillie qui vole =
-  // fleur_resistante), graine de chêne-coeur (+1 coeur, forêt sombre 2).
+  // cadre tete (x 30, y 0, 198x195) de decor_plante_resistante_fleurie, et
+  // non fleur_resistante, plante entière avec ses racines), graine de
+  // chêne-coeur (+1 coeur, forêt sombre 2 ; sert aussi d'icône).
   decor_mare_berge: {
     path: "assets/decors/elements/decor_mare_berge.png", scale: 0.14,
     placeholder: { w: 62, h: 42, color: 0x3a3550, label: "Berge" },
@@ -1500,23 +1528,27 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 1536 },
   },
   // [P1] Mousses : plaque à gratter (intacte / grattée / repoussée, même
-  // cadrage, bosquet), taches lumineuses (sol, tronc, plafond, petite),
-  // touffes de mousse vivante (3 tailles même échelle + une penchée vers la
-  // droite, forêt corrompue 1), empreinte boueuse (forêt sombre 2).
+  // cadrage, bosquet ; 0,216 = 70 px, la largeur de grattage ; coulures
+  // 2 px sous la base, à enfoncer de 3 px), taches lumineuses (sol, tronc,
+  // plafond, petite ; plafond = origine (0.5, 0), tronc = bord gauche
+  // presque plat), touffes de mousse vivante (3 tailles même échelle + une
+  // penchée vers la droite, pied à 40 % de la largeur, forêt corrompue 1),
+  // empreinte boueuse (forêt sombre 2 ; livrée en VUE DE DESSUS, à écraser
+  // en Y par la clé de prop flatY 0,5, soit 21x6 px).
   decor_mousse_plaque_intacte: {
-    path: "assets/decors/elements/decor_mousse_plaque_intacte.png", scale: 0.2,
+    path: "assets/decors/elements/decor_mousse_plaque_intacte.png", scale: 0.216,
     placeholder: { w: 70, h: 30, color: 0x2f5a2a, label: "Mousse" },
     src: { planche: "assets/_codex_src/mousses_plaques.png", grid: [4, 3], cell: 0, cut: "grid" },
     norm: { mode: "fit", value: 384 },
   },
   decor_mousse_plaque_grattee: {
-    path: "assets/decors/elements/decor_mousse_plaque_grattee.png", scale: 0.2,
+    path: "assets/decors/elements/decor_mousse_plaque_grattee.png", scale: 0.216,
     placeholder: { w: 70, h: 30, color: 0x1d3a1a, label: "Mousse" },
     src: { planche: "assets/_codex_src/mousses_plaques.png", grid: [4, 3], cell: 1, cut: "grid" },
     norm: { mode: "fit", value: 384 },
   },
   decor_mousse_plaque_repoussee: {
-    path: "assets/decors/elements/decor_mousse_plaque_repoussee.png", scale: 0.2,
+    path: "assets/decors/elements/decor_mousse_plaque_repoussee.png", scale: 0.216,
     placeholder: { w: 70, h: 30, color: 0x3e7a2c, label: "Mousse" },
     src: { planche: "assets/_codex_src/mousses_plaques.png", grid: [4, 3], cell: 2, cut: "grid" },
     norm: { mode: "fit", value: 384 },
@@ -1570,14 +1602,14 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 384 },
   },
   decor_empreinte_boue: {
-    path: "assets/decors/elements/decor_empreinte_boue.png", scale: 0.05,
-    placeholder: { w: 13, h: 10, color: 0x140e20, label: "Empreinte" },
+    path: "assets/decors/elements/decor_empreinte_boue.png", scale: 0.08,
+    placeholder: { w: 21, h: 12, color: 0x140e20, label: "Empreinte" },
     src: { planche: "assets/_codex_src/mousses_plaques.png", grid: [4, 3], cell: 11, cut: "grid" },
     norm: { mode: "fit", value: 384 },
   },
-  // [P1] Voile d'obscurité (clé ambient) : image OPAQUE en niveaux de gris
-  // (centre blanc, bords sombres), plein écran en mode MULTIPLY, teintée par
-  // setTint à la couleur d'ambiance.
+  // [P1] Voile d'obscurité (clé ambient, ambient.vignette) : image OPAQUE en
+  // niveaux de gris (centre blanc, bords sombres), plein écran en mode
+  // MULTIPLY, NON teintée (alpha = force), profondeur 999,5 (sous le HUD).
   couche_vignette: {
     path: "assets/decors/fonds/couche_vignette.png", scale: 0.625,
     placeholder: { w: 960, h: 540, color: 0x15101f, label: "Vignette" },
@@ -1614,8 +1646,8 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 128 },
   },
   fx_eclat_pierre: {
-    path: "assets/vfx/particules/fx_eclat_pierre.png", scale: 0.05,
-    placeholder: { w: 6, h: 6, color: 0x8a8a8a, label: "fx" },
+    path: "assets/vfx/particules/fx_eclat_pierre.png", scale: 0.07,
+    placeholder: { w: 8, h: 9, color: 0x8a8a8a, label: "fx" },
     src: { planche: "assets/_codex_src/particules_matieres.png", grid: [4, 3], cell: 4, cut: "grid" },
     norm: { mode: "fit", value: 128 },
   },
@@ -1663,19 +1695,23 @@ const ITEM_MANIFEST = {
   },
   // [P2] Particules (lumières et souffles), mode ADD conseillé pour les
   // lumières : luciole, grain de lumière (blanc, teinte par setTint),
-  // étincelle de purification, étincelle et traînée du papillon, trait de
-  // vent (courant d'air), ombre au sol annonçant une chute (alpha par le
-  // code), marqueur de danger au sol, spore toxique, bouffées de poussière et
-  // de gaz toxique, braise (réveil du talisman).
+  // étincelle de purification, étincelle et traînée du papillon (tête à
+  // droite : orienter selon la vitesse), trait de vent (courant d'air),
+  // ombre au sol annonçant une chute (alpha par le code), marqueur de danger
+  // au sol (intérieur opaque : ADD obligatoire), spore toxique (12-14 px au
+  // moins sur fond corrompu), bouffées de poussière et de gaz toxique,
+  // braise (réveil du talisman). Échelles = taille UTILE mesurée (luciole
+  // 14 px, grain 18-20, braise 10-12, étincelle papillon 16) ; documentaire,
+  // le code de particules passe sa propre taille.
   fx_luciole: {
-    path: "assets/vfx/particules/fx_luciole.png", scale: 0.06,
-    placeholder: { w: 8, h: 8, color: 0xfff6a0, label: "fx" },
+    path: "assets/vfx/particules/fx_luciole.png", scale: 0.11,
+    placeholder: { w: 14, h: 14, color: 0xfff6a0, label: "fx" },
     src: { planche: "assets/_codex_src/particules_lumieres.png", grid: [4, 3], cell: 0, cut: "grid" },
     norm: { mode: "fit", value: 128 },
   },
   fx_grain_lumiere: {
-    path: "assets/vfx/particules/fx_grain_lumiere.png", scale: 0.05,
-    placeholder: { w: 6, h: 6, color: 0xffffff, label: "fx" },
+    path: "assets/vfx/particules/fx_grain_lumiere.png", scale: 0.15,
+    placeholder: { w: 18, h: 19, color: 0xffffff, label: "fx" },
     src: { planche: "assets/_codex_src/particules_lumieres.png", grid: [4, 3], cell: 1, cut: "grid" },
     norm: { mode: "fit", value: 128 },
   },
@@ -1686,8 +1722,8 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 128 },
   },
   fx_etincelle_papillon: {
-    path: "assets/vfx/particules/fx_etincelle_papillon.png", scale: 0.07,
-    placeholder: { w: 8, h: 8, color: 0xffb3f0, label: "fx" },
+    path: "assets/vfx/particules/fx_etincelle_papillon.png", scale: 0.13,
+    placeholder: { w: 14, h: 17, color: 0xffb3f0, label: "fx" },
     src: { planche: "assets/_codex_src/particules_lumieres.png", grid: [4, 3], cell: 3, cut: "grid" },
     norm: { mode: "fit", value: 128 },
   },
@@ -1734,55 +1770,67 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 128 },
   },
   fx_braise: {
-    path: "assets/vfx/particules/fx_braise.png", scale: 0.06,
-    placeholder: { w: 8, h: 8, color: 0xffc36b, label: "fx" },
+    path: "assets/vfx/particules/fx_braise.png", scale: 0.09,
+    placeholder: { w: 9, h: 12, color: 0xffc36b, label: "fx" },
     src: { planche: "assets/_codex_src/particules_lumieres.png", grid: [4, 3], cell: 11, cut: "grid" },
     norm: { mode: "fit", value: 128 },
   },
   // [P2] Halos et lumières douces (blancs, teintés par setTint, mode ADD ;
   // taille réelle par setDisplaySize) : halo rond, halo à rayons, rai de
-  // lumière (canopée, autel, vieux sentier), halo d'objet ramassable, aura
-  // de l'esprit de Kainati, flaque de lumière au sol.
+  // lumière (canopée, autel, vieux sentier ; haut net et intérieur en
+  // plateau : haut hors caméra ou sous un plafond, alpha 0,2-0,35), halo
+  // d'objet ramassable, aura de l'esprit de Kainati (alpha 0,15-0,2),
+  // flaque de lumière au sol.
+  // Retouches à l'import (norm) : halo rond et halo à rayons peints en
+  // PLATEAU (lus comme des disques pleins) -> marge de 12 px puis dégradé
+  // radial jusqu'à 0 au bord (falloff ; énergie 0,39 -> 0,18, proche des
+  // halos dessinés ; ils paraissent environ 25 % plus petits à taille
+  // égale) ; flaque au sol rognée de son ellipse fantôme (cropTop) et mise
+  // en BLANC teintable (desaturate ; elle était cyan) ; trimAlpha 0 sur les
+  // grandes lueurs garde leur traîne d'alpha (plus de bord net à alpha 11).
   fx_halo_doux: {
     path: "assets/vfx/particules/fx_halo_doux.png", scale: 0.28,
     placeholder: { w: 128, h: 128, color: 0xffffff, label: "Halo" },
     src: { planche: "assets/_codex_src/halos_lumiere.png", grid: [3, 2], cell: 0, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+    norm: { mode: "fit", value: 512, pad: 12, falloff: 1.0 },
   },
   fx_halo_rayons: {
     path: "assets/vfx/particules/fx_halo_rayons.png", scale: 0.33,
     placeholder: { w: 150, h: 150, color: 0xfff1c0, label: "Halo" },
     src: { planche: "assets/_codex_src/halos_lumiere.png", grid: [3, 2], cell: 1, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+    norm: { mode: "fit", value: 512, pad: 12, falloff: 0.9 },
   },
   fx_rai_lumiere: {
     path: "assets/vfx/particules/fx_rai_lumiere.png", scale: 0.45,
     placeholder: { w: 100, h: 210, color: 0xffe9a8, label: "Rai" },
     src: { planche: "assets/_codex_src/halos_lumiere.png", grid: [3, 2], cell: 2, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+    norm: { mode: "fit", value: 512, trimAlpha: 0 },
   },
   fx_halo_objet: {
     path: "assets/vfx/particules/fx_halo_objet.png", scale: 0.15,
     placeholder: { w: 44, h: 44, color: 0x8fe3b8, label: "Halo" },
     src: { planche: "assets/_codex_src/halos_lumiere.png", grid: [3, 2], cell: 3, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+    norm: { mode: "fit", value: 512, trimAlpha: 0 },
   },
   fx_aura_esprit: {
     path: "assets/vfx/particules/fx_aura_esprit.png", scale: 0.62,
     placeholder: { w: 273, h: 252, color: 0x9fe3ff, label: "Aura" },
     src: { planche: "assets/_codex_src/halos_lumiere.png", grid: [3, 2], cell: 4, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+    norm: { mode: "fit", value: 512, trimAlpha: 0 },
   },
   fx_lueur_sol: {
     path: "assets/vfx/particules/fx_lueur_sol.png", scale: 0.4,
-    placeholder: { w: 184, h: 48, color: 0xfff6d8, label: "Lueur" },
+    placeholder: { w: 184, h: 48, color: 0xffffff, label: "Lueur" },
     src: { planche: "assets/_codex_src/halos_lumiere.png", grid: [3, 2], cell: 5, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+    norm: { mode: "fit", value: 512, trimAlpha: 0, cropTop: 20, desaturate: true },
   },
   // [P3] Petites créatures (images fixes, animées par tweens) : petite
-  // araignée qui s'incline devant Xara (3 poses, même échelle, forêt sombre
-  // 1), bête de mousse abattue par Amanite (vivante / touchée / morte,
-  // forêt flottante 2), créature de mousse guérie (repos / rebond).
+  // araignée qui s'incline devant Xara (3 poses, même échelle et même ligne
+  // de base, forêt sombre 1), bête de mousse abattue par Amanite (vivante /
+  // touchée / morte, forêt flottante 2 ; tournée à droite, flipX ; la morte
+  // reste comme trace à la revisite ; mousse_creature en repli), créature
+  // de mousse guérie (repos / rebond ; 0,2 = aussi haute que la créature
+  // corrompue).
   araignee_petite_0: {
     path: "assets/sprites/petites/araignee_petite_0.png", scale: 0.1,
     placeholder: { w: 24, h: 14, color: 0x1a1024, label: "Araignee" },
@@ -1802,38 +1850,41 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 512 },
   },
   bete_mousse_vivante: {
-    path: "assets/sprites/petites/bete_mousse_vivante.png", scale: 0.21,
-    placeholder: { w: 64, h: 44, color: 0x2f5a2a, label: "Bete" },
+    path: "assets/sprites/petites/bete_mousse_vivante.png", scale: 0.25,
+    placeholder: { w: 65, h: 49, color: 0x2f5a2a, label: "Bete" },
     src: { planche: "assets/_codex_src/petites_creatures.png", grid: [4, 2], cell: 3, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   bete_mousse_touchee: {
-    path: "assets/sprites/petites/bete_mousse_touchee.png", scale: 0.21,
-    placeholder: { w: 64, h: 40, color: 0x2f5a2a, label: "Bete" },
+    path: "assets/sprites/petites/bete_mousse_touchee.png", scale: 0.25,
+    placeholder: { w: 53, h: 42, color: 0x2f5a2a, label: "Bete" },
     src: { planche: "assets/_codex_src/petites_creatures.png", grid: [4, 2], cell: 4, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   bete_mousse_morte: {
-    path: "assets/sprites/petites/bete_mousse_morte.png", scale: 0.21,
-    placeholder: { w: 72, h: 20, color: 0x34502a, label: "Bete" },
+    path: "assets/sprites/petites/bete_mousse_morte.png", scale: 0.25,
+    placeholder: { w: 61, h: 22, color: 0x34502a, label: "Bete" },
     src: { planche: "assets/_codex_src/petites_creatures.png", grid: [4, 2], cell: 5, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   mousse_creature_guerie_0: {
-    path: "assets/sprites/petites/mousse_creature_guerie_0.png", scale: 0.15,
-    placeholder: { w: 38, h: 26, color: 0x6fbf73, label: "Mousse guerie" },
+    path: "assets/sprites/petites/mousse_creature_guerie_0.png", scale: 0.2,
+    placeholder: { w: 34, h: 36, color: 0x6fbf73, label: "Mousse guerie" },
     src: { planche: "assets/_codex_src/petites_creatures.png", grid: [4, 2], cell: 6, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   mousse_creature_guerie_1: {
-    path: "assets/sprites/petites/mousse_creature_guerie_1.png", scale: 0.15,
-    placeholder: { w: 42, h: 22, color: 0x6fbf73, label: "Mousse guerie" },
+    path: "assets/sprites/petites/mousse_creature_guerie_1.png", scale: 0.2,
+    placeholder: { w: 39, h: 30, color: 0x6fbf73, label: "Mousse guerie" },
     src: { planche: "assets/_codex_src/petites_creatures.png", grid: [4, 2], cell: 7, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
   // [P3] Objets : note de Geralt (id d'inventaire, utilisée automatiquement
   // par addItemImage dès qu'elle existe), accessoires du duel de Geralt
-  // (grappin au bout de la corde, flèche, collet posé au sol).
+  // (grappin au bout de la corde, flèche pointe à droite, collet posé au
+  // sol, piquet à droite). La note et le grappin dépassaient leur cellule
+  // dans le dessin brut (controles/lot_8/23_generation_brute.png) : ils ont
+  // été réextraits entiers dans objets_C.png (2026-10-25), sans génération.
   note_geralt: {
     path: "assets/items/objets/note_geralt.png", scale: 0.16,
     placeholder: { w: 36, h: 36, color: 0xe9d3a0, label: "Note" },
@@ -1859,7 +1910,8 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 256 },
   },
   // [P3] Segments TUILABLES en hauteur (tileSprite, pivotable) : corde de
-  // Geralt, fil de soie de Xara. Découpe par colonnes transparentes.
+  // Geralt (jamais au-delà de 0,3), fil de soie de Xara (0,25 : perles
+  // visibles, 3 px de large). Découpe par colonnes transparentes.
   objet_corde: {
     path: "assets/items/objets/objet_corde.png", scale: 0.15,
     placeholder: { w: 4, h: 77, color: 0xc9a26b, label: "Corde" },
@@ -1867,47 +1919,55 @@ const ITEM_MANIFEST = {
     norm: { mode: "height", value: 512, trim_x: true },
   },
   fx_fil_soie: {
-    path: "assets/vfx/particules/fx_fil_soie.png", scale: 0.15,
-    placeholder: { w: 2, h: 77, color: 0xe8e0ff, label: "Soie" },
+    path: "assets/vfx/particules/fx_fil_soie.png", scale: 0.25,
+    placeholder: { w: 3, h: 128, color: 0xe8e0ff, label: "Soie" },
     src: { planche: "assets/_codex_src/segments_tuilables.png", grid: [2, 1], cell: 1, cut: "columns" },
     norm: { mode: "height", value: 512, trim_x: true },
   },
-  // [P4] Panneaux d'interface en 9-slice (bordures nineSlice en px source, à
-  // ajuster après génération) : bulle de dialogue des personnages + sa
-  // pointe (même échelle), panneau d'invite E, bannière objet obtenu (460x104).
+  // [P4] Panneaux d'interface en 9-slice (bordures nineSlice en px source,
+  // mesurées sur les images livrées ; top = bottom = 0 -> 3 morceaux
+  // horizontaux, hauteur = hauteur de l'image x scale ; cf. addUiSliced) :
+  // bulle de dialogue des personnages (padding 12/7, sinon le texte touche
+  // les coins) + sa pointe (0,26 pour raccorder son liseré), panneau
+  // d'invite E (24 px de haut), bannière objet obtenu (460x128 : à 104 px la
+  // zone unie ne tenait pas 2 lignes de description).
   ui_bulle: {
-    path: "assets/ui/ui_bulle.png", scale: 0.25,
+    path: "assets/ui/ui_bulle.png", scale: 0.2,
     placeholder: { w: 220, h: 48, color: 0x15101f, label: "Bulle" },
-    nineSlice: { left: 48, right: 48, top: 48, bottom: 48 },
+    nineSlice: { left: 74, right: 74, top: 60, bottom: 60 },
     src: { planche: "assets/_codex_src/ui_panneaux.png", grid: [2, 2], cell: 0, cut: "grid" },
     norm: { mode: "trim" },
   },
   ui_bulle_pointe: {
-    path: "assets/ui/ui_bulle_pointe.png", scale: 0.25,
-    placeholder: { w: 17, h: 12, color: 0x15101f, label: "Pointe" },
+    path: "assets/ui/ui_bulle_pointe.png", scale: 0.26,
+    placeholder: { w: 18, h: 13, color: 0x15101f, label: "Pointe" },
     src: { planche: "assets/_codex_src/ui_panneaux.png", grid: [2, 2], cell: 1, cut: "grid" },
     norm: { mode: "trim" },
   },
   ui_invite: {
-    path: "assets/ui/ui_invite.png", scale: 0.2,
-    placeholder: { w: 128, h: 32, color: 0x2a1f45, label: "Invite" },
-    nineSlice: { left: 70, right: 70, top: 60, bottom: 60 },
+    path: "assets/ui/ui_invite.png", scale: 0.15,
+    placeholder: { w: 128, h: 24, color: 0x2a1f45, label: "Invite" },
+    nineSlice: { left: 105, right: 105, top: 0, bottom: 0 },
     src: { planche: "assets/_codex_src/ui_panneaux.png", grid: [2, 2], cell: 2, cut: "grid" },
     norm: { mode: "trim" },
   },
   ui_banniere: {
-    path: "assets/ui/ui_banniere.png", scale: 0.64,
-    placeholder: { w: 460, h: 104, color: 0x241510, label: "Banniere" },
-    nineSlice: { left: 70, right: 70, top: 50, bottom: 50 },
+    path: "assets/ui/ui_banniere.png", scale: 0.65,
+    placeholder: { w: 460, h: 128, color: 0x241510, label: "Banniere" },
+    nineSlice: { left: 115, right: 115, top: 76, bottom: 78 },
     src: { planche: "assets/_codex_src/ui_panneaux.png", grid: [2, 2], cell: 3, cut: "grid" },
     norm: { mode: "trim" },
   },
-  // [P4] HUD et icônes du monde : pastille de touche vierge (le jeu écrit la
-  // lettre), alerte !, étoiles d'étourdissement, case de compétence vide,
-  // anneau de l'objet de la bannière, ornement de carte-titre de zone.
+  // [P4] HUD et icônes du monde : pastille de touche vierge en bois clair
+  // (le jeu écrit la lettre, sombre #2a1f45 obligatoire ; 3 morceaux pour les
+  // libellés longs), alerte !, étoiles d'étourdissement, case de compétence
+  // vide (34 px), anneau de l'objet de la bannière (disque intérieur 50x46 :
+  // icône de 46 px), ornement de carte-titre de zone (0,5, posé sous le
+  // titre sans le toucher).
   ui_touche: {
     path: "assets/ui/ui_touche.png", scale: 0.09,
     placeholder: { w: 23, h: 23, color: 0xd8c08a, label: "Touche" },
+    nineSlice: { left: 90, right: 90, top: 0, bottom: 0 },
     src: { planche: "assets/_codex_src/ui_hud.png", grid: [3, 2], cell: 0, cut: "grid" },
     norm: { mode: "fit", value: 256 },
   },
@@ -1936,46 +1996,50 @@ const ITEM_MANIFEST = {
     norm: { mode: "fit", value: 256 },
   },
   ui_ornement_titre: {
-    path: "assets/ui/ui_ornement_titre.png", scale: 0.6,
-    placeholder: { w: 288, h: 66, color: 0xffe9f5, label: "Ornement" },
+    path: "assets/ui/ui_ornement_titre.png", scale: 0.5,
+    placeholder: { w: 186, h: 55, color: 0xffe9f5, label: "Ornement" },
     src: { planche: "assets/_codex_src/ui_hud.png", grid: [3, 2], cell: 5, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
-  // [P4] Barres : énergie (cadre 150x10 en 3-slice + remplissage rogné par
-  // setCrop selon le ratio), boss (cadre 448x20 + remplissage).
+  // [P4] Barres, affichées plus épaisses que prévu pour que le remplissage
+  // reste lisible (les rainures peintes sont fines) : énergie = cadre 150x22
+  // en 3 morceaux, rainure de 114x7 (et non 128) où le remplissage est
+  // affiché en displaySize(114, 7) et rogné par setCrop selon le ratio ;
+  // boss = cadre 448x32, rainure 378x8 pour le remplissage.
   ui_energie_cadre: {
-    path: "assets/ui/ui_energie_cadre.png", scale: 0.111,
-    placeholder: { w: 150, h: 10, color: 0x241510, label: "Energie" },
-    nineSlice: { left: 60, right: 60, top: 0, bottom: 0 },
+    path: "assets/ui/ui_energie_cadre.png", scale: 0.25,
+    placeholder: { w: 150, h: 22, color: 0x241510, label: "Energie" },
+    nineSlice: { left: 290, right: 290, top: 0, bottom: 0 },
     src: { planche: "assets/_codex_src/ui_barres.png", grid: [1, 4], cell: 0, cut: "grid" },
     norm: { mode: "trim" },
   },
   ui_energie_remplissage: {
     path: "assets/ui/ui_energie_remplissage.png", scale: 0.11,
-    placeholder: { w: 142, h: 6, color: 0x8fe3b8, label: "Energie" },
+    placeholder: { w: 114, h: 7, color: 0x8fe3b8, label: "Energie" },
     src: { planche: "assets/_codex_src/ui_barres.png", grid: [1, 4], cell: 1, cut: "grid" },
     norm: { mode: "trim" },
   },
   ui_boss_cadre: {
-    path: "assets/ui/ui_boss_cadre.png", scale: 0.32,
-    placeholder: { w: 448, h: 20, color: 0x241510, label: "Boss" },
-    nineSlice: { left: 60, right: 60, top: 0, bottom: 0 },
+    path: "assets/ui/ui_boss_cadre.png", scale: 0.5,
+    placeholder: { w: 448, h: 32, color: 0x241510, label: "Boss" },
+    nineSlice: { left: 250, right: 250, top: 0, bottom: 0 },
     src: { planche: "assets/_codex_src/ui_barres.png", grid: [1, 4], cell: 2, cut: "grid" },
     norm: { mode: "trim" },
   },
   ui_boss_remplissage: {
     path: "assets/ui/ui_boss_remplissage.png", scale: 0.32,
-    placeholder: { w: 435, h: 12, color: 0x7bd35a, label: "Boss" },
+    placeholder: { w: 378, h: 8, color: 0x7bd35a, label: "Boss" },
     src: { planche: "assets/_codex_src/ui_barres.png", grid: [1, 4], cell: 3, cut: "grid" },
     norm: { mode: "trim" },
   },
   // Panneau peint du menu du feu de camp (image EXISTANTE, pas à générer) :
-  // CampfireMenuScene l'affiche si la texture item-ui_feu_camp existe. src =
-  // l'image elle-même (l'import la voit présente ; seul un --force la
-  // rognerait de ses marges transparentes).
+  // CampfireMenuScene l'affiche si la texture item-ui_feu_camp existe, à
+  // échelle uniforme calculée (toute la hauteur, 727x540). src = l'image
+  // elle-même (l'import la voit présente) : JAMAIS de --force sur cette
+  // entrée, il la rognerait de ses marges transparentes.
   ui_feu_camp: {
-    path: "assets/items/firecamp_menu/interface.png", scale: 0.65,
-    placeholder: { w: 950, h: 534, color: 0x2a1e14, label: "Feu de camp" },
+    path: "assets/items/firecamp_menu/interface.png", scale: 0.5,
+    placeholder: { w: 727, h: 540, color: 0x2a1e14, label: "Feu de camp" },
     src: { file: "assets/items/firecamp_menu/interface.png" },
     norm: { mode: "trim" },
   },

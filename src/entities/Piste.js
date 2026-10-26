@@ -12,6 +12,9 @@ const PISTE_FADE_SPEED = 4; // alpha par seconde
 const PISTE_REVEAL_DIST = 200;
 const PISTE_HINT_DIST = 360;
 const PAW_TEXTURE_KEY = 'fx-paw-print';
+// Boîte extérieure des tirets dans decor_plateforme_fantome.png (px source,
+// mesurée sur l'image : bord des tirets avec leur lueur).
+const PISTE_GHOST_DASH_BOX = { x0: 1, x1: 378, y0: 26, y1: 132 };
 
 function ensurePawTexture(scene) {
   if (scene.textures.exists(PAW_TEXTURE_KEY)) return PAW_TEXTURE_KEY;
@@ -31,12 +34,20 @@ function playerIsWolf(scene) {
   return !!(scene.player && scene.player.form === 'wolf');
 }
 
+// Décalage entre deux empreintes qui « s'allument » quand la piste apparaît
+// (anim `appear` du lot Codex, jouée de proche en proche, sens de la piste).
+const PISTE_APPEAR_STAGGER_MS = 60;
+
 class PisteTrack {
   constructor(scene, cfg) {
     this.scene = scene;
     this.prints = [];
     this.alpha = 0;
+    // Apparition jouée une fois à chaque passage de l'invisible au visible.
+    this.shown = false;
     const useVfx = typeof hasManifestArt === 'function' && hasManifestArt(scene, 'vfx_piste_loup');
+    this.useVfx = useVfx;
+    this.appearArt = useVfx && hasManifestArt(scene, 'vfx_piste_loup', 'appear');
     const w = Math.max(PISTE_PRINT_SPACING, cfg.w || 200);
     const count = Math.max(1, Math.floor(w / PISTE_PRINT_SPACING));
     for (let i = 0; i < count; i++) {
@@ -67,10 +78,41 @@ class PisteTrack {
   update(time, delta) {
     const target = playerIsWolf(this.scene) ? 1 : 0;
     const step = (PISTE_FADE_SPEED * Math.min(delta, 50)) / 1000;
+    const prev = this.alpha;
     this.alpha = target > this.alpha ? Math.min(target, this.alpha + step) : Math.max(target, this.alpha - step);
+    if (prev <= 0 && this.alpha > 0 && !this.shown) {
+      this.shown = true;
+      this.playAppear();
+    } else if (this.alpha <= 0) {
+      this.shown = false;
+    }
     this.prints.forEach((p, i) => {
       const pulse = 0.75 + 0.25 * Math.sin(time / 260 - i * 0.6);
       p.setAlpha(this.alpha * pulse);
+    });
+  }
+
+  // Les empreintes s'allument une à une (anim `appear`, 60 ms d'écart dans le
+  // sens de la piste), puis reprennent leur lueur en boucle (`glow`). Les deux
+  // rangées ont le même bas visible (marge de 4 px sous l'empreinte, cf.
+  // anchorVisibleFeet) : aucun saut au raccord. Purement visuel : le fondu
+  // d'alpha (update) est inchangé ; sans la rangée `appear`, rien ne change.
+  playAppear() {
+    if (!this.appearArt) return;
+    const scene = this.scene;
+    const first = typeof manifestFrameKey === 'function' ? manifestFrameKey('vfx_piste_loup', 'appear', 0) : null;
+    this.prints.forEach((p, i) => {
+      if (!p.active || !p.playManifest) return;
+      // En attendant son tour : 1re image de l'apparition (presque éteinte),
+      // pas la lueur pleine.
+      p.anims.stop();
+      if (first && scene.textures.exists(first)) p.setTexture(first);
+      scene.time.delayedCall(i * PISTE_APPEAR_STAGGER_MS, () => {
+        if (!p.active) return;
+        p.off('animationcomplete-vfx_piste_loup-appear');
+        p.once('animationcomplete-vfx_piste_loup-appear', () => { if (p.active) p.playManifest('glow', false); });
+        p.playManifest('appear', false);
+      });
     });
   }
 }
@@ -85,10 +127,18 @@ class HiddenPlatform {
     const size = typeof GROUND_TILE_SIZE !== 'undefined' ? GROUND_TILE_SIZE : 64;
     this.rect = new Phaser.Geom.Rectangle(cfg.gx * size, cfg.gy * size, w * size, size);
     // Contour fantôme : indice discret quand le loup approche (avant révélation).
-    // Art `decor_plateforme_fantome` (lot Codex n°8) s'il existe.
+    // Art `decor_plateforme_fantome` (lot Codex n°8) s'il existe : le PNG a des
+    // marges (feuilles, étincelles) autour du rectangle de tirets ; c'est ce
+    // rectangle -- et non le cadre de l'image -- qui est calé sur la case
+    // pleine (même retrait de 2 px que le contour de repli), sinon le contour
+    // débordait de la plateforme révélée.
     if (scene.textures.exists('item-decor_plateforme_fantome')) {
-      this.hint = scene.add.image(this.rect.centerX, this.rect.y, 'item-decor_plateforme_fantome').setOrigin(0.5, 0)
-        .setDisplaySize(this.rect.width, this.rect.height).setTint(PISTE_COLOR).setBlendMode(Phaser.BlendModes.ADD);
+      const f = scene.textures.getFrame('item-decor_plateforme_fantome');
+      const C = PISTE_GHOST_DASH_BOX;
+      this.hint = scene.add.image(this.rect.x + 2, this.rect.y + 2, 'item-decor_plateforme_fantome')
+        .setOrigin(C.x0 / f.width, C.y0 / f.height)
+        .setScale((this.rect.width - 4) / (C.x1 - C.x0), (this.rect.height - 4) / (C.y1 - C.y0))
+        .setTint(PISTE_COLOR).setBlendMode(Phaser.BlendModes.ADD);
     } else {
       this.hint = scene.add.graphics();
       this.hint.lineStyle(2, PISTE_COLOR, 1);
@@ -131,8 +181,17 @@ class HiddenPlatform {
       img.y = y0 + 18;
       scene.tweens.add({ targets: img, alpha: 1, y: y0, duration: 420, delay: 40 + k * 260, ease: 'Back.Out' });
     }
-    const flash = scene.add.rectangle(this.rect.centerX, this.rect.centerY, this.rect.width, this.rect.height, PISTE_COLOR, 0.5)
-      .setBlendMode(Phaser.BlendModes.ADD);
+    // Éclat de révélation : flaque de lumière `fx_lueur_sol` (lot n°8, rognée
+    // et désaturée à l'import, donc teintable) posée sur le dessus des cases ;
+    // repli : le rectangle plein d'origine. Même fondu (0,5 -> 0 en 600 ms).
+    let flash;
+    if (scene.textures.exists('item-fx_lueur_sol')) {
+      flash = scene.add.image(this.rect.centerX, this.rect.y + 6, 'item-fx_lueur_sol').setOrigin(0.5, 0.5)
+        .setDisplaySize(this.rect.width * 1.3, 40).setTint(PISTE_COLOR).setAlpha(0.5);
+    } else {
+      flash = scene.add.rectangle(this.rect.centerX, this.rect.centerY, this.rect.width, this.rect.height, PISTE_COLOR, 0.5);
+    }
+    flash.setBlendMode(Phaser.BlendModes.ADD);
     scene.tweens.add({ targets: flash, alpha: 0, duration: 600, onComplete: () => flash.destroy() });
     if (typeof spawnFx === 'function') {
       for (let x = this.rect.x + 16; x < this.rect.right; x += 40) {

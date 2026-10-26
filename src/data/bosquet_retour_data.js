@@ -15,6 +15,12 @@ const BOSQUET_RETOUR_DATA = {
   groundCells: [...groundRow(0, 30, [7, 8])],
   avoidRanges: [[1450, 1680]],
   playerSpawn: { x: 110, y: 412 },
+  // L'aube sur l'autel (lot Codex n°8, clé `lights`, H15) : écho du clair de
+  // lune de l'ouverture (bosquet_data.js), même rai, teinte chaude. Bas posé
+  // sur le sol (y 448), derrière les personnages.
+  lights: [
+    { id: 'fx_rai_lumiere', x: 1560, y: 448, w: 130, h: 380, tint: 0xfff2d8, alpha: 0.32 },
+  ],
   // Bâtiments du village d'abord (derrière les autres décors et les
   // habitants), aux mêmes échelles que dans le bosquet de l'acte 1.
   props: [
@@ -32,6 +38,12 @@ const BOSQUET_RETOUR_DATA = {
     // d'avant laissait l'idole flotter 50 px au-dessus de sa pointe.
     { type: 'bosquet_antler_totem', x: 1560, y: 448, scale: 0.55 },
     { type: 'bosquet_lamp_post', x: 1760, y: 448, scale: 0.5 },
+    // La mousse au retour (lot Codex n°8, H12), posée au sol : une plaque
+    // grattée (« vous grattiez la mousse ») entre le lampadaire et la
+    // palissade, et une plaque qui repousse (« elle reviendra ») entre
+    // l'autel et le lampadaire.
+    { type: 'decor_mousse_plaque_grattee', x: 375, y: 448 },
+    { type: 'decor_mousse_plaque_repoussee', x: 1668, y: 448 },
   ],
   npcs: [
     { id: 'habitant_garde', x: 690, facing: 'left', talk: 'bosquet_retour_garde' },

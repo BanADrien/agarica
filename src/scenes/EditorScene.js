@@ -74,8 +74,11 @@ const EDITOR_UNDO_MAX = 50;
 // agrandissement qui a un sens.
 const EDITOR_RESIZABLE_KINDS = new Set(['totem', 'campfire', 'prop']);
 const EDITOR_GROUND_SNAPPED_KINDS = new Set(['totem', 'campfire', 'prop']);
-const EDITOR_SCALE_STEP = 0.03;
-const EDITOR_MIN_SCALE = 0.08;
+// Pas MULTIPLICATIF (x1,1 par cran) : les décors du manifest Codex vont de
+// 0,05 à 0,3 d'échelle, un pas fixe de 0,03 sautait de 60 % d'un coup sur une
+// empreinte à 0,05 ; et le minimum de 0,08 interdisait leur vraie taille.
+const EDITOR_SCALE_FACTOR = 1.1;
+const EDITOR_MIN_SCALE = 0.02;
 const EDITOR_MAX_SCALE = 2.5;
 const EDITOR_ENEMY_MARKER_COLORS = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t) => [t.value, t.color]));
 const EDITOR_ENEMY_MARKER_LABELS = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t) => [t.value, t.letter]));
@@ -90,7 +93,41 @@ const EDITOR_NPC_IDS = [
 ];
 const EDITOR_NPC_DEFAULTS = { xara_extra: { id: 'xara', sprite: 'xara_extra' } };
 // Objets d'ITEM_MANIFEST qui ne sont pas des objets ramassables (UI, fonds...).
-const EDITOR_NON_PICKUP_ITEM = /^(hud_|fond_|portrait_|skill_icone|form_icone|dialogue_box|titre_logo|carte_parchemin|totem_monkey|liane$|mousse_|porte_mousse|courant_air)/;
+// Lot Codex n°8 : interface (ui_), particules et halos (fx_), couches de fond
+// (couche_), décors et liquides (decor_, liquide_ : posés en `props` ou par
+// les scripts), créatures d'ambiance et objets de décor (flèche, collet,
+// grappin, corde : ils se posent en `props`, section `objet`). La graine-cœur
+// (objet_graine_coeur) et la note de Geralt restent ramassables.
+const EDITOR_NON_PICKUP_ITEM = /^(hud_|fond_|portrait_|skill_icone|form_icone|dialogue_box|titre_logo|carte_parchemin|totem_monkey|liane$|mousse_|porte_mousse|courant_air|ui_|fx_|couche_|decor_|liquide_|araignee_petite|bete_mousse|objet_(corde|grappin|fleche|collet)|rocher_roulant|lance_amanite)/;
+
+// Libellés des sections de décors venues du manifest Codex (les autres
+// sections gardent leur nom « humanisé », cf. humanizeDecorItemName).
+const EDITOR_DECOR_SECTION_LABELS = { decor: 'Décors (Codex)', objet: 'Objets posés (Codex)', rocher: 'Rochers (Codex)' };
+
+// Décors : échelle par défaut et placement (contrat LevelKit.js,
+// PLAN_DEV « clés de props »), lus avec garde pour que l'éditeur marche même
+// sans ces ajouts. Les décors du manifest (sections decor / objet / rocher)
+// ont l'échelle de leur entrée du manifest, les autres PROP_SCALE.
+function editorPropDefaultScale(type) {
+  return typeof propDefaultScale === 'function' ? propDefaultScale(type) : PROP_SCALE;
+}
+
+// Clés de placement d'un décor : celles de l'entrée d'abord, puis les défauts
+// du type (DECOR_PROP_PLACEMENT : mousse de plafond accrochée, mousse de
+// tronc libre, empreinte écrasée). `angle: 0` vaut « pas de rotation ».
+function editorPropPlacement(entry) {
+  const defaults = (typeof DECOR_PROP_PLACEMENT !== 'undefined' && DECOR_PROP_PLACEMENT[entry.type]) || {};
+  const pick = (k) => (entry[k] !== undefined ? entry[k] : defaults[k]);
+  const angle = Number(pick('angle')) || 0;
+  const flatY = Number(pick('flatY'));
+  return {
+    flipX: !!pick('flipX'), angle, hang: !!pick('hang'), free: !!pick('free'),
+    flatY: flatY > 0 ? flatY : 1,
+    // Accroché, libre ou penché : `y` est le point d'attache, jamais recalé
+    // sur le sol (mêmes règles qu'au runtime, buildLevelFromData).
+    unsnapped: !!(pick('hang') || pick('free') || angle),
+  };
+}
 const EDITOR_ANIMAL_TYPES = [
   { value: 'cochons', label: 'Bébés cochons (x3, au sol)' },
   { value: 'poissons', label: 'Poissons (x3, rectangle d\'eau)' },
@@ -751,6 +788,8 @@ class EditorScene extends Phaser.Scene {
     const backImages = renderAutotileGrid(this, null, this.data.groundBackCells, { back: true, tileset });
     const frontImages = renderAutotileGrid(this, null, this.data.groundCells, { tileset });
     this.groundImages = [...backImages, ...frontImages];
+    // Repère des décors plantés de travers (cf. layoutPropPreview).
+    this.frontGroundFirstImage = frontImages[0] || null;
     EditorScene.setStatus(`${this.data.groundCells.length} case(s) de sol, ${this.data.groundBackCells.length} arrière-plan`);
   }
 
@@ -989,12 +1028,56 @@ class EditorScene extends Phaser.Scene {
     }
     if (this.tool === 'prop') {
       const type = this.subtype;
-      const y = this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY;
-      const entry = { type, x: worldX, y, scale: PROP_SCALE };
+      // Échelle du manifest pour les décors Codex (PROP_SCALE sinon). Le
+      // placement par défaut du type (mousse de plafond accrochée…) décide
+      // si le clic est recalé sur le sol ou gardé tel quel.
+      const texKey = type ? this.propTexture(type) : null;
+      if (!texKey) return;
+      const entry = { type, x: Math.round(worldX), y: 0, scale: editorPropDefaultScale(type) };
+      entry.y = Math.round(editorPropPlacement(entry).unsnapped ? worldY : (this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY));
       this.data.props.push(entry);
-      const obj = anchorVisibleFeet(this.add.image(worldX, y + PROP_GROUND_SINK + GROUND_CONTACT_SINK, `${PROP_PREFIX}${type}`).setOrigin(0.5, 1).setScale(PROP_SCALE));
+      const obj = this.layoutPropPreview(this.add.image(entry.x, entry.y, texKey), entry);
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
+  }
+
+  // Aperçu d'un décor, mêmes règles qu'au runtime (buildLevelFromData) :
+  // - au sol : origine (0.5, 1), bas VISIBLE sur la surface de marche
+  //   (anchorVisibleFeet), enfoncé de GROUND_CONTACT_SINK ;
+  // - `hang` : origine (0.5, 0), le haut accroché en y ; `free` : centré en y ;
+  // - `angle` (seul) : origine (0.5, 1), le bas en y (point d'enfoncement),
+  //   tourné, sans recalage ;
+  // - `flipX` retourne l'image, `flatY` écrase sa hauteur (empreinte vue de dessus).
+  // Rappelée après un déplacement ou un changement d'échelle : l'image garde
+  // ses réglages (échelle Y écrasée comprise).
+  layoutPropPreview(img, entry) {
+    const pl = editorPropPlacement(entry);
+    const s = entry.scale || editorPropDefaultScale(entry.type);
+    img.setFlipX(pl.flipX).setAngle(pl.angle).setScale(s, s * pl.flatY);
+    if (pl.hang) img.setOrigin(0.5, 0).setPosition(entry.x, entry.y);
+    else if (pl.free) img.setOrigin(0.5, 0.5).setPosition(entry.x, entry.y);
+    else if (pl.angle) img.setOrigin(0.5, 1).setPosition(entry.x, entry.y);
+    else {
+      img.setOrigin(0.5, 1).setPosition(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK);
+      anchorVisibleFeet(img);
+    }
+    // Planté de travers (flèche) : derrière le sol de premier plan, comme au
+    // runtime (sendBehindFrontGround), pour que la partie enfoncée soit cachée.
+    if (pl.angle && this.frontGroundFirstImage && this.frontGroundFirstImage.active) {
+      this.children.moveBelow(img, this.frontGroundFirstImage);
+    }
+    // Pendu, centré ou penché : pas une surface où poser un PNJ (propTopYAt
+    // l'ignore, cf. editorNpcFootY), comme au runtime.
+    img.__noPropSurface = pl.unsnapped;
+    return img;
+  }
+
+  // Texture d'un décor : `prop-<type>`, ou, pour un décor du manifest dont le
+  // préchargement `prop-` manque, sa texture d'objet `item-<id>` (même règle
+  // qu'au runtime, propTextureKey). Null : décor retiré ou image absente.
+  propTexture(type) {
+    if (typeof propTextureKey === 'function') return propTextureKey(this, type);
+    return this.textures.exists(`${PROP_PREFIX}${type}`) ? `${PROP_PREFIX}${type}` : null;
   }
 
   // --- Éléments de l'histoire (cf. EDITOR_STORY_KINDS) ---
@@ -1239,6 +1322,15 @@ class EditorScene extends Phaser.Scene {
       this.updateSelectionVisual();
       return;
     }
+    if (m.kind === 'prop') {
+      // Décor accroché, libre ou penché : suit la souris sans recalage au sol
+      // (y = point d'attache) ; sinon même calage que placeAt.
+      entry.x = Math.round(worldX);
+      entry.y = Math.round(editorPropPlacement(entry).unsnapped ? worldY : (this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY));
+      this.layoutPropPreview(m.obj[0], entry);
+      this.updateSelectionVisual();
+      return;
+    }
     entry.x = worldX;
     entry.y = EDITOR_GROUND_SNAPPED_KINDS.has(m.kind)
       ? (this.groundSurfaceYAtGrid(worldX, worldY) ?? worldY)
@@ -1249,9 +1341,6 @@ class EditorScene extends Phaser.Scene {
     if (m.kind === 'totem') {
       m.obj[0].setPosition(entry.x, entry.y + TOTEM_GROUND_SINK);
     } else if (m.kind === 'campfire') {
-      m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK);
-    } else if (m.kind === 'prop') {
-      // Même surface que dans le jeu (cf. groundStandYAt / PROP_GROUND_SINK).
       m.obj[0].setPosition(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK);
     } else if (m.kind === 'enemy') {
       m.obj[0].setPosition(entry.x, entry.y);
@@ -1298,15 +1387,16 @@ class EditorScene extends Phaser.Scene {
     clearTimeout(this.modifyResizeTimer);
     this.modifyResizeTimer = setTimeout(() => { this.modifyResizePushed = false; }, 600);
 
-    const fallback = m.kind === 'totem' ? TOTEM_SCALE : m.kind === 'campfire' ? CAMPFIRE_SCALE : PROP_SCALE;
+    const fallback = m.kind === 'totem' ? TOTEM_SCALE : m.kind === 'campfire' ? CAMPFIRE_SCALE : editorPropDefaultScale(m.entry.type);
     const current = m.entry.scale || fallback;
-    const next = Phaser.Math.Clamp(
-      current - Math.sign(deltaY) * EDITOR_SCALE_STEP,
-      EDITOR_MIN_SCALE,
-      EDITOR_MAX_SCALE,
-    );
+    // Molette vers le haut (deltaY < 0) = plus grand ; arrondi à 4 décimales
+    // pour garder une donnée lisible (0.0825 plutôt que 0.08250000000000002).
+    const factor = deltaY < 0 ? EDITOR_SCALE_FACTOR : deltaY > 0 ? 1 / EDITOR_SCALE_FACTOR : 1;
+    const next = Math.round(Phaser.Math.Clamp(current * factor, EDITOR_MIN_SCALE, EDITOR_MAX_SCALE) * 10000) / 10000;
     m.entry.scale = next;
-    m.obj[0].setScale(next);
+    // Décor : réapplique tout le placement (flatY écrase l'échelle Y).
+    if (m.kind === 'prop') this.layoutPropPreview(m.obj[0], m.entry);
+    else m.obj[0].setScale(next);
     this.updateSelectionVisual();
   }
 
@@ -1781,8 +1871,11 @@ class EditorScene extends Phaser.Scene {
     for (const entry of this.data.props) {
       // Décor retiré du jeu (cf. DECOR_SECTIONS, ex. arbre_moussu) : non
       // affiché, sans erreur (l'entrée reste dans le brouillon telle quelle).
-      if (!this.textures.exists(`${PROP_PREFIX}${entry.type}`)) continue;
-      const obj = anchorVisibleFeet(this.add.image(entry.x, entry.y + PROP_GROUND_SINK + GROUND_CONTACT_SINK, `${PROP_PREFIX}${entry.type}`).setOrigin(0.5, 1).setScale(entry.scale || PROP_SCALE));
+      const texKey = entry && entry.type ? this.propTexture(entry.type) : null;
+      if (!texKey) continue;
+      // Clés flipX / angle / hang / free / flatY affichées (layoutPropPreview)
+      // et gardées telles quelles dans l'entrée (aller-retour sans perte).
+      const obj = this.layoutPropPreview(this.add.image(entry.x, entry.y, texKey), entry);
       this.markers.push({ kind: 'prop', entry, obj: [obj], sourceArray: this.data.props });
     }
     for (const entry of this.data.campfires) {
@@ -1953,20 +2046,25 @@ class EditorScene extends Phaser.Scene {
       section.style.display = '';
       label.textContent = 'Décor';
       let firstValue = null;
+      const scene = EditorScene.getEditor();
+      const manifestSections = typeof MANIFEST_DECOR_SECTIONS !== 'undefined' ? MANIFEST_DECOR_SECTIONS : [];
       for (const [sectionName, items] of Object.entries(DECOR_SECTIONS)) {
         const group = document.createElement('optgroup');
-        group.label = EditorScene.humanizeDecorItemName(sectionName);
+        group.label = EDITOR_DECOR_SECTION_LABELS[sectionName] || EditorScene.humanizeDecorItemName(sectionName);
         for (const item of items) {
           const value = `${sectionName}_${item}`;
+          // Décor du manifest Codex pas encore livré (BootScene ne l'a pas
+          // chargé) : pas proposé, il se poserait en carré « texture manquante ».
+          if (manifestSections.includes(sectionName) && !scene.propTexture(value)) continue;
           if (firstValue === null) firstValue = value;
           const o = document.createElement('option');
           o.value = value;
           o.textContent = EditorScene.humanizeDecorItemName(item);
           group.appendChild(o);
         }
-        select.appendChild(group);
+        if (group.children.length) select.appendChild(group);
       }
-      EditorScene.getEditor().subtype = firstValue;
+      scene.subtype = firstValue;
       return;
     }
 

@@ -8,9 +8,14 @@
 // hauteurs (forêt flottante 1) s'ouvre. Agarica a donc la forme singe ici.
 //
 // RÈGLES DU COMBAT :
-// - Kainati reste au sol, entre ses deux postes (bords de l'arène). Les 4
-//   lianes sont pour Agarica : ses attaques pleine largeur (onde de choc,
-//   vague de mousse, éboulement) ne s'esquivent qu'accrochée à une liane.
+// - Kainati reste au sol, entre ses deux postes (bords de l'arène). Les 2
+//   lianes (demande utilisateur du 2026-10-25) sont pour Agarica : ses
+//   attaques pleine largeur (onde de choc, vague de mousse, éboulement) et sa
+//   charge ne s'esquivent qu'accrochée à une liane ; télégraphes calés pour
+//   en rejoindre une à pied depuis n'importe où (cf. KAINATI_TIMINGS).
+// - Sans la forme singe active (ancienne sauvegarde, « Zones de test », aigle
+//   choisi au feu de camp), le combat ne commence pas : Xara explique et le
+//   chemin du retour (racines, feu de camp du palier) reste ouvert.
 // - Frappable à tout moment (1 PV, ~0,26 s entre deux coups) ; après chaque
 //   charge (esquive : une liane) il heurte le rideau, rebondit vers le
 //   centre et reste SONNÉ ~3 s (2 PV par coup, ~0,2 s), puis retourne au
@@ -74,6 +79,28 @@ function kainatiBubble(scene, who, text, ms) {
 
 function kainatiFrozen(scene) {
   return typeof isWorldFrozen === 'function' ? isWorldFrozen(scene) : scene.scene.isActive('CampfireMenuScene');
+}
+
+// Forme singe : 'ready' (active, les lianes portent Agarica), 'other' (débloquée
+// mais l'aigle est choisi au feu de camp), 'none' (pas encore obtenue). Sans
+// elle, aucune grande attaque ne s'esquive : le combat ne doit pas commencer.
+function kainatiMonkeyState(scene, p) {
+  const unlocked = p && typeof p.isFormUnlocked === 'function' ? p.isFormUnlocked('monkey') : !!kainatiFlag(scene, 'hasMonkeyForm', false);
+  if (!unlocked) return 'none';
+  const air = p && typeof p.getActiveAirForm === 'function' ? p.getActiveAirForm() : kainatiFlag(scene, 'airForm', null);
+  return air === 'monkey' ? 'ready' : 'other';
+}
+
+// Xara retient Agarica au seuil de l'arène (une fois par approche) : le
+// combat ne démarre pas, et le retour reste libre (rideau gauche ouvert).
+function kainatiNeedMonkey(scene, st, state) {
+  if (st.toldMonkey) return;
+  st.toldMonkey = true;
+  st.boss.face(scene.player.x > st.boss.x ? 1 : -1);
+  const text = state === 'other'
+    ? 'Ses lianes ne portent que la forme du singe ! Choisis-la au feu de camp, juste derrière nous.'
+    : 'Sans la forme du singe, ses coups balaieront tout le sol… Redescendons aux racines : le totem du singe nous attend.';
+  kainatiBubble(scene, 'xara', text, 4200);
 }
 
 // Joue une cinématique si elle existe, sinon le dialogue du même id.
@@ -323,9 +350,15 @@ ZONE_SCRIPTS.kainati_arene = {
     }
 
     // Parler à Kainati apaisé (événement clavier : ne consomme pas le JustDown de Player).
-    st.talkPrompt = scene.add.text(0, 0, 'E : parler', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5', backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
-    }).setOrigin(0.5, 1).setDepth(1050).setVisible(false);
+    // Invite peinte (`ui_invite` + touche, StoryKit) comme celles des PNJ ; repli :
+    // le Text d'avant. Toujours dans l'écran (règle commune de LevelKit).
+    st.talkPrompt = typeof createStoryPromptLabel === 'function'
+      ? createStoryPromptLabel(scene, { originY: 1 })
+      : scene.add.text(0, 0, '', {
+        fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5', backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
+      }).setOrigin(0.5, 1).setDepth(1050);
+    st.talkPrompt.setText('E : parler').setVisible(false);
+    if (typeof keepWorldUiInView === 'function') keepWorldUiInView(st.talkPrompt, { prompt: true });
     st.onKeyE = () => {
       if (st.disposed || !st.boss.calm || !st.talkPrompt.visible || st.talking || kainatiFrozen(scene)) return;
       st.talking = true;
@@ -384,8 +417,12 @@ ZONE_SCRIPTS.kainati_arene = {
     const defeated = kainatiFlag(scene, 'kainatiDefeated', false);
 
     if (!defeated && !st.fightActive && !st.starting && !st.downFired && p.hearts > 0 && p.x > st.cfg.lockX && p.x < st.cfg.maxX) {
-      kainatiStartFight(scene, st);
+      const monkey = kainatiMonkeyState(scene, p);
+      if (monkey === 'ready') kainatiStartFight(scene, st);
+      else kainatiNeedMonkey(scene, st, monkey);
     }
+    // Repartie vers le palier : Xara pourra le redire à la prochaine approche.
+    if (st.toldMonkey && p.x < st.cfg.lockX - 150) st.toldMonkey = false;
 
     st.boss.update(dt, p);
     kainatiCheckPlayerHits(scene, st, time);

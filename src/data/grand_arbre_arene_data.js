@@ -8,7 +8,7 @@
 //   x 0-512     palier d'arrivée (depuis les racines) + feu de camp
 //   x 512-1472  l'arène, exactement un écran : caméra figée pendant le combat,
 //               rideaux de mousse aux deux bords (créés par le script) ;
-//               canopée (rangée 0) d'où pendent 4 lianes. Plus de branches
+//               canopée (rangée 0) d'où pendent 2 lianes. Plus de branches
 //               basses : sous les grandes attaques, seul abri = une liane.
 //   x 1472-1920 au-delà du rideau droit (ouvert après la victoire) : la
 //               route des hauteurs (-> ForetFlottante1Scene, créée après la victoire).
@@ -44,16 +44,18 @@ const GRAND_ARBRE_ARENE_DATA = {
   // charge et de la bande où blessent les grandes attaques (onde, mousse,
   // rochers -- ceux qui tombent de la canopée ne blessent qu'une fois au ras
   // du sol). Seules les pierres (lancées, ou tombées sur sa liane en phase 2)
-  // l'atteignent là-haut. Symétriques (milieu x 992), hors des postes de
-  // Kainati (x 617 et 1367, d'où partent toutes ses attaques ; sonné après
-  // une charge, il rebondit entre deux lianes, 817 ou 1167, puis retourne à
-  // son poste). Son contact ne monte pas à plus de 140 px du sol
+  // l'atteignent là-haut. Son contact ne monte pas à plus de 140 px du sol
   // (KAINATI_CONTACT_MAX_H) : il n'atteint jamais une Agarica suspendue.
+  // 2 lianes seulement (demande utilisateur du 2026-10-25), symétriques
+  // (milieu x 992) : 792 et 1192 laissent au plus ~200 px à parcourir à pied
+  // depuis n'importe quel point de l'arène (rideaux, pied de Kainati, milieu)
+  // -- les télégraphes de Kainati.js (KAINATI_TIMINGS) en dépendent. Loin de
+  // ses postes (617 et 1367, d'où partent ses attaques et où tombent les
+  // pierres de l'éboulement) ; sonné après une charge, il rebondit à 817 ou
+  // 1167, juste sous une liane : on s'y laisse tomber pour frapper.
   vines: [
-    { x: 736, y: 64, length: 170 },
-    { x: 896, y: 64, length: 170 },
-    { x: 1088, y: 64, length: 170 },
-    { x: 1248, y: 64, length: 170 },
+    { x: 792, y: 64, length: 170 },
+    { x: 1192, y: 64, length: 170 },
   ],
   script: 'kainati_arene',
   // Paramètres du combat lus par ZONE_SCRIPTS.kainati_arene.
@@ -66,7 +68,7 @@ const GRAND_ARBRE_ARENE_DATA = {
     ceilingY: 0,        // haut de la canopée (pierres et cailloux qui en tombent à y+66)
     lockX: 600,         // le combat démarre quand Agarica dépasse ce x
     spotInset: 105,     // postes de Kainati : minX+105 et maxX-105 (il charge de l'un à l'autre)
-    recoil: 200,        // rebond après le fracas contre le rideau : sonné à 817 / 1167, à portée des lianes, puis retour au poste
+    recoil: 200,        // rebond après le fracas contre le rideau : sonné à 817 / 1167, sous les lianes, puis retour au poste
     calmX: 1300,        // Kainati apaisé (revisite, si sa place n'a pas été mémorisée)
     exitsAfterVictory: [
       { x: 1896, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_arbre' } },

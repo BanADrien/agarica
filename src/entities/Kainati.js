@@ -7,7 +7,8 @@
 // REFONTE (demande utilisateur 2026-10-24) : Kainati reste AU SOL, ne monte
 // jamais sur les lianes. Agarica arrive avec la forme singe (obtenue dans le
 // monde spirituel) : ses grandes attaques couvrent TOUT le sol de l'arène et
-// ne s'esquivent qu'accrochée aux lianes (4 lianes, cf. la donnée de zone).
+// ne s'esquivent qu'accrochée aux lianes (2 lianes depuis le 2026-10-25, cf.
+// la donnée de zone et KAINATI_TIMINGS).
 // - Charge au sol d'un bout à l'autre de l'arène → il heurte le rideau,
 //   rebondit de 200 px vers le centre et reste SONNÉ ~3 s (coups doublés),
 //   puis retourne au trot à son poste. Esquive : une liane (pas de saut
@@ -68,6 +69,13 @@ const KAINATI_UI_DEPTH = CHARACTER_DEPTH + 3;
 // (rien n'est dessiné sur Kainati -- demande utilisateur, pas de mousse
 // plaquée sur lui), au-dessus du sol.
 const KAINATI_GROUND_FX_DEPTH = CHARACTER_DEPTH - 1;
+// Bande d'alerte peinte (fx_lueur_sol) : largeur visée d'une lueur et hauteur
+// affichée (l'image, très étirée, ne montre que son cœur lumineux).
+const KAINATI_WARN_GLOW_W = 190;
+const KAINATI_WARN_GLOW_H = 70;
+// « ! » des télégraphes (art `ui_alerte`) : hauteur à l'écran. Playtest : à
+// l'échelle du manifeste (26 px), on le voyait à peine ; 36 px (≈ 0,14).
+const KAINATI_ALERT_H = 36;
 
 // PV : frappable à tout moment (1 PV), sonné 2 PV par coup. ~1 min 30 pour
 // une joueuse correcte. Depuis que la fenêtre « sonné » est atteignable
@@ -84,20 +92,30 @@ const KAINATI_STUN_HIT_INVULN = 220;
 // Phase 2 (enragé) : légère teinte rouge, constante (pas de clignotement).
 const KAINATI_PHASE2_TINT = 0xffd4d4;
 
-// Durées (ms) et vitesses par phase. Télégraphes des attaques pleine largeur
-// entre 0,8 et 1 s (demande utilisateur). `stun` : assez long pour qu'Agarica,
+// Durées (ms) et vitesses par phase. `stun` : assez long pour qu'Agarica,
 // sur la liane la plus éloignée, lâche, coure (ou sprinte) jusqu'à lui et
 // place quelques coups doublés (à 2,3 s, il était déjà relevé à son arrivée).
-// `chargeWind` : la charge ne s'esquive plus que sur une liane (pas de saut
-// par-dessus) -- même préavis que les attaques pleine largeur (0,8-0,9 s).
+// `chargeWind` : la charge ne s'esquive que sur une liane (pas de saut
+// par-dessus).
+// Télégraphes (`fullWind`, `chargeWind`) recalculés pour 2 lianes (demande
+// utilisateur du 2026-10-25 : « ne met que 2 lianes ») : depuis N'IMPORTE OÙ
+// dans l'arène, une joueuse qui réagit en 450 ms et MARCHE (sans sprint)
+// jusqu'à la liane la plus proche doit y être accrochée avant que le danger
+// ne l'atteigne. Lianes en 792 / 1192 : au plus ~200-245 px à parcourir
+// (bot de revue « humain » : ~1,1 s après son réflexe pour 200 px, saut et
+// prise compris) ; pire cas = le milieu de l'arène, pour toutes les attaques
+// (dangers qui partent de ses mains : onde, vague, rocher, charge). Avec 4
+// lianes, 0,8-1 s suffisaient. Phase 2 un peu plus vive (repos, pierres,
+// pierre de la canopée), télégraphes à peine plus courts : avant, l'onde de
+// choc était impossible à esquiver sans sprint depuis le rideau opposé.
 const KAINATI_TIMINGS = {
   1: {
-    idle: 950, throwWind: 650, throwRelease: 450, chargeWind: 900, chargeSpeed: 620, stun: 3200, returnSpeed: 330,
-    fullWind: 950, recover: 550, quake: 1900, moss: 2300, rocks: 6, rockEvery: 230,
+    idle: 950, throwWind: 650, throwRelease: 450, chargeWind: 1200, chargeSpeed: 620, stun: 3200, returnSpeed: 330,
+    fullWind: 1250, recover: 550, quake: 1900, moss: 2300, rocks: 6, rockEvery: 230,
   },
   2: {
-    idle: 650, throwWind: 550, throwRelease: 380, chargeWind: 780, chargeSpeed: 740, stun: 2700, returnSpeed: 400,
-    fullWind: 820, recover: 420, quake: 2000, moss: 2400, rocks: 8, rockEvery: 200,
+    idle: 650, throwWind: 550, throwRelease: 380, chargeWind: 1200, chargeSpeed: 700, stun: 2700, returnSpeed: 400,
+    fullWind: 1200, recover: 420, quake: 2000, moss: 2400, rocks: 8, rockEvery: 200,
   },
 };
 // Rebond après le fracas contre le rideau (durée du recul, ms) ; la distance
@@ -127,7 +145,10 @@ const KAINATI_PATTERN = {
 // bande (pas pendant leur chute depuis la canopée).
 const KAINATI_QUAKE_H = 58;
 const KAINATI_MOSS_H = 60;
-const KAINATI_QUAKE_SPEED = 1150; // front de l'onde (px/s)
+// Front de l'onde (px/s). 1150 avant les 2 lianes : au milieu de l'arène,
+// à ~200 px de chaque liane, elle arrivait 360 ms après le coup -- trop tôt
+// pour une joueuse qui marche (réflexe 450 ms). 800 : même ordre que la vague.
+const KAINATI_QUAKE_SPEED = 800;
 const KAINATI_MOSS_SPEED = 640;   // front de la vague (px/s)
 const KAINATI_ROLL_SPEED = [540, 620];
 const KAINATI_BOULDER_D = 88;     // diamètre du rocher qu'il tient (mesuré sur sweep r3_2)
@@ -152,6 +173,9 @@ const KAINATI_RISE_GRACE = 500;
 // plus tard (pas d'abri permanent dans son corps). Sinon elle reprenait un
 // coup toutes les ~1 s, coincée contre le rideau.
 const KAINATI_UNPIN_MS = 1200;
+// Retour au poste avec Agarica dans son dos : il s'arrête à cette distance
+// devant elle (demi-largeur de son contact ~60 px + marge), cf. 'return'.
+const KAINATI_RETURN_GAP = 120;
 
 // ---------------------------------------------------------------------------
 // Poses : une anim par état. `src` = sources par ordre de préférence
@@ -160,7 +184,10 @@ const KAINATI_UNPIN_MS = 1200;
 // frame reste affichée (pose tenue).
 // ---------------------------------------------------------------------------
 const KAINATI_POSES = {
-  idle: { src: [[KAINATI_ID, 'idle']], fps: 6, loop: true },
+  // Boucle stable (playtest) : la frame 3 de l'idle (posture basse, tête de
+  // profil) suivie de la 0 (tête de trois quarts) faisait se retourner sa tête
+  // à chaque tour. Aller-retour 0-1-2-1 : jamais deux frames éloignées à la suite.
+  idle: { src: [[KAINATI_ID, 'idle', [0, 1, 2, 1]]], fps: 5, loop: true },
   throwWind: { src: [[KAINATI_ID, 'throw_stone', [0, 1]]], fps: 6 },
   throwRelease: { src: [[KAINATI_ID, 'throw_stone', [2, 3]]], fps: 10 },
   chargeWind: { src: [[KAINATI_SOL_ID, 'charge', [0]], [KAINATI_ID, 'idle', [3]]] },
@@ -278,12 +305,21 @@ function ensureKainatiStoneTexture(scene) {
 }
 
 // Pierre (art `pierre`, sinon dessinée). Aussi utilisée par acte1_arbre.js
-// (pierres des racines et de l'épreuve) : profondeur de ces scripts gardée.
-function addKainatiStoneImage(scene, x, y) {
+// (pierres des racines et de l'épreuve) : profondeur et taille de ces
+// scripts gardées (sans `size`). `size` (px, plus grand côté visible) : les
+// pierres du combat, à la taille de leur zone de dégâts.
+function addKainatiStoneImage(scene, x, y, size = null) {
   const hasItem = typeof getItemManifest === 'function' && getItemManifest().pierre;
   const img = hasItem ? addItemImage(scene, x, y, 'pierre') : scene.add.image(x, y, ensureKainatiStoneTexture(scene));
+  if (size) img.setScale(size / Math.max(img.width, img.height, 1));
   return img.setDepth(991);
 }
+
+// Pierres du combat (jets et canopée) : 2 × rayon de dégâts + 4 px (plan
+// lot 8, §3.10) -- l'art à l'échelle du manifeste (41 px) et la pierre de la
+// canopée (×0,26 : 66 px avec l'art, 7 px dessinée) ne disaient pas où elles
+// blessent.
+const KAINATI_STONE_SIZE = 2 * KAINATI_STONE_RADIUS + 4;
 
 // Rocher roulant (art `rocher_roulant`, sinon la pierre dessinée agrandie)
 // au diamètre `d` px (pixels visibles).
@@ -363,14 +399,33 @@ class KainatiHazards {
     const T = flight / 1000;
     const vx = (tx - sx) / T;
     const vy = (ty - sy - 0.5 * KAINATI_STONE_GRAVITY * T * T) / T;
-    const img = addKainatiStoneImage(this.scene, sx, sy).setDepth(KAINATI_FX_DEPTH);
+    const img = addKainatiStoneImage(this.scene, sx, sy, KAINATI_STONE_SIZE).setDepth(KAINATI_FX_DEPTH);
     return this.push({ kind: 'stone', img, vx, vy, g: KAINATI_STONE_GRAVITY, spin: Phaser.Math.Between(-8, 8) });
   }
 
-  // Bande d'alerte au ras du sol (toute la largeur) pendant `ms`.
+  // Bande d'alerte au ras du sol (toute la largeur) pendant `ms`. Playtest :
+  // dessinée seule, elle partait presque invisible (14 px, alpha 0,12) au
+  // moment où il faut réagir. Elle est vive dès la 1re image ; avec l'art
+  // `fx_lueur_sol` (lueur blanche, teinte exacte), une rangée de lueurs de la
+  // couleur de l'attaque, en ADD, qui respire sur tout le sol.
   warnBand(color, ms) {
-    const g = this.scene.add.graphics().setDepth(KAINATI_GROUND_FX_DEPTH);
-    return this.push({ kind: 'warn', g, color, ms, t: 0 });
+    const sc = this.scene;
+    const a = this.arena;
+    const g = sc.add.graphics().setDepth(KAINATI_GROUND_FX_DEPTH);
+    const glows = [];
+    if (sc.textures.exists('item-fx_lueur_sol')) {
+      const n = Math.max(1, Math.round((a.maxX - a.minX) / KAINATI_WARN_GLOW_W));
+      const step = (a.maxX - a.minX) / n;
+      for (let i = 0; i < n; i++) {
+        const img = sc.add.image(a.minX + step * (i + 0.5), a.floorY + 6, 'item-fx_lueur_sol').setOrigin(0.5, 1)
+          .setDisplaySize(step * 1.35, KAINATI_WARN_GLOW_H).setTint(color).setBlendMode(Phaser.BlendModes.ADD)
+          .setAlpha(0).setDepth(KAINATI_GROUND_FX_DEPTH);
+        img.__sx = img.scaleX;
+        img.__sy = img.scaleY;
+        glows.push(img);
+      }
+    }
+    return this.push({ kind: 'warn', g, glows, color, ms, t: 0 });
   }
 
   // Onde de choc : un front part de x0 vers les deux rideaux ; derrière lui
@@ -416,11 +471,24 @@ class KainatiHazards {
   }
 
   // Pierre du plafond au-dessus de x : poussière qui tombe de la canopée et
-  // ombre au sol pendant `telegraph` ms, puis la pierre tombe.
+  // ombre au sol pendant `telegraph` ms, puis la pierre tombe. Art (plan lot 8,
+  // §3.10) : ombre `fx_ombre_sol` et marqueur `fx_marqueur_danger` (anneau
+  // rouge, ADD) qui grandissent ; repli : l'ellipse dessinée.
   ceilingRock(x, telegraph) {
+    const sc = this.scene;
     const a = this.arena;
-    const shadow = this.scene.add.ellipse(x, a.floorY - 3, 20, 8, 0x12000c, 1).setAlpha(0.25).setDepth(KAINATI_FX_DEPTH);
-    return this.push({ kind: 'ceil', x, t: 0, telegraph, shadow, dustAt: 0 });
+    let shadow;
+    let marker = null;
+    if (sc.textures.exists('item-fx_ombre_sol')) {
+      shadow = sc.add.image(x, a.floorY - 2, 'item-fx_ombre_sol').setDisplaySize(18, 8).setAlpha(0.35).setDepth(KAINATI_FX_DEPTH);
+    } else {
+      shadow = sc.add.ellipse(x, a.floorY - 3, 20, 8, 0x12000c, 1).setAlpha(0.25).setDepth(KAINATI_FX_DEPTH);
+    }
+    if (sc.textures.exists('item-fx_marqueur_danger')) {
+      marker = sc.add.image(x, a.floorY - 2, 'item-fx_marqueur_danger').setDisplaySize(40, 10)
+        .setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(KAINATI_FX_DEPTH);
+    }
+    return this.push({ kind: 'ceil', x, t: 0, telegraph, shadow, marker, dustAt: 0 });
   }
 
   update(dt, player) {
@@ -462,22 +530,33 @@ class KainatiHazards {
           h.t += dt;
           const k = Math.min(1, h.t / h.ms);
           const pulse = 0.5 + 0.5 * Math.sin(h.t / 70);
+          // Apparition franche (100 ms) : le préavis compte dès la 1re image.
+          const on = Math.min(1, h.t / 100);
           // Lueur qui monte du sol sur toute la largeur (dégradé en 4
           // bandes), liseré vif qui pulse : « tout le sol va y passer ».
           // (Hauteur finale = celle du danger : on voit ce qui va être balayé.)
-          const hh = 14 + (KAINATI_MOSS_H - 14) * k;
+          const hh = 30 + (KAINATI_MOSS_H - 30) * k;
           h.g.clear();
           for (let i = 0; i < 4; i++) {
-            h.g.fillStyle(h.color, (0.12 + 0.2 * k) * (0.7 + 0.3 * pulse) * (1 - i * 0.22));
+            h.g.fillStyle(h.color, on * (0.3 + 0.2 * k) * (0.7 + 0.3 * pulse) * (1 - i * 0.22));
             h.g.fillRect(a.minX, a.floorY - hh * (i + 1) / 4, a.maxX - a.minX, hh / 4);
           }
-          h.g.fillStyle(h.color, 0.6 + 0.35 * pulse);
-          h.g.fillRect(a.minX, a.floorY - 4, a.maxX - a.minX, 4);
+          h.g.fillStyle(h.color, on * (0.75 + 0.25 * pulse));
+          h.g.fillRect(a.minX, a.floorY - 5, a.maxX - a.minX, 5);
+          for (const img of h.glows) {
+            // Lueurs : déjà nettes au départ (0,55), plus hautes vers la fin.
+            img.setAlpha(on * (0.55 + 0.3 * k) * (0.8 + 0.2 * pulse));
+            img.scaleY = img.__sy * (0.75 + 0.45 * k);
+          }
           if (Math.random() < 0.35) {
             spawnFx(this.scene, 'dust', Phaser.Math.Between(a.minX + 20, a.maxX - 20), a.floorY - 2,
               { count: 1, angle: [250, 290], power: 0.5, tint: h.color });
           }
-          if (h.t >= h.ms) { h.dead = true; h.g.destroy(); }
+          if (h.t >= h.ms) {
+            h.dead = true;
+            h.g.destroy();
+            for (const img of h.glows) img.destroy();
+          }
           break;
         }
         case 'quake': {
@@ -562,7 +641,16 @@ class KainatiHazards {
         case 'ceil': {
           h.t += dt;
           const k = Math.min(1, h.t / h.telegraph);
-          h.shadow.setScale(1 + 2.2 * k, 1 + 1.4 * k).setAlpha(0.25 + 0.5 * k);
+          if (h.shadow.type === 'Image') {
+            // Ombre peinte : déjà sombre en son centre (alpha plus bas que l'ellipse unie).
+            h.shadow.setDisplaySize(18 + 46 * k, 8 + 10 * k).setAlpha(0.35 + 0.45 * k);
+          } else {
+            h.shadow.setScale(1 + 2.2 * k, 1 + 1.4 * k).setAlpha(0.25 + 0.5 * k);
+          }
+          if (h.marker) {
+            const pulse = 0.5 + 0.5 * Math.sin(h.t / 80);
+            h.marker.setDisplaySize(40 + 100 * k, 10 + 14 * k).setAlpha(Math.min(1, h.t / 120) * (0.55 + 0.35 * pulse));
+          }
           if (h.t >= h.dustAt) {
             h.dustAt = h.t + 110;
             spawnFx(this.scene, 'chip', h.x + Phaser.Math.Between(-10, 10), a.ceilingY + 70, { count: 1, angle: [80, 100], speed: [40, 120] });
@@ -570,8 +658,9 @@ class KainatiHazards {
           if (h.t >= h.telegraph) {
             h.dead = true;
             h.shadow.destroy();
-            const img = addKainatiStoneImage(this.scene, h.x, a.ceilingY + 66).setDepth(KAINATI_FX_DEPTH).setScale(0.26);
-            added.push({ kind: 'stone', img, vx: 0, vy: 120, g: 1700, spin: 5, dead: false, serial: h.serial });
+            if (h.marker) h.marker.destroy();
+            const img = addKainatiStoneImage(this.scene, h.x, a.ceilingY + 66, KAINATI_STONE_SIZE).setDepth(KAINATI_FX_DEPTH);
+            added.push({ kind: 'stone', img, vx: 0, vy: 120, g: 1700, spin: 5, dead: false, serial: h.serial, fromCeiling: true });
           }
           break;
         }
@@ -636,7 +725,7 @@ class KainatiHazards {
   // Tout efface ; `fade` : en douceur (fin du combat).
   clear(fade = false) {
     for (const h of this.list) {
-      const objs = [h.img, h.g, h.front, h.shadow].filter((o) => o && o.active);
+      const objs = [h.img, h.g, h.front, h.shadow, h.marker, ...(h.glows || [])].filter((o) => o && o.active);
       for (const o of objs) {
         if (fade) this.scene.tweens.add({ targets: o, alpha: 0, duration: 350, onComplete: () => o.destroy() });
         else o.destroy();
@@ -649,6 +738,11 @@ class KainatiHazards {
   // Un danger au sol est-il actif (bots, indices) ?
   floorDanger() {
     return this.list.some((h) => (h.kind === 'quake' && h.t < h.ms) || (h.kind === 'moss' && h.t < h.ms) || h.kind === 'boulder');
+  }
+
+  // Pierres lancées encore en l'air (pas celles de la canopée) ?
+  thrownStonesAirborne() {
+    return this.list.some((h) => h.kind === 'stone' && !h.dead && !h.fromCeiling);
   }
 }
 
@@ -673,8 +767,9 @@ class KainatiBoss {
     this.alertIcon = scene.textures.exists('item-ui_alerte')
       ? addItemImage(scene, 0, 0, 'ui_alerte', { origin: [0.5, 1] })
       : scene.add.text(0, 0, '!', {
-        fontFamily: 'sans-serif', fontSize: '34px', fontStyle: 'bold', color: '#ffe066', stroke: '#2a1f45', strokeThickness: 6,
+        fontFamily: 'sans-serif', fontSize: '40px', fontStyle: 'bold', color: '#ffe066', stroke: '#2a1f45', strokeThickness: 6,
       }).setOrigin(0.5, 1);
+    if (this.alertIcon.type === 'Image') this.alertIcon.setScale(KAINATI_ALERT_H / Math.max(1, this.alertIcon.height));
     this.alertIcon.setDepth(KAINATI_UI_DEPTH).setVisible(false);
     this.alertBase = this.alertIcon.scaleX;
     this.stunStars = scene.textures.exists('item-ui_etoiles_etourdi')
@@ -683,6 +778,12 @@ class KainatiBoss {
         fontFamily: 'sans-serif', fontSize: '18px', color: '#fff2a8', stroke: '#2a1f45', strokeThickness: 4,
       }).setOrigin(0.5, 1);
     this.stunStars.setDepth(KAINATI_UI_DEPTH).setVisible(false);
+    // Règle commune : « ! » et étoiles toujours dans l'écran (LevelKit) --
+    // Kainati dressé près du haut de la vue, le « ! » en sortait.
+    if (typeof keepWorldUiInView === 'function') {
+      keepWorldUiInView(this.alertIcon);
+      keepWorldUiInView(this.stunStars);
+    }
     this.lastTurnAt = -Infinity;
     this.reset();
   }
@@ -792,6 +893,11 @@ class KainatiBoss {
     const top = box ? box.top : this.cfg.floorY - this.size.h;
     this.alertIcon.setPosition(this.x, Math.max(70, top - 6));
     this.stunStars.setPosition(this.x, top + 18);
+    // Étoiles peintes : elles « tournent » (retournées toutes les 200 ms) et
+    // se balancent un peu, comme un vertige (plan lot 8, §3.10).
+    if (this.stunStars.visible && this.stunStars.type === 'Image') {
+      this.stunStars.setFlipX(Math.floor(this.clock / 200) % 2 === 1).setAngle(Math.sin(this.clock / 170) * 6);
+    }
     this.h = this.cfg.floorY - top;
   }
 
@@ -893,8 +999,15 @@ class KainatiBoss {
       return;
     }
     const pattern = KAINATI_PATTERN[this.phase];
-    const action = pattern[this.patternIndex % pattern.length];
-    this.patternIndex += 1;
+    let action = pattern[this.patternIndex % pattern.length];
+    // Agarica DERRIÈRE lui (entre lui et son rideau, en le suivant jusqu'à
+    // son poste) : de là, aucune liane n'est à portée avant qu'une grande
+    // attaque ne la touche (elles partent de ses mains et couvrent aussi son
+    // dos), et une salve de pierres l'acculerait au rideau. Il charge alors
+    // vers l'autre bout -- loin d'elle --, et l'action prévue garde son tour.
+    const behind = player && (player.x - this.x) * this.centerDir < -10;
+    if (behind && action !== 'charge') action = 'charge';
+    else this.patternIndex += 1;
     const evt = (kind) => this.scene.events.emit('kainati-attack', { kind, phase: this.phase, boss: this });
     if (action === 'throw') {
       if (player) this.face(player.x > this.x ? 1 : -1);
@@ -931,11 +1044,20 @@ class KainatiBoss {
     }
   }
 
-  // Phase 2 : une pierre tombe de la canopée sur la position d'Agarica (sur sa
-  // liane) pendant les grandes attaques : il faut se balancer ou changer de liane.
+  // Phase 2 : une pierre tombe de la canopée sur la liane d'Agarica pendant
+  // les grandes attaques : il faut se balancer (2 lianes, trop loin l'une de
+  // l'autre pour en changer). Pas encore accrochée : sur la liane la plus
+  // proche, celle qu'elle rejoint -- jamais sur son chemin au sol. Appelée
+  // en différé (delayedCall) : rien si le combat s'est arrêté entre-temps
+  // (victoire, mort d'Agarica) -- une pierre tombait après la victoire.
   dropCeilingRock(player) {
-    if (this.phase !== 2 || !player) return;
-    const x = player.vine ? player.vine.x : player.x;
+    if (this.phase !== 2 || !player || !player.active || !this.active || this.defeated || this.calm) return;
+    let x = player.x;
+    if (player.vine) x = player.vine.x;
+    else {
+      const vines = (this.scene.vines || []).filter((v) => v.alive);
+      if (vines.length) x = vines.reduce((b, v) => (Math.abs(v.x - player.x) < Math.abs(b.x - player.x) ? v : b)).x;
+    }
     this.hazards.ceilingRock(Phaser.Math.Clamp(x + Phaser.Math.Between(-8, 8), this.cfg.minX + 30, this.cfg.maxX - 30), 950);
   }
 
@@ -955,7 +1077,11 @@ class KainatiBoss {
         break;
       case 'idle':
         if (player) this.faceToward(player.x);
-        if (this.active && this.t >= T.idle) this.nextAction(player);
+        // Sol dégagé avant d'enchaîner : avec 2 lianes, la course jusqu'à une
+        // liane est plus longue, et elle croisait la dernière pierre d'une
+        // salve encore en vol (phase 2 : jet, puis grande attaque 1 s après)
+        // -- un cœur perdu que le télégraphe ne laissait pas éviter (bot).
+        if (this.active && this.t >= T.idle && !this.hazards.thrownStonesAirborne()) this.nextAction(player);
         break;
       case 'throwWind':
         this.glow(0xffe066);
@@ -1014,6 +1140,15 @@ class KainatiBoss {
         break;
       case 'return': {
         const step = T.returnSpeed * (dt / 1000);
+        // Agarica dans son dos, entre son poste et son rideau (elle l'a suivi
+        // pour frapper) : il s'arrête devant elle au lieu de la coincer contre
+        // le rideau, d'où ses coups (contact réarmé) ne s'évitaient qu'en lui
+        // sautant par-dessus. Sa prochaine grande attaque devient une charge
+        // vers l'autre bout (cf. nextAction), loin d'elle.
+        if (player && (player.x - this.returnTo) * this.centerDir < 0) {
+          const stop = player.x + this.centerDir * KAINATI_RETURN_GAP;
+          if ((stop - this.returnTo) * this.centerDir > 0) this.returnTo = stop;
+        }
         const left = this.returnTo - this.x;
         if (Math.floor(this.t / 140) !== Math.floor((this.t - dt) / 140)) {
           spawnFx(this.scene, 'step', this.x - this.dir * 50, this.cfg.floorY, { dir: this.dir, power: 0.7 });
@@ -1179,8 +1314,17 @@ class KainatiEsprit {
     this.baseScale = this.sprite.scaleX;
     this.sprite.setDepth(KAINATI_DEPTH).setAlpha(0.75).setFlipX(kainatiFlipFor('kainati_esprit', facing === 'right'));
     this.sprite.setBlendMode(Phaser.BlendModes.SCREEN);
-    this.glow = scene.add.ellipse(x, y - this.h / 2, this.size.w * 1.4, this.h * 1.2, 0x9fe3ff, 0.12)
-      .setDepth(KAINATI_DEPTH - 1);
+    // Aura : art `fx_aura_esprit` en ADD (plan lot 8, §3.10), sinon l'ellipse
+    // pâle d'avant. Même emprise ; l'image (taille posée par setDisplaySize)
+    // garde scaleX ≠ scaleY : bless() tweene donc scaleX et scaleY à part.
+    if (scene.textures.exists('item-fx_aura_esprit')) {
+      this.glow = scene.add.image(x, y - this.h / 2, 'item-fx_aura_esprit')
+        .setDisplaySize(this.size.w * 1.4, this.h * 1.2).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.18);
+    } else {
+      this.glow = scene.add.ellipse(x, y - this.h / 2, this.size.w * 1.4, this.h * 1.2, 0x9fe3ff, 0.12);
+    }
+    this.glow.setDepth(KAINATI_DEPTH - 1);
+    this.glowBase = { sx: this.glow.scaleX, sy: this.glow.scaleY, alpha: this.glow.alpha };
     this.vine = null;
     this.clock = Math.random() * 1000;
     this.busy = false;
@@ -1224,7 +1368,11 @@ class KainatiEsprit {
         this.sprite.setScale(r && r.scale ? r.scale : this.baseScale);
         this.sprite.play(`${id}-give`);
       }
-      sc.tweens.add({ targets: this.glow, scale: 1.6, alpha: 0.35, duration: ms / 2, yoyo: true, ease: 'Sine.easeInOut' });
+      const gb = this.glowBase;
+      sc.tweens.add({
+        targets: this.glow, scaleX: gb.sx * 1.6, scaleY: gb.sy * 1.6, alpha: Math.max(0.35, gb.alpha * 2),
+        duration: ms / 2, yoyo: true, ease: 'Sine.easeInOut',
+      });
       spawnFx(sc, 'motes', this.feet.x, this.feet.y - this.h * 0.6, { count: 18, spread: 40, power: 1.6, color: [0x9fe3ff, 0xbfe8a0, 0xffffff] });
       sc.time.delayedCall(ms, () => {
         if (this.sprite.active && !this.busy) this.play(this.vine ? 'swing' : 'idle');

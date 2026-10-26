@@ -256,11 +256,23 @@ class CampfireMenuScene extends Phaser.Scene {
     // la partie gauche de l'emplacement, toujours visible (la carte équipée
     // occupe le reste).
     this.addSectionHeader(left0, leftX1, R.skillHead, 'Compétences');
+    // Touche peinte (`ui_touche`, bois clair, 20 px) : la même pastille que
+    // les cases A/F/R du HUD, pour qu'on relie l'emplacement à sa touche en
+    // jeu. Lettre sombre #2a1f45 obligatoire sur le bois clair. Elle tient
+    // dans les 24 px laissés à gauche de la carte équipée (2..22 px).
+    // Repli : la touche sombre dessinée, lettre jaune.
+    const paintedKey = this.textures.exists('item-ui_touche');
     this.skillSlotBoxes = SKILL_KEYS.map((k, i) => {
       const box = drawSlotBox(colX(i), R.skillSlot, L.left.colW, L.slotH, 'skill', i);
       const kx = box.x - box.width / 2 + 12;
-      this.add.rectangle(kx, box.y, 16, 20, 0x15101f, 1).setStrokeStyle(1, 0xffe066, 0.75);
-      this.add.text(kx, box.y, k, { fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe066', fontStyle: 'bold' }).setOrigin(0.5);
+      if (paintedKey) {
+        const key = this.add.image(kx, box.y, 'item-ui_touche');
+        key.setScale(20 / Math.max(key.width, key.height));
+        this.add.text(kx, box.y, k, { fontFamily: 'sans-serif', fontSize: '11px', color: '#2a1f45', fontStyle: 'bold' }).setOrigin(0.5);
+      } else {
+        this.add.rectangle(kx, box.y, 16, 20, 0x15101f, 1).setStrokeStyle(1, 0xffe066, 0.75);
+        this.add.text(kx, box.y, k, { fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe066', fontStyle: 'bold' }).setOrigin(0.5);
+      }
       return box;
     });
     this.skillPoolZone = drawPoolInset(left0, leftX1, R.skillPool, L.poolH, 'skill');
@@ -562,7 +574,8 @@ class CampfireMenuScene extends Phaser.Scene {
     player.skillSlots.forEach((id, slotIdx) => {
       if (!id || !SKILL_DEFS[id]) return;
       const box = this.skillSlotBoxes[slotIdx];
-      // De 24 px après le bord gauche (touche de 16 px + jours) à 4 px du
+      // De 24 px après le bord gauche (touche de 16 px, ou 20 px peinte, +
+      // jours) à 4 px du
       // bord droit : carte de 80 px.
       const x0 = box.x - box.width / 2 + 24;
       const x1 = box.x + box.width / 2 - 4;

@@ -294,6 +294,8 @@ function spawnFish(scene, x, y, w = 200, h = 60) {
 // (butterfliesFlyTo) ou suivre une cible (butterfliesFollow).
 // ---------------------------------------------------------------------------
 const BUTTERFLY_COLORS = [0xff8fd8, 0x8ff6ff, 0xffd6f2, 0xa8fff0, 0xffb0e0, 0x9fdcff];
+// Diamètre du halo de chaque papillon, en px avant l'échelle du conteneur.
+const BUTTERFLY_HALO_SIZE = 35.2; // = point dessiné de 32 px × 1,1
 
 function ensureButterflyTexture(scene) {
   if (scene.textures.exists('papillon')) return;
@@ -314,11 +316,17 @@ function spawnButterflies(scene, x, y, count = 6, { radius = 40, colors = BUTTER
   ensureButterflyTexture(scene);
   if (typeof ensureGlowDotTexture === 'function') ensureGlowDotTexture(scene);
   const useArt = typeof hasManifestArt === 'function' && hasManifestArt(scene, 'papillon');
+  // Halo : `fx_halo_doux` (lot n°8) s'il existe, à la taille du point dessiné
+  // (32 px × 1,1 = 35 px, compensé pour garder le même éclat, cf.
+  // entityHaloTexture) ; teinte, mode ADD et alpha inchangés.
+  const haloTex = typeof entityHaloTexture === 'function'
+    ? entityHaloTexture(scene, FX_GLOW_DOT_KEY) : { key: FX_GLOW_DOT_KEY, size: 32, comp: 1 };
+  const haloScale = (BUTTERFLY_HALO_SIZE * haloTex.comp) / haloTex.size;
   const list = [];
   for (let i = 0; i < count; i++) {
     const color = colors[i % colors.length];
-    const halo = scene.add.image(0, 0, FX_GLOW_DOT_KEY)
-      .setBlendMode(Phaser.BlendModes.ADD).setTint(color).setScale(1.1).setAlpha(0.55);
+    const halo = scene.add.image(0, 0, haloTex.key)
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(color).setScale(haloScale).setAlpha(0.55);
     const wings = useArt
       ? addManifestSprite(scene, 0, 0, 'papillon', 'idle', { origin: [0.5, 0.5] })
       : scene.add.image(0, 0, 'papillon').setTint(color);

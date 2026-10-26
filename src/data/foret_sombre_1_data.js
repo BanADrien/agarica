@@ -21,6 +21,12 @@ const FORET_SOMBRE_1_DATA = {
   // Pas encore de fond dédié au manifest : le ciel nocturne par défaut
   // (plan4) + un voile bleu nuit suffisent à l'ambiance.
   ambient: { tint: 0x070b22, darkness: 0.3 },
+  // Un rai de lune sur la souche de la rencontre avec Xara (lot Codex n°8,
+  // clé `lights`, H15) : bas posé sur le haut du bloc de la souche (y 384) ;
+  // 420 px de haut pour que le haut net du rai sorte de l'écran.
+  lights: [
+    { id: 'fx_rai_lumiere', x: 1344, y: 384, w: 110, h: 420, tint: 0xbfe8ff, alpha: 0.3 },
+  ],
   script: 'foret_sombre_1',
   groundCells: [
     // (groundRow : borne de fin exclue)

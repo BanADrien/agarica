@@ -29,6 +29,13 @@ class CourantAir {
       len: 14 + Math.random() * 26,
       wobble: Math.random() * Math.PI * 2,
     }));
+    // Traits peints `fx_trait_vent` (lot n°8, blancs donc teintables, tête à
+    // droite) : une image par trait, tournée tête en HAUT (le courant monte) ;
+    // repli : les traits dessinés de draw().
+    this.streakImgs = scene.textures.exists('item-fx_trait_vent')
+      ? this.streaks.map(() => scene.add.image(0, 0, 'item-fx_trait_vent')
+        .setBlendMode(Phaser.BlendModes.ADD).setTint(WIND_COLOR).setAngle(-90))
+      : null;
     this.draw(0);
   }
 
@@ -46,16 +53,25 @@ class CourantAir {
     const g = this.gfx;
     const r = this.rect;
     g.clear();
-    g.fillStyle(WIND_COLOR, 0.05);
-    g.fillRect(r.x, r.y, r.width, r.height);
-    for (const s of this.streaks) {
+    // Voile de la zone : inutile quand l'art `courant_air` la couvre déjà.
+    if (!this.image) {
+      g.fillStyle(WIND_COLOR, 0.05);
+      g.fillRect(r.x, r.y, r.width, r.height);
+    }
+    this.streaks.forEach((s, i) => {
       const x = r.x + s.x * r.width + Math.sin(time / 300 + s.wobble) * 4;
       const y = r.y + s.y * r.height;
       // Plus transparent aux extrémités haut/bas du courant.
       const edge = Math.min(s.y, 1 - s.y) * 4;
-      g.lineStyle(2, WIND_COLOR, 0.45 * Math.min(1, edge));
-      g.lineBetween(x, y, x, Math.min(r.bottom, y + s.len));
-    }
+      const img = this.streakImgs && this.streakImgs[i];
+      if (img) {
+        // Même segment que le trait dessiné (de y à y + len), 6 px d'épaisseur.
+        img.setPosition(x, y + s.len / 2).setDisplaySize(s.len, 6).setAlpha(0.45 * Math.min(1, edge));
+      } else {
+        g.lineStyle(2, WIND_COLOR, 0.45 * Math.min(1, edge));
+        g.lineBetween(x, y, x, Math.min(r.bottom, y + s.len));
+      }
+    });
   }
 
   pushPlayer(dt) {

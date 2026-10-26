@@ -1,10 +1,13 @@
 // Zone « monde_spirituel » : l'arbre d'avant, le monde spirituel du peuple
-// singe (acte 1, PLAN_DEV.md). On y arrive par le TOTEM DU SINGE des racines
-// (bout de la grande branche), AVANT le combat contre Kainati. L'esprit
-// simien ancestral éprouve Agarica (question), lui donne la forme singe, puis
-// la GUIDE de liane en liane au-dessus du vide (« suis mes mouvements »).
-// Les deux sorties ramènent au totem. Logique : src/story/acte1_arbre.js
-// (ZONE_SCRIPTS.monde_spirituel + CUTSCENES `esprit_*`).
+// singe (acte 1, PLAN_DEV.md). HORS DU CHEMIN DE L'HISTOIRE depuis la
+// décision du 2026-10-25 (« pas de phase avec singe ancestral, allume juste
+// le totem ») : le totem des racines donne directement la forme singe. Zone
+// gardée telle quelle (réversible), ouverte seulement depuis « Zones de
+// test » : l'esprit simien ancestral y éprouve Agarica (question), lui donne
+// la forme singe, puis la GUIDE de liane en liane au-dessus du vide. Une
+// arrivée avec un point d'entrée (ancienne sauvegarde) retombe devant le
+// totem des racines. Les deux sorties y ramènent aussi. Logique :
+// src/story/acte1_arbre.js (ZONE_SCRIPTS.monde_spirituel + CUTSCENES `esprit_*`).
 //
 // Plan (grille 64, surface du sol y=448) :
 //   x 0-640      clairière d'arrivée (l'esprit attend au bord du vide)
@@ -72,9 +75,9 @@ const MONDE_SPIRITUEL_DATA = {
   ],
   exits: [
     // Le passage derrière l'arbre spirituel : retour au totem des racines.
-    { x: 2864, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_monde_spirituel' } },
+    { x: 2864, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'totem_singe' } },
     // Retour possible à tout moment par où l'on est venue (le totem).
-    { x: 16, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_monde_spirituel' } },
+    { x: 16, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'totem_singe' } },
   ],
   entries: [
     { id: 'from_racines', x: 200, y: 400, height: 100 },

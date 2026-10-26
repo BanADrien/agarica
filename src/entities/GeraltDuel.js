@@ -14,6 +14,10 @@
 // attaque vraiment et où Geralt ne se laisse plus talonner ; victoire dès le
 // 8e coup, même en l'air ; garde-fou contre la sortie de l'arène ; souffle de
 // 1 cœur à la phase 2 et répit croissant après chaque défaite.
+// Finitions (lot 8) : collet de repli derrière lui et roulade qui finit dans
+// ses collets (il s'y prend ~1 fois par duel si on le presse) ; textes dans
+// l'écran ; conseils de Xara différés à une accalmie et jamais posés sur
+// Agarica ; Clak calmé au sol (victoire, défaite) et retiré des interactifs.
 //
 // Ici, la mécanique seule. L'histoire (rencontre, bulles de Xara, fin, carte)
 // reste dans src/story/acte2.js, qui reçoit les événements du duel (onEvent).
@@ -66,6 +70,25 @@ const GERALT_DUEL_CFG = {
   // 50 ms : un 2e cœur perdu impossible à éviter).
   trapRootMs: 500,
   trapW: 42, // largeur à l'écran (34 px : brun sur l'herbe, invisible)
+  // Collet « de repli » (demande utilisateur : « il met des pièges où il peut
+  // tomber dedans mais nous aussi ») : avant, ses collets tombaient toujours
+  // entre lui et Agarica et il reculait sans jamais les retraverser. Le 2e
+  // collet de chaque série de 3 est lancé DERRIÈRE lui, à la longueur d'une
+  // roulade (« pour couvrir sa retraite »)… qu'il oublie aussitôt : pressé
+  // par Agarica, il recule ou roule droit dedans. Rien d'automatique : sans
+  // elle sur ses talons, il n'y retourne pas.
+  trapBackEvery: 3,
+  trapBackDist: 190,
+  // Roulade arrière qui passe sur un collet armé, ou finit à moins de cette
+  // marge au-delà : elle s'y termine pile (il ne regarde pas où il roule).
+  evadeTrapSnap: 70,
+  // Conseils de Xara (bulles) pendant le duel : jamais en plein danger --
+  // ils attendent une accalmie, puis Geralt et Clak laissent `adviceCalmMs`
+  // pour lire le début (6 conseils au plus par visite, une fois chacun).
+  // (Et la bulle ne se pose plus sur Agarica : cf. playerGuard.)
+  adviceCalmMs: 900,
+  adviceLullMs: 500, // accalmie minimale avant sa prochaine attaque pour poser le conseil
+  adviceMaxWaitMs: 6000,
 };
 
 // Clak en phase 2 : il garde ses distances de côté, charge (dégâts au contact)
@@ -133,6 +156,9 @@ const GERALT_POSES = {
 };
 // États où Geralt marche au sol (et peut donc poser le pied dans un collet).
 const GERALT_TRAPPABLE = ['move', 'hurt', 'recover'];
+// Événements qui déclenchent un conseil de Xara (GERALT_DUEL_BULLES,
+// acte2.js) : différés à une accalmie (cf. GeraltDuel.flushAdvice).
+const GERALT_DUEL_ADVICE = ['lob', 'shot', 'trap', 'crash', 'player-trapped', 'geralt-trapped'];
 
 function gdRect(x, y, w, h) { return new Phaser.Geom.Rectangle(x, y, w, h); }
 function gdHit(a, b) { return !!a && !!b && Phaser.Geom.Intersects.RectangleToRectangle(a, b); }
@@ -148,6 +174,10 @@ function gdFloat(scene, x, y, text, color = '#ffd27a', { size = 15, ms = 1100 } 
   }).setOrigin(0.5, 1).setDepth(1060);
   scene.tweens.add({ targets: t, y: y - 30, duration: ms, ease: 'Sine.easeOut' });
   scene.tweens.add({ targets: t, alpha: 0, delay: ms * 0.65, duration: ms * 0.35, onComplete: () => t.destroy() });
+  // Règle commune (LevelKit) : toujours dans l'écran, hors du HUD et des
+  // bulles. Playtest : « Bond du Blaireau ! » sortait par le bord droit, et
+  // le nom de l'attaque recouvrait la bulle de reprise de Geralt.
+  if (typeof keepWorldUiInView === 'function') keepWorldUiInView(t);
   return t;
 }
 
@@ -219,6 +249,7 @@ class GeraltDuel {
     this.over = false;
     this.down = null;
     this.seen = new Set();
+    this.advice = [];
     this.bag = [];
     this.opening = [];
     this.manifest = typeof getAssetManifest === 'function' ? getAssetManifest() : {};
@@ -243,6 +274,15 @@ class GeraltDuel {
     ];
     scene.pogoTargets = scene.pogoTargets || [];
     scene.pogoTargets.push(...this.pogo);
+    // Agarica = obstacle de la règle commune « interface dans l'écran »
+    // (LevelKit, worldUiAddScreenObstacle) pendant le duel : bulles (Xara la
+    // suit à 46 px, sa bulle lui couvrait la tête -- playtest) et textes
+    // flottants se posent au-dessus d'elle ou à côté, plus jamais sur elle.
+    // Rectangle invisible fixé à l'écran, recalé sur elle à chaque image (sync).
+    if (typeof worldUiAddScreenObstacle === 'function') {
+      this.playerGuard = scene.add.zone(0, -999, 1, 1).setOrigin(0, 0).setScrollFactor(0);
+      worldUiAddScreenObstacle(this.playerGuard);
+    }
     this.onDepleted = () => this.playerDown();
     this.onSkill = (ev) => { if (ev && ev.rect) this.pendingSkills.push(ev); };
     scene.events.on('player-depleted', this.onDepleted);
@@ -305,6 +345,7 @@ class GeraltDuel {
     this.updateArrows(dt, p);
     this.updateTraps(dt, p);
     this.updateRoot(p);
+    if (!this.down && !this.disposed) this.flushAdvice(p);
     this.sync();
   }
 
@@ -337,6 +378,7 @@ class GeraltDuel {
     }
     for (const o of this.objs) if (o && o.active) o.destroy();
     this.objs.clear();
+    if (this.playerGuard) { if (this.playerGuard.active) this.playerGuard.destroy(); this.playerGuard = null; }
   }
 
   // --- Géométrie ------------------------------------------------------------
@@ -466,7 +508,41 @@ class GeraltDuel {
       if (this.seen.has(name)) return;
       this.seen.add(name);
     }
+    // Conseil de Xara (bulle au-dessus d'elle, qui suit Agarica de près : la
+    // bulle couvre la tête d'Agarica) : playtest, ils tombaient en plein
+    // apprentissage (flèche droite en vol, collet qu'il faut sauter…). Ils
+    // attendent maintenant une accalmie (cf. flushAdvice).
+    if (GERALT_DUEL_ADVICE.includes(name) && this.active && !this.over) {
+      this.advice.push({ name, data: data || {}, at: this.now });
+      return;
+    }
+    this.emit(name, data);
+  }
+
+  emit(name, data) {
     try { this.onEvent(name, data || {}); } catch (e) { console.error('duel Geralt, événement', name, e); }
+  }
+
+  // Accalmie : rien ne la vise (ni télégraphe, ni flèche en vol, ni Clak à
+  // l'assaut), elle est au sol, libre, et la prochaine attaque n'est pas
+  // imminente -- ou Geralt est à terre (fenêtre de frappe : la bulle « Frappe,
+  // vite ! » ne cache alors rien de dangereux). Un conseil à la fois ; s'il
+  // attend trop (combat très serré), il sort au premier instant sans flèche.
+  flushAdvice(p) {
+    if (!this.advice.length || this.now < (this.adviceBlockUntil || 0)) return;
+    const G = this.G;
+    const cfg = GERALT_DUEL_CFG;
+    const arrows = this.arrows.some((a) => a.state === 'fly');
+    const waited = this.now - this.advice[0].at > cfg.adviceMaxWaitMs;
+    const busy = this.geraltBusy() || this.clakBusy() || !!this.root || !p.body.blocked.down
+      || (!G.lying && G.nextAttackAt - this.now < cfg.adviceLullMs);
+    if (arrows || (busy && !waited)) return;
+    const a = this.advice.shift();
+    this.emit(a.name, a.data);
+    // Le temps de lire le début : pas d'attaque (Geralt, Clak) tout de suite.
+    G.nextAttackAt = Math.max(G.nextAttackAt, this.now + cfg.adviceCalmMs);
+    if (this.C) this.C.nextAt = Math.max(this.C.nextAt || 0, this.now + cfg.adviceCalmMs);
+    this.adviceBlockUntil = this.now + 2500;
   }
 
   float(x, y, text, color, opts) { return gdFloat(this.scene, x, y, text, color, opts); }
@@ -1001,7 +1077,27 @@ class GeraltDuel {
     // Roulade d'environ 200 px ; dos au mur, saut par-dessus elle (~280 px).
     let vx = away * 330;
     let vy = -460;
-    if (G.x + away * 180 < this.minX + 30 || G.x + away * 180 > this.maxX - 30) { vx = -away * 360; vy = -680; }
+    if (G.x + away * 180 < this.minX + 30 || G.x + away * 180 > this.maxX - 30) { vx = -away * 360; vy = -680; } else {
+      // Roulade arrière qui passe sur un collet (le sien, posé derrière lui)
+      // ou finit tout près : il s'y arrête pile -- il ne regarde pas où il
+      // roule. C'est la fenêtre que la joueuse gagne en le pressant (cf.
+      // trapBackEvery) ; le plus proche sur son chemin.
+      const T = (2 * -vy) / GERALT_DUEL_CFG.gravity;
+      const reach = Math.abs(vx * T) + GERALT_DUEL_CFG.evadeTrapSnap;
+      let tr = null;
+      for (const t of this.traps) {
+        if (t.state !== 'armed' && t.state !== 'setting') continue;
+        const behind = (t.x - G.x) * away;
+        if (behind > 4 && behind <= reach && (!tr || behind < (tr.x - G.x) * away)) tr = t;
+      }
+      if (tr) {
+        // Collet tout proche dans son dos : un petit bond en arrière suffit
+        // pour mettre le pied dedans (une roulade entière, au ralenti, se
+        // voyait mal).
+        if (Math.abs(tr.x - G.x) < 90) vy = -300;
+        vx = (tr.x - G.x) / ((2 * -vy) / GERALT_DUEL_CFG.gravity);
+      }
+    }
     G.vx = vx;
     G.vy = vy;
     G.air = true;
@@ -1151,24 +1247,45 @@ class GeraltDuel {
     return !this.noTrap.some(([a, b]) => x > a - half && x < b + half);
   }
 
+  // Collet de repli : derrière lui, de préférence à la longueur d'une
+  // roulade, sinon un peu plus près ou plus loin (les fleurs hautes, où un
+  // collet ne se voit pas, sont souvent dans son dos : il y est repoussé) ;
+  // null si le mur est trop près dans son dos.
+  backTrapSpot(p) {
+    const G = this.G;
+    const d0 = GERALT_DUEL_CFG.trapBackDist;
+    for (const d of [d0, d0 - 40, d0 + 40, d0 - 80, d0 + 70]) {
+      const x = G.x - G.face * d;
+      if (x < this.minX + 60 || x > this.maxX - 60) continue;
+      if (this.trapSpotOk(x, p)) return x;
+    }
+    return null;
+  }
+
   placeTrap(p) {
     const G = this.G;
-    const x = this.trapSpot(p);
+    const cfg = GERALT_DUEL_CFG;
+    this.trapCount = (this.trapCount || 0) + 1;
+    const backX = this.trapCount % cfg.trapBackEvery === 2 ? this.backTrapSpot(p) : null;
+    const back = backX != null;
+    const x = back ? backX : this.trapSpot(p);
     if (x == null) { this.float(G.x, G.y - 84, 'Euh… pas ici.', '#ffd27a', { size: 13, ms: 800 }); return; }
     const img = addItemImage(this.scene, x, this.groundY + 2, 'objet_collet', { origin: [0.5, 1] });
-    const s = GERALT_DUEL_CFG.trapW / Math.max(img.width, 1);
+    const s = cfg.trapW / Math.max(img.width, 1);
     img.setScale(s).setDepth(CHARACTER_DEPTH - 1);
-    const trap = { img, x, s, state: 'setting', t: 0, ownerClear: false, glintAt: this.now + 700 };
+    const trap = { img, x, s, state: 'setting', t: 0, ownerClear: false, glintAt: this.now + 700, back };
     // Lancé depuis sa main (cloche basse et courte en phase 1, longue en
-    // phase 2) : on voit où il tombe.
+    // phase 2) : on voit où il tombe. Collet de repli : par-dessus son
+    // épaule, en cloche haute (bien visible derrière lui).
     trap.state = 'flying';
-    trap.x0 = G.x + G.face * 12;
+    trap.x0 = G.x + (back ? -G.face * 8 : G.face * 12);
     trap.y0 = G.y - 40;
-    trap.T = this.phase === 2 ? 0.55 : 0.32;
-    trap.arc = this.phase === 2 ? 70 : 26;
+    trap.T = back ? 0.5 : (this.phase === 2 ? 0.55 : 0.32);
+    trap.arc = back ? 90 : (this.phase === 2 ? 70 : 26);
     img.setPosition(trap.x0, trap.y0);
     this.traps.push(trap);
     this.track(img);
+    if (back) this.float(G.x, G.y - 64, 'Et un pour mes arrières !', '#ffd27a', { size: 13, ms: 1000 });
     this.event('trap', null, true);
   }
 
@@ -1189,14 +1306,18 @@ class GeraltDuel {
 
   // Halo additif pâle sous un collet posé, qui pulse doucement : sans lui, le
   // collet (brun, 34 px) disparaissait dans l'herbe. Visible mais discret.
+  // Playtest du lot 8 (« l'image du piège n'apparaît pas ») : l'art est bien
+  // affiché, mais le halo (48x12, jusqu'à 0,6) remplissait la boucle et la
+  // lavait -- on ne voyait qu'un ovale lumineux. Il passe SOUS la corde, plus
+  // plat et plus doux : la boucle et le piquet se lisent.
   addTrapHalo(trap) {
     const sc = this.scene;
-    const halo = sc.add.image(trap.x, this.groundY - 5, gdArrowGlowTexture(sc))
-      .setDisplaySize(48, 12).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff0c8)
+    const halo = sc.add.image(trap.x - 2, this.groundY, gdArrowGlowTexture(sc))
+      .setDisplaySize(54, 9).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff0c8)
       .setAlpha(0).setDepth(CHARACTER_DEPTH - 2);
     trap.halo = this.track(halo);
-    sc.tweens.add({ targets: halo, alpha: 0.6, duration: 220, onComplete: () => {
-      if (halo.active) sc.tweens.add({ targets: halo, alpha: { from: 0.6, to: 0.35 }, duration: 750, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    sc.tweens.add({ targets: halo, alpha: 0.45, duration: 220, onComplete: () => {
+      if (halo.active) sc.tweens.add({ targets: halo, alpha: { from: 0.45, to: 0.25 }, duration: 750, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     } });
   }
 
@@ -1345,8 +1466,10 @@ class GeraltDuel {
       d.marker = this.addMarker(d.tx);
       const sc = this.scene;
       const glowKey = sc.textures.exists('item-fx_lueur_sol') ? 'item-fx_lueur_sol' : gdBeamTexture(sc);
+      // fx_lueur_sol est désaturé à l'import (lot 8, M05) : teinte chaude de
+      // la lumière ancestrale, comme le rai et la colonne.
       d.glow = this.track(sc.add.image(d.tx, this.groundY + 4, glowKey).setOrigin(0.5, 1)
-        .setDisplaySize(96, 26).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(CHARACTER_DEPTH - 1));
+        .setDisplaySize(96, 26).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff6e0).setAlpha(0).setDepth(CHARACTER_DEPTH - 1));
       sc.tweens.add({ targets: d.glow, alpha: 0.9, duration: 500 });
       const rayKey = sc.textures.exists('item-fx_rai_lumiere') ? 'item-fx_rai_lumiere' : gdBeamTexture(sc);
       d.ray = this.track(sc.add.image(d.tx, this.groundY, rayKey).setOrigin(0.5, 1)
@@ -1466,6 +1589,10 @@ class GeraltDuel {
     scene.tweens.add({ targets: c, alpha: 1, duration: 140 });
     this.clak = c;
     this.C = { x, y, vx: 0, vy: 0, state: 'hover', t: 0, face: 1, nextAt: 0, lastToken: null };
+    // PNJ créé en cours de visite : inscrit comme les PNJ de la donnée (son
+    // `talk` ne répond qu'après geraltMet). Contrat du lot StoryKit, sans
+    // doublon si acte2.js l'inscrit aussi.
+    if (typeof registerStoryNpc === 'function') registerStoryNpc(scene, c);
     this.event('clak-spawned', { clak: c });
   }
 
@@ -1475,11 +1602,42 @@ class GeraltDuel {
     this.clak = null;
     this.C = null;
     if (!c) return;
+    // Retiré de la liste des objets interactifs (sinon un Clak de plus y
+    // restait à chaque reprise du duel).
+    if (typeof unregisterStoryInteractable === 'function') unregisterStoryInteractable(this.scene, c);
     if (c.active) {
       spawnFx(this.scene, 'poof', c.x, c.y - 14, { size: 0.8 });
       if (this.scene.npcs && this.scene.npcs.clak === c) delete this.scene.npcs.clak;
       c.destroy();
     }
+  }
+
+  // Clak au repos, posé au sol : fin du duel ou défaite d'Agarica. Sonné, son
+  // anim restait figée (pause sur la dernière frame) pendant la cinématique
+  // de fin ; mort d'Agarica pendant la colonne, il restait suspendu en l'air.
+  calmClak() {
+    const C = this.C;
+    const c = this.clak;
+    if (!C || !c || !c.active) return;
+    if (C.y < this.groundY - 0.5 || C.state === 'hover' || C.state === 'drop') {
+      C.y = this.groundY;
+      C.vy = 0;
+      spawnFx(this.scene, 'land', C.x, this.groundY, { power: 0.6 });
+    }
+    C.state = 'calm';
+    C.vx = 0;
+    this.showStars('C', false);
+    this.showAlert(false, 'alertC');
+    this.juiceHold(c, { lean: 0 });
+    if (c.anims) {
+      c.anims.timeScale = 1;
+      if (c.anims.isPaused) c.anims.resume();
+    }
+    if (c.playManifest) c.playManifest('idle', false);
+    const j = typeof juiceRender === 'function' ? juiceRender(c) : null;
+    if (j) j.off.x = 0;
+    c.setAlpha(1);
+    this.sync();
   }
 
   clakFace(dir) {
@@ -1631,11 +1789,30 @@ class GeraltDuel {
     }
   }
 
+  // Rectangle-obstacle (coordonnées ÉCRAN, cf. constructeur) calé sur la
+  // silhouette visible d'Agarica ; retiré de la règle (invisible) hors combat
+  // actif : défaite, victoire.
+  syncPlayerGuard() {
+    const z = this.playerGuard;
+    if (!z || !z.active) return;
+    const p = this.scene.player;
+    const on = this.active && !this.over && !this.down && p && p.active && p.visible && p.body;
+    z.setVisible(!!on);
+    if (!on) return;
+    const box = typeof worldUiBodyBox === 'function' ? worldUiBodyBox(p) : null;
+    const b = box || { left: p.body.left, right: p.body.right, top: p.body.top, bottom: p.body.bottom };
+    const cam = this.scene.cameras.main;
+    const pad = 3;
+    z.setPosition(b.left - cam.scrollX - pad, b.top - cam.scrollY - pad);
+    z.setSize(Math.max(1, b.right - b.left + 2 * pad), Math.max(1, b.bottom - b.top + 2 * pad));
+  }
+
   // --- Positions des sprites et indicateurs ------------------------------------
   sync() {
     const G = this.G;
     const g = this.g;
     if (g.active) { g.x = G.x; g.y = G.y - G.lift; }
+    this.syncPlayerGuard();
     if (this.starsG) this.starsG.setPosition(G.lying ? G.x + G.face * 18 : G.x, G.lying ? G.y - 34 : G.y - G.lift - 78);
     if (this.alert) this.alert.setPosition(G.x, G.y - 76);
     const C = this.C;
@@ -1667,7 +1844,8 @@ class GeraltDuel {
     this.showStars('G', false);
     this.setPose('idle', true);
     this.enter('pause', { ms: 99 });
-    if (this.C) { this.C.state = 'calm'; this.showStars('C', false); this.showAlert(false, 'alertC'); this.juiceHold(this.clak, { lean: 0 }); }
+    // Au repos et AU SOL (encore dans la colonne : il y restait suspendu).
+    this.calmClak();
     this.event('player-down');
   }
 
@@ -1686,6 +1864,7 @@ class GeraltDuel {
     G.x = this.resetX;
     G.y = this.groundY;
     G.evadeReadyAt = 0;
+    this.trapCount = 0;
     this.bag = [];
     this.opening = ['lob', 'trap', 'jump'];
     this.face(gdSign(p.x - G.x, -1));
@@ -1717,10 +1896,9 @@ class GeraltDuel {
     } else this.fallFlat();
     this.float(G.x, Math.min(G.y, this.groundY) - 70, 'Je me rends ! Je me rends !', '#ffd27a', { size: 16, ms: 1600 });
     this.showAlert(false, 'alertC');
-    if (this.C && this.C.state !== 'hover' && this.C.state !== 'drop') {
-      if (this.C.state !== 'stunned') this.C.state = 'calm';
-      if (this.clak.anims) this.clak.anims.timeScale = 1;
-    }
+    // Clak au calme tout de suite, même sonné (sinon figé pendant la
+    // cinématique de fin, qui démarre avant la fin de son étourdissement).
+    if (this.C && this.C.state !== 'hover' && this.C.state !== 'drop') this.calmClak();
     this.enter('beaten', {});
     this.event('victory');
   }

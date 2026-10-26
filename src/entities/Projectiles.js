@@ -71,8 +71,14 @@ class PierreProjectile extends Phaser.Physics.Arcade.Sprite {
       const fx = addManifestSprite(scene, this.x, this.y + 6, 'vfx_impact_pierre', 'idle').setDepth(CHARACTER_DEPTH + 1);
       fx.once('animationcomplete', () => fx.destroy());
     }
+    // Éclats : art `fx_eclat_pierre` (lot n°8) à 8 px, mêmes trajectoires ;
+    // repli : petits disques gris.
+    const chipArt = scene.textures.exists('item-fx_eclat_pierre');
     for (let i = 0; i < 5; i++) {
-      const chip = scene.add.circle(this.x, this.y, 2.5, 0x8a8794, 1).setDepth(CHARACTER_DEPTH + 1);
+      const chip = chipArt
+        ? scene.add.image(this.x, this.y, 'item-fx_eclat_pierre').setScale(8 / 128).setRotation(Math.random() * Math.PI * 2)
+          .setDepth(CHARACTER_DEPTH + 1)
+        : scene.add.circle(this.x, this.y, 2.5, 0x8a8794, 1).setDepth(CHARACTER_DEPTH + 1);
       scene.tweens.add({
         targets: chip,
         x: this.x + Phaser.Math.Between(-22, 22),
@@ -200,9 +206,13 @@ class PapillonSwarm {
     this.elapsed = 0;
     this.active = true;
     this.healed = new Set();
-    this.glow = scene.add.image(this.cx, this.cy, PAPILLON_GLOW_KEY)
+    // Halo : `fx_halo_doux` (lot n°8) si l'art existe (cf. entityHaloTexture,
+    // MousseCreature.js : même éclat que le dégradé dessiné), mêmes teinte,
+    // alpha et profondeur ; la zone de soin (this.rect) n'en dépend pas.
+    const halo = typeof entityHaloTexture === 'function' ? entityHaloTexture(scene, PAPILLON_GLOW_KEY) : { key: PAPILLON_GLOW_KEY, comp: 1 };
+    this.glow = scene.add.image(this.cx, this.cy, halo.key)
       .setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff8ff).setAlpha(0).setDepth(CHARACTER_DEPTH + 1);
-    this.glow.setDisplaySize(PAPILLON_RECT_W * 1.25, PAPILLON_RECT_H * 1.25);
+    this.glow.setDisplaySize(PAPILLON_RECT_W * 1.25 * halo.comp, PAPILLON_RECT_H * 1.25 * halo.comp);
     // Anneau : affiché à la taille où ses pixels VISIBLES (union des frames
     // de `swirl`) remplissent le rectangle de soin.
     this.swirl = null;

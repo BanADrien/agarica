@@ -16,13 +16,13 @@
 //   P2-P9        l'ascension en zigzag au-dessus du vide (chute = 1 cœur et
 //                retour au dernier appui), de 256 à -896 (1 150 px) :
 //                marches de 2 rangées (saut simple) et 2 marches de 3 rangées
-//                (2e saut du singe, de l'aigle ou dash du papillon), écarts
+//                (2e saut du singe ou de l'aigle), écarts
 //                horizontaux de 128 px ; deux corbeaux qui ne piquent que sur
 //                une Agarica posée ; P9 = belvédère au-dessus des cimes, en
 //                plein jour (vue, créature), sortie vers les îles à droite.
 // Sauts : simple ≈ 172 px (2 rangées) ; singe ≈ 264 px, aigle ≈ 284 px
 // (3 rangées). Pas de liane ici : le chemin reste faisable avec n'importe
-// quelle forme aérienne (retours depuis les îles avec l'aigle ou le papillon).
+// quelle forme aérienne (retours depuis les îles avec l'aigle).
 const FORET_FLOTTANTE_1_DATA = {
   zoneName: 'Le chemin des hauteurs',
   zoneSub: 'Forêt flottante',
@@ -39,6 +39,16 @@ const FORET_FLOTTANTE_1_DATA = {
   // au-dessus du vide.
   backgroundBaseline: 540,
   liquidFloor: { y: 500, style: 'brume' },
+  // Lointain peint (lot Codex n°8, clé `farLayers`) : l'horizon de la forêt
+  // malade, à l'est, que la cinématique `ff1_vue` montre du belvédère (« cette
+  // forêt presque noire ») et que le fond peint ne montre pas. Image actuelle
+  // ASSOMBRIE par la teinte (pas de version peinte réimportable). Il n'existe
+  // que tout en haut : il suit le ciel qui se révèle (withSky) et n'apparaît
+  // qu'en arrivant à l'est (fadeInX). Pas d'îles lointaines ici : le fond
+  // peint les montre déjà.
+  farLayers: [
+    { id: 'couche_horizon_malade', y: 95, scale: 0.45, tint: 0x3c4e44, scrollX: 0.12, scrollY: 0.25, fill: true, fadeInX: [2300, 2900], withSky: true },
+  ],
   groundCells: [
     // (groundRow : borne de fin exclue)
     ...groundRow(0, 34, [7, 8]),   // branche maîtresse (x 0-2176)
@@ -65,6 +75,12 @@ const FORET_FLOTTANTE_1_DATA = {
   props: [
     { type: 'foret_flottante_arbre_jeune', x: 300, y: 448, scale: 0.45 },
     { type: 'foret_flottante_panneau_geralt', x: 600, y: 448, scale: 0.36 },
+    // Tirs d'entraînement de Geralt, plantés à gauche de son panneau (objets
+    // du lot 8, section `objet`) : `angle` = flèche penchée, pointe enfoncée
+    // vers la droite, empennage en l'air ; `y` = milieu du fût (point de
+    // rotation), 6 px au-dessus du sol pour que l'empennage dépasse de l'herbe.
+    { type: 'objet_fleche', x: 510, y: 442, angle: 65 },
+    { type: 'objet_fleche', x: 530, y: 442, angle: 75 },
     { type: 'bosquet_log_pile', x: 700, y: 448, scale: 0.35 },
     { type: 'foret_flottante_tente_geralt', x: 1040, y: 448, scale: 0.42 },
     { type: 'bosquet_crates', x: 1160, y: 448, scale: 0.3 },

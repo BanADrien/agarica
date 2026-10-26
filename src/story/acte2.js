@@ -14,6 +14,25 @@
 // totem, objets carte_geralt, totem_poche_casse, fleur_resistante, repulsif,
 // note_geralt, et les flags automatiques trig_* / pickup_* / moss* de StoryKit).
 
+// Mousse de la clairière préservée (retour utilisateur du 2026-10-25 : « la
+// mousse horrible de la clairière préservée »). Le tapis dessiné d'avant, une
+// rangée de grosses bosses vert sombre à points vert vif sur toute l'herbe,
+// faisait lire la clairière comme ENVAHIE ; l'image du lot 8 prévue pour le
+// remplacer (`decor_tapis_mousse`, bave vert citron à gouttes) aurait été
+// aussi criarde. Le but : une clairière qui se lit PRÉSERVÉE, l'herbe des
+// tuiles bien visible, la corruption seulement devinée vers les bords, sombre
+// et sobre (silhouettes façon Hollow Knight), et rien autour du cercle sain.
+// Trois variantes (cf. a2DrawMossCarpet), on garde la plus lisible :
+//   'touffes' : quelques touffes et plaques de mousse du lot 8 teintées
+//               presque noires, clairsemées, plus denses vers les deux bords
+//               de la zone, absentes à moins de 150 px du cercle ;
+//   'lisere'  : un liseré de mousse sombre très bas (10 px) au ras de
+//               l'herbe, aux deux extrémités seulement, qui s'efface vers
+//               le centre ;
+//   'aucune'  : rien hors du cercle, seulement le contraste du cercle sain
+//               et de sa colonne de lumière.
+const CLAIRIERE_MOUSSE_VARIANTE = 'touffes';
+
 // Le totem de poche est trouvé dans les ruines des îles flottantes (et non
 // dans la hutte, comme le disait la description par défaut de StoryKit).
 if (typeof ITEM_INFO !== 'undefined' && ITEM_INFO.totem_poche_casse) {
@@ -45,6 +64,9 @@ function a2Float(scene, x, y, text, color = '#ffe9f5', { size = 16, ms = 1400 } 
     fontFamily: STORY_UI.serif, fontSize: `${size}px`, fontStyle: 'bold', color,
     stroke: '#15101f', strokeThickness: 4, align: 'center',
   }).setOrigin(0.5, 1).setDepth(1060);
+  // Règle commune (LevelKit) : texte toujours dans l'écran (un PNJ au bord
+  // de l'écran faisait sortir son annonce).
+  if (typeof keepWorldUiInView === 'function') keepWorldUiInView(t);
   scene.tweens.add({ targets: t, y: y - 34, duration: ms, ease: 'Sine.easeOut' });
   scene.tweens.add({ targets: t, alpha: 0, delay: ms * 0.65, duration: ms * 0.35, onComplete: () => t.destroy() });
   return t;
@@ -99,7 +121,13 @@ function a2DestroyWalls(group) {
 }
 
 // Halo additif doux (dégradé radial) pour la lumière, les fleurs, le totem.
+// Halo peint `fx_halo_doux` du lot 8 s'il existe (dégradé radial refait à
+// l'import, M04) : même quantité de lumière que le dégradé dessiné à taille
+// égale (mesuré : rapport 1,03), donc pas d'agrandissement. Repli : le
+// dégradé dessiné ci-dessous. Tous les tweens de ces halos sont en alpha ou
+// en displayWidth/Height : indépendants de la taille de l'image.
 function a2GlowTexture(scene) {
+  if (scene.textures.exists('item-fx_halo_doux')) return 'item-fx_halo_doux';
   const key = 'a2-glow';
   if (scene.textures.exists(key)) return key;
   const tex = scene.textures.createCanvas(key, 128, 128);
@@ -121,8 +149,14 @@ function a2Glow(scene, x, y, size, color, alpha, depth = 5) {
 
 // Voile de ciel posé juste au-dessus du fond (derrière tout le reste) : tant
 // que `fond_foret_flottante` n'existe pas, le ciel nocturne par défaut devient
-// un ciel de jour. Renvoie le rectangle (alpha réglable par le script).
+// un ciel de jour. Renvoie le rectangle (alpha réglable par le script), ou
+// null quand le fond de la zone est déjà une image peinte du manifest
+// (texture `item-…`, pas le ciel nocturne `decor-plan4`) : le voile ne
+// faisait alors que délaver `fond_foret_flottante` (clairière, hutte).
 function a2SkyWash(scene, color, alpha) {
+  const far = scene.__farBackground;
+  const farKey = far && far.active && far.texture ? far.texture.key : '';
+  if (farKey.startsWith('item-')) return null;
   const { width, height } = scene.scale;
   const rect = scene.add.rectangle(0, 0, width, height, color, alpha).setOrigin(0).setScrollFactor(0);
   const bg = scene.children.list.find((o) => o.type === 'TileSprite');
@@ -139,6 +173,29 @@ function a2PlaceAbove(scene, obj, ref) {
   const i = list.getIndex(ref);
   if (i < 0 || !obj) return;
   list.moveTo(obj, list.getIndex(obj) > i ? i + 1 : i);
+}
+
+// Devant les décors de la donnée (`props`), toujours derrière les personnages
+// (plus profonds). storyPutBehindPlayer glisse un objet juste sous le joueur
+// dans la liste d'affichage ; or le joueur est créé AVANT les décors
+// (buildLevelFromData) puis se retrouve après eux : l'objet du script
+// finissait derrière tous les décors (bête d'Amanite cachée par l'arbre de
+// son île, mesuré : bête 224, arbre 230, joueur 295).
+// Même profondeur que les décors : placé juste après le dernier d'entre eux
+// (pas en fin de liste, devant ce qui a été créé ensuite). Sans décor :
+// storyPutBehindPlayer.
+function a2PutAboveProps(scene, obj) {
+  const list = scene.children;
+  let last = -1;
+  for (const p of scene.props || []) last = Math.max(last, list.getIndex(p));
+  if (last < 0) {
+    storyPutBehindPlayer(scene, obj);
+    return obj;
+  }
+  // moveTo retire l'objet avant de l'insérer : venant d'avant le dernier
+  // décor, l'index de celui-ci a reculé d'un cran.
+  list.moveTo(obj, list.getIndex(obj) < last ? last : last + 1);
+  return obj;
 }
 
 // Plafond au bord haut de l'écran : la caméra de ces zones ne défile pas
@@ -165,10 +222,19 @@ function a2UpdateInteract(scene) {
   const player = scene.player;
   if (!scene.__a2Inter || !player) return;
   if (!scene.__a2Prompt || !scene.__a2Prompt.active) {
-    scene.__a2Prompt = scene.add.text(0, 0, '', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
-      backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
-    }).setOrigin(0.5, 1).setDepth(1050).setVisible(false);
+    // Invite peinte de StoryKit (pastille `ui_invite` + touche en bois, lot
+    // 8) comme celles des PNJ ; sinon le Text d'avant. Même origine (bas,
+    // centre) et même profondeur dans les deux cas.
+    scene.__a2Prompt = (typeof createStoryPromptLabel === 'function'
+      ? createStoryPromptLabel(scene, { depth: 1050, originY: 1 })
+      : scene.add.text(0, 0, '', {
+        fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
+        backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
+      }).setOrigin(0.5, 1).setDepth(1050)).setVisible(false);
+    // Règle commune (LevelKit) : invite toujours dans l'écran (« E :
+    // examiner la plante » et « E : lire le panneau » en sortaient) ;
+    // ancre trop haute ramenée à hauteur de la tête d'Agarica.
+    if (typeof keepWorldUiInView === 'function') keepWorldUiInView(scene.__a2Prompt, { prompt: true });
   }
   const prompt = scene.__a2Prompt;
   const best = scene.__a2Inter.find((it) => (!it.cond || it.cond())
@@ -316,6 +382,11 @@ function a2GeraltFallAngle(scene, angle) {
   return hasManifestArt(scene, 'geralt', 'trip_fall') ? 0 : angle;
 }
 
+// Grappin peint (`objet_grappin`, 256x206) : origine sur son anneau (où se
+// noue la corde), et angle de sa tige (de l'anneau à la pointe centrale,
+// mesuré sur l'image : 98°, presque vers le bas) pour l'aligner sur la corde.
+const A2_GRAPPIN_RING = { x: 0.45, y: 0.1, axis: Math.atan2(170, -25) };
+
 // Geralt tente la corniche : petit bond raté, puis la corde qui lui retombe dessus.
 async function a2GeraltComicJump(scene) {
   const g = a2Npc(scene, 'geralt');
@@ -335,15 +406,54 @@ async function a2GeraltComicJump(scene) {
   // La corde : un trait lancé vers la corniche, qui retombe sur sa tête.
   a2Float(scene, g.x, g.y - 80, 'Plan B : la corde !', '#ffd27a');
   const rope = scene.add.graphics().setDepth(g.depth + 1);
+  // Art du lot 8 : corde peinte `objet_corde` (segment tuilable, 3 px de
+  // large, étiré de la main au grappin) et grappin `objet_grappin` accroché
+  // par son anneau. Repli : le trait et le rond dessinés. Trajectoire et
+  // durées inchangées.
+  const man = getItemManifest();
+  const ropeArt = scene.textures.exists('item-objet_corde')
+    ? scene.add.tileSprite(0, 0, 3, 8, 'item-objet_corde').setOrigin(0.5, 0)
+      .setTileScale((man.objet_corde || {}).scale || 0.15).setDepth(g.depth + 1)
+    : null;
+  const hook = scene.textures.exists('item-objet_grappin')
+    ? scene.add.image(0, 0, 'item-objet_grappin').setOrigin(A2_GRAPPIN_RING.x, A2_GRAPPIN_RING.y)
+      .setScale((man.objet_grappin || {}).scale || 0.08).setDepth(g.depth + 1)
+    : null;
   const tip = { x: g.x, y: g.y - 60 };
   const draw = () => {
     rope.clear();
-    rope.lineStyle(3, 0xc9a26b, 1);
-    rope.lineBetween(g.x + 6, g.y - 50, tip.x, tip.y);
-    rope.fillStyle(0x8a6a3e, 1);
-    rope.fillCircle(tip.x, tip.y, 5);
+    const hx = g.x + 6;
+    const hy = g.y - 50;
+    if (ropeArt) {
+      // Origine (0,5 ; 0) à la main, axe +y local tourné vers le grappin.
+      const L = Math.max(1, Math.hypot(tip.x - hx, tip.y - hy));
+      if (Math.abs(ropeArt.height - L) > 0.5) ropeArt.setSize(3, L);
+      ropeArt.setPosition(hx, hy).setRotation(Math.atan2(-(tip.x - hx), tip.y - hy));
+    } else {
+      rope.lineStyle(3, 0xc9a26b, 1);
+      rope.lineBetween(hx, hy, tip.x, tip.y);
+    }
+    if (hook) {
+      // Les crochets en avant, dans le prolongement de la corde.
+      hook.setPosition(tip.x, tip.y)
+        .setRotation(Phaser.Math.Angle.Between(hx, hy, tip.x, tip.y) - A2_GRAPPIN_RING.axis);
+    } else {
+      rope.fillStyle(0x8a6a3e, 1);
+      rope.fillCircle(tip.x, tip.y, 5);
+    }
   };
-  const upd = () => draw();
+  // Posés tout de suite (sinon l'art restait une image en (0, 0)).
+  draw();
+  rope.once('destroy', () => {
+    if (ropeArt) ropeArt.destroy();
+    if (hook) hook.destroy();
+  });
+  // Zone quittée en pleine cinématique : la corde est détruite avec la
+  // scène, l'écouteur se retire au lieu de redessiner des objets morts.
+  const upd = () => {
+    if (!rope.active) { scene.events.off('update', upd); return; }
+    draw();
+  };
   scene.events.on('update', upd);
   await a2Tween(scene, { targets: tip, x: 1915, y: 230, duration: 450, ease: 'Quad.easeOut' });
   await a2Wait(scene, 250);
@@ -461,12 +571,32 @@ function a2DuelStart(scene) {
   st.duel.start();
 }
 
-// PNJ créé en cours de visite (Clak, à l'invocation) : invite « E : parler »
-// comme les PNJ de la donnée (son `talk` ne répond qu'après geraltMet).
+// PNJ créé en cours de visite (Clak à l'invocation, Geralt et Clak à la
+// revisite du bosquet) : invite « E : parler » comme les PNJ de la donnée
+// (le `talk` de Clak ne répond qu'après geraltMet). Inscrit par StoryKit
+// (registerStoryNpc : pas de doublon, clé dans scene.npcs) et désinscrit
+// quand le PNJ est détruit : Clak est retiré à chaque reprise du duel
+// (GeraltDuel.removeClak) et laissait sinon une entrée morte à chaque fois.
+// Repli sans StoryKit à jour : l'ancien ajout direct dans la liste.
 function a2RegisterNpc(scene, npc) {
-  const list = scene.__story && scene.__story.interactables;
-  if (!npc || !list || list.some((it) => it.npc === npc)) return;
-  list.push({ kind: 'npc', npc });
+  if (!npc || !npc.active) return npc;
+  if (typeof registerStoryNpc === 'function') {
+    registerStoryNpc(scene, npc);
+  } else {
+    const list = scene.__story && scene.__story.interactables;
+    if (list && !list.some((it) => it.npc === npc)) list.push({ kind: 'npc', npc });
+  }
+  if (!npc.__a2Unregister) {
+    npc.__a2Unregister = true;
+    npc.once('destroy', () => {
+      if (typeof unregisterStoryInteractable === 'function') {
+        unregisterStoryInteractable(scene, npc);
+      } else if (scene.__story && scene.__story.interactables) {
+        scene.__story.interactables = scene.__story.interactables.filter((it) => it.npc !== npc);
+      }
+    });
+  }
+  return npc;
 }
 
 function a2DuelEvent(scene, name, data) {
@@ -524,6 +654,20 @@ async function a2DuelFinish(scene) {
   await runCutscene(scene, 'geralt_fin_duel');
 }
 
+// Revisite : le « Plan B » de Geralt est resté couché au pied de la corniche
+// (P1, x 1920). Image seule (sans art : rien, c'est un simple clin d'œil).
+// Tourné de -80° (anneau à gauche, crochets à droite), le bas de l'image
+// tourné est son bord gauche, où pointe un crochet : posé 2 px dans l'herbe.
+function a2DrawFallenGrapple(scene, x) {
+  if (!scene.textures.exists('item-objet_grappin')) return null;
+  const img = scene.add.image(x, 0, 'item-objet_grappin').setOrigin(0.5)
+    .setScale((getItemManifest().objet_grappin || {}).scale || 0.08).setAngle(-80);
+  const ground = storyStandY(scene, x, 448);
+  img.y += ground + 2 - img.getBounds().bottom;
+  a2PutAboveProps(scene, img);
+  return img;
+}
+
 ZONE_SCRIPTS.acte2_ff1 = {
   create(scene, data) {
     // La montée vers le ciel (caméra verticale, `skyReveal` : LevelKit)
@@ -540,6 +684,7 @@ ZONE_SCRIPTS.acte2_ff1 = {
       const c = a2Npc(scene, 'clak');
       if (g) { g.x = 1840; g.playManifest('map_reading'); }
       if (c) c.x = 1790;
+      a2DrawFallenGrapple(scene, 1915);
     }
   },
   update(scene, time, delta) {
@@ -627,14 +772,42 @@ CUTSCENES.amanite_rencontre = (scene) => {
   ];
 };
 
-// Petite bête de mousse qu'Amanite abat à l'arrivée d'Agarica : l'art de la
-// créature de mousse (manifest `mousse_creature`, posée sur le sol, tournée
-// vers Amanite) ; le dessin par code ne reste qu'en repli sans l'art.
+// Petite bête de mousse qu'Amanite abat à l'arrivée d'Agarica : la bête
+// dédiée du lot 8 (`bete_mousse_vivante`, puis `_touchee` et `_morte` au coup
+// de lance), un animal moussu « innocent » qui rend le geste plus cruel
+// (décision utilisateur, Q7). Tournée vers Amanite (l'art regarde à droite),
+// bas visible sur la surface de marche. Replis, dans l'ordre : l'ennemi
+// `mousse_creature` (Niveaux 2), puis le dessin par code.
+const A2_BETE = { vivante: 'bete_mousse_vivante', touchee: 'bete_mousse_touchee', morte: 'bete_mousse_morte' };
+
+function a2BeteImage(scene, x, footY, id) {
+  const img = scene.add.image(x, footY, `item-${id}`).setOrigin(0.5, 1)
+    .setScale((getItemManifest()[id] || {}).scale || 0.25).setFlipX(true);
+  setVisibleBottomY(img, footY);
+  a2PutAboveProps(scene, img);
+  return img;
+}
+
+// Change la pose de la bête dédiée en gardant ses pieds au même endroit (les
+// trois poses n'ont pas la même hauteur ; même échelle : pas de saut de taille).
+function a2BeteSetPose(beast, id) {
+  if (!beast || !beast.active || !beast.scene.textures.exists(`item-${id}`)) return;
+  beast.setTexture(`item-${id}`);
+  setVisibleBottomY(beast, beast.beteFootY);
+}
+
 function a2DrawMossBeast(scene, x, y) {
+  if (scene.textures.exists(`item-${A2_BETE.vivante}`)) {
+    const footY = storyStandY(scene, x, y);
+    const img = a2BeteImage(scene, x, footY, A2_BETE.vivante);
+    img.beteArt = true;
+    img.beteFootY = footY;
+    return img;
+  }
   if (hasManifestArt(scene, 'mousse_creature')) {
     const spr = addManifestSprite(scene, x, storyStandY(scene, x, y), 'mousse_creature', 'idle');
     spr.setFlipX(true);
-    storyPutBehindPlayer(scene, spr);
+    a2PutAboveProps(scene, spr);
     return spr;
   }
   const g = scene.add.graphics({ x, y });
@@ -649,7 +822,7 @@ function a2DrawMossBeast(scene, x, y) {
   g.fillStyle(0x6fdc3a, 0.8);
   g.fillRoundedRect(-20, -6, 4, 12, 2);
   g.fillRoundedRect(10, -4, 4, 10, 2);
-  storyPutBehindPlayer(scene, g);
+  a2PutAboveProps(scene, g);
   return g;
 }
 
@@ -662,14 +835,67 @@ async function a2AmaniteStrike(scene, st) {
   await a2Wait(scene, 250);
   scene.cameras.main.flash(180, 255, 80, 80);
   scene.cameras.main.shake(200, 0.008);
+  // Éclats : mottes et éclats de mousse peints du lot 8, en alternance
+  // (taille du rond d'avant x 1,5, angle au hasard) ; repli : les ronds verts.
   for (let i = 0; i < 10; i++) {
-    const m = scene.add.circle(beast.x + Phaser.Math.Between(-30, 30), beast.y - 30, Phaser.Math.Between(3, 7), 0x6fae3a);
+    const r = Phaser.Math.Between(3, 7);
+    const fx = i % 2 ? 'fx_motte_mousse' : 'fx_eclat_mousse';
+    const x0 = beast.x + Phaser.Math.Between(-30, 30);
+    const m = scene.textures.exists(`item-${fx}`)
+      ? scene.add.image(x0, beast.y - 30, `item-${fx}`).setScale((2 * r * 1.5) / 128).setAngle(Phaser.Math.Between(0, 359))
+      : scene.add.circle(x0, beast.y - 30, r, 0x6fae3a);
     scene.tweens.add({ targets: m, y: beast.y - 2, x: m.x + Phaser.Math.Between(-30, 30), alpha: 0, duration: 600, onComplete: () => m.destroy() });
   }
-  if (beast.anims && hasManifestArt(scene, 'mousse_creature', 'death')) beast.playManifest('death', false);
-  await a2Tween(scene, { targets: beast, scaleY: beast.scaleY * 0.25, alpha: 0.55, duration: 500, ease: 'Quad.easeIn' });
+  if (beast.beteArt) {
+    // Bête dédiée : touchée au flash, morte 200 ms plus tard ; elle reste
+    // au sol, à peine estompée (pas d'écrasement : l'image dessine déjà la
+    // bête effondrée).
+    a2BeteSetPose(beast, A2_BETE.touchee);
+    scene.time.delayedCall(200, () => a2BeteSetPose(beast, A2_BETE.morte));
+    await a2Tween(scene, { targets: beast, alpha: 0.85, duration: 500, ease: 'Quad.easeIn' });
+  } else if (beast.anims && hasManifestArt(scene, 'mousse_creature', 'death')) {
+    // L'anim de mort dessine déjà l'effondrement : l'écraser en plus à 25 %
+    // n'en laissait qu'une ligne de ~4 px. Alpha seul.
+    beast.playManifest('death', false);
+    await a2Tween(scene, { targets: beast, alpha: 0.55, duration: 500, ease: 'Quad.easeIn' });
+  } else {
+    // Dessin de repli : la bête s'affaisse.
+    await a2Tween(scene, { targets: beast, scaleY: beast.scaleY * 0.25, alpha: 0.55, duration: 500, ease: 'Quad.easeIn' });
+  }
   await showDialogue(scene, ['Sur la grande île, une silhouette rouge vient d\'abattre sa lance sur une bête couverte de mousse.']);
   a.playManifest('idle');
+}
+
+// Revisite : la trace du passage d'Amanite, le dernier état de la bête, à la
+// même place et dans la même pose qu'à la fin du coup de lance. Ordre :
+// bête dédiée morte (même alpha 0,85), dernière image de l'anim de mort de
+// `mousse_creature`, mousse séchée, puis la flaque dessinée (posée SUR la
+// surface : l'ancienne ellipse était 12 px sous l'herbe, invisible).
+function a2DrawMossBeastRemains(scene, x, y) {
+  const footY = storyStandY(scene, x, y);
+  if (scene.textures.exists(`item-${A2_BETE.morte}`)) {
+    return a2BeteImage(scene, x, footY, A2_BETE.morte).setAlpha(0.85);
+  }
+  const deathKey = manifestFrameKey('mousse_creature', 'death', 4);
+  if (scene.textures.exists(deathKey)) {
+    const img = scene.add.image(x, footY, deathKey).setOrigin(0.5, 1)
+      .setScale((getAssetManifest().mousse_creature || {}).scale || 0.26).setFlipX(true).setAlpha(0.55);
+    setVisibleBottomY(img, footY);
+    a2PutAboveProps(scene, img);
+    return img;
+  }
+  if (scene.textures.exists('item-decor_mousse_sechee')) {
+    const img = scene.add.image(x, footY, 'item-decor_mousse_sechee').setOrigin(0.5, 1)
+      .setScale((getItemManifest().decor_mousse_sechee || {}).scale || 0.08);
+    setVisibleBottomY(img, footY + GROUND_CONTACT_SINK);
+    a2PutAboveProps(scene, img);
+    return img;
+  }
+  const g = scene.add.graphics();
+  g.fillStyle(0x34502a, 0.7);
+  g.fillEllipse(x, footY - 2, 80, 14);
+  a2PutAboveProps(scene, g);
+  return g;
 }
 
 async function a2AmaniteLeaves(scene) {
@@ -698,13 +924,7 @@ ZONE_SCRIPTS.acte2_ff2 = {
     scene.__a2 = { hadEagle: !!storyGet('hasEagleForm'), revealQueued: false, beast: null };
     a2InteractReset(scene);
     if (!storyGet('amaniteMet')) scene.__a2.beast = a2DrawMossBeast(scene, 2070, 384 + GROUND_STAND_SINK);
-    else {
-      // Trace du passage d'Amanite : une flaque de mousse morte.
-      const g = scene.add.graphics();
-      g.fillStyle(0x34502a, 0.7);
-      g.fillEllipse(2070, 396, 80, 14);
-      storyPutBehindPlayer(scene, g);
-    }
+    else a2DrawMossBeastRemains(scene, 2070, 384 + GROUND_STAND_SINK);
   },
   update(scene) {
     const st = scene.__a2;
@@ -777,9 +997,38 @@ function a2PlanteBaseY(scene, x) {
   return storyStandY(scene, x, 448);
 }
 
-// Plante dessinée : tige, feuilles, fleur blanche et rose, halo qui pulse.
+// La plante résistante peinte (lot 8) : fleurie, puis en bouton après la
+// cueillette (même cadrage, même échelle). La fleur qui s'envole est la tête
+// de l'image fleurie (rectangle 'tete' x 30, y 0, 198x195, affiché par
+// setCrop), et non l'objet `fleur_resistante`, qui montre la plante entière
+// avec racines et motte. Pas de cadre ajouté à la texture : Phaser en fait
+// alors son cadre par défaut, et toute image créée ensuite sans cadre
+// (plante d'une revisite, décor posé à l'éditeur) n'affichait plus que la tête.
+const A2_PLANTE = {
+  fleurie: 'item-decor_plante_resistante_fleurie',
+  bouton: 'item-decor_plante_resistante_bouton',
+  tete: { x: 30, y: 0, w: 198, h: 195 },
+  // Bas de la motte 3 px sous la ligne de marche (les racines dans l'herbe).
+  sink: 3,
+};
+
+// Plante : tige, feuilles, fleur blanche et rose, halo qui pulse.
 function a2DrawPlante(scene, x, y, picked) {
   const st = scene.__a2;
+  if (scene.textures.exists(A2_PLANTE.fleurie) && scene.textures.exists(A2_PLANTE.bouton)) {
+    const img = scene.add.image(x, y, picked ? A2_PLANTE.bouton : A2_PLANTE.fleurie).setOrigin(0.5, 1)
+      .setScale((getItemManifest().decor_plante_resistante_fleurie || {}).scale || 0.2);
+    setVisibleBottomY(img, y + A2_PLANTE.sink);
+    storyPutBehindPlayer(scene, img);
+    st.planteGfx = img;
+    st.planteArt = true;
+    st.fleur = null;
+    // Halo centré sur la fleur (plus bas que celui du dessin : la plante
+    // peinte fait 90 px de haut).
+    st.planteGlow = a2Glow(scene, x, y - 72, 150, 0xfff2f8, 0.55, 3);
+    scene.tweens.add({ targets: st.planteGlow, alpha: 0.25, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return;
+  }
   const g = scene.add.graphics({ x, y });
   g.lineStyle(5, 0x3f7a52, 1);
   g.beginPath(); g.moveTo(0, 0); g.lineTo(-4, -40); g.lineTo(2, -78); g.strokePath();
@@ -807,45 +1056,202 @@ function a2DrawPlante(scene, x, y, picked) {
   storyPutBehindPlayer(scene, st.fleur);
 }
 
-// Tapis de mousse partout… sauf dans le cercle autour de la plante.
-function a2DrawMossCarpet(scene, cx, radius, levelWidth) {
-  const g = scene.add.graphics();
-  const rnd = new Phaser.Math.RandomDataGenerator(['clairiere']);
-  for (let x = 140; x < levelWidth; x += 26) {
-    if (Math.abs(x - cx) < radius) continue;
-    const near = Math.abs(x - cx) < radius + 70;
-    const y = storyGroundY(scene, x, 448);
-    // Correctif contraste (vert sombre sur herbe verte = invisible) : même
-    // code couleur que les amas de mousse (drawMossVisual, StoryKit) -- socle
-    // presque noir, bosses vertes, reflets vert toxique bien visibles.
-    const a = near ? 0.65 : 1;
-    const w = rnd.realInRange(34, 56);
-    g.fillStyle(0x10200f, 0.92 * a);
-    g.fillEllipse(x, y + 3, w, rnd.realInRange(16, 24));
-    g.fillStyle(rnd.pick([0x2f5a2a, 0x3e7a2c, 0x274d22]), a);
-    g.fillEllipse(x + rnd.realInRange(-6, 6), y, w * 0.6, rnd.realInRange(9, 14));
-    g.fillStyle(0x9bff5a, 0.85 * a);
-    g.fillCircle(x + rnd.realInRange(-14, 14), y - rnd.realInRange(0, 5), rnd.realInRange(2, 3.5));
-    if (rnd.frac() < 0.5) g.fillCircle(x + rnd.realInRange(-16, 16), y + rnd.realInRange(-2, 6), 2);
+// Mousse de la clairière (cf. CLAIRIERE_MOUSSE_VARIANTE en tête du fichier),
+// puis le cercle sain et sa colonne de lumière, dans toutes les variantes.
+function a2DrawMossCarpet(scene, cx, radius, levelWidth, variante = CLAIRIERE_MOUSSE_VARIANTE) {
+  if (variante === 'touffes') a2ClairiereTouffes(scene, cx, radius, levelWidth);
+  else if (variante === 'lisere') a2ClairiereLisere(scene, cx, radius, levelWidth);
+  a2DrawHealthyCircle(scene, cx, radius);
+}
+
+// Réglages communs des mousses de la clairière. Teinte multipliée sur l'art
+// vert vif du lot 8 (bleu-violet nuit sombre) : il en sort des silhouettes
+// vert-de-gris presque noires, jamais un aplat vert citron.
+const A2_CLAIRIERE_MOUSSE = {
+  tint: 0x3a3f56,
+  alpha: 0.95,
+  drawn: 0x1b2027, // repli dessiné, même valeur sombre
+  start: 140,      // après le courant d'air de gauche (x 0-112)
+  end: 16,         // marge avant le bord droit de la zone
+  clear: 150,      // aucune mousse à moins de 150 px du bord du cercle
+};
+
+// Surface de marche à plat autour de x (pas au ras d'une marche : une touffe
+// à cheval sur le bord de la butte flotterait à moitié dans le vide).
+function a2FlatStandY(scene, x, half = 18) {
+  const y = storyStandY(scene, x, 448);
+  const ok = Math.abs(storyStandY(scene, x - half, 448) - y) < 2 && Math.abs(storyStandY(scene, x + half, 448) - y) < 2;
+  return ok ? y : null;
+}
+
+// Variante 'touffes' : touffes et plaques de mousse du lot 8, petites (11 à
+// 16 % de l'image), teintées sombre, tirées au sort (graine fixe : même
+// clairière à chaque visite) avec une probabilité qui croît du cercle vers
+// les bords de la zone (t^1,6 : presque rien à mi-chemin, des grappes aux
+// extrémités). Pied derrière la frange d'herbe des tuiles : elles y sont
+// plantées. Repli sans l'art : les mêmes silhouettes, dessinées.
+function a2ClairiereTouffes(scene, cx, radius, levelWidth) {
+  const M = A2_CLAIRIERE_MOUSSE;
+  const rnd = new Phaser.Math.RandomDataGenerator(['clairiere-mousse']);
+  const art = (id) => scene.textures.exists(`item-${id}`);
+  // Pieds des grands décors (arbres, rochers) : une touffe posée là restait
+  // cachée derrière eux (ils passent devant les objets du script).
+  const hidden = typeof objectVisibleBox !== 'function' ? [] : (scene.props || [])
+    .map((p) => objectVisibleBox(p)).filter(Boolean)
+    .map((b) => [(b.baseLeft ?? b.left) + 6, (b.baseRight ?? b.right) - 6]);
+  let drawn = null;
+  const xEnd = levelWidth - M.end;
+  for (let x = M.start; x < xEnd; x += rnd.realInRange(20, 36)) {
+    const d = Math.abs(x - cx) - radius;
+    if (d < M.clear) continue;
+    const span = (x < cx ? cx - radius - M.start : xEnd - cx - radius) - M.clear;
+    const t = Phaser.Math.Clamp((d - M.clear) / Math.max(1, span), 0, 1);
+    if (rnd.frac() >= Math.min(1, Math.pow(t, 1.6) * 1.1)) continue;
+    const footY = a2FlatStandY(scene, x);
+    if (footY == null || hidden.some(([l, r]) => x > l && x < r)) continue;
+    // Plaques aux extrémités seulement ; touffes partout ailleurs.
+    const plaque = t > 0.55 && rnd.frac() < 0.4;
+    const id = plaque
+      ? (rnd.frac() < 0.7 ? 'decor_mousse_plaque_intacte' : 'decor_mousse_plaque_repoussee')
+      : (t > 0.8 && rnd.frac() < 0.25 ? 'decor_touffe_mousse_grande'
+        : rnd.frac() < 0.65 ? 'decor_touffe_mousse_petite' : 'decor_touffe_mousse_moyenne');
+    // Un peu plus grandes tout au bord de la zone (jusqu'à 0,16).
+    const scale = rnd.realInRange(0.11, 0.13) + 0.03 * t;
+    const flip = rnd.frac() < 0.5;
+    if (art(id)) {
+      const img = scene.add.image(x, footY, `item-${id}`).setOrigin(0.5, 1).setScale(scale)
+        .setFlipX(flip).setTint(M.tint).setAlpha(M.alpha);
+      // Plaques : coulures 2 px sous la base, enfoncées de 3 px (manifest).
+      setVisibleBottomY(img, footY + (plaque ? 3 : 2));
+      storyPutBehindPlayer(scene, img);
+      continue;
+    }
+    if (!drawn) drawn = scene.add.graphics();
+    drawn.fillStyle(M.drawn, 0.9);
+    if (plaque) {
+      drawn.fillEllipse(x, footY, 34 * scale / 0.12, 10);
+    } else {
+      const h = (id.endsWith('grande') ? 34 : id.endsWith('moyenne') ? 26 : 18) * scale / 0.12;
+      drawn.fillTriangle(x - 5, footY + 2, x + 5, footY + 2, x + (flip ? -2 : 2), footY + 2 - h);
+      drawn.fillEllipse(x, footY + 1, 14, 6);
+    }
   }
-  // Cercle propre : herbe vive et petites fleurs.
+  if (drawn) storyPutBehindPlayer(scene, drawn);
+}
+
+// Morceaux à plat de [x0, x1] : [[a, b, surface]], coupés à chaque marche.
+function a2FlatRuns(scene, x0, x1, step = 8) {
+  const runs = [];
+  for (let x = x0; x < x1; x += step) {
+    const y = storyStandY(scene, x + step / 2, 448);
+    const last = runs[runs.length - 1];
+    if (last && Math.abs(last[2] - y) < 2) last[1] = Math.min(x1, x + step);
+    else runs.push([x, Math.min(x1, x + step), y]);
+  }
+  return runs;
+}
+
+// Variante 'lisere' : un liseré de mousse très bas (10 px, `decor_tapis_mousse`
+// réduit et teinté sombre) au ras de l'herbe, aux deux extrémités de la zone
+// seulement (40 % du chemin du bord au cercle), plein au bord et effacé vers
+// le centre (alpha par coin : fondu en WebGL seulement, uniforme en Canvas).
+// Repli sans l'art : une frange de petites ellipses sombres, même fondu.
+function a2ClairiereLisere(scene, cx, radius, levelWidth) {
+  const M = A2_CLAIRIERE_MOUSSE;
+  const H = 10;
+  const reach = 0.4;
+  const xEnd = levelWidth - M.end;
+  const zones = [
+    { x0: M.start, x1: M.start + (cx - radius - M.start) * reach, full: M.start },
+    { x0: xEnd - (xEnd - cx - radius) * reach, x1: xEnd, full: xEnd },
+  ];
+  const rnd = new Phaser.Math.RandomDataGenerator(['clairiere-lisere']);
+  const useArt = scene.textures.exists('item-decor_tapis_mousse');
+  const drawn = useArt ? null : scene.add.graphics();
+  for (const z of zones) {
+    const len = z.x1 - z.x0;
+    // Plein sur la première moitié côté bord de la zone, effacé ensuite
+    // jusqu'à 0 côté cercle.
+    const fade = (x) => Phaser.Math.Clamp((1 - Math.abs(x - z.full) / len) * 2, 0, 1) * M.alpha;
+    for (const [a, b, y] of a2FlatRuns(scene, z.x0, z.x1)) {
+      if (useArt) {
+        const tex = scene.textures.get('item-decor_tapis_mousse').getSourceImage();
+        const band = scene.add.tileSprite(a, y + 2, b - a, H, 'item-decor_tapis_mousse').setOrigin(0, 1)
+          .setTileScale(H / tex.height).setTilePosition(rnd.between(0, tex.width), 0).setTint(M.tint);
+        band.setAlpha(fade(a), fade(b), fade(a), fade(b));
+        // Devant la frange d'herbe des tuiles (sinon elle le cachait presque
+        // entièrement) : après les décors dans la liste d'affichage.
+        a2PutAboveProps(scene, band);
+      } else {
+        for (let x = a; x < b; x += 9) {
+          drawn.fillStyle(M.drawn, 0.9 * fade(x));
+          drawn.fillEllipse(x + 4, y - 2, rnd.realInRange(12, 18), rnd.realInRange(6, 9));
+        }
+      }
+    }
+  }
+  if (drawn) a2PutAboveProps(scene, drawn);
+}
+
+// Cercle sain autour de la plante : herbe fleurie peinte (`decor_cercle_sain`,
+// largeur = diamètre du cercle), et colonne de lumière douce
+// (`fx_rai_lumiere`, additive, derrière les personnages). Replis : l'ellipse
+// d'herbe vive à petites fleurs, et le halo étiré en colonne.
+function a2DrawHealthyCircle(scene, cx, radius) {
   const yC = storyGroundY(scene, cx, 448);
-  g.fillStyle(0x7bd35a, 0.85);
-  g.fillEllipse(cx, yC + 4, radius * 2, 18);
-  for (let i = 0; i < 16; i++) {
-    const fx = cx + rnd.realInRange(-radius + 20, radius - 20);
-    g.fillStyle(rnd.pick([0xffe9f5, 0xffc6e0, 0xfff2a8]), 1);
-    g.fillCircle(fx, yC - 2, 3);
+  if (scene.textures.exists('item-decor_cercle_sain')) {
+    const c = scene.add.image(cx, yC + 4, 'item-decor_cercle_sain').setOrigin(0.5, 1);
+    c.setScale((2 * radius) / c.width);
+    storyPutBehindPlayer(scene, c);
+  } else {
+    const rnd = new Phaser.Math.RandomDataGenerator(['clairiere']);
+    const g = scene.add.graphics();
+    g.fillStyle(0x7bd35a, 0.85);
+    g.fillEllipse(cx, yC + 4, radius * 2, 18);
+    for (let i = 0; i < 16; i++) {
+      const fx = cx + rnd.realInRange(-radius + 20, radius - 20);
+      g.fillStyle(rnd.pick([0xffe9f5, 0xffc6e0, 0xfff2a8]), 1);
+      g.fillCircle(fx, yC - 2, 3);
+    }
+    storyPutBehindPlayer(scene, g);
   }
-  storyPutBehindPlayer(scene, g);
-  // Colonne de lumière douce au-dessus du cercle.
-  a2Glow(scene, cx, yC - 160, 520, 0xfff6d8, 0.22, 2).setDisplaySize(radius * 2.2, 520);
+  if (scene.textures.exists('item-fx_rai_lumiere')) {
+    scene.add.image(cx, yC + 6, 'item-fx_rai_lumiere').setOrigin(0.5, 1).setDisplaySize(radius * 1.6, 520)
+      .setTint(0xfff6d8).setAlpha(0.3).setBlendMode(Phaser.BlendModes.ADD).setDepth(2);
+  } else {
+    a2Glow(scene, cx, yC - 160, 520, 0xfff6d8, 0.22, 2).setDisplaySize(radius * 2.2, 520);
+  }
 }
 
 async function a2PlantePick(scene) {
   const st = scene.__a2;
-  if (!st.fleur) return;
+  // Plante peinte : il n'y a pas de `st.fleur` dessinée (la garde d'avant,
+  // `if (!st.fleur) return`, empêchait alors toute cueillette).
+  if (!st.fleur && !st.planteArt) return;
   const p = scene.player;
+  if (st.planteArt) {
+    // La tête de la fleur se détache (au pixel près sur la plante), la
+    // plante passe en bouton dans la même image, puis la fleur vole vers
+    // Agarica en rapetissant (échelle relative : 0,6 x celle de la plante).
+    const img = st.planteGfx;
+    const T = A2_PLANTE.tete;
+    const s = img.scaleX;
+    // Copie de l'image fleurie rognée à la tête, ancrée au centre de la tête
+    // (le tween d'échelle la rétrécit sur place, comme l'ancienne fleur).
+    const cx = (T.x + T.w / 2) / img.width;
+    const cy = (T.y + T.h / 2) / img.height;
+    const fx = img.x + (cx - img.originX) * img.width * s;
+    const fy = img.y + (cy - img.originY) * img.height * s;
+    const fleur = scene.add.image(fx, fy, A2_PLANTE.fleurie).setCrop(T.x, T.y, T.w, T.h)
+      .setOrigin(cx, cy).setScale(s);
+    storyPutBehindPlayer(scene, fleur);
+    img.setTexture(A2_PLANTE.bouton);
+    setVisibleBottomY(img, a2PlanteBaseY(scene, st.cfg.x) + A2_PLANTE.sink);
+    await a2Tween(scene, { targets: fleur, x: p.x, y: p.y - 60, scale: s * 0.6, duration: 700, ease: 'Sine.easeInOut' });
+    await a2Tween(scene, { targets: fleur, alpha: 0, duration: 250 });
+    fleur.destroy();
+    return;
+  }
   await a2Tween(scene, { targets: st.fleur, x: p.x, y: p.y - 60, scale: 0.6, duration: 700, ease: 'Sine.easeInOut' });
   await a2Tween(scene, { targets: st.fleur, alpha: 0, duration: 250 });
   st.fleur.destroy();
@@ -1027,9 +1433,16 @@ CUTSCENES.morgat_rencontre = (scene) => {
 async function a2MorgatBrew(scene) {
   const m = a2Npc(scene, 'morgat');
   if (!m) return;
+  // Bulles peintes `fx_bulle` (anneau irisé, teinté rose ou miel) à la place
+  // des ronds pleins ; même taille (2r x 1,2 sur 128 px), mêmes tweens.
+  const bubbleArt = scene.textures.exists('item-fx_bulle');
   for (let i = 0; i < 16; i++) {
-    const b = scene.add.circle(m.x + Phaser.Math.Between(-24, 24), m.y - 40, Phaser.Math.Between(3, 6),
-      i % 2 ? STORY_UI.pink : 0xd0b060, 0.9).setDepth(1040);
+    const r = Phaser.Math.Between(3, 6);
+    const color = i % 2 ? STORY_UI.pink : 0xd0b060;
+    const bx = m.x + Phaser.Math.Between(-24, 24);
+    const b = (bubbleArt
+      ? scene.add.image(bx, m.y - 40, 'item-fx_bulle').setScale((2 * r * 1.2) / 128).setTint(color).setAlpha(0.9)
+      : scene.add.circle(bx, m.y - 40, r, color, 0.9)).setDepth(1040);
     scene.tweens.add({ targets: b, y: b.y - 70, alpha: 0, duration: 900, delay: i * 90, onComplete: () => b.destroy() });
   }
   if (typeof spawnButterflies === 'function') {
@@ -1187,8 +1600,20 @@ function a2DrawHutte(scene, x) {
   a2Glow(scene, x, y - 40, 160, 0xffe9a0, 0.35, 3);
 }
 
+// Rampe d'envol (le « plongeoir ») au bord de la falaise : image du lot 8
+// `decor_rampe_lancement`, le bout de sa base d'appui (x 189 du PNG de 439)
+// sur `x` (bord de la falaise), la planche en surplomb au-dessus du vide,
+// pieds des poteaux sur la ligne de marche. Repli : le dessin. La
+// cinématique du crash et son déclencheur ne changent pas.
 function a2DrawRampe(scene, x) {
   const y = 256 + GROUND_STAND_SINK;
+  if (scene.textures.exists('item-decor_rampe_lancement')) {
+    const img = scene.add.image(x, y, 'item-decor_rampe_lancement').setOrigin(189 / 439, 1)
+      .setScale((getItemManifest().decor_rampe_lancement || {}).scale || 0.21);
+    setVisibleBottomY(img, y + GROUND_CONTACT_SINK);
+    storyPutBehindPlayer(scene, img);
+    return img;
+  }
   const g = scene.add.graphics({ x, y });
   g.fillStyle(0x8a6a3e, 1);
   g.fillRect(-60, -10, 90, 10);
@@ -1332,9 +1757,17 @@ async function a2Fc1TotemPulse(scene) {
   glow.destroy();
 }
 
-// Cratère du crash + branches cassées.
+// Cratère du crash + branches cassées : image `decor_cratere` du lot 8 (le
+// creux et les branches sont peints), fond du creux (y 185 du PNG de 280)
+// sur la ligne de marche, là où Agarica se réveille. Repli : le dessin.
 function a2DrawCrater(scene, x) {
   const y = storyGroundY(scene, x, 448) + GROUND_STAND_SINK;
+  if (scene.textures.exists('item-decor_cratere')) {
+    const img = scene.add.image(x, y, 'item-decor_cratere').setOrigin(0.5, 185 / 280)
+      .setScale((getItemManifest().decor_cratere || {}).scale || 0.2);
+    storyPutBehindPlayer(scene, img);
+    return img;
+  }
   const g = scene.add.graphics();
   g.fillStyle(0x1a2614, 1);
   g.fillEllipse(x, y + 2, 200, 26);
@@ -1359,28 +1792,57 @@ function a2DrawSpiralTree(scene, x) {
     g.fillStyle(0x3b3026, 1);
     g.fillRect(-26, -330, 52, 330);
   }
-  g.lineStyle(3, 0xb48cff, 0.9);
-  g.beginPath();
-  for (let i = 0; i <= 60; i++) {
-    const a = i * 0.32;
-    const r = 2 + i * 0.32;
-    const px = Math.cos(a) * r;
-    const py = -150 + Math.sin(a) * r;
-    if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
-  }
-  g.strokePath();
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2;
-    g.lineBetween(0, -150, Math.cos(a) * 22, -150 + Math.sin(a) * 22);
+  // Spirale peinte du lot 8 (`decor_spirale_gravee`, violette, rayons en
+  // pointes) à la place du tracé ; repli : le tracé.
+  let spiral = g;
+  if (scene.textures.exists('item-decor_spirale_gravee')) {
+    spiral = scene.add.image(x, sy - 150, 'item-decor_spirale_gravee')
+      .setScale((getItemManifest().decor_spirale_gravee || {}).scale || 0.15);
+  } else {
+    g.lineStyle(3, 0xb48cff, 0.9);
+    g.beginPath();
+    for (let i = 0; i <= 60; i++) {
+      const a = i * 0.32;
+      const r = 2 + i * 0.32;
+      const px = Math.cos(a) * r;
+      const py = -150 + Math.sin(a) * r;
+      if (i === 0) g.moveTo(px, py); else g.lineTo(px, py);
+    }
+    g.strokePath();
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      g.lineBetween(0, -150, Math.cos(a) * 22, -150 + Math.sin(a) * 22);
+    }
   }
   storyPutBehindPlayer(scene, g);
+  // Gravée SUR le tronc : placée juste devant le décor de l'arbre dans la
+  // liste d'affichage (toujours derrière les personnages, plus profonds).
+  // Glissée seulement sous le joueur, la spirale a fini derrière le tronc
+  // (capture d'avant le lot 8 : on n'en voyait qu'un bout d'arc).
+  if (tree) a2PlaceAbove(scene, spiral, tree);
+  else if (spiral !== g) storyPutBehindPlayer(scene, spiral);
   const glow = a2Glow(scene, x, sy - 150, 90, 0xb48cff, 0.25, 3);
   scene.tweens.add({ targets: glow, alpha: 0.05, duration: 1600, yoyo: true, repeat: -1 });
 }
 
-// Touffes de mousse vivante qui se tendent vers Agarica.
+// Touffes de mousse vivante qui se tendent vers Agarica : touffes peintes du
+// lot 8 (petite, moyenne, grande en alternance, mêmes hauteurs que le dessin
+// d'avant : 26, 38 et 50 px), pied planté 2 px dans l'herbe ; origine au
+// pied, la rotation d'a2UpdateMossTufts pivote donc autour de lui. Repli :
+// les triangles dessinés.
+const A2_TOUFFES = ['decor_touffe_mousse_petite', 'decor_touffe_mousse_moyenne', 'decor_touffe_mousse_grande'];
+
 function a2MakeMossTufts(scene, xs) {
   return xs.map((x, i) => {
+    const id = A2_TOUFFES[i % 3];
+    if (scene.textures.exists(`item-${id}`)) {
+      const foot = storyStandY(scene, x, 448) + 2;
+      const img = scene.add.image(x, foot, `item-${id}`).setOrigin(0.5, 1)
+        .setScale((getItemManifest()[id] || {}).scale || 0.18);
+      setVisibleBottomY(img, foot);
+      storyPutBehindPlayer(scene, img);
+      return { g: img, x, phase: i * 0.7, size: i % 3 };
+    }
     // Pied 2 px sous la ligne de marche (cf. GROUND_STAND_SINK), planté dans l'herbe.
     const y = storyGroundY(scene, x, 448) + GROUND_STAND_SINK + 2;
     const g = scene.add.graphics({ x, y });
@@ -1392,7 +1854,7 @@ function a2MakeMossTufts(scene, xs) {
     g.fillStyle(0x9bff5a, 0.85);
     g.fillCircle(0, -h, 3);
     storyPutBehindPlayer(scene, g);
-    return { g, x, phase: i * 0.7 };
+    return { g, x, phase: i * 0.7, size: i % 3 };
   });
 }
 
@@ -1419,14 +1881,19 @@ function a2Fc1CloseBehind(scene, animate) {
 }
 
 ZONE_SCRIPTS.acte2_fc1 = {
-  create(scene) {
+  create(scene, data) {
     a2Ceiling(scene);
     scene.__a2 = { tufts: [], butterflies: null };
     a2InteractReset(scene);
     a2DrawCrater(scene, 170);
     a2DrawSpiralTree(scene, 2470);
+    // Pas de touffe collée à un feu de camp (celle de x 3717 se tendait
+    // dans les flammes) : 48 px de marge autour des feux de la donnée.
+    const fires = ((data && data.campfires) || []).map((c) => c.x);
     const xs = [];
-    for (let x = 300; x < 4000; x += 150 + (x % 7) * 9) if (Math.abs(x - 1824) > 120 && Math.abs(x - 3200) > 90) xs.push(x);
+    for (let x = 300; x < 4000; x += 150 + (x % 7) * 9) {
+      if (Math.abs(x - 1824) > 120 && Math.abs(x - 3200) > 90 && fires.every((fx) => Math.abs(x - fx) >= 48)) xs.push(x);
+    }
     scene.__a2.tufts = a2MakeMossTufts(scene, xs);
     if (storyGet('fc1MousseFermee')) a2Fc1CloseBehind(scene, false);
     if (storyGet('trig_foret_corrompue_1_papillons')) a2Fc1Butterflies(scene, false);
@@ -1707,8 +2174,7 @@ ZONE_SCRIPTS.acte2_bosquet_retour = {
         { id: 'geralt', x: 470, talk: 'bosquet_retour_geralt' },
         { id: 'clak', x: 420, talk: 'bosquet_retour_clak' },
       ]) {
-        const npc = createStoryNpc(scene, n);
-        scene.__story.interactables.push({ kind: 'npc', npc });
+        a2RegisterNpc(scene, createStoryNpc(scene, n));
       }
       if (scene.__a2.idol) scene.__a2.idol.setTint(0x9aa89a);
       return;

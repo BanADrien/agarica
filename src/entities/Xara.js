@@ -159,6 +159,10 @@ const XARA_BUBBLE_OFFSET_X = -42;
 const XARA_BUBBLE_OFFSET_Y = -30;
 const XARA_BUBBLE_RADIUS = 30;
 const XARA_BUBBLE_COLOR = 0x9fe6e0;
+// Fil de soie peint (`fx_fil_soie`, 10x512 px source) : 3 px de large à
+// l'écran, motif à l'échelle 0,25 du manifeste (perles visibles, cf. lot n°8).
+const XARA_THREAD_ART_W = 3;
+const XARA_THREAD_ART_TILE_SCALE = 0.25;
 
 // Balancier : vrai pendule (code, pas anim) — pivot FIXE tant qu'un swing
 // est en cours (jamais suivi/lissé en continu, retour utilisateur), fil et
@@ -311,6 +315,15 @@ class Xara extends Phaser.GameObjects.Sprite {
     // Fil de soie : tracé sous la sprite (créé avant), visible seulement en
     // balancier (et pendant la bascule vers/depuis cet état).
     const thread = scene.add.graphics().setDepth(CHARACTER_DEPTH);
+    // Fil de soie peint (`fx_fil_soie`, lot n°8 : perles de rosée, segment
+    // tuilable) s'il existe, étiré de la tête au point d'ancrage (cf.
+    // drawThread) ; le Graphics garde la bulle et sert de repli au fil. Créé
+    // AVANT la sprite, comme le Graphics : il reste dessiné sous elle.
+    const threadArt = scene.textures.exists('item-fx_fil_soie')
+      ? scene.add.tileSprite(0, 0, XARA_THREAD_ART_W, 8, 'item-fx_fil_soie')
+        .setOrigin(0.5, 0).setTileScale((getItemManifest().fx_fil_soie || {}).scale || XARA_THREAD_ART_TILE_SCALE)
+        .setDepth(CHARACTER_DEPTH).setVisible(false)
+      : null;
 
     super(scene, target.x + XARA_GROUND_OFFSET_X, target.y + XARA_GROUND_OFFSET_Y, `xara-walk-${XARA_WALK_FRAME_INDICES[0]}`);
     scene.add.existing(this);
@@ -343,6 +356,8 @@ class Xara extends Phaser.GameObjects.Sprite {
     scene.physics.add.collider(this, scene.ground);
 
     this.thread = thread;
+    this.threadArt = threadArt;
+    if (threadArt) this.once('destroy', () => threadArt.destroy());
     this.target = target;
 
     // Sens affiché, indépendant de `target.facingDir` (qui peut changer
@@ -887,6 +902,7 @@ class Xara extends Phaser.GameObjects.Sprite {
   // simple qui grandit/rétrécit vers le haut de l'écran.
   drawThread(progress, pivotX, pivotY) {
     this.thread.clear();
+    if (this.threadArt) this.threadArt.setVisible(false);
     if (progress <= 0.01) return;
 
     // Position de la tête en tenant compte de la rotation courante (le
@@ -906,6 +922,18 @@ class Xara extends Phaser.GameObjects.Sprite {
     } else {
       topX = pivotX !== undefined ? pivotX : headX;
       topY = Phaser.Math.Linear(headY, this.scene.cameras.main.scrollY, progress);
+    }
+    if (this.threadArt) {
+      // TileSprite d'origine (0,5 ; 0) au point d'ancrage, de la longueur du
+      // fil, tourné pour que son axe (+y local) pointe vers la tête.
+      const L = Math.max(1, Math.hypot(headX - topX, headY - topY));
+      // Taille changée seulement si elle bouge vraiment (évite de refaire le
+      // tuilage à chaque image une fois le balancier stabilisé).
+      if (Math.abs(this.threadArt.height - L) > 0.5) this.threadArt.setSize(XARA_THREAD_ART_W, L);
+      this.threadArt.setPosition(topX, topY)
+        .setRotation(Math.atan2(-(headX - topX), headY - topY))
+        .setAlpha(0.85).setVisible(this.visible);
+      return;
     }
     this.thread.lineStyle(1.5, 0xe8d9ff, 0.7);
     this.thread.beginPath();

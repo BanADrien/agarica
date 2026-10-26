@@ -80,9 +80,24 @@ class DialogueScene extends Phaser.Scene {
       shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 2, fill: true },
     });
     const I = this.inner;
-    this.nextMarker = this.add.text(I.x + I.w - 18, I.y + I.h - 8, '▼', {
-      fontFamily: 'sans-serif', fontSize: '14px', color: '#8fe3b8',
-    }).setOrigin(0.5, 1).setVisible(false);
+    // Indicateur « suite » : la pointe peinte des bulles (`ui_bulle_pointe`,
+    // triangle sombre cerclé de vert lunaire, même dessin que le ▼), à
+    // l'échelle du manifest (0,26 : 18x13, même liseré que la pointe des
+    // bulles). À 14 px (0,2) le liseré tombait à 1 px et le chevron se perdait
+    // sur les planches sombres. Repli : le caractère ▼. `nextMarkerScale` =
+    // échelle de repos, que le rebond de completeLine doit retrouver (1 pour
+    // le texte).
+    if (this.textures.exists('item-ui_bulle_pointe')) {
+      this.nextMarker = this.add.image(I.x + I.w - 18, I.y + I.h - 8, 'item-ui_bulle_pointe');
+      this.nextMarkerScale = (getItemManifest().ui_bulle_pointe || {}).scale || 0.26;
+      this.nextMarker.setScale(this.nextMarkerScale);
+    } else {
+      this.nextMarker = this.add.text(I.x + I.w - 18, I.y + I.h - 8, '▼', {
+        fontFamily: 'sans-serif', fontSize: '14px', color: '#8fe3b8',
+      });
+      this.nextMarkerScale = 1;
+    }
+    this.nextMarker.setOrigin(0.5, 1).setVisible(false);
     // Indicateur « suite » : rebond doux + pulsation (cf. completeLine : il surgit).
     this.tweens.add({ targets: this.nextMarker, y: this.nextMarker.y + 4, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: this.nextMarker, alpha: { from: 1, to: 0.55 }, duration: 620, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -280,8 +295,10 @@ class DialogueScene extends Phaser.Scene {
       this.showChoices(line.choices);
     } else if (!this.nextMarker.visible) {
       // L'indicateur surgit (rebond) au lieu d'apparaître d'un coup.
+      // Vers l'échelle de repos et non vers 1 : l'image peinte (70x50) est
+      // affichée à ~0,2, un tween vers 1 la ferait grossir 5 fois.
       this.nextMarker.setVisible(true).setScale(0);
-      this.tweens.add({ targets: this.nextMarker, scale: 1, duration: 240, ease: 'Back.Out' });
+      this.tweens.add({ targets: this.nextMarker, scale: this.nextMarkerScale, duration: 240, ease: 'Back.Out' });
     }
   }
 

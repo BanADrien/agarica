@@ -237,6 +237,18 @@ class BootScene extends Phaser.Scene {
     for (const [section, items] of Object.entries(DECOR_SECTIONS)) {
       for (const item of items) {
         const key = `${section}_${item}`;
+        // Sections `decor` / `objet` / `rocher` (MANIFEST_DECOR_SECTIONS,
+        // LevelKit.js) : leur clé `<section>_<item>` EST un id du manifest
+        // Codex (decor_mare_berge, objet_fleche…), l'image vit donc à son
+        // chemin du manifest et pas dans deco_item_frames/. Chargée seulement
+        // si elle est livrée (assetPresent) : pas de 404, et le décor absent
+        // est ignoré par buildLevelFromData. Le doublon avec `item-<id>` est
+        // servi par le cache du navigateur.
+        if (typeof MANIFEST_DECOR_SECTIONS !== 'undefined' && MANIFEST_DECOR_SECTIONS.includes(section)) {
+          const def = typeof getItemManifest === 'function' ? getItemManifest()[key] : null;
+          if (def && def.path && assetPresent(def.path)) this.load.image(`${PROP_PREFIX}${key}`, def.path);
+          continue;
+        }
         this.load.image(`${PROP_PREFIX}${key}`, `assets/decors/deco_item_frames/${section}/${key}.png`);
       }
     }

@@ -13,7 +13,7 @@
 //                (x 0-320, y=-128) et fente de l'ÉPREUVE DU SINGE (optionnelle).
 //     à droite   branche y=-64 → GRANDE BRANCHE HAUTE (y=-192, x 2176-2944) :
 //                pierres qui tombent (ombres au sol), singe corrompu, puis au
-//                bout le TOTEM DU SINGE (→ monde spirituel, forme singe).
+//                bout le TOTEM DU SINGE (E : il s'allume et donne la forme singe).
 //   x 2944-3584  le VIDE DE LA CIME : 2 LIANES (x 3040, 3488) pendues sous la
 //                canopée (rangée -8) -- même gabarit que celles de l'épreuve
 //                (bord → 96 px → liane → 448 px → liane → 96 px → appui).
@@ -110,9 +110,15 @@ const GRAND_ARBRE_RACINES_DATA = {
     { type: 'grand_arbre_nid_singe', x: 1090, y: -128, scale: 0.24 },                 // branche d'élan
     { type: 'grand_arbre_statue_simien', x: 230, y: -128, scale: 0.28 },              // corniche de l'épreuve
   ],
-  // Totem du singe (lu par le script de zone) : art `totem_monkey_dim`, puis
-  // `totem_monkey_lit` une fois éveillé (E) -- il ouvre le monde spirituel.
-  totemSinge: { x: 2860, y: -192 },
+  // Totem du singe, au bout de la grande branche (décision du 2026-10-25 :
+  // comme le loup et l'aigle, il s'allume et donne DIRECTEMENT la forme
+  // singe ; plus de monde spirituel). Même clé que les autres totems
+  // (LevelKit addAbilityShrine) : art `totem_monkey_dim`, puis
+  // `totem_monkey_lit` une fois la forme prise. Suite : bulle de Xara et
+  // rappel des lianes (script de zone, `racines_singe_eveil`).
+  totems: [
+    { x: 2860, y: -192, flag: 'hasMonkeyForm', message: 'Forme du singe !' },
+  ],
   // Pierres qui tombent des branches supérieures (lu par le script de zone) :
   // une ombre grandit sur la branche (télégraphe), puis la pierre tombe.
   // S'arrêtent une fois Kainati apaisé (ce sont ses guetteurs qui les lancent).
@@ -141,7 +147,9 @@ const GRAND_ARBRE_RACINES_DATA = {
     { id: 'from_foret_sombre', x: 110, y: 400, height: 100 },
     { id: 'from_epreuve', x: 150, y: -170, height: 80 },
     { id: 'from_arene', x: 3700, y: -230, height: 80 },
-    // Retour du monde spirituel : devant le totem, côté branche.
-    { id: 'from_monde_spirituel', x: 2780, y: -230, height: 80 },
+    // Devant le totem, côté branche : reprise d'une ancienne sauvegarde
+    // arrêtée au monde spirituel (qui n'est plus sur le chemin de
+    // l'histoire, cf. ZONE_SCRIPTS.monde_spirituel) et sorties de cette zone de test.
+    { id: 'totem_singe', x: 2780, y: -230, height: 80 },
   ],
 };

@@ -359,6 +359,9 @@ function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], bac
   // bande vide en haut de l'écran quand on monte).
   if (camHigh < camLow || baseline != null) addFarBackgroundCaps(scene, far, bgKey, { top, height, coverWidth, camLow, camHigh, farScroll, skyFade: !!sky });
   if (sky) addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh });
+  // Lointains peints (clé `farLayers`) : entre le ciel et la forêt du fond.
+  scene.__farLayers = null;
+  if (backdrop.farLayers) addFarLayers(scene, backdrop.farLayers, { levelWidth, width });
 
   const floatingBackground = background === 'fond_foret_flottante';
   const canopyView = floatingBackground && !treesAtScreenBottom;
@@ -403,7 +406,92 @@ function zoneBackdropSpec(data, { camLow = 0, camHigh = 0 } = {}) {
   // Fond peint qui a déjà son propre soleil : pas de second soleil par-dessus
   // (sauf `rays: true` explicite dans la zone).
   if (sky && sky.rays === undefined && BACKGROUNDS_WITH_SUN.has(id)) sky.rays = false;
-  return { baseline, groundLine, camLow, camHigh, sky };
+  const farLayers = Array.isArray(data.farLayers) && data.farLayers.length ? data.farLayers : null;
+  return { baseline, groundLine, camLow, camHigh, sky, farLayers };
+}
+
+// ---------------------------------------------------------------------------
+// Lointains peints (clé de zone `farLayers`, lot Codex n°8) : bandes d'images
+// du manifest (îles lointaines, horizon malade…) répétées en largeur, entre
+// le ciel (et ses nappes de nuages) et la forêt du fond.
+//   farLayers: [{ id, y, scale?, scrollX = 0.25, scrollY = 0.3, alpha = 1,
+//     tint?, fill = false, fadeInX?: [x0, x1], withSky = false }]
+// - `y` : haut de la bande (monde, à scrollY près) ; `scale` : échelle de
+//   l'image (défaut : celle du manifest) ;
+// - `tint` : teinte multipliée, ne peut donc qu'ASSOMBRIR (horizon malade
+//   « presque noir » : 0x3c4e44) ;
+// - `fill` : rectangle de la couleur du bas de l'image (teinte comprise)
+//   sous la bande, jusqu'à 600 px plus bas (pas de ciel sous l'horizon) ;
+// - `fadeInX: [x0, x1]` : apparaît quand le centre de l'écran va de x0 à x1 ;
+// - `withSky` : suit le ciel qui se révèle (skyReveal) -- invisible en bas
+//   de la course de la caméra, pleine quand le ciel est découvert.
+// Couche décorative : image absente = rien (pas de repli dessiné).
+// ---------------------------------------------------------------------------
+const FAR_LAYER_FILL_DEPTH = 600;
+
+// Teinte multipliée d'une couleur (comme setTint sur un pixel de cette couleur).
+function multiplyColor(color, tint) {
+  if (tint == null) return color;
+  const c = Phaser.Display.Color.IntegerToRGB(color);
+  const t = Phaser.Display.Color.IntegerToRGB(tint);
+  return Phaser.Display.Color.GetColor(Math.round(c.r * t.r / 255), Math.round(c.g * t.g / 255), Math.round(c.b * t.b / 255));
+}
+
+function addFarLayers(scene, layers, { levelWidth, width }) {
+  const list = [];
+  const manifest = typeof getItemManifest === 'function' ? getItemManifest() : {};
+  for (const L of layers) {
+    if (!L || !L.id || L.y == null) continue;
+    const key = `item-${L.id}`;
+    if (!scene.textures.exists(key)) continue;
+    const src = scene.textures.get(key).getSourceImage();
+    const k = L.scale ?? (manifest[L.id] || {}).scale ?? 1;
+    const sx = L.scrollX ?? 0.25;
+    const sy = L.scrollY ?? 0.3;
+    const alpha = L.alpha ?? 1;
+    const h = src.height * k;
+    const t = scene.add.tileSprite(-100, L.y, levelWidth * sx + width + 200, h, key)
+      .setOrigin(0, 0).setTileScale(k, k).setScrollFactor(sx, sy).setAlpha(alpha);
+    if (L.tint != null) t.setTint(L.tint);
+    const parts = [t];
+    if (L.fill) {
+      const color = multiplyColor(textureEdgeColor(scene, key, 'bottom'), L.tint);
+      const f = scene.add.rectangle(-100, L.y + h - 1, t.width, FAR_LAYER_FILL_DEPTH, color)
+        .setOrigin(0, 0).setScrollFactor(sx, sy).setAlpha(alpha);
+      parts.unshift(f);
+    }
+    // Ciel qui se révèle : derrière ses nappes de nuages (la bande est plus
+    // lointaine qu'elles).
+    const nappes = scene.__sky && scene.__sky.nappes;
+    if (nappes && nappes.length) for (const o of parts) scene.children.moveBelow(o, nappes[0]);
+    list.push({ cfg: L, parts, alpha });
+  }
+  scene.__farLayers = list.length ? list : null;
+  updateFarLayers(scene);
+}
+
+// Fondus `withSky` / `fadeInX`, recalculés à chaque image (appelée par
+// updateLevelFromData, même monde gelé : seule la caméra compte -- et pas
+// seulement dans updateSkyReveal, qui ne tourne pas sans caméra de zone).
+function updateFarLayers(scene) {
+  const list = scene.__farLayers;
+  if (!list) return;
+  const cam = scene.cameras.main;
+  const st = scene.__sky;
+  // Progression lissée du ciel (cf. updateSkyReveal) ; sans ciel : pleine.
+  const e = st && st.low ? st.progress * st.progress * (3 - 2 * st.progress) : 1;
+  const centerX = cam.scrollX + cam.width / 2;
+  for (const layer of list) {
+    const L = layer.cfg;
+    if (!L.withSky && !L.fadeInX) continue;
+    let a = layer.alpha;
+    if (L.withSky) a *= Phaser.Math.Clamp((e - 0.4) / 0.5, 0, 1);
+    if (Array.isArray(L.fadeInX) && L.fadeInX.length === 2) {
+      const [x0, x1] = L.fadeInX;
+      a *= x1 > x0 ? Phaser.Math.Clamp((centerX - x0) / (x1 - x0), 0, 1) : (centerX >= x0 ? 1 : 0);
+    }
+    for (const o of layer.parts) if (o.active) o.setAlpha(a);
+  }
 }
 
 // Fonds lointains dont l'image contient déjà un soleil (cf. zoneBackdropSpec).
@@ -498,6 +586,17 @@ const LIQUID_STYLES = {
   brume: { deep: 0x2a3550, blobs: [0x46557a, 0x5a6a90], glow: 0xd6e2ff, images: ['couche_nappe_brume', 'liquide_brume'], frontImages: ['couche_brume_avant'] },
 };
 const LIQUID_MARE_SURFACE_FRAMES = ['liquide_mare_surface_0', 'liquide_mare_surface_1', 'liquide_mare_surface_2', 'liquide_mare_surface_3'];
+// Rangée de la ligne claire dans `liquide_mare_surface_*` (rangées 26-31 sur 35).
+const LIQUID_MARE_SURFACE_LINE_ROW = 26;
+// Rangée de l'image (px source) posée sur `y`, pour les images du lot 8 dont
+// la ligne utile n'est pas le 1er rang visible :
+// - `liquide_mousse_toxique` : crête médiane (rangée 82 ; la crête haute
+//   déborde un peu au-dessus). À l'épreuve, le corps couvre ainsi la ligne de
+//   base des arbres du fond (492) ; purement visuel, la chute `fall` ne bouge pas ;
+// - `couche_nappe_brume` : rangée la plus dense (80 sur 160 ; le dégradé
+//   déborde de part et d'autre) -- calée sur son 1er rang, la partie dense
+//   tombait ~50 px trop bas et ne cachait plus le pied des arbres.
+const LIQUID_IMAGE_ANCHOR_ROW = { liquide_mousse_toxique: 82, couche_nappe_brume: 80 };
 
 function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
   if (!cfg || cfg.y == null) return null;
@@ -518,12 +617,24 @@ function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
     const def = typeof getItemManifest === 'function' ? getItemManifest()[imgId] || {} : {};
     const k = cfg.height ? cfg.height / src.height : (def.scale || 96 / src.height);
     const band = src.height * k;
-    // Crête (1er rang visible de l'image) quelques px au-dessus de `y`.
+    // Crête (1er rang visible de l'image) quelques px au-dessus de `y`, sauf
+    // pour les images dont la ligne utile est plus bas (LIQUID_IMAGE_ANCHOR_ROW).
     const vb = visibleBounds(scene, key);
-    const surfTop = y - (vb && !vb.empty ? vb.y0 * k : 0) - 6;
-    const deep = scene.add.rectangle(x1, surfTop + band - 1, x2 - x1, Math.max(0, bottom - surfTop - band), textureEdgeColor(scene, key, 'bottom', pal.deep)).setOrigin(0, 0);
+    const anchorRow = LIQUID_IMAGE_ANCHOR_ROW[imgId];
+    const surfTop = anchorRow != null ? y - anchorRow * k : y - (vb && !vb.empty ? vb.y0 * k : 0) - 6;
+    // Brume d'arrière-plan : son bas s'effiloche en transparence -- le
+    // rectangle de « fond » (couleur moyenne du bas de l'image, opaque)
+    // aurait posé une bande claire sous la nappe. Les liquides (corps opaque
+    // jusqu'en bas) et la brume de premier plan le gardent.
+    if (!(style === 'brume' && !cfg.front)) {
+      objs.push(scene.add.rectangle(x1, surfTop + band - 1, x2 - x1, Math.max(0, bottom - surfTop - band), textureEdgeColor(scene, key, 'bottom', pal.deep)).setOrigin(0, 0));
+    }
     const surf = scene.add.tileSprite(x1, surfTop, x2 - x1, band, key).setOrigin(0, 0).setTileScale(k, k);
-    objs.push(deep, surf);
+    // Brume teintée par la zone (`color`, ex. sarcelle 0x1d4a5a du monde
+    // spirituel) : la nappe peinte est blanche, la teinte la colore -- sans
+    // ça, la couleur de la zone n'était plus lue depuis le passage à l'image.
+    if (style === 'brume' && cfg.color != null) surf.setTint(cfg.color);
+    objs.push(surf);
     // Lente dérive de la surface.
     scene.tweens.add({ targets: surf, tilePositionX: { from: 0, to: src.width }, duration: 60000, repeat: -1 });
     // Eau (mare, lot n°8) : ligne de surface animée (~8 i/s) et voile avant
@@ -534,7 +645,9 @@ function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
         const fdef = getItemManifest()[frames[0]] || {};
         const fsrc = scene.textures.get(`item-${frames[0]}`).getSourceImage();
         const fk = fdef.scale || k;
-        const line = scene.add.tileSprite(x1, surfTop - fsrc.height * fk * 0.5, x2 - x1, fsrc.height * fk, `item-${frames[0]}`)
+        // Ligne claire de la surface (rangées 26 à 31 de l'image) posée sur
+        // le liseré du haut du fond : une seule ligne claire au lieu de deux.
+        const line = scene.add.tileSprite(x1, surfTop - LIQUID_MARE_SURFACE_LINE_ROW * fk, x2 - x1, fsrc.height * fk, `item-${frames[0]}`)
           .setOrigin(0, 0).setTileScale(fk, fk);
         let fi = 0;
         scene.time.addEvent({
@@ -549,6 +662,8 @@ function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
         const vk = vdef.scale || k;
         const veil = scene.add.tileSprite(x1, surfTop + 4, x2 - x1, vsrc.height * vk, 'item-liquide_mare_voile')
           .setOrigin(0, 0).setTileScale(vk, vk).setAlpha(0.28);
+        // Son 1er rang est noir (bord de découpe) : décalé d'un rang.
+        veil.tilePositionY = 1;
         scene.tweens.add({ targets: veil, tilePositionX: { from: 0, to: -vsrc.width }, duration: 45000, repeat: -1 });
         objs.push(veil);
       }
@@ -666,6 +781,10 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
     if (cloudId) {
       const cdef = getItemManifest()[cloudId] || {};
       c = scene.add.image(cx, cy, `item-${cloudId}`).setScale((cdef.scale || 0.7) * rnd.realInRange(0.75, 1.1));
+      // `couche_nuage_4` : un bout du nuage voisin de la planche dépasse au
+      // bord gauche de la case (colonnes 0-26, vide de 27 à 63) -- rogné au
+      // milieu du vide, sans toucher le petit nuage qui commence en 64.
+      if (cloudId === 'couche_nuage_4') c.setCrop(44, 0, c.width - 44, c.height);
     } else {
       // Nuage doux : base ombrée, puis boules de plus en plus claires.
       c = scene.add.graphics({ x: cx, y: cy });
@@ -1749,7 +1868,7 @@ function registerVisibleFeetBody(sprite) {
 function propTopYAt(scene, x, type = null) {
   let best = null;
   for (const img of scene.props || []) {
-    if (!img.active || (type && img.propType !== type)) continue;
+    if (!img.active || img.__noPropSurface || (type && img.propType !== type)) continue;
     const y = visibleTopYAt(img, x);
     if (y != null && (best === null || y < best)) best = y;
   }
@@ -1988,7 +2107,11 @@ function worldUiHudRects(scene) {
   if (scene.hudGraphics && scene.hudGraphics.active && scene.player) {
     const hearts = Math.max(1, scene.player.maxHearts || 1);
     const topW = Math.max(HUD_ENERGY_BAR_WIDTH, hearts * (HUD_HEART_SIZE + HUD_HEART_GAP) - HUD_HEART_GAP);
-    const topH = HUD_HEART_SIZE + HUD_ENERGY_BAR_GAP_Y + HUD_ENERGY_BAR_HEIGHT;
+    // Barre d'énergie peinte (cf. HUD_ENERGY_ART) : son cadre descend plus
+    // bas que la barre dessinée (22 px dont 6 au-dessus de sa ligne).
+    const energyArt = scene.__energyArt && scene.__energyArt.owner === scene.hudGraphics;
+    const barBottom = energyArt ? HUD_ENERGY_ART.frameDy + HUD_ENERGY_ART.frameH + 1 : HUD_ENERGY_BAR_HEIGHT;
+    const topH = HUD_HEART_SIZE + HUD_ENERGY_BAR_GAP_Y + barBottom;
     const skillY = scene.scale.height - HUD_MARGIN - HUD_SKILL_SIZE / 2;
     const firstCx = HUD_MARGIN + HUD_SKILL_SIZE / 2;
     const lastCx = firstCx + (HUD_SKILL_LABELS.length - 1) * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
@@ -2187,13 +2310,69 @@ function totemTextureKey(scene, totemType, state) {
   return manifestPlaceholderKey(scene, itemId);
 }
 
+// Écouteur de scène posé par un objet de la zone (totem, feu de camp) et
+// RETIRÉ à l'arrêt de la scène (shutdown : sortie de zone, scene.restart()).
+// Phaser réutilise la même instance de scène d'une visite à l'autre et ne
+// retire pas les écouteurs posés sur `scene.events` : chaque visite en
+// ajoutait un de plus (fuite), resté inerte grâce au garde `currentLevelScene`
+// mais appelé à chaque image. Les écouteurs posés UNE fois par instance
+// (drapeau sur la scène : worldUiState, juiceTimeState, setupZoneCamera…) ne
+// fuient pas et restent tels quels.
+function levelSceneOn(scene, event, fn) {
+  scene.events.on(event, fn);
+  const off = () => scene.events.off(event, fn);
+  scene.events.once('shutdown', off);
+  return off;
+}
+
+// Invite « E : … » d'un totem ou d'un feu de camp : pastille peinte de
+// StoryKit (createStoryPromptLabel, touche en bois + texte, lot 8) si elle
+// existe, sinon le Text historique. Même profondeur et même règle que les
+// invites de l'histoire (STORY_PROMPT_DEPTH, toujours dans l'écran) ; libellé
+// au format « E : verbe » pour que la touche peinte s'affiche.
+const LEVEL_PROMPT_DEPTH = 1050;
+function addLevelPrompt(scene, x, y, label) {
+  let prompt = null;
+  if (typeof createStoryPromptLabel === 'function') {
+    try { prompt = createStoryPromptLabel(scene, { depth: LEVEL_PROMPT_DEPTH, originY: 0.5 }); } catch (e) { prompt = null; }
+  }
+  if (prompt) {
+    prompt.setText(label).setPosition(x, y).setVisible(false);
+  } else {
+    prompt = scene.add.text(x, y, label, {
+      fontFamily: 'sans-serif',
+      fontSize: '13px',
+      color: '#ffe9f5',
+      backgroundColor: '#2a1f45',
+      padding: { x: 6, y: 3 },
+    }).setOrigin(0.5).setDepth(LEVEL_PROMPT_DEPTH).setVisible(false);
+  }
+  return prompt;
+}
+
+// Agrandissement des halos peints (`fx_halo_doux`) : depuis le réimport du
+// lot 8 (dégradé radial, marge transparente), le halo n'est plus un disque
+// plein et paraît ~25 % plus petit à taille égale que celui que Juice avait
+// réglé à l'œil. Ne s'applique qu'à l'art (le halo dessiné de repli garde sa
+// taille) ; cf. juiceBurstImage, addAbilityShrine, addCampfire.
+const JUICE_HALO_ART_BOOST = 1.28;
+
 // Idempotent : le flag protège contre un second déclenchement. Vérifié à
-// chaque frame via `scene.events.on('update', ...)` plutôt qu'un collider
-// dédié : pas besoin de toucher la boucle update() de chaque Zone*Scene.
+// chaque frame via un écouteur 'update' de la scène (levelSceneOn) plutôt
+// qu'un collider dédié : pas besoin de toucher la boucle update() de chaque
+// Zone*Scene.
 function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   const totemType = TOTEM_TYPE_BY_FLAG[flagName] || 'wolf';
   const alreadyHas = !!scene.registry.get(flagName);
-  const textureKey = totemTextureKey(scene, totemType, alreadyHas ? 'dim' : 'lit');
+  // Art par drapeau : les totems historiques (loup, aigle, pieuvre) sont
+  // lumineux tant que la forme attend et s'éteignent une fois prise ; ceux
+  // qui « s'éveillent » (singe, décision du 2026-10-25 : « allume juste le
+  // totem ») font l'inverse -- `totem_monkey_dim` endormi, puis `_lit` et son
+  // halo une fois la forme prise, pour de bon. Même repli (totemTextureKey).
+  const WAKING_TOTEM_FLAGS = ['hasMonkeyForm'];
+  const wakes = WAKING_TOTEM_FLAGS.includes(flagName);
+  const stateFor = (has) => (has !== wakes ? 'dim' : 'lit');
+  const textureKey = totemTextureKey(scene, totemType, stateFor(alreadyHas));
 
   // Cf. TOTEM_GROUND_SINK : `y` (déjà calé sur la limite de grille par
   // l'appelant) est légèrement enfoncé pour que le socle touche vraiment
@@ -2208,49 +2387,44 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   anchorVisibleFeet(marker);
   marker.body.updateFromGameObject();
   const plants = addTotemPlants(scene, x, y - TOTEM_GROUND_SINK, marker.displayWidth);
-  // Juice : halo qui « respire » derrière le totem tant qu'il n'est pas
-  // activé, lueurs qui montent (cf. l'update plus bas).
+  // Juice : halo qui « respire » derrière le totem tant qu'il est allumé
+  // (avant l'activation, ou après pour un totem qui s'éveille), lueurs qui
+  // montent (cf. l'update plus bas).
   const haloY = y - marker.displayHeight * 0.55;
-  let halo = null;
-  if (!alreadyHas) {
+  const makeHalo = () => {
     const ht = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
-    const hs = (marker.displayHeight * 1.15) / ht.size;
-    halo = scene.add.image(x, haloY, ht.key).setBlendMode(Phaser.BlendModes.ADD).setTint(0x8fe3b8).setAlpha(0.3).setScale(hs);
-    scene.tweens.add({ targets: halo, alpha: { from: 0.14, to: 0.42 }, scale: { from: hs * 0.9, to: hs * 1.08 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-  }
+    const hs = (marker.displayHeight * 1.15 * (ht.art ? JUICE_HALO_ART_BOOST : 1)) / ht.size;
+    const h = scene.add.image(x, haloY, ht.key).setBlendMode(Phaser.BlendModes.ADD).setTint(0x8fe3b8).setAlpha(0.3).setScale(hs);
+    scene.tweens.add({ targets: h, alpha: { from: 0.14, to: 0.42 }, scale: { from: hs * 0.9, to: hs * 1.08 }, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return h;
+  };
+  let halo = stateFor(alreadyHas) === 'lit' ? makeHalo() : null;
   sendBehindFrontGround(scene, [...(halo ? [halo] : []), marker, ...plants]);
   let nextMoteAt = 0;
 
-  const prompt = scene.add.text(x, y - marker.displayHeight - 14, 'Appuie sur E', {
-    fontFamily: 'sans-serif',
-    fontSize: '13px',
-    color: '#ffe9f5',
-    backgroundColor: '#2a1f45',
-    padding: { x: 6, y: 3 },
-  }).setOrigin(0.5).setVisible(false);
+  const prompt = addLevelPrompt(scene, x, y - marker.displayHeight - 14, 'E : se recueillir');
   // Grand totem (aigle de la forêt flottante 2) : son sommet sort du haut de
   // l'écran -- l'invite se pose alors à hauteur de la tête d'Agarica.
   keepWorldUiInView(prompt, { prompt: true });
 
-  scene.events.on('update', () => {
-    // Cf. `currentLevelScene` : ce listener n'est jamais retiré au départ
-    // de la zone (persiste sur `scene.events`, réutilisé d'une visite à
-    // l'autre) -- sans ce garde-fou il continuerait à tourner sur un
-    // `marker`/`scene.player` d'une visite précédente, potentiellement déjà
-    // détruits, après un retour dans cette même zone.
+  levelSceneOn(scene, 'update', () => {
+    // Écouteur retiré à l'arrêt de la scène (levelSceneOn) ; garde-fou
+    // gardé pour les images « fantômes » qu'une zone quittée peut encore
+    // recevoir avant son arrêt (cf. `currentLevelScene`).
     if (scene !== currentLevelScene) return;
     // Écouteur d'une visite précédente (totem détruit avec elle) : inerte.
     if (!marker.scene) return;
-    if (scene.registry.get(flagName) || isWorldFrozen(scene)) {
-      prompt.setVisible(false);
-      return;
-    }
-    // Lueurs qui montent du totem encore actif (plus serrées à portée).
+    // Lueurs qui montent du totem allumé (plus serrées à portée) : celui qui
+    // attend encore, ou celui qui s'est éveillé (seul à garder son halo).
     const now = scene.time.now;
-    if (halo && halo.active && now >= nextMoteAt) {
+    if (halo && halo.active && now >= nextMoteAt && !isWorldFrozen(scene)) {
       const near = Math.abs(scene.player.x - x) < 220;
       nextMoteAt = now + (near ? 260 : 520);
       spawnFx(scene, 'motes', x + Phaser.Math.Between(-18, 18), haloY + Phaser.Math.Between(-20, 30), { count: 1, color: [0x8fe3b8, 0xe8fff2, 0xff9fc9] });
+    }
+    if (scene.registry.get(flagName) || isWorldFrozen(scene)) {
+      prompt.setVisible(false);
+      return;
     }
     const inRange = scene.physics.overlap(scene.player, marker);
     prompt.setVisible(inRange);
@@ -2278,8 +2452,8 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
       scene.registry.set('equippedForms', scene.player.equippedForms);
     }
     // Éteint plutôt que détruit : le totem reste planté là, juste sans
-    // lueur, comme une capacité déjà récupérée.
-    marker.setTexture(totemTextureKey(scene, totemType, 'dim'));
+    // lueur, comme une capacité déjà récupérée (ou allumé, s'il s'éveille).
+    marker.setTexture(totemTextureKey(scene, totemType, stateFor(true)));
     if (isStoryScene(scene)) saveGame(scene, { silent: true });
     prompt.setVisible(false);
     // Juice : gros éclat à l'activation (flash du totem, halo, anneau,
@@ -2292,7 +2466,11 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     juiceShake(scene, 'medium');
     juiceZoomPulse(scene, { zoom: 1.04, ms: 700 });
     playSfx('totem_activate', { form: totemType });
-    if (halo) {
+    if (wakes && !halo) {
+      // Totem qui s'éveille : son halo apparaît et respire désormais.
+      halo = makeHalo();
+      scene.children.moveBelow(halo, marker);
+    } else if (!wakes && halo) {
       const h = halo;
       halo = null;
       scene.tweens.killTweensOf(h);
@@ -2372,7 +2550,7 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
   // petites gerbes d'étincelles au hasard (cf. l'update plus bas).
   const flameY = footY - fire.displayHeight * 0.42;
   const glowTex = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
-  const glowScale = (fire.displayWidth * 3.4) / glowTex.size;
+  const glowScale = (fire.displayWidth * 3.4 * (glowTex.art ? JUICE_HALO_ART_BOOST : 1)) / glowTex.size;
   const halo = scene.add.image(x, flameY, glowTex.key).setBlendMode(Phaser.BlendModes.ADD)
     .setTint(0xffa860).setAlpha(0.3).setScale(glowScale);
   scene.children.moveBelow(halo, fire);
@@ -2380,21 +2558,26 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     targets: halo, alpha: { from: 0.28, to: 0.52 }, scale: { from: glowScale * 0.93, to: glowScale * 1.07 },
     duration: 950, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
   });
+  // Flaque de lumière chaude au pied du feu (`fx_lueur_sol`, lot 8 : ellipse
+  // blanche teintable) : le feu éclaire l'herbe autour de lui. Posée sur la
+  // ligne de marche, derrière les bûches, et respire avec le halo (même
+  // rythme). Purement décorative ; sans l'image, rien (le halo suffit).
+  if (scene.textures.exists('item-fx_lueur_sol')) {
+    const pool = scene.add.image(x, footY - 2, 'item-fx_lueur_sol').setBlendMode(Phaser.BlendModes.ADD)
+      .setTint(0xffa860).setDisplaySize(fire.displayWidth * 3, 30).setAlpha(0.3);
+    scene.children.moveBelow(pool, fire);
+    scene.tweens.add({ targets: pool, alpha: { from: 0.25, to: 0.4 }, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
   let nextEmberAt = 0;
   let nextCrackleAt = 0;
 
-  const prompt = scene.add.text(x, y - 90, 'Appuie sur E pour te reposer', {
-    fontFamily: 'sans-serif',
-    fontSize: '13px',
-    color: '#ffe9f5',
-    backgroundColor: '#2a1f45',
-    padding: { x: 6, y: 3 },
-  }).setOrigin(0.5).setVisible(false);
+  const prompt = addLevelPrompt(scene, x, y - 90, 'E : te reposer');
   keepWorldUiInView(prompt, { prompt: true });
 
-  scene.events.on('update', () => {
-    // Cf. `currentLevelScene` (même raison que dans addAbilityShrine) :
-    // ce listener persiste d'une visite à l'autre de la zone.
+  levelSceneOn(scene, 'update', () => {
+    // Écouteur retiré à l'arrêt de la scène (levelSceneOn) ; garde-fou
+    // gardé pour les images « fantômes » d'une zone quittée (cf.
+    // `currentLevelScene`, même raison que dans addAbilityShrine).
     if (scene !== currentLevelScene) return;
     // Écouteur d'une visite précédente (feu détruit avec elle) : inerte.
     if (!fire.scene) return;
@@ -2698,12 +2881,64 @@ const DECOR_SECTIONS = {
     'sechoir_plantes', 'lanterne_papillons', 'panier_plantes', 'tapis_rond',
     'pot_fleurs', 'bocal_papillons',
   ],
+  // EXCEPTION (lot Codex n°8, cf. MANIFEST_DECOR_SECTIONS) : ces trois
+  // sections ne viennent PAS de tools/crop_deco_items.py. Leurs images sont
+  // des entrées du manifest (src/data/asset_manifest.js) : la clé
+  // `<section>_<item>` EST l'id du manifest (`decor_mare_berge`,
+  // `objet_fleche`, `rocher_roulant`…), chargée depuis son `path`, échelle par
+  // défaut = celle du manifest (propDefaultScale). Aucune collision avec les
+  // clés des sections ci-dessus (aucune ne commence par decor_/objet_/rocher_).
+  decor: [
+    'mare_berge', 'mare_roseaux', 'fleur_perchee', 'cercle_sain', 'tapis_mousse', 'mousse_sechee',
+    'mousse_plaque_intacte', 'mousse_plaque_grattee', 'mousse_plaque_repoussee',
+    'mousse_lumineuse_sol', 'mousse_lumineuse_petite', 'mousse_lumineuse_tronc', 'mousse_lumineuse_plafond',
+    'touffe_mousse_petite', 'touffe_mousse_moyenne', 'touffe_mousse_grande', 'touffe_mousse_penchee',
+    'empreinte_boue', 'marches_racines', 'autel_sommet',
+  ],
+  objet: ['fleche', 'collet', 'grappin'],
+  // Rocher de Kainati : seulement proposé dans l'éditeur (aucune zone ne le
+  // pose) -- garde la liste des sections du manifest complète (contrat).
+  rocher: ['roulant'],
 };
 const PROP_PREFIX = 'prop-';
 const PROP_TYPES = Object.entries(DECOR_SECTIONS).flatMap(
   ([section, items]) => items.map((item) => `${section}_${item}`),
 );
 const PROP_SCALE = 0.4;
+// Sections de DECOR_SECTIONS dont les images sont des entrées du manifest
+// (pas des découpes de deco_item_frames/) : BootScene les précharge depuis le
+// `path` du manifest en `prop-<id>`, l'éditeur les propose à l'échelle du
+// manifest.
+const MANIFEST_DECOR_SECTIONS = ['decor', 'objet', 'rocher'];
+// Échelle par défaut d'un décor posé : celle du manifest pour les décors du
+// lot 8 (`type` = id du manifest), sinon PROP_SCALE (décors historiques).
+function propDefaultScale(type) {
+  const def = typeof getItemManifest === 'function' ? getItemManifest()[type] : null;
+  return (def && def.scale) || PROP_SCALE;
+}
+// Pose par défaut de certains décors du manifest (clés de props, cf.
+// buildLevelFromData) ; une clé écrite sur l'entrée de la zone l'emporte.
+// - mousse de plafond : pend SOUS `y` (dessous d'une case) ;
+// - mousse de tronc : centrée sur (x, y), collée à un tronc, pas au sol ;
+// - empreinte : vue de dessus, écrasée en hauteur pour une vue rasante.
+const DECOR_PROP_PLACEMENT = {
+  decor_mousse_lumineuse_plafond: { hang: true },
+  decor_mousse_lumineuse_tronc: { free: true },
+  decor_empreinte_boue: { flatY: 0.5 },
+};
+// Clés de pose d'un décor (entrée de `props`), toutes facultatives.
+const PROP_PLACEMENT_KEYS = ['flipX', 'angle', 'hang', 'free', 'flatY', 'front'];
+
+// Texture d'un décor : `prop-<type>` (préchargée par BootScene), sinon, pour
+// un décor du manifest, sa texture d'objet `item-<id>` (même image, chargée
+// par loadManifestAssets) -- le décor s'affiche même si le préchargement
+// `prop-` manque. Null : décor retiré ou image absente.
+function propTextureKey(scene, type) {
+  if (scene.textures.exists(`${PROP_PREFIX}${type}`)) return `${PROP_PREFIX}${type}`;
+  const section = MANIFEST_DECOR_SECTIONS.find((s) => type.startsWith(`${s}_`));
+  if (section && scene.textures.exists(`item-${type}`)) return `item-${type}`;
+  return null;
+}
 
 function gridCellKey(gx, gy) {
   return `${gx},${gy}`;
@@ -3789,18 +4024,49 @@ function buildLevelFromData(scene, data, sceneData) {
   // (cf. propTopYAt) plutôt que sur un y écrit à la main.
   scene.props = [];
   for (const p of data.props || []) {
+    if (!p || !p.type) continue;
     // Décor retiré du jeu (ex. `foret_sombre_arbre_moussu`) ou image absente :
     // ignoré en silence plutôt qu'affiché en carré « texture manquante ».
-    if (!scene.textures.exists(`${PROP_PREFIX}${p.type}`)) continue;
-    // Surface où l'on MARCHE (haut de la hitbox, cf. GROUND_STAND_SINK :
-    // 16 px sous le haut visuel des tuiles d'herbe avec 'floor', le haut de la
-    // case avec 'tuiles'), pas le haut de l'image de tuile -- sinon, avec
-    // 'floor', les décors flottaient au-dessus de l'herbe.
-    // Par le bas VISIBLE de l'image (cf. placeOnGround) : les planches gardent
-    // quelques px de marge transparente sous le socle (2-3 px affichés).
-    const stand = groundStandYAt(scene, p.x, p.y);
-    const img = scene.add.image(p.x, stand ?? p.y, `${PROP_PREFIX}${p.type}`).setOrigin(0.5, 1).setScale(p.scale || PROP_SCALE);
-    if (stand != null) setVisibleBottomY(img, stand + GROUND_CONTACT_SINK);
+    const texKey = propTextureKey(scene, p.type);
+    if (!texKey) continue;
+    // Clés de pose (facultatives, rétro-compatibles) : celles de l'entrée,
+    // sinon la pose par défaut du décor (DECOR_PROP_PLACEMENT).
+    const place = { ...(DECOR_PROP_PLACEMENT[p.type] || {}) };
+    for (const k of PROP_PLACEMENT_KEYS) if (p[k] !== undefined) place[k] = p[k];
+    const img = scene.add.image(p.x, p.y, texKey).setScale(p.scale || propDefaultScale(p.type));
+    if (place.flipX) img.setFlipX(true);
+    // Écrasé en hauteur (empreinte vue de dessus -> vue rasante).
+    if (place.flatY) img.setScale(img.scaleX, img.scaleY * place.flatY);
+    if (place.hang) {
+      // Pend sous `y` (mousse sous une case de plafond) : pas de recalage.
+      img.setOrigin(0.5, 0);
+    } else if (place.free) {
+      // Centré sur (x, y) (mousse sur un tronc) : pas de recalage.
+      img.setOrigin(0.5, 0.5);
+    } else {
+      img.setOrigin(0.5, 1);
+      if (!place.angle) {
+        // Surface où l'on MARCHE (haut de la hitbox, cf. GROUND_STAND_SINK :
+        // 16 px sous le haut visuel des tuiles d'herbe avec 'floor', le haut
+        // de la case avec 'tuiles'), pas le haut de l'image de tuile --
+        // sinon, avec 'floor', les décors flottaient au-dessus de l'herbe.
+        // Par le bas VISIBLE de l'image (cf. placeOnGround) : les planches
+        // gardent quelques px de marge transparente sous le socle.
+        const stand = groundStandYAt(scene, p.x, p.y);
+        img.y = stand ?? p.y;
+        if (stand != null) setVisibleBottomY(img, stand + GROUND_CONTACT_SINK);
+      }
+    }
+    if (place.angle) {
+      // Planté de travers (flèche) : `y` est le point d'enfoncement (bas de
+      // l'image, tourné autour de lui), sans recalage au sol ; glissé
+      // derrière le sol pour que la partie enfoncée soit cachée par la terre.
+      img.setAngle(place.angle);
+      sendBehindFrontGround(scene, [img]);
+    }
+    if (place.front) img.setDepth(DECOR_FOREGROUND_DEPTH - 3);
+    // Pendu, centré ou tourné : pas une surface où poser un PNJ (propTopYAt).
+    if (place.hang || place.free || place.angle) img.__noPropSurface = true;
     img.propType = p.type;
     scene.props.push(img);
   }
@@ -4110,6 +4376,8 @@ function updateLevelFromData(scene, time, delta) {
   // disparaître au Shift+A/Shift+J pendant que le menu est ouvert.
   drawCombatDebugOverlays(scene);
   drawHud(scene);
+  // Fondus des lointains peints (clé `farLayers`) : suivent la caméra.
+  updateFarLayers(scene);
 }
 
 // Pendant un gel, la physique continue (gravité) : on coupe l'élan horizontal
@@ -4489,9 +4757,22 @@ function juiceTexture(scene, artId, fallback) {
 // Teinte : les images Codex sont déjà colorées -> `artTint` (défaut : aucune)
 // ; seules celles livrées en blanc pour être teintées (`tintArt: true` :
 // grain de lumière, bulle) prennent la teinte de l'appel, comme le repli.
+// `artSize` : taille à l'écran quand l'IMAGE Codex est utilisée -- le grain
+// utile n'occupe qu'une partie de son canevas de 128 px (halo, éclats
+// satellites), il paraissait deux fois plus petit que le repli dessiné à la
+// même `size` (taille utile mesurée, cf. le manifest : braise 10-12, grain
+// 18-20 -- pas 26, les points satellites font du bruit --, étincelle de
+// papillon 16). Le repli garde `size`.
+// Poussière (`dust`) : repli lavande teintable (art: null) plutôt que la
+// bouffée Codex brune -- la teinte lavande sur l'art brun donnait une boue
+// grise, et la poussière nocturne lavande reste dans la palette (violet
+// nuit), discrète sous les pas.
+// Étincelles (`spark`) : traînée dessinée teintable (art: null) -- l'art
+// `fx_etincelle` est vert menthe, toutes les étincelles (coups, murs)
+// sortaient vertes ; il reste pour la purification (MousseCreature).
 const FX_PARTICLES = {
   dust: {
-    art: 'fx_bouffee_poussiere', tex: 'juice-puff', size: 24, depth: 'front', artTint: [0xc9b8f5, 0xb9a9e9],
+    art: null, tex: 'juice-puff', size: 24, depth: 'front',
     lifespan: [360, 620], speed: [20, 90], angle: [190, 350], gravityY: -30,
     scale: [0.55, 1.4], alpha: [0.62, 0], tint: [0xd8ccf5, 0xb9a9d9, 0xece6fa], spin: true,
   },
@@ -4501,17 +4782,17 @@ const FX_PARTICLES = {
     scale: [0.6, 1.6], alpha: [0.6, 0], tint: [0x8a78c0, 0x6a5a9a, 0xb4a6e0], spin: true,
   },
   spark: {
-    art: 'fx_etincelle', tex: 'juice-spark', size: 20, depth: 'front', add: true,
+    art: null, tex: 'juice-spark', size: 20, depth: 'front', add: true,
     lifespan: [180, 360], speed: [200, 480], angle: [0, 360], gravityY: 300,
     scale: [1, 0.25], alpha: [1, 0], tint: [0xffffff, 0xe8fff2, 0x9fffd0, 0xffb3e0], alignToVelocity: true,
   },
   star: {
-    art: 'fx_grain_lumiere', tex: 'juice-star', size: 12, depth: 'front', add: true, tintArt: true,
+    art: 'fx_grain_lumiere', tex: 'juice-star', size: 12, artSize: 19, depth: 'front', add: true, tintArt: true,
     lifespan: [420, 800], speed: [20, 90], angle: [0, 360], gravityY: -20,
     scale: [1, 0], alpha: [1, 0.2], tint: [0xffffff, 0x8fe3b8, 0xff9fc9], spin: true,
   },
   mote: {
-    art: 'fx_grain_lumiere', tex: 'juice-dot', size: 12, depth: 'front', add: true, tintArt: true,
+    art: 'fx_grain_lumiere', tex: 'juice-dot', size: 12, artSize: 19, depth: 'front', add: true, tintArt: true,
     lifespan: [700, 1300], speed: [10, 45], angle: [245, 295], gravityY: -40,
     scale: [1, 0.2], alpha: [0.95, 0], tint: [0x8fe3b8, 0xe8fff2, 0xff9fc9],
   },
@@ -4541,7 +4822,7 @@ const FX_PARTICLES = {
     scale: [1, 0.7], alpha: [1, 0], tint: [0x5a4630, 0x7a5f40, 0x3d2f22], spin: true,
   },
   ember: {
-    art: 'fx_braise', tex: 'juice-dot', size: 6, depth: 'front', add: true,
+    art: 'fx_braise', tex: 'juice-dot', size: 6, artSize: 11, depth: 'front', add: true,
     lifespan: [700, 1300], speed: [15, 55], angle: [250, 290], gravityY: -55,
     scale: [1, 0.3], alpha: [1, 0], tint: [0xffc36b, 0xff9a3c, 0xffe29a],
   },
@@ -4566,7 +4847,7 @@ const FX_PARTICLES = {
     scale: [1, 0.7], alpha: [1, 0], tint: [0xff9fc9, 0xffd0e6], spin: true,
   },
   wing: {
-    art: 'fx_etincelle_papillon', tex: 'juice-star', size: 9, depth: 'front', add: true,
+    art: 'fx_etincelle_papillon', tex: 'juice-star', size: 9, artSize: 16, depth: 'front', add: true,
     lifespan: [320, 560], speed: [20, 110], angle: [0, 360], gravityY: 40,
     scale: [1, 0.1], alpha: [1, 0], tint: [0x9ff3ff, 0x6fd8ff, 0xffb3f0, 0xfff6a0],
   },
@@ -4602,7 +4883,7 @@ function juiceEmitter(scene, kind, plain = false) {
   const r = FX_PARTICLES[kind];
   if (!r) return null;
   const tex = plain ? juiceTexture(scene, null, r.tex) : juiceTexture(scene, r.art, r.tex);
-  const base = r.size / tex.size;
+  const base = (tex.art && r.artSize ? r.artSize : r.size) / tex.size;
   const cfg = {
     emitting: false,
     lifespan: { min: r.lifespan[0], max: r.lifespan[1] },
@@ -4692,7 +4973,9 @@ function juiceBurstImage(scene, kind, x, y, { size = 80, from = 0.3, to = 1, ms 
     .setBlendMode(Phaser.BlendModes.ADD)
     .setDepth(depth ?? (ui ? FX_DEPTHS.ui : FX_DEPTHS.front));
   if (ui) img.setScrollFactor(0);
-  const k = size / tex.size;
+  // Halo peint (dégradé radial depuis le lot 8) : agrandi pour garder
+  // l'emprise lumineuse réglée par Juice (cf. JUICE_HALO_ART_BOOST).
+  const k = (size * (kind === 'glow' && tex.art ? JUICE_HALO_ART_BOOST : 1)) / tex.size;
   img.setScale(k * from, k * from * flat);
   scene.tweens.add({
     targets: img, scaleX: k * to, scaleY: k * to * flat, alpha: 0, duration: ms, ease,
@@ -4708,12 +4991,19 @@ function juiceBurstImage(scene, kind, x, y, { size = 80, from = 0.3, to = 1, ms 
 // ramassages, purification, totems…) sortaient ambre et ignoraient `color`.
 // Sans variante : anneau dessiné par code, teinté de `color`.
 const JUICE_SHOCK_RING_ART_VARIANTS = ['toxique', 'talisman'];
+// Emprise de l'anneau peint : son trait mesure ~287 px de large à sa plus
+// grande frame (canevas de 316 px depuis l'import `align: "ring"`, qui le
+// recentre). Échelle calée sur le TRAIT et non sur le canevas (le canevas a
+// grandi au réimport : les anneaux rapetissaient de 5 %), pour qu'il ait la
+// même emprise que l'anneau dessiné (trait à ~94 % de `size`).
+const JUICE_SHOCK_RING_ART_SPAN = 287;
+const JUICE_SHOCK_RING_DRAWN_RATIO = 0.94;
 function juiceShockRing(scene, x, y, { size = 120, color = 0xe8fff2, ms = 420, variant = null, flat = 1, depth } = {}) {
   if (JUICE_SHOCK_RING_ART_VARIANTS.includes(variant)
     && typeof hasManifestArt === 'function' && hasManifestArt(scene, 'vfx_anneau_choc', variant)) {
     const fx = addManifestSprite(scene, x, y, 'vfx_anneau_choc', variant, { origin: [0.5, 0.5] })
       .setDepth(depth ?? FX_DEPTHS.front).setBlendMode(Phaser.BlendModes.ADD);
-    const k = size / Math.max(fx.width, 1);
+    const k = (size * JUICE_SHOCK_RING_DRAWN_RATIO) / JUICE_SHOCK_RING_ART_SPAN;
     fx.setScale(k, k * flat);
     fx.once('animationcomplete', () => fx.destroy());
     scene.time.delayedCall(ms + 800, () => { if (fx.active) fx.destroy(); });
@@ -4958,8 +5248,9 @@ function juiceUpdateCameraLook(scene, dt) {
 }
 
 // --- Vie ambiante : lucioles (nuit) et papillons (jour) ---------------------
-// Clé de zone optionnelle `ambientLife: false | { fireflies: n, butterflies: n }`
-// (défaut selon le fond : lucioles la nuit, quelques papillons le jour).
+// Clé de zone optionnelle `ambientLife: false | { fireflies: n, butterflies: n,
+// spores: n }` (défaut selon le fond : lucioles la nuit, quelques papillons le
+// jour ; spores toxiques seulement si demandées, cf. plus bas).
 // Nombre fixe d'objets par visite (pas d'émission continue).
 const JUICE_DAY_BACKGROUNDS = ['fond_bosquet', 'fond_foret_flottante'];
 
@@ -4990,6 +5281,33 @@ function juiceAddAmbientLife(scene, data) {
       targets: f, alpha: { from: 0.08, to: front ? 0.55 : 0.85 },
       duration: rnd.between(900, 2200), yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: rnd.between(0, 2500),
     });
+  }
+  // Spores toxiques d'ambiance (`ambientLife.spores: n`, forêt corrompue) :
+  // `fx_spore_toxique` (lot 8) en mode NORMAL (une spore n'est pas une
+  // lumière), 10-12 px, qui dérivent lentement en tournant. Repli : petit
+  // point vert dessiné. Pas dans l'arène de Ghil't : la spore y annonce une
+  // attaque (télégraphe), il ne faut pas en semer pour rien.
+  const nSpores = Math.max(0, Math.round(cfg.spores || 0));
+  if (nSpores > 0) {
+    const stex = juiceTexture(scene, 'fx_spore_toxique', 'juice-dot');
+    for (let i = 0; i < nSpores; i++) {
+      const x = rnd.between(30, Math.max(31, lw - 30));
+      const ground = groundStandYAt(scene, x, 448);
+      const y = (ground ?? 440) - rnd.between(20, 220);
+      const front = rnd.frac() < 0.2;
+      const size = stex.art ? rnd.between(10, 12) : rnd.between(4, 6);
+      const s = scene.add.image(x, y, stex.key).setScale(size / stex.size).setAlpha(0)
+        .setTint(stex.art ? 0xffffff : 0x9bff5a).setRotation(rnd.realInRange(0, Math.PI * 2))
+        .setDepth(front ? DECOR_FOREGROUND_DEPTH - 3 : CHARACTER_DEPTH - 2);
+      scene.tweens.add({
+        targets: s, x: x + rnd.between(-50, 50), y: y + rnd.between(-35, 20), rotation: s.rotation + rnd.realInRange(-2, 2),
+        duration: rnd.between(6000, 11000), yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: rnd.between(0, 2000),
+      });
+      scene.tweens.add({
+        targets: s, alpha: { from: 0.25, to: front ? 0.55 : 0.8 },
+        duration: rnd.between(1800, 3600), yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: rnd.between(0, 2500),
+      });
+    }
   }
   const hasButterflies = (data.animals || []).some((a) => a && a.type === 'papillons');
   const nBut = cfg.butterflies ?? (day && !hasButterflies ? Phaser.Math.Clamp(Math.round(lw / 900), 2, 5) : 0);
@@ -5147,6 +5465,42 @@ function juiceHudSkillScale(scene, i) {
   return 1 + 0.28 * Math.sin(t * Math.PI) * (1 - t * 0.4);
 }
 
+// Barre d'énergie peinte (lot Codex n°8 ; agrandie pour que le remplissage
+// reste lisible, les rainures peintes étant fines) : cadre de lianes
+// `ui_energie_cadre` en 3 morceaux, 150x22 (addUiSliced, StoryKit), posé
+// 6 px au-dessus de la ligne de la barre dessinée ; remplissage
+// `ui_energie_remplissage` affiché dans la rainure peinte, 114x7 à (18, 9)
+// du coin du cadre (la rainure s'arrête à 18 px des bords : PAS 128), rogné
+// selon l'énergie. Traîne et contours (refus, énergie pleine) dans un
+// Graphics dédié entre les deux. Tout fixé à l'écran, au-dessus du HUD
+// dessiné (1000) et sous les cœurs (1001).
+const HUD_ENERGY_ART = {
+  frameDy: -6, frameW: 150, frameH: 22, scale: 0.25,
+  grooveX: 18, grooveY: 3, grooveW: 114, grooveH: 7,
+  depthFrame: 1000.2, depthFx: 1000.4, depthFill: 1000.6,
+};
+
+// Objets de la barre peinte, créés une fois par visite (owner = le Graphics
+// du HUD, recréé à chaque visite) ; null tant que l'art ou addUiSliced
+// manque (repli : barre dessinée).
+function juiceEnergyArt(scene) {
+  const art = scene.__energyArt;
+  if (art && art.owner === scene.hudGraphics && art.frame.active) return art;
+  if (typeof addUiSliced !== 'function' || !scene.textures.exists('item-ui_energie_cadre')
+    || !scene.textures.exists('item-ui_energie_remplissage')) return null;
+  const A = HUD_ENERGY_ART;
+  let frame = null;
+  try { frame = addUiSliced(scene, 'ui_energie_cadre', 0, 0, A.frameW, null, { scale: A.scale, depth: A.depthFrame, scrollFactor: 0 }); } catch (e) { frame = null; }
+  if (!frame) return null;
+  frame.setScrollFactor(0).setDepth(A.depthFrame);
+  const fx = scene.add.graphics().setScrollFactor(0).setDepth(A.depthFx);
+  const fill = scene.add.image(0, 0, 'item-ui_energie_remplissage').setOrigin(0, 0)
+    .setScrollFactor(0).setDepth(A.depthFill).setDisplaySize(A.grooveW, A.grooveH);
+  const src = scene.textures.get('item-ui_energie_remplissage').getSourceImage();
+  scene.__energyArt = { owner: scene.hudGraphics, frame, fx, fill, texW: src.width, texH: src.height };
+  return scene.__energyArt;
+}
+
 // Barre d'énergie : fond, traîne pâle, remplissage lissé, reflet, pointe
 // lumineuse pendant qu'elle monte, lueur qui respire quand elle est pleine.
 function juiceDrawEnergyBar(scene, g, x, y, w, h) {
@@ -5156,6 +5510,11 @@ function juiceDrawEnergyBar(scene, g, x, y, w, h) {
   const dk = (now - st.denyAt) / 260;
   const deny = dk < 1 ? Math.sin(dk * Math.PI * 4) * 3 * (1 - dk) : 0;
   const bx = x + deny;
+  const art = juiceEnergyArt(scene);
+  if (art) {
+    juiceDrawEnergyBarArt(scene, art, bx, y, st, dk);
+    return;
+  }
   g.fillStyle(0x2a1f45, 1);
   g.fillRoundedRect(bx, y, w, h, 4);
   const max = Math.max(1, p.maxEnergy);
@@ -5184,6 +5543,51 @@ function juiceDrawEnergyBar(scene, g, x, y, w, h) {
     const breathe = 0.25 + 0.2 * Math.sin(now / 320);
     g.lineStyle(2, 0x8fe3b8, Math.min(1, breathe + burst));
     g.strokeRoundedRect(bx - 1.5, y - 1.5, w + 3, h + 3, 5);
+  }
+}
+
+// Même lecture que la barre dessinée (traîne, remplissage lissé, pointe qui
+// monte, refus, énergie pleine), sur l'art peint. `bx` : x déjà décalé par
+// le tremblement du refus (tout bouge ensemble).
+function juiceDrawEnergyBarArt(scene, art, bx, y, st, dk) {
+  const A = HUD_ENERGY_ART;
+  const p = scene.player;
+  const now = scene.time.now;
+  const max = Math.max(1, p.maxEnergy);
+  const trail = Phaser.Math.Clamp(st.energyTrail / max, 0, 1);
+  const shown = Phaser.Math.Clamp(st.energyShown / max, 0, 1);
+  const gx = bx + A.grooveX;
+  const gy = y + A.grooveY;
+  art.frame.setPosition(bx, y + A.frameDy);
+  art.fill.setPosition(gx, gy).setVisible(shown > 0.002);
+  if (shown > 0.002) art.fill.setCrop(0, 0, Math.max(1, art.texW * shown), art.texH);
+  const g = art.fx;
+  g.clear();
+  if (trail > shown + 0.002) {
+    g.fillStyle(0xffe9f5, 0.45);
+    g.fillRect(gx, gy, A.grooveW * trail, A.grooveH);
+  }
+  if (shown > 0 && st.energyShown < p.energy - 0.5) {
+    // Pointe lumineuse au bout du remplissage pendant qu'il monte (sous
+    // l'image du remplissage : seule sa moitié en avant dépasse, comme une
+    // goutte de lumière qui le précède).
+    g.fillStyle(0xffffff, 0.85);
+    g.fillCircle(gx + A.grooveW * shown, gy + A.grooveH / 2, A.grooveH * 0.6);
+  }
+  // Contours autour du cadre peint (refus en rouge, énergie pleine qui respire).
+  const ox = bx - 1;
+  const oy = y + A.frameDy - 1;
+  const ow = A.frameW + 2;
+  const oh = A.frameH + 2;
+  if (dk < 1) {
+    g.lineStyle(2, 0xff4d6d, 0.9 * (1 - dk));
+    g.strokeRoundedRect(ox, oy, ow, oh, 8);
+  }
+  if (p.energy >= max) {
+    const burst = Math.max(0, 1 - (now - st.fullAt) / 500);
+    const breathe = 0.25 + 0.2 * Math.sin(now / 320);
+    g.lineStyle(2, 0x8fe3b8, Math.min(1, breathe + burst));
+    g.strokeRoundedRect(ox - 0.5, oy - 0.5, ow + 1, oh + 1, 8);
   }
 }
 

@@ -20,7 +20,18 @@ const BOSQUET_DATA = {
   zoneName: "Bosquet d'Émeraude",
   zoneSub: 'La nuit où tout a basculé',
   background: 'fond_bosquet',
-  ambient: { tint: 0x0a1030, darkness: 0.12 },
+  // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones sombres
+  // (forêts sombres, forêt corrompue, arène de Ghil't, trou sombre) ; le
+  // bosquet est le foyer, encore paisible.
+  ambient: { tint: 0x0a1030, darkness: 0.12, vignette: false },
+  // Clair de lune sur l'idole (lot Codex n°8, clé `lights`, H15) : rai posé
+  // sur la marche de l'autel (y 320, où l'on marche ; posé à 448 il
+  // traverserait deux rangées de tuiles). Il s'éteint en fondu quand Amanite
+  // vole l'idole ; il a son écho, l'aube sur l'autel, au retour au bosquet.
+  // Alpha 0,38 : à 0,25 il ne se voyait presque pas sur le fond de nuit.
+  lights: [
+    { id: 'fx_rai_lumiere', x: 3424, y: 320, w: 130, h: 380, tint: 0xd8ecff, alpha: 0.38, forbids: { idoleVolee: true } },
+  ],
   xara: false,
   script: 'bosquet',
   groundCells: [
@@ -73,6 +84,10 @@ const BOSQUET_DATA = {
     // Hutte du chef : le grand arbre au sol, le cottage (plus haut) sur le
     // seuil x 2752-2944.
     { type: 'bosquet_grand_arbre', x: 2562, y: BOSQUET_SURFACE_Y, scale: 1.1 },
+    // « Elle s'étend sur les troncs » : la mousse lumineuse (lot Codex n°8,
+    // H12) gagne déjà le pied du grand arbre du chef. `free` (pose par
+    // défaut) : centrée sur (x, y), collée au tronc, pas recalée au sol.
+    { type: 'decor_mousse_lumineuse_tronc', x: 2546, y: 392 },
     { type: 'bosquet_banner_tree', x: 2980, y: BOSQUET_SURFACE_Y, scale: 0.6 },
     { type: 'bosquet_lamp_post', x: 3070, y: BOSQUET_SURFACE_Y, scale: 0.55 },
     // Sanctuaire de l'idole

@@ -30,26 +30,47 @@ function ensureGlowDotTexture(scene) {
   return FX_GLOW_DOT_KEY;
 }
 
+// Halo doux des entités (nuée du papillon, papillons d'ambiance) : art
+// `fx_halo_doux` (lot n°8) s'il existe, sinon `fallbackKey` (dégradé dessiné).
+// Le halo importé (dégradé `falloff`, marge `pad`) porte ~25 % de lumière en
+// moins qu'un dégradé dessiné de même taille (énergie mesurée : 0,178 contre
+// 0,226-0,236) : `comp` agrandit l'image d'autant pour garder le même éclat
+// qu'avant, sans disque plein. `size` = plus grand côté de la texture.
+const ENTITY_HALO_ART_COMP = 1.12;
+function entityHaloTexture(scene, fallbackKey) {
+  const art = scene.textures.exists('item-fx_halo_doux');
+  const key = art ? 'item-fx_halo_doux' : fallbackKey;
+  const src = scene.textures.get(key).getSourceImage();
+  return { key, art, size: Math.max(src.width, src.height, 1), comp: art ? ENTITY_HALO_ART_COMP : 1 };
+}
+
 // Gerbe de petites lumières qui montent et s'éteignent (purification,
 // soin…). Purement décoratif, s'autodétruit.
+// Art : grains `fx_grain_lumiere` (lot n°8, blancs donc teintables), à la
+// taille du point de repli (32 px × 0,25-0,5) × 1,6 (son noyau est plus petit
+// que le dégradé dessiné : 18-20 px utiles pour 128 px d'image) ; le
+// rétrécissement final est RELATIF (× 0,25, comme 0,1 / 0,4 en moyenne).
 function spawnLightParticles(scene, x, y, { count = 14, colors = PURIFY_COLORS, spread = 26, rise = 60, depth = 900 } = {}) {
   ensureGlowDotTexture(scene);
+  const art = scene.textures.exists('item-fx_grain_lumiere');
   for (let i = 0; i < count; i++) {
     const dot = scene.add.image(
       x + Phaser.Math.Between(-spread, spread),
       y + Phaser.Math.Between(-spread / 2, spread / 2),
-      FX_GLOW_DOT_KEY,
+      art ? 'item-fx_grain_lumiere' : FX_GLOW_DOT_KEY,
     );
     dot.setBlendMode(Phaser.BlendModes.ADD);
     dot.setTint(colors[i % colors.length]);
-    dot.setScale(Phaser.Math.FloatBetween(0.25, 0.5));
+    const k = Phaser.Math.FloatBetween(0.25, 0.5);
+    const base = art ? (k * 32 * 1.6) / 128 : k;
+    dot.setScale(base);
     dot.setDepth(depth);
     scene.tweens.add({
       targets: dot,
       x: dot.x + Phaser.Math.Between(-18, 18),
       y: dot.y - rise - Phaser.Math.Between(0, 30),
       alpha: 0,
-      scale: 0.1,
+      scale: art ? base * 0.25 : 0.1,
       duration: Phaser.Math.Between(700, 1200),
       delay: Phaser.Math.Between(0, 250),
       ease: 'Sine.easeOut',
@@ -59,8 +80,12 @@ function spawnLightParticles(scene, x, y, { count = 14, colors = PURIFY_COLORS, 
 }
 
 // Goutte de mousse toxique qui tombe d'un corps corrompu et s'éteint.
+// Art : `fx_goutte_toxique` (lot n°8) à 6 px de haut (lisible à 6-7 px),
+// mêmes chute et fondu ; repli : l'ellipse dessinée.
 function spawnToxicDrip(scene, x, y, depth = 5) {
-  const drop = scene.add.ellipse(x, y, 3, 5, CORRUPTION_TINT, 0.9).setDepth(depth);
+  const drop = scene.textures.exists('item-fx_goutte_toxique')
+    ? scene.add.image(x, y, 'item-fx_goutte_toxique').setScale(6 / 128).setAlpha(0.9).setDepth(depth)
+    : scene.add.ellipse(x, y, 3, 5, CORRUPTION_TINT, 0.9).setDepth(depth);
   scene.tweens.add({
     targets: drop,
     y: y + Phaser.Math.Between(10, 18),
@@ -95,6 +120,23 @@ function corruptedTakeHit(enemy, source, { knockX = 160, knockY = -160 } = {}) {
   });
 }
 
+// Écart (px monde) entre `y` et le bas VISIBLE d'un ennemi : mesuré avant de
+// lui donner son apparence saine, puis rétabli après chaque changement de
+// texture (cf. corruptedKeepFeet) -- l'animal guéri garde les pieds au même
+// endroit, même si sa nouvelle image n'a ni la même taille ni la même marge.
+function corruptedFeetGap(e) {
+  return typeof visibleBottomY === 'function' ? visibleBottomY(e) - e.y : null;
+}
+
+// Recale l'ORIGINE verticale (et non `y`, que pilotent les tweens de bond et
+// de fuite de purifyCorruptedEnemy) pour que le bas visible retombe à `gap`
+// sous `y`.
+function corruptedKeepFeet(e, gap) {
+  if (gap == null || !e.active || typeof visibleBottomY !== 'function' || !e.displayHeight) return;
+  const dy = e.y + gap - visibleBottomY(e);
+  if (Math.abs(dy) > 0.01) e.setOrigin(e.originX, e.originY - dy / e.displayHeight);
+}
+
 // Purification (compétence papillon) : l'animal redevient sain et s'en va
 // paisiblement. NE compte PAS comme un ennemi tué : `healed = true`
 // (`defeated = true` aussi, pour que LevelKit cesse update/contacts/coups).
@@ -116,6 +158,19 @@ function purifyCorruptedEnemy(enemy, { onClean, fleeDistance = 200, fleeMs = 180
   const cx = enemy.getCenter().x;
   const cy = enemy.getCenter().y;
   spawnLightParticles(scene, cx, cy, { count: 16 });
+  // Éclat de purification peint (`vfx_purification`, rangée burst, jamais
+  // affichée jusqu'ici) au centre de l'animal, joué une fois. À l'échelle du
+  // manifeste il fait ~130 px et noyait une créature de mousse de 30 px sous
+  // l'anneau et les lueurs : taille proportionnée à l'animal (2,4 × sa plus
+  // grande dimension, entre 72 et 130 px), pour rester lisible sans surcharger.
+  if (typeof hasManifestArt === 'function' && hasManifestArt(scene, 'vfx_purification', 'burst')) {
+    const bounds = enemy.getBounds();
+    const fx = addManifestSprite(scene, cx, cy, 'vfx_purification', 'burst', { origin: [0.5, 0.5] }).setDepth(901);
+    const d = Phaser.Math.Clamp(2.4 * Math.max(bounds.width, bounds.height), 72, 130);
+    fx.setScale(d / Math.max(fx.width, fx.height, 1));
+    fx.once('animationcomplete', () => fx.destroy());
+    scene.time.delayedCall(1500, () => { if (fx.active) fx.destroy(); });
+  }
   // Juice : anneau de lumière douce et petite étoile (visuel seul).
   if (typeof juiceShockRing === 'function') {
     juiceShockRing(scene, cx, cy, { size: 96, ms: 460, color: 0xfff6c2 });
@@ -173,6 +228,10 @@ const MOUSSE_WIDTH = 38;
 const MOUSSE_HEIGHT = 26;
 const MOUSSE_BODY_W = 30;
 const MOUSSE_BODY_H = 18;
+// Apparence guérie peinte (lot n°8) : debout / tassée en marche.
+const MOUSSE_HEALED_ART = ['item-mousse_creature_guerie_0', 'item-mousse_creature_guerie_1'];
+const MOUSSE_HEALED_LANDINGS_MS = [530, 890, 1250];
+const MOUSSE_HEALED_SQUASH_MS = 120;
 
 function ensureMousseTextures(scene) {
   if (!scene.textures.exists(MOUSSE_TEXTURE_KEY)) {
@@ -374,9 +433,37 @@ class MousseCreature extends Phaser.Physics.Arcade.Sprite {
     return purifyCorruptedEnemy(this, {
       onClean: (e) => {
         e.anims.stop();
+        const gap = corruptedFeetGap(e);
+        if (e.scene.textures.exists(MOUSSE_HEALED_ART[0])) {
+          // Art « guéri » (lot n°8) à l'échelle du manifeste ; pose `_1`
+          // (corps tassé, en marche) 120 ms à chaque atterrissage des 3 bonds
+          // de joie de purifyCorruptedEnemy (530, 890 et 1250 ms après cet
+          // appel). Visuel seul.
+          const s = (getItemManifest().mousse_creature_guerie_0 || {}).scale || 0.2;
+          e.setTexture(MOUSSE_HEALED_ART[0]);
+          e.setScale(s);
+          e.baseScale = s;
+          corruptedKeepFeet(e, gap);
+          if (e.scene.textures.exists(MOUSSE_HEALED_ART[1])) {
+            for (const at of MOUSSE_HEALED_LANDINGS_MS) {
+              e.scene.time.delayedCall(at, () => {
+                if (!e.active) return;
+                e.setTexture(MOUSSE_HEALED_ART[1]);
+                corruptedKeepFeet(e, gap);
+                e.scene.time.delayedCall(MOUSSE_HEALED_SQUASH_MS, () => {
+                  if (!e.active) return;
+                  e.setTexture(MOUSSE_HEALED_ART[0]);
+                  corruptedKeepFeet(e, gap);
+                });
+              });
+            }
+          }
+          return;
+        }
         e.setTexture(MOUSSE_HEALED_TEXTURE_KEY);
         e.setScale(1);
         e.baseScale = 1;
+        corruptedKeepFeet(e, gap);
       },
       fleeDistance: 140,
     });

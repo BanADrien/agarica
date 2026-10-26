@@ -266,24 +266,48 @@ function ghAnim(sprite, anim) {
 // Halo doux (dégradé radial) en mode ADD : éclaire par-dessus le voile
 // `ambient` de la Fondation sans avoir besoin de masque.
 const GH_GLOW_DEPTH = 950;
-function ghGlowTexture(scene) {
+// Halos peints du lot n°8 (blancs, donc teintables) : `fx_halo_doux` pour
+// tous les halos, `fx_halo_rayons` pour le totem qui s'active. Énergie
+// mesurée (luminance × alpha moyenne) : dégradé dessiné 0,191, `fx_halo_doux`
+// 0,176, `fx_halo_rayons` 0,193 -- d'où un agrandissement de √(0,191/0,176)
+// ≈ 1,04 pour le halo doux, pour garder le même éclat qu'avant à taille égale.
+const GH_GLOW_ART = {
+  doux: { key: 'item-fx_halo_doux', comp: 1.04 },
+  rayons: { key: 'item-fx_halo_rayons', comp: 1 },
+};
+function ghGlowTexture(scene, kind = 'doux') {
+  const art = GH_GLOW_ART[kind] || GH_GLOW_ART.doux;
+  if (scene.textures.exists(art.key)) return { key: art.key, comp: art.comp };
+  // Repli : l'art des rayons manque mais le halo doux existe.
+  if (kind !== 'doux' && scene.textures.exists(GH_GLOW_ART.doux.key)) return { ...GH_GLOW_ART.doux };
   const key = 'gh-glow';
-  if (scene.textures.exists(key)) return key;
-  const tex = scene.textures.createCanvas(key, 128, 128);
-  const ctx = tex.getContext();
-  const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.35, 'rgba(255,255,255,0.45)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 128, 128);
-  tex.refresh();
-  return key;
+  if (!scene.textures.exists(key)) {
+    const tex = scene.textures.createCanvas(key, 128, 128);
+    const ctx = tex.getContext();
+    const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.35, 'rgba(255,255,255,0.45)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 128, 128);
+    tex.refresh();
+  }
+  return { key, comp: 1 };
 }
 
-function ghGlow(scene, x, y, size, color, alpha) {
-  return scene.add.image(x, y, ghGlowTexture(scene)).setDisplaySize(size, size).setTint(color)
+// `size` = diamètre du halo dessiné d'avant ; l'image peinte est agrandie de
+// `comp` (même éclat). `__ghComp` sert aux tweens de taille (cf. ghGlowSize).
+function ghGlow(scene, x, y, size, color, alpha, kind = 'doux') {
+  const t = ghGlowTexture(scene, kind);
+  const img = scene.add.image(x, y, t.key).setDisplaySize(size * t.comp, size * t.comp).setTint(color)
     .setAlpha(alpha).setBlendMode(Phaser.BlendModes.ADD).setDepth(GH_GLOW_DEPTH);
+  img.__ghComp = t.comp;
+  return img;
+}
+
+// Taille d'affichage d'un halo de ghGlow pour un diamètre « dessiné » donné.
+function ghGlowSize(glow, size) {
+  return size * ((glow && glow.__ghComp) || 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -543,6 +567,48 @@ async function ghiltPlayerDown(scene, st) {
   scene.player = null;
 }
 
+// Onde de l'explosion de mousse : image FIXE `vfx_anneau_choc` toxique,
+// frame 2 (anneau vert à débris, après le recentrage M06), et non l'anim :
+// sa propre croissance (×7 sur 4 frames) se cumulerait au tween. Le trait de
+// l'anneau mesure ~198 px source sur cette frame : même diamètre affiché que
+// l'ancien cercle (60 → 1800 px), même alpha (0,75 → 0) et même durée.
+// Repli : le disque vert dessiné.
+const GH_WAVE_RING_PX = 198;
+function ghShockWave(scene, x, y, depth) {
+  const key = typeof manifestFrameKey === 'function' ? manifestFrameKey('vfx_anneau_choc', 'toxique', 2) : 'vfx_anneau_choc-toxique-2';
+  if (scene.textures.exists(key)) {
+    const ring = scene.add.image(x, y, key).setOrigin(0.5, 0.5).setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(depth).setAlpha(0.75).setScale(60 / GH_WAVE_RING_PX);
+    scene.tweens.add({
+      targets: ring, scale: 1800 / GH_WAVE_RING_PX, alpha: 0, duration: 900, onComplete: () => ring.destroy(),
+    });
+    return ring;
+  }
+  const wave = scene.add.circle(x, y, 30, 0x7fdc5a, 0.75).setDepth(depth);
+  scene.tweens.add({ targets: wave, scale: 30, alpha: 0, duration: 900, onComplete: () => wave.destroy() });
+  return wave;
+}
+
+// Trou d'effondrement sous Agarica : `decor_trou_effondre` (lot n°8) à 0,16
+// (~191 x 41 px ; réglage R3). À 0,14 (échelle du manifeste, l'emprise de
+// l'ancienne ellipse de 170 px), son intérieur brun-noir se perdait sous la
+// flaque verte et le flash : on prend la taille lisible. La rangée 90/255 de
+// l'image (bord des lèvres herbeuses) est posée sur la ligne de marche ; il
+// s'ouvre en 300 ms comme avant (échelle 6 % → 100 %). Repli : l'ellipse noire.
+const GH_HOLE_SCALE = 0.16;
+function ghCollapseHole(scene, x, gy, depth) {
+  if (scene.textures.exists('item-decor_trou_effondre')) {
+    const hs = GH_HOLE_SCALE;
+    const hole = scene.add.image(x, gy, 'item-decor_trou_effondre').setOrigin(0.5, 90 / 255)
+      .setScale(hs * 0.06).setDepth(depth);
+    scene.tweens.add({ targets: hole, scaleX: hs, scaleY: hs, duration: 300 });
+    return hole;
+  }
+  const hole = scene.add.ellipse(x, gy - 4, 10, 8, 0x000000).setDepth(depth);
+  scene.tweens.add({ targets: hole, displayWidth: 170, displayHeight: 36, duration: 300 });
+  return hole;
+}
+
 // Phase 1 : sous 60 % PV, attaque imparable (défaite imposée) → trou sombre.
 async function ghiltChute(scene, st) {
   if (st.busy) return;
@@ -572,18 +638,23 @@ async function ghiltChute(scene, st) {
   const s = boss.snout();
   cam.flash(450, 140, 255, 120);
   cam.shake(800, 0.025);
-  const wave = scene.add.circle(s.x, s.y, 30, 0x7fdc5a, 0.75).setDepth(boss.depth + 2);
-  scene.tweens.add({ targets: wave, scale: 30, alpha: 0, duration: 900, onComplete: () => wave.destroy() });
+  ghShockWave(scene, s.x, s.y, boss.depth + 2);
   if (hasManifestArt(scene, 'vfx_flaque_mousse')) {
     const v = addManifestSprite(scene, player.x, ghArenaGroundY(scene, player.x), 'vfx_flaque_mousse', 'spawn');
     v.setScale(v.scaleX * 2);
   }
   await ghWait(scene, 250);
   const gy = ghArenaGroundY(scene, player.x);
-  const hole = scene.add.ellipse(player.x, gy - 4, 10, 8, 0x000000).setDepth(player.depth + 1);
-  scene.tweens.add({ targets: hole, displayWidth: 170, displayHeight: 36, duration: 300 });
+  ghCollapseHole(scene, player.x, gy, player.depth + 1);
+  // Mottes de terre : `fx_motte_terre` (lot n°8) à 14 px de haut, la taille
+  // du rectangle d'avant ; repli : le rectangle brun.
+  const motteArt = scene.textures.exists('item-fx_motte_terre');
   for (let i = 0; i < 8; i++) {
-    const chunk = scene.add.rectangle(player.x + Phaser.Math.Between(-70, 70), gy - 6, 14, 10, 0x5a4630).setDepth(player.depth + 2);
+    const cx = player.x + Phaser.Math.Between(-70, 70);
+    const chunk = motteArt
+      ? scene.add.image(cx, gy - 6, 'item-fx_motte_terre').setScale(14 / 128).setFlipX(i % 2 === 1)
+      : scene.add.rectangle(cx, gy - 6, 14, 10, 0x5a4630);
+    chunk.setDepth(player.depth + 2);
     scene.tweens.add({
       targets: chunk, y: gy + 220, angle: Phaser.Math.Between(-180, 180), duration: 700, delay: i * 40,
       ease: 'Quad.easeIn', onComplete: () => chunk.destroy(),
@@ -613,6 +684,165 @@ function ghiltWeakenedHint(scene, st) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Soin : fin de la transformation d'Agarica, herbe saine, créatures guéries
+// ---------------------------------------------------------------------------
+// Demande utilisateur (2026-10-25) : « finir l'animation de transformation
+// dans l'animation de sauvetage de Ghil't ». heal() est déclenché par la nuée
+// de la compétence papillon, en plein battement (pose « avec la forme » de
+// Player.startSkillFormPose) ; ghLock gèle aussitôt le monde, donc
+// player.update() ne tourne plus : Agarica restait PAPILLON, la nuée figée
+// autour d'elle, jusqu'à la 1re réplique, qui la remettait d'un coup en pose
+// `talk`. On fait avancer la pose avec SES propres durées (fin du battement
+// puis transfo inverse : 0,74 s au plus, pendant le panoramique de 700 ms),
+// puis Agarica reprend l'idle ; la nuée gelée file vers Ghil't en s'effaçant
+// et les papillons de la cinématique prennent le relais. Aucune durée de la
+// cinématique ne change. Sans pose en cours (compétence lancée sous une autre
+// forme, déclenchement direct en test) : rien à faire.
+function ghFinishSkillPose(scene, tx, ty) {
+  const p = scene.player;
+  if (!p || !p.active) return;
+  const swarm = p.papillonSwarm;
+  if (swarm && swarm.active) ghReleaseSwarm(scene, swarm, tx, ty);
+  if (!p.skillFormPose || typeof p.tickSkillFormPose !== 'function' || typeof p.drawSkillFormPose !== 'function') return;
+  const stop = () => scene.events.off('update', step);
+  // Écouteur 'update' de la scène (pas ZONE_SCRIPTS.update, coupé par le gel).
+  function step() {
+    if (!p.active || !p.body) { stop(); return; }
+    const now = scene.time.now;
+    // Horloge de la pose (transfo inverse, gerbe de poussière sans l'art) ;
+    // elle s'efface d'elle-même si une pose narrative a pris la main.
+    p.tickSkillFormPose(now);
+    if (p.skillFormPose && p.drawSkillFormPose(now)) return;
+    if (p.skillFormPose) p.endSkillFormPose(true);
+    stop();
+    if (!p.storyPose) ghPlayerIdle(scene, p);
+  }
+  scene.events.on('update', step);
+  scene.events.once('shutdown', stop);
+  step();
+}
+
+// Agarica debout au repos, comme la branche « forme humaine au sol » de
+// Player.update (qui ne tourne pas pendant le gel) : pivot aux pieds, idle,
+// hitbox humaine, feuille d'idle face à GAUCHE (flip quand elle regarde à droite).
+function ghPlayerIdle(scene, p) {
+  if (typeof p.resetVineArtAnchor === 'function') p.resetVineArtAnchor();
+  p.setOrigin(0.5, 1).setRotation(0);
+  if (typeof ANIM_IDLE_KEY !== 'undefined' && scene.anims.exists(ANIM_IDLE_KEY)) p.anims.play(ANIM_IDLE_KEY, true);
+  if (typeof FORMS !== 'undefined' && FORMS.agarica && typeof p.applyBodyForScale === 'function') {
+    p.applyBodyForScale(FORMS.agarica.scale, FORMS.agarica.body);
+  }
+  p.setFlipX(p.facingDir > 0);
+}
+
+// Nuée de la compétence (PapillonSwarm, gelée avec le monde) : ses papillons
+// filent vers Ghil't en s'effaçant, halo et anneau s'éteignent, puis elle est
+// détruite (sa zone de soin ne sert plus : Ghil't est déjà soigné).
+function ghReleaseSwarm(scene, swarm, tx, ty) {
+  const flies = (swarm.flies || []).map((f) => f.sprite).filter((s) => s && s.active);
+  flies.forEach((s, i) => scene.tweens.add({
+    targets: s, x: tx + Phaser.Math.Between(-110, 110), y: ty + Phaser.Math.Between(-70, 50), alpha: 0,
+    duration: 650, delay: i * 40, ease: 'Sine.easeIn',
+  }));
+  const rest = [swarm.glow, swarm.swirl].filter((o) => o && o.active);
+  if (rest.length) scene.tweens.add({ targets: rest, alpha: 0, duration: 350 });
+  scene.time.delayedCall(700 + flies.length * 40, () => {
+    if (swarm.active && typeof swarm.destroy === 'function') swarm.destroy();
+  });
+}
+
+// Cercle d'herbe saine (option H11) : `decor_cercle_sain` à 0,22 (~317 px,
+// la largeur de Ghil't ; 0,32 au manifeste pour la clairière), posé à plat
+// sur le sol (bas à gy + 3), juste derrière `behind` (le corps). Pendant le
+// soin il s'étire depuis le centre en 1400 ms (le temps de la chute de la
+// mousse, sans attente ajoutée) ; dans l'arène calme il est déjà là. Sans
+// l'image : rien, comme avant.
+const GH_HEALTHY_CIRCLE_SCALE = 0.22;
+function ghHealthyCircle(scene, x, gy, behind, grow) {
+  if (!scene.textures.exists('item-decor_cercle_sain')) return null;
+  const s = GH_HEALTHY_CIRCLE_SCALE;
+  const c = scene.add.image(x, gy + 3, 'item-decor_cercle_sain').setOrigin(0.5, 1).setScale(grow ? 0.005 : s, s);
+  if (behind && behind.active) {
+    c.setDepth(behind.depth);
+    scene.children.moveBelow(c, behind);
+  }
+  if (grow) scene.tweens.add({ targets: c, scaleX: s, duration: 1400, ease: 'Sine.easeOut' });
+  return c;
+}
+
+// Créatures de mousse guéries (option H16) : images `mousse_creature_guerie_0`
+// (debout) et `_1` (tassée : pose d'atterrissage, comme MousseCreature.js),
+// échelle du manifeste (0,2 : ~35 px, la taille de la créature corrompue),
+// pieds sur le sol (origine en bas). Art regardant à droite. Rien sans l'art.
+const GH_CRITTER_IDS = ['mousse_creature_guerie_0', 'mousse_creature_guerie_1'];
+function ghCritterAvailable(scene) {
+  return GH_CRITTER_IDS.every((id) => scene.textures.exists(`item-${id}`));
+}
+
+function ghCritterImage(scene, x, frame) {
+  const id = GH_CRITTER_IDS[frame];
+  const img = scene.add.image(x, ghArenaGroundY(scene, x), `item-${id}`).setOrigin(0.5, 1);
+  img.setScale((getItemManifest()[id] || {}).scale || 0.2);
+  return img;
+}
+
+// Un petit bond sur place : _0 en l'air, _1 tassée 120 ms à l'atterrissage.
+function ghCritterHop(scene, c, height = 8) {
+  if (!c.img.active) return;
+  scene.tweens.add({
+    targets: c.img, y: c.gy - height, duration: 140, yoyo: true, ease: 'Sine.easeOut',
+    onComplete: () => {
+      if (!c.img.active || c.fleeing) return;
+      c.img.setTexture(`item-${GH_CRITTER_IDS[1]}`);
+      scene.time.delayedCall(120, () => c.img.active && !c.fleeing && c.img.setTexture(`item-${GH_CRITTER_IDS[0]}`));
+    },
+  });
+}
+
+// Elles sortent de la mousse tombée de part et d'autre de Ghil't guéri, en
+// fondu avec un petit bond, puis sautillent pendant la réplique (un bond
+// toutes les 600 ms, décalés). Derrière le gardien et Agarica.
+function ghHealedCritters(scene, bx, gueri) {
+  if (!ghCritterAvailable(scene)) return [];
+  const half = gueri.displayWidth / 2 + 40;
+  return [-1, 1].map((side, i) => {
+    const x = Phaser.Math.Clamp(bx + side * half, 60, 1284);
+    const img = ghCritterImage(scene, x, 0).setFlipX(side > 0).setAlpha(0);
+    img.setDepth(gueri.depth);
+    scene.children.moveBelow(img, gueri);
+    const c = { img, gy: img.y, fleeing: false, timer: null };
+    scene.tweens.add({ targets: img, alpha: 1, duration: 300, delay: i * 250 });
+    scene.time.delayedCall(i * 250, () => ghCritterHop(scene, c, 14));
+    c.timer = scene.time.addEvent({ delay: 600, startAt: i * 300, loop: true, callback: () => ghCritterHop(scene, c) });
+    return c;
+  });
+}
+
+// À l'arrivée d'Amanite : elles détalent vers `dir` en petits bonds et
+// s'effacent (sans retarder la cinématique).
+function ghCrittersFlee(scene, critters, dir) {
+  for (const c of critters || []) {
+    if (!c.img.active) continue;
+    c.fleeing = true;
+    if (c.timer) c.timer.remove();
+    scene.tweens.killTweensOf(c.img);
+    c.img.setTexture(`item-${GH_CRITTER_IDS[0]}`).setFlipX(dir < 0).setY(c.gy).setAlpha(1);
+    scene.tweens.add({ targets: c.img, x: c.img.x + dir * 300, duration: 1100, ease: 'Quad.easeIn' });
+    scene.tweens.add({ targets: c.img, y: c.gy - 7, duration: 110, yoyo: true, repeat: 4 });
+    scene.tweens.add({ targets: c.img, alpha: 0, duration: 500, delay: 600, onComplete: () => c.img.destroy() });
+  }
+}
+
+// Arène calme : une créature guérie posée près du corps, tournée vers lui.
+function ghCalmCritter(scene, x, frame) {
+  if (!ghCritterAvailable(scene)) return null;
+  return ghCritterImage(scene, x, frame).setFlipX(x > 700).setDepth(GH_CALM_DEPTH);
+}
+
+// Rai de l'arène calme (option H15).
+const GH_CALM_RAY_ALPHA = 0.3;
+
 // Purification → Amanite → Geralt → bosquet.
 async function ghiltSoin(scene, st) {
   if (st.busy) return;
@@ -626,6 +856,9 @@ async function ghiltSoin(scene, st) {
   const bx = boss.x;
   const by = boss.y;
   const midY = by - boss.displayHeight * 0.5;
+  // La compétence papillon qui vient de le soigner finit sa transformation
+  // (Agarica redevient elle-même) au lieu de rester figée par le gel.
+  ghFinishSkillPose(scene, bx, midY);
   // Cadre fixe sur Agarica + Ghil't pour toute la fin (Amanite, Geralt).
   cam.stopFollow();
   cam.pan((player.x + bx) / 2, cam.midPoint.y, 700, 'Sine.easeInOut');
@@ -645,16 +878,29 @@ async function ghiltSoin(scene, st) {
     pur.once('animationcomplete', () => pur.active && pur.playManifest('fade'));
   } else {
     pur = ghGlow(scene, bx, midY, 120, 0xe8ffd8, 0.9);
-    scene.tweens.add({ targets: pur, displayWidth: 520, displayHeight: 520, alpha: 0.6, duration: 1600, yoyo: true });
+    const big = ghGlowSize(pur, 520);
+    scene.tweens.add({ targets: pur, displayWidth: big, displayHeight: big, alpha: 0.6, duration: 1600, yoyo: true });
   }
-  // La mousse se détache et tombe.
+  // La mousse se détache et tombe : mottes et éclats peints du lot n°8 en
+  // alternance (diamètre ×1,1 du cercle d'avant, images de 128 px), qui
+  // tournent un peu en tombant ; repli : les cercles verts.
+  const mossArt = ['item-fx_motte_mousse', 'item-fx_eclat_mousse'].filter((k) => scene.textures.exists(k));
   for (let i = 0; i < 18; i++) {
-    const m = scene.add.circle(bx + Phaser.Math.Between(-140, 140), midY + Phaser.Math.Between(-80, 40),
-      Phaser.Math.Between(5, 12), 0x6fae3a).setDepth(boss.depth + 1);
+    const mx = bx + Phaser.Math.Between(-140, 140);
+    const my = midY + Phaser.Math.Between(-80, 40);
+    const r = Phaser.Math.Between(5, 12);
+    const m = mossArt.length
+      ? scene.add.image(mx, my, mossArt[i % mossArt.length]).setScale((2 * r * 1.1) / 128)
+        .setAngle(Phaser.Math.Between(-30, 30)).setFlipX(i % 3 === 0)
+      : scene.add.circle(mx, my, r, 0x6fae3a);
+    m.setDepth(boss.depth + 1);
     scene.tweens.add({
       targets: m, y: by - 4, alpha: 0, duration: 900, delay: i * 70, ease: 'Quad.easeIn', onComplete: () => m.destroy(),
+      ...(mossArt.length ? { angle: m.angle + Phaser.Math.Between(-90, 90) } : {}),
     });
   }
+  // Là où la mousse tombe, l'herbe saine repousse sous lui (option H11).
+  const circle = ghHealthyCircle(scene, bx, by, boss, true);
   let swirl = null;
   if (hasManifestArt(scene, 'vfx_soin_papillon')) {
     swirl = addManifestSprite(scene, bx, midY, 'vfx_soin_papillon', 'swirl', { origin: [0.5, 0.5] }).setDepth(GH_GLOW_DEPTH + 1);
@@ -664,15 +910,35 @@ async function ghiltSoin(scene, st) {
   boss.setTint(0xe8ffd8);
   cam.flash(600, 230, 255, 220);
   await ghWait(scene, 1400);
-  // Ghil't retrouve sa forme d'ancien gardien.
+  // Ghil't retrouve sa forme d'ancien gardien : vrai fondu enchaîné (le corps
+  // malade s'efface PENDANT que le gardien apparaît, mêmes pieds, même sens),
+  // sous une bouffée de lumière douce qui gonfle puis retombe. Avant, le
+  // malade restait opaque dessous puis disparaissait d'un coup à la fin.
+  // Même durée (700 ms).
   const gueri = ghSprite(scene, bx, by, 'ghilt_gueri', 'idle');
   gueri.setFlipX(boss.flipX).setAlpha(0);
   scene.children.moveBelow(gueri, player);
+  // L'herbe saine passe sous le gardien (il n'a pas la profondeur du boss) :
+  // ses pattes restent devant la touffe.
+  if (circle) {
+    circle.setDepth(gueri.depth);
+    scene.children.moveBelow(circle, gueri);
+  }
+  const bloom = ghGlow(scene, bx, midY, gueri.displayWidth * 0.7, 0xf2ffe4, 0);
+  const bloomBig = ghGlowSize(bloom, gueri.displayWidth * 1.25);
+  scene.tweens.add({
+    targets: bloom, alpha: 0.45, displayWidth: bloomBig, displayHeight: bloomBig, duration: 350,
+    yoyo: true, ease: 'Sine.easeOut', onComplete: () => bloom.destroy(),
+  });
+  scene.tweens.add({ targets: boss, alpha: 0, duration: 700, ease: 'Sine.easeIn' });
   await ghTween(scene, { targets: gueri, alpha: 1, duration: 700 });
   boss.removeFromFight();
   st.boss = null;
   ghSet(scene, 'ghiltHealed', true);
   if (pur && pur.active) scene.tweens.add({ targets: pur, alpha: 0, duration: 600, onComplete: () => pur.destroy() });
+  // Deux petites créatures de mousse guéries sortent de la mousse tombée
+  // (option H16) : seul endroit où leur art se voit en partie normale.
+  const critters = ghHealedCritters(scene, bx, gueri);
   await ghSay(scene, 'ghilt_soin');
   paps.forEach((p, i) => {
     ghPapillonMove(scene, p, bx + Phaser.Math.Between(-300, 300), -40, 1400, i * 90);
@@ -682,6 +948,8 @@ async function ghiltSoin(scene, st) {
   // Amanite surgit et l'achève d'un coup de lance.
   await ghWait(scene, 600);
   const fromLeft = player.x > bx ? false : true;
+  // Les créatures guéries détalent à l'arrivée d'Amanite, du côté opposé.
+  ghCrittersFlee(scene, critters, fromLeft ? 1 : -1);
   const ax = cam.scrollX + (fromLeft ? -60 : cam.width + 60);
   const amanite = ghSprite(scene, ax, by, 'amanite', 'walk_angry');
   amanite.setFlipX(!fromLeft);
@@ -732,17 +1000,47 @@ async function ghiltSoin(scene, st) {
 }
 
 // Revisite après la guérison : arène calme, corps de Ghil't, sorties ouvertes.
+// Tout le tableau (herbe saine, corps, mousse séchée, créatures, rai) est posé
+// à GH_CALM_DEPTH, juste sous les personnages (10) : les décors de la zone
+// (arche à x 672, piliers) sont construits APRÈS ce script, à la profondeur 0,
+// et cachaient le corps (déjà le cas avant le lot n°8). Au combat aussi, Ghil't
+// passe devant l'arche. Dans la même profondeur, l'ordre de création fait foi.
+const GH_CALM_DEPTH = CHARACTER_DEPTH - 1;
 function ghiltArenaCalm(scene) {
   const x = 700;
   const gy = ghArenaGroundY(scene, x);
+  // L'herbe saine repoussée pendant le soin est restée sous lui (option H11).
+  ghHealthyCircle(scene, x, gy, null, false)?.setDepth(GH_CALM_DEPTH);
   const body = ghSprite(scene, x, gy, 'ghilt_gueri', 'collapse');
   body.setTint(0x9a9aa8);
   body.setScale(body.scaleX, body.scaleY * 0.82);
-  scene.children.moveBelow(body, scene.player);
-  // Traces de mousse séchée et deux papillons qui veillent.
-  const g = scene.add.graphics();
-  g.fillStyle(0x34502a, 0.6);
-  for (const dx of [-420, -260, 320, 470]) g.fillEllipse(x + dx, gy - 4, 90, 14);
+  body.setDepth(GH_CALM_DEPTH);
+  // Traces de mousse séchée : `decor_mousse_sechee` (lot n°8, 0,09 : ~90 px,
+  // la largeur des anciennes ellipses), posées sur le sol (bas à gy + 2),
+  // retournées une sur deux pour casser la répétition. Repli : les ellipses.
+  const dryArt = scene.textures.exists('item-decor_mousse_sechee');
+  const g = dryArt ? null : scene.add.graphics().fillStyle(0x34502a, 0.6).setDepth(GH_CALM_DEPTH);
+  [-420, -260, 320, 470].forEach((dx, i) => {
+    const mx = x + dx;
+    const my = ghArenaGroundY(scene, mx);
+    if (dryArt) {
+      scene.add.image(mx, my + 2, 'item-decor_mousse_sechee').setOrigin(0.5, 1).setScale(0.09)
+        .setFlipX(i % 2 === 1).setDepth(GH_CALM_DEPTH);
+    } else {
+      g.fillEllipse(mx, my - 4, 90, 14);
+    }
+  });
+  // Les deux créatures guéries sont restées près de lui (option H16).
+  ghCalmCritter(scene, 520, 1);
+  ghCalmCritter(scene, 880, 0);
+  // Rai de lumière chaude sur le corps (option H15) : la paix est revenue.
+  // Comme les `lights` de la Fondation : ADD, bas posé sur le sol ; créé en
+  // dernier, il passe DEVANT le corps, qu'il éclaire. Rien sans l'image.
+  if (scene.textures.exists('item-fx_rai_lumiere')) {
+    scene.add.image(x, gy, 'item-fx_rai_lumiere').setOrigin(0.5, 1).setDisplaySize(260, 460)
+      .setTint(0xfff6e0).setAlpha(GH_CALM_RAY_ALPHA).setBlendMode(Phaser.BlendModes.ADD).setDepth(GH_CALM_DEPTH);
+  }
+  // Deux papillons veillent.
   ghPapillon(scene, x - 40, gy - 230);
   ghPapillon(scene, x + 60, gy - 200);
 }
@@ -761,7 +1059,10 @@ ZONE_SCRIPTS.trou_sombre = {
     if (!scene.player || scene.__ghiltScriptFor === scene.player) return;
     scene.__ghiltScriptFor = scene.player;
     ghInstallTick(scene);
-    scene.__ghPlayerGlow = ghGlow(scene, scene.player.x, scene.player.y - 45, 240, 0xfff2c8, 0.35);
+    // Halo d'Agarica dans le noir : 300 px avec le halo peint (plan GH-4 : son
+    // profil, plus doux au centre, éclaire moins loin à taille égale), 240 sans.
+    const ownGlow = scene.textures.exists(GH_GLOW_ART.doux.key) ? 300 : 240;
+    scene.__ghPlayerGlow = ghGlow(scene, scene.player.x, scene.player.y - 45, ownGlow, 0xfff2c8, 0.35);
     const exits = scene.__exits || [];
     if (ghGet(scene, 'trouSombreFait', false)) {
       TROU_PATH.forEach((pt) => ghPapillon(scene, pt.x, pt.y));
@@ -843,8 +1144,13 @@ async function trouSequence(scene, exits) {
   const bottle = ghBigItem(scene, ix + 26, iy - 40, 'bocal_antidote').setAlpha(0).setAngle(-60);
   if (typeof setPlayerStoryPose === 'function') setPlayerStoryPose(scene, 'cast');
   await ghTween(scene, { targets: [totem, bottle], alpha: 1, duration: 500 });
+  // Gouttes `fx_goutte_antidote` (lot n°8) de 8 px ; repli : points dessinés.
+  const dropArt = scene.textures.exists('item-fx_goutte_antidote');
   for (let i = 0; i < 9; i++) {
-    const d = scene.add.circle(ix + 10, iy - 30, 3, 0x9fffd6).setDepth(GH_GLOW_DEPTH + 3);
+    const d = dropArt
+      ? scene.add.image(ix + 10, iy - 30, 'item-fx_goutte_antidote').setScale(8 / 128)
+      : scene.add.circle(ix + 10, iy - 30, 3, 0x9fffd6);
+    d.setDepth(GH_GLOW_DEPTH + 3);
     scene.tweens.add({
       targets: d, x: ix, y: iy, duration: 380, delay: i * 140, ease: 'Quad.easeIn', onComplete: () => d.destroy(),
     });
@@ -857,12 +1163,14 @@ async function trouSequence(scene, exits) {
     burst.once('animationcomplete', () => burst.active && burst.playManifest('fade'));
   } else {
     burst = ghGlow(scene, ix, iy, 60, 0xfff2a8, 1);
-    scene.tweens.add({ targets: burst, displayWidth: 600, displayHeight: 600, alpha: 0.25, duration: 900 });
+    const big = ghGlowSize(burst, 600);
+    scene.tweens.add({ targets: burst, displayWidth: big, displayHeight: big, alpha: 0.25, duration: 900 });
   }
   cam.flash(500, 255, 240, 190);
   totem.destroy();
   const active = ghBigItem(scene, ix, iy, 'totem_poche_actif');
-  const activeGlow = ghGlow(scene, ix, iy, 150, 0xfff2a8, 0.8);
+  // Totem activé : halo à rayons `fx_halo_rayons` (même éclat que le dégradé).
+  const activeGlow = ghGlow(scene, ix, iy, 150, 0xfff2a8, 0.8, 'rayons');
   paps.forEach((p, i) => ghPapillonMove(scene, p, ix + Math.cos(i) * 60, iy + Math.sin(i) * 40, 900));
   ghInvRemove(scene, 'bocal_antidote');
   ghInvRemove(scene, 'totem_poche_casse');

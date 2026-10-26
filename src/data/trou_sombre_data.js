@@ -11,6 +11,13 @@ const TROU_SOMBRE_DATA = {
   levelHeight: 540,
   // Très sombre (géré par la Fondation) ; les halos du script percent le noir.
   ambient: { tint: 0x05040c, darkness: 0.85 },
+  // Filet de lumière qui tombe du sol effondré de l'arène, là où Agarica a
+  // chuté (lot Codex n°8, clé `lights`, H15). `aboveAmbient` : au-dessus du
+  // voile (0,85), sinon il serait éteint ; alpha bas pour ne pas lever le
+  // noir, que les halos du script doivent percer.
+  lights: [
+    { id: 'fx_rai_lumiere', x: 200, y: 448, w: 150, h: 470, tint: 0xcfd8ff, alpha: 0.16, layer: 'aboveAmbient' },
+  ],
   groundCells: [
     ...groundRow(0, 21, [7, 8]),
     // Remontée vers l'arène : trois corniches que les papillons éclairent
