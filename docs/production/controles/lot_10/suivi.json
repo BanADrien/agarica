@@ -1,0 +1,283 @@
+{
+  "forme_papillon": {
+    "source": "assets\\sprites\\forme_papillon.png",
+    "frames": 12,
+    "positions": [
+      {
+        "cell": 0,
+        "bbox": [
+          84,
+          71,
+          299,
+          271
+        ],
+        "visible_size": [
+          215,
+          200
+        ]
+      },
+      {
+        "cell": 1,
+        "bbox": [
+          476,
+          88,
+          676,
+          253
+        ],
+        "visible_size": [
+          200,
+          165
+        ]
+      },
+      {
+        "cell": 2,
+        "bbox": [
+          858,
+          101,
+          1061,
+          241
+        ],
+        "visible_size": [
+          203,
+          140
+        ]
+      },
+      {
+        "cell": 3,
+        "bbox": [
+          1244,
+          77,
+          1444,
+          264
+        ],
+        "visible_size": [
+          200,
+          187
+        ]
+      },
+      {
+        "cell": 4,
+        "bbox": [
+          90,
+          452,
+          293,
+          572
+        ],
+        "visible_size": [
+          203,
+          120
+        ]
+      },
+      {
+        "cell": 5,
+        "bbox": [
+          486,
+          442,
+          666,
+          583
+        ],
+        "visible_size": [
+          180,
+          141
+        ]
+      },
+      {
+        "cell": 6,
+        "bbox": [
+          863,
+          449,
+          1057,
+          575
+        ],
+        "visible_size": [
+          194,
+          126
+        ]
+      },
+      {
+        "cell": 7,
+        "bbox": [
+          1255,
+          444,
+          1433,
+          579
+        ],
+        "visible_size": [
+          178,
+          135
+        ]
+      },
+      {
+        "cell": 8,
+        "bbox": [
+          82,
+          777,
+          302,
+          930
+        ],
+        "visible_size": [
+          220,
+          153
+        ]
+      },
+      {
+        "cell": 9,
+        "bbox": [
+          482,
+          779,
+          670,
+          928
+        ],
+        "visible_size": [
+          188,
+          149
+        ]
+      },
+      {
+        "cell": 10,
+        "bbox": [
+          847,
+          776,
+          1073,
+          930
+        ],
+        "visible_size": [
+          226,
+          154
+        ]
+      },
+      {
+        "cell": 11,
+        "bbox": [
+          1244,
+          788,
+          1445,
+          918
+        ],
+        "visible_size": [
+          201,
+          130
+        ]
+      }
+    ],
+    "status": "importe sans avertissement"
+  },
+  "transfo_papillon": {
+    "source": "assets\\sprites\\transfo_papillon.png",
+    "frames": 4,
+    "positions": [
+      {
+        "cell": 0,
+        "bbox": [
+          67,
+          396,
+          317,
+          628
+        ],
+        "visible_size": [
+          250,
+          232
+        ]
+      },
+      {
+        "cell": 1,
+        "bbox": [
+          470,
+          394,
+          683,
+          629
+        ],
+        "visible_size": [
+          213,
+          235
+        ]
+      },
+      {
+        "cell": 2,
+        "bbox": [
+          850,
+          410,
+          1070,
+          614
+        ],
+        "visible_size": [
+          220,
+          204
+        ]
+      },
+      {
+        "cell": 3,
+        "bbox": [
+          1234,
+          436,
+          1454,
+          589
+        ],
+        "visible_size": [
+          220,
+          153
+        ]
+      }
+    ],
+    "status": "importe sans avertissement"
+  },
+  "forme_papillon_extra": {
+    "source": "assets\\sprites\\forme_papillon_extra.png",
+    "frames": 4,
+    "positions": [
+      {
+        "cell": 0,
+        "bbox": [
+          110,
+          412,
+          274,
+          612
+        ],
+        "visible_size": [
+          164,
+          200
+        ]
+      },
+      {
+        "cell": 1,
+        "bbox": [
+          488,
+          416,
+          664,
+          607
+        ],
+        "visible_size": [
+          176,
+          191
+        ]
+      },
+      {
+        "cell": 2,
+        "bbox": [
+          843,
+          430,
+          1077,
+          593
+        ],
+        "visible_size": [
+          234,
+          163
+        ]
+      },
+      {
+        "cell": 3,
+        "bbox": [
+          1260,
+          422,
+          1428,
+          602
+        ],
+        "visible_size": [
+          168,
+          180
+        ]
+      }
+    ],
+    "status": "importe sans avertissement"
+  }
+}

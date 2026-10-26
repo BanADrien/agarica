@@ -44,7 +44,9 @@ const EPREUVE_SINGE_DATA = {
   zoneSub: 'Ne touche pas le sol',
   background: 'fond_grand_arbre',
   tileset: 'tuiles_ecorce',
-  ambient: { tint: 0x0b1424, darkness: 0.12 },
+  // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones
+  // sombres ; l'épreuve se joue dans la cime, à la lumière.
+  ambient: { tint: 0x0b1424, darkness: 0.12, vignette: false },
   script: 'epreuve_singe',
   groundCells: [
     // (groundRow : borne de fin exclue ; une case = 64 px)

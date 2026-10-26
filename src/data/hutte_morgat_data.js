@@ -27,6 +27,13 @@ const HUTTE_MORGAT_DATA = {
   fall: { y: 600, mode: 'hurt' },
   // Brume du vide au-delà de la falaise (là où part le grand vol).
   liquidFloor: { y: 500, style: 'brume', x1: 2600 },
+  // Lointain peint (lot Codex n°8, clé `farLayers`) : la forêt malade au
+  // fond du vide, terrain du vol raté vers lequel on s'élance (assombrie par
+  // la teinte). Elle se lève en approchant de la falaise (fadeInX) et
+  // remplace l'ellipse sombre dessinée que le script n'affiche plus.
+  farLayers: [
+    { id: 'couche_horizon_malade', y: 395, scale: 0.45, tint: 0x3c4e44, scrollX: 0.3, scrollY: 1, fill: true, fadeInX: [1700, 2500] },
+  ],
   campfires: [{ x: 1500, y: 448 }],
   // Décors (`hutte_morgat`) : la hutte elle-même (remplace l'ancien dessin du
   // script, cf. a2DrawHutte), le chaudron où mijote l'antidote, l'atelier.

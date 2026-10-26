@@ -38,7 +38,10 @@ const GRAND_ARBRE_RACINES_DATA = {
   zoneSub: 'Là où la piste du loup s\'arrête',
   background: 'fond_grand_arbre',
   tileset: 'tuiles_ecorce',
-  ambient: { tint: 0x0b1424, darkness: 0.18 },
+  // Pas de vignette (lot Codex n°8, décision H1) : elle est réservée aux
+  // zones sombres (forêts sombres, forêt corrompue, arène de Ghil't, trou
+  // sombre) ; ici l'arbre est encore sain, la mousse ne fait que monter.
+  ambient: { tint: 0x0b1424, darkness: 0.18, vignette: false },
   script: 'grand_arbre_racines',
   groundCells: [
     // (groundRow : borne de fin exclue)

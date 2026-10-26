@@ -1,0 +1,13 @@
+[forme_papillon] découpe de 1 image(s)
+  rangée 0 flap: 4 frame(s) [OK]
+  rangée 1 dash: 4 frame(s) [OK]
+  rangée 2 glide: 4 frame(s) [OK]
+  canvas uniforme 232x206 -> assets/sprites/forme_papillon_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : forme_papillon
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

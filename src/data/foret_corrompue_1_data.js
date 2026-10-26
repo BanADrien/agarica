@@ -19,6 +19,11 @@ const FORET_CORROMPUE_1_DATA = {
   background: 'fond_foret_corrompue',
   tileset: 'tuiles_corrompues',
   ambient: { tint: 0x1d3a12, darkness: 0.3 },
+  // Spores toxiques qui dérivent dans l'air (lot Codex n°8,
+  // `ambientLife.spores`) : le cœur de la corruption. Les lucioles gardent
+  // leur nombre par défaut. (Pas de spores d'ambiance dans l'arène de
+  // Ghil't : la spore y annonce une attaque.)
+  ambientLife: { spores: 14 },
   levelWidth: 4160,
   levelHeight: 540,
   groundCells: [
@@ -40,6 +45,19 @@ const FORET_CORROMPUE_1_DATA = {
   props: [
     { type: 'foret_corrompue_arbre_malade', x: 600, y: 448, scale: 0.5 },
     { type: 'foret_corrompue_os_creature', x: 1080, y: 448, scale: 0.28 },        // sous la voûte (208 px libres)
+    // Mousse lumineuse pendue sous la voûte de la galerie (lot Codex n°8,
+    // option H12) : `hang` = haut de l'image accroché en y 239, juste sous le
+    // dessous visible des tuiles (rangée 3) ; deux plaques seulement, la
+    // voûte a déjà ses coulures. Décor seul, aucune collision.
+    { type: 'decor_mousse_lumineuse_plafond', x: 980, y: 239, hang: true },
+    { type: 'decor_mousse_lumineuse_plafond', x: 1190, y: 239, hang: true, flipX: true },
+    // Campement abandonné de Geralt (objets du lot 8, section `objet`) : un
+    // collet laissé près du feu, une flèche plantée devant ses caisses
+    // (`angle` : pointe enfoncée, empennage en l'air ; `y` = milieu du fût,
+    // 6 px au-dessus du sol, comme les tirs d'entraînement de la forêt
+    // flottante 1). « Si tu lis ceci, c'est que je suis passé par là. »
+    { type: 'objet_collet', x: 1470, y: 448 },
+    { type: 'objet_fleche', x: 1525, y: 442, angle: 70 },
     { type: 'bosquet_crates', x: 1560, y: 448, scale: 0.28 },
     { type: 'bosquet_log_pile', x: 1690, y: 448, scale: 0.3 },   // à côté de la note (x 1600), pas devant
     { type: 'foret_corrompue_champignon_toxique', x: 2020, y: 448, scale: 0.3 },

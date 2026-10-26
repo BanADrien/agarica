@@ -1,0 +1,11 @@
+[transfo_papillon] découpe de 1 image(s)
+  rangée 0 transform: 4 frame(s) [OK]
+  canvas uniforme 257x243 -> assets/sprites/transfo_papillon_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : transfo_papillon
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).

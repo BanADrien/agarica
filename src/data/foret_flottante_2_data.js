@@ -29,6 +29,14 @@ const FORET_FLOTTANTE_2_DATA = {
   largeTrees: false,
   // Brume du vide sous les îles (bande devant le fond, derrière le sol).
   liquidFloor: { y: 520, style: 'brume' },
+  // Lointain peint (lot Codex n°8, clé `farLayers`) : l'horizon de la forêt
+  // malade, assombri par la teinte, présage de la suite à l'est ; il se lève
+  // en avançant vers l'est (fadeInX) et remplace l'horizon sombre dessiné que
+  // le script n'affiche plus. Pas d'îles lointaines (option H4 écartée) : le
+  // fond peint en montre déjà, on ne charge pas le ciel.
+  farLayers: [
+    { id: 'couche_horizon_malade', y: 400, scale: 0.45, tint: 0x3c4e44, scrollX: 0.3, scrollY: 0.3, fill: true, fadeInX: [1400, 2400] },
+  ],
   groundCells: [
     ...groundRow(0, 6, [5, 6]),     // I0 arrivée (surface 320)
     ...groundRow(8, 11, [6]),       // I1 (surface 384)

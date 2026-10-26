@@ -45,9 +45,11 @@ const FORET_FLOTTANTE_1_DATA = {
   // ASSOMBRIE par la teinte (pas de version peinte réimportable). Il n'existe
   // que tout en haut : il suit le ciel qui se révèle (withSky) et n'apparaît
   // qu'en arrivant à l'est (fadeInX). Pas d'îles lointaines ici : le fond
-  // peint les montre déjà.
+  // peint les montre déjà. y 125 (et non 95, valeur du plan) : vue du
+  // belvédère (caméra en haut, scrollY -1200), les cimes noires commencent
+  // vers y 425 à l'écran, SOUS le pied des îles peintes, qui restent entières.
   farLayers: [
-    { id: 'couche_horizon_malade', y: 95, scale: 0.45, tint: 0x3c4e44, scrollX: 0.12, scrollY: 0.25, fill: true, fadeInX: [2300, 2900], withSky: true },
+    { id: 'couche_horizon_malade', y: 125, scale: 0.45, tint: 0x3c4e44, scrollX: 0.12, scrollY: 0.25, fill: true, fadeInX: [2300, 2900], withSky: true },
   ],
   groundCells: [
     // (groundRow : borne de fin exclue)

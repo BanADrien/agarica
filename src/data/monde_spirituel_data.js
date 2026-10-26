@@ -26,7 +26,9 @@ const MONDE_SPIRITUEL_DATA = {
   background: 'fond_monde_spirituel',
   tileset: 'tuiles_ecorce',
   // Voile éthéré bleu-vert (lumière d'esprit, à l'opposé du violet de la nuit).
-  ambient: { tint: 0x6fe3d0, darkness: 0.12 },
+  // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones
+  // sombres ; le monde spirituel est lumineux.
+  ambient: { tint: 0x6fe3d0, darkness: 0.12, vignette: false },
   // Agarica y entre seule : Xara attend dans le monde réel.
   xara: false,
   script: 'monde_spirituel',

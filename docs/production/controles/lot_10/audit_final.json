@@ -1,0 +1,143 @@
+{
+  "images": {
+    "forme_papillon": {
+      "frames": 12,
+      "rows": {
+        "0": 4,
+        "1": 4,
+        "2": 4
+      },
+      "visible_sizes": [
+        [
+          215,
+          200
+        ],
+        [
+          200,
+          165
+        ],
+        [
+          203,
+          140
+        ],
+        [
+          200,
+          187
+        ],
+        [
+          203,
+          120
+        ],
+        [
+          180,
+          141
+        ],
+        [
+          194,
+          126
+        ],
+        [
+          178,
+          135
+        ],
+        [
+          220,
+          153
+        ],
+        [
+          188,
+          149
+        ],
+        [
+          226,
+          154
+        ],
+        [
+          201,
+          130
+        ]
+      ],
+      "archive_sha256": "19a7886f284944565beaed9de316089f811116ea9eced1ffc7255eddb764a947"
+    },
+    "transfo_papillon": {
+      "frames": 4,
+      "rows": {
+        "0": 4
+      },
+      "visible_sizes": [
+        [
+          250,
+          232
+        ],
+        [
+          213,
+          235
+        ],
+        [
+          220,
+          204
+        ],
+        [
+          220,
+          153
+        ]
+      ],
+      "archive_sha256": "8b296758e03c975b00245c337ce9a84d1d6b06fa8887b1e9143cfae73aaafdf1"
+    },
+    "forme_papillon_extra": {
+      "frames": 4,
+      "rows": {
+        "0": 4
+      },
+      "visible_sizes": [
+        [
+          164,
+          200
+        ],
+        [
+          176,
+          191
+        ],
+        [
+          234,
+          163
+        ],
+        [
+          168,
+          180
+        ]
+      ],
+      "archive_sha256": "452ba8eefa5760c54ae6d3b24b38683cdd0ffba2dc5910d2d44f0bf2ef66de12"
+    }
+  },
+  "problems": [],
+  "final_transform_identical_to_glide_1": true,
+  "changed_assets": [
+    "assets/sprites/forme_papillon.png",
+    "assets/sprites/forme_papillon_extra.png",
+    "assets/sprites/transfo_papillon.png",
+    "assets/sprites/forme_papillon_extra_frames/forme_papillon_extra_row0_0.png",
+    "assets/sprites/forme_papillon_extra_frames/forme_papillon_extra_row0_1.png",
+    "assets/sprites/forme_papillon_extra_frames/forme_papillon_extra_row0_2.png",
+    "assets/sprites/forme_papillon_extra_frames/forme_papillon_extra_row0_3.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row0_0.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row0_1.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row0_2.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row0_3.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row1_0.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row1_1.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row1_2.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row1_3.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row2_0.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row2_1.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row2_2.png",
+    "assets/sprites/forme_papillon_frames/forme_papillon_row2_3.png",
+    "assets/sprites/transfo_papillon_frames/transfo_papillon_row0_0.png",
+    "assets/sprites/transfo_papillon_frames/transfo_papillon_row0_1.png",
+    "assets/sprites/transfo_papillon_frames/transfo_papillon_row0_2.png",
+    "assets/sprites/transfo_papillon_frames/transfo_papillon_row0_3.png"
+  ],
+  "unexpected_asset_changes": [],
+  "src_changes_observed": [],
+  "manifest_unchanged": true
+}

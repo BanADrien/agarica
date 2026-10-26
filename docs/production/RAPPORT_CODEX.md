@@ -474,3 +474,37 @@ Aucun avertissement.
 
 asset_present.js : 749 fichier(s) présent(s).
 ```
+
+
+<!-- LOT10 -->
+## Lot n°10 — Papillon lunaire — 2026-10-26
+
+Trois feuilles remplacées via imagegen, anciennes sources archivées dans `controles/lot_10/avant/`. Le papillon est un insecte violet nuit à nervures vert lunaire et spirales roses, sans visage humain. Contrôles : [galerie avant / après](controles/lot_10/index.html), `controles/lot_10/suivi.json`, générations et imports unitaires.
+
+| Image | État | Frames | Envergure / dimensions visibles en px source |
+|---|---|---|---|
+| `forme_papillon.png` | importe sans avertissement | 12 | 215×200, 200×165, 203×140, 200×187, 203×120, 180×141, 194×126, 178×135, 220×153, 188×149, 226×154, 201×130 |
+| `transfo_papillon.png` | importe sans avertissement | 4 | 250×232, 213×235, 220×204, 220×153 |
+| `forme_papillon_extra.png` | importe sans avertissement | 4 | 164×200, 176×191, 234×163, 168×180 |
+
+Mesures : largeur × hauteur de la silhouette alpha visible ; en profil, les ailes se chevauchent et la largeur varie avec le battement. Les antennes et longues queues sont incluses. La pose finale de transformation est une copie pixel-identique de `glide` frame 1. Les trois toiles font 1536 × 1024, poses centrées, une composante connexe par frame. Finition mécanique uniquement : nettoyage des pixels détachés, mise à l échelle, centrage ; aucun dessin généré par code.
+<!-- /LOT10 -->
+
+### Contrôles finaux du lot n°10
+
+20 frames découpées : `flap` 4, `dash` 4, `glide` 4 ; `transform` 4 ; `cast` 4. Vérification des marges, du centrage, de la transparence et de la connexité : aucun élément vide ou coupé. Les trois archives sont identiques aux sources avant remplacement (SHA-256). Seuls les trois PNG et leurs 20 frames ont changé parmi les assets existants. Le manifeste reste intact ; aucune édition manuelle de `src/`. Audit : `controles/lot_10/audit_final.json`.
+
+La largeur de la pose `glide` 1 est de 220 px source (hauteur 153 px, antennes et queues incluses). Les amplitudes des ailes varient avec les poses ; les dimensions de chaque frame sont mesurées dans le tableau et le suivi. La transformation finale est pixel-identique à cette pose. Comparaison visuelle : couleurs et design communs, papillon insecte sans tête humaine dans les formes achevées ; visage humain seulement dans les deux premiers stades de transformation. Incantation à lumière tenue par les pattes. Aucun test de compétence en jeu effectué dans cette livraison ; contrôles des feuilles et des frames importées.
+
+Import complet final : `python tools/import_codex_assets.py`. [Journal complet](imports/final_lot_10_2026-10-26.log).
+
+```text
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (212) : agarica_extra, agarica_slash, singe, transfo_singe, geralt_invocation, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, cochon_bebe_rose, cochon_bebe_gris, cochon_bebe_orange, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_invocation_clak, vfx_impact_pierre, singe_extra, forme_papillon_extra, singe_gueri, vfx_mousse_toxique, vfx_anneau_choc, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, liquide_mare_fond, liquide_mare_voile, liquide_mare_surface_0, liquide_mare_surface_1, liquide_mare_surface_2, liquide_mare_surface_3, liquide_mousse_toxique, couche_ciel_jour, couche_nappe_nuages, couche_nappe_brume, couche_brume_avant, couche_nuage_0, couche_nuage_1, couche_nuage_2, couche_nuage_3, couche_nuage_4, couche_soleil, decor_lanterne_eteinte, decor_lanterne_allumee, decor_fente_fermee, decor_fente_ouverte, decor_spirale_gravee, decor_plateforme_fantome, decor_plateforme_ecorce_intacte, decor_plateforme_ecorce_fissuree, decor_plateforme_ecorce_brisee, decor_rampe_lancement, decor_marches_racines, decor_autel_sommet, decor_pont_tronc, decor_cratere, decor_trou_effondre, couche_iles_lointaines, couche_horizon_malade, decor_mare_berge, decor_mare_roseaux, decor_fleur_perchee, decor_plante_resistante_fleurie, decor_plante_resistante_bouton, objet_graine_coeur, decor_tapis_mousse, decor_cercle_sain, decor_mousse_sechee, decor_mousse_plaque_intacte, decor_mousse_plaque_grattee, decor_mousse_plaque_repoussee, decor_mousse_lumineuse_sol, decor_mousse_lumineuse_tronc, decor_mousse_lumineuse_plafond, decor_mousse_lumineuse_petite, decor_touffe_mousse_petite, decor_touffe_mousse_moyenne, decor_touffe_mousse_grande, decor_touffe_mousse_penchee, decor_empreinte_boue, couche_vignette, fx_eclat_mousse, fx_motte_mousse, fx_motte_terre, fx_eclat_ecorce, fx_eclat_pierre, fx_feuille, fx_petale_rose, fx_petale_blanc, fx_goutte_toxique, fx_goutte_antidote, fx_bulle, fx_eclaboussure_toxique, fx_luciole, fx_grain_lumiere, fx_etincelle, fx_etincelle_papillon, fx_trainee_papillon, fx_trait_vent, fx_ombre_sol, fx_marqueur_danger, fx_spore_toxique, fx_bouffee_poussiere, fx_bouffee_toxique, fx_braise, fx_halo_doux, fx_halo_rayons, fx_rai_lumiere, fx_halo_objet, fx_aura_esprit, fx_lueur_sol, araignee_petite_0, araignee_petite_1, araignee_petite_2, bete_mousse_vivante, bete_mousse_touchee, bete_mousse_morte, mousse_creature_guerie_0, mousse_creature_guerie_1, note_geralt, objet_grappin, objet_fleche, objet_collet, objet_corde, fx_fil_soie, ui_bulle, ui_bulle_pointe, ui_invite, ui_banniere, ui_touche, ui_alerte, ui_etoiles_etourdi, ui_case_competence, ui_anneau_objet, ui_ornement_titre, ui_energie_cadre, ui_energie_remplissage, ui_boss_cadre, ui_boss_remplissage, ui_feu_camp, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (3) : geralt_combat, kainati_calme, kainati_esprit_extra
+
+Aucun avertissement.
+
+asset_present.js : 749 fichier(s) présent(s).
+```
