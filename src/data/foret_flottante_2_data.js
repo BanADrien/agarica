@@ -32,9 +32,15 @@ const FORET_FLOTTANTE_2_DATA = {
   // Lointain peint (lot Codex n°8, clé `farLayers`) : l'horizon de la forêt
   // malade, assombri par la teinte, présage de la suite à l'est ; il se lève
   // en avançant vers l'est (fadeInX) et remplace l'horizon sombre dessiné que
-  // le script n'affiche plus. Pas d'îles lointaines (option H4 écartée) : le
-  // fond peint en montre déjà, on ne charge pas le ciel.
+  // le script n'affiche plus.
+  // Îles lointaines (option H4, revue du lot 8 : image jamais affichée) : les
+  // îles des anciens gardiens, en haut du ciel, plus loin que celles du fond
+  // peint (parallaxe 0,15 / 0,2). Petites (0,4), translucides (0,5) et
+  // bleuies par la teinte (l'image est d'un vert saturé ; une teinte ne peut
+  // qu'assombrir, elle tire ici vers le lointain bleuté) : de la profondeur,
+  // sans faire concurrence aux îles peintes.
   farLayers: [
+    { id: 'couche_iles_lointaines', y: 0, scale: 0.4, alpha: 0.5, tint: 0xa8c4e8, scrollX: 0.15, scrollY: 0.2 },
     { id: 'couche_horizon_malade', y: 400, scale: 0.45, tint: 0x3c4e44, scrollX: 0.3, scrollY: 0.3, fill: true, fadeInX: [1400, 2400] },
   ],
   groundCells: [

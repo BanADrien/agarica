@@ -131,7 +131,8 @@ Conditions communes (`requires` / `forbids`) : objet `{ flagName: valeurAttendue
 Clés gérées par la **Fondation** :
 - `zoneName: 'Forêt sombre'` — carte-titre à l'entrée (une fois par visite).
 - `background: 'fond_bosquet'` — fond parallaxe (ITEM_MANIFEST) à la place de plan4_ciel ;
-  `ambient: {tint: 0xRRGGBB, darkness: 0..1}` — voile de couleur (forêt corrompue, trou sombre).
+  `ambient: {tint: 0xRRGGBB, darkness: 0..1, vignette?}` — voile de couleur (forêt corrompue, trou sombre) ;
+  `vignette` : voir « Lot Codex n°8 : intégration ».
 - `xara: false` — pas de Xara dans la zone (sinon Xara présente si `storyGet('xaraMet')`).
 - `npcs: [{id, x, y, anim?, facing?, talk?: dialogueId | cutsceneId, requires?, forbids?, name?}]`
   → PNJ (`scene.npcs[id]`), invite « E : parler » à portée ; `talk` lance
@@ -170,21 +171,29 @@ Clés gérées par l'agent **Formes** (fichier `src/entities/Liane.js`, `src/ent
   (pas en piqué). `scene.windCurrents`.
 
 Formes (Player.js) — état & API :
-- Registre : `hasWolfForm`, `hasEagleForm`, `hasMonkeyForm`, `hasButterflyForm`, `hasOctopusForm`,
-  `airForm` ('monkey' | 'eagle' | 'butterfly' | null — **à inclure dans la sauvegarde**), `equippedForms`
+- Registre : `hasWolfForm`, `hasEagleForm`, `hasMonkeyForm`, `hasOctopusForm`,
+  `airForm` ('monkey' | 'eagle' | null — **à inclure dans la sauvegarde**), `equippedForms`
   (toujours un tableau de 3, normalisé en `[sol, aérien, eau]`, ex. `['wolf','eagle',null]`).
+- **Le papillon n'est qu'une compétence** (décision de l'utilisateur, 2026-10-24) : formes
+  aériennes = `AIR_FORM_IDS = ['eagle', 'monkey']`. Une vieille sauvegarde où `airForm` ou une
+  case d'`equippedForms` vaut `'butterfly'` est migrée au chargement par
+  `migrateSaveValues(values)` (StoryKit, appelée à la lecture de la sauvegarde, `readSaveData`) puis
+  `player.resolveInitialAirForm(regAir)` (même règle pour un registre posé par `?flags=`) :
+  aigle s'il est débloqué, sinon singe, sinon aucune. Le flag `hasButterflyForm` d'une vieille
+  sauvegarde reste au registre, ignoré.
 - Débloquer une forme aérienne en cours de jeu (flag posé au registre OU sur `player`) la rend
   automatiquement active (`airForm`). Totems LevelKit et triche Ctrl+Shift+D restent
   compatibles (la triche Player ajoute `hasMonkeyForm` sans changer l'aigle).
   `storySet('airForm', 'monkey')` est aussi suivi en direct.
 - `player.getActiveAirForm()`, `player.equipForm(id)`, `player.unequipForm(id)`,
-  `player.vine` (liane tenue ou null), `player.form` ∈ agarica/wolf/eagle/monkey/butterfly/octopus.
+  `player.vine` (liane tenue ou null), `player.form` ∈ agarica/wolf/eagle/monkey/octopus.
 - Saut = **Espace seul** (-680, ~172 px ; tolérance de bord 110 ms). **Sans forme aérienne :
   UN SEUL saut** (plus de double saut de base). 2e appui en l'air : singe = -500 + forme singe +
-  accroche aux lianes ; aigle = -550 + plané (inchangé) ; papillon = battement sur place
-  (130 ms) puis dash rectiligne à 45° avant-haut sans gravité (~290 px, 380 ms), puis chute
-  humaine — un par saut. Forme papillon débloquée avec la compétence `papillon`
-  (`unlockSkillFromStory(scene, 'papillon')` débloque aussi `hasButterflyForm`).
+  accroche aux lianes ; aigle = -550 + plané (inchangé) — un par saut.
+- **Totems de bonus verrouillés pour la démo** : `DEMO_TOTEMS_LOCKED = true` (Player.js).
+  `recomputeTotemBonuses` calcule alors comme si aucun totem n'était porté, sans toucher à
+  `equippedTotem` ni au registre ; le menu du feu de camp lit la même constante
+  (`CAMPFIRE_TOTEMS_LOCKED`, chaînes en croix + cadenas, aucune interaction). `false` rouvre tout.
 - Lianes : seule la forme singe s'y accroche ; en forme humaine/aigle/loup elles sont
   ignorées partout (plus de lianes-tremplins, arène de Kainati comprise).
   Sur une liane (2026-10-23) : Q/D (←/→) pompe le balancement, plafonné à ~55°
@@ -204,6 +213,15 @@ Formes (Player.js) — état & API :
   repli `singe` climb) si l'art existe
   (frame choisie selon la distance parcourue, une prise tous les 18 px, descente = mêmes
   prises), sinon frames de `liane_hang` au même rythme + traction de 3 px.
+  Pose (lot n°8) : la distance grimpée et l'heure du dernier mouvement des mains
+  (`vineClimbMovedAt`) sont relevées au pas de physique (`stepVinePhysics`) ; la grimpe
+  s'affiche si Z/S est tenu et que les mains ont bougé depuis moins de
+  `VINE_CLIMB_POSE_HOLD_MS` (50 ms), sinon la pose suspendue (`player.playVineHangAnim()` la
+  relance si son anim est arrêtée) -- plus d'alternance de deux poses au-delà de 60 i/s.
+  Dessin (Liane.js) : le haut de la liane entre de `VINE_TOP_TUCK` (12 px) dans le bloc
+  au-dessus, mesuré sur ses pixels par `vineBlockAbove(scene, x, y)` (repli : boîte de
+  l'image) ; liane derrière le sol de premier plan (`sendBehindFrontGround`). Attache physique,
+  longueur utile, pendule, prise et grimpe inchangées.
 - Combat (humaine + singe) : Z/↑ = viser haut, S/↓ = viser bas (en l'air seulement),
   K/clic = coup dans la direction visée (sinon devant). `player.getAttackHitbox()` renvoie le
   rectangle de l'ARC AFFICHÉ (art `vfx_slash`) pendant ses images actives seulement, null
@@ -295,6 +313,13 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
   `mosswall_<zone>_<id|i>`. Événement scène `moss-destroyed`.
 - **fall** : `mode: 'hurt'` → retour au dernier appui sûr + 1 cœur ; `'respawn'` → dernier
   checkpoint (sans dégât) ; `'scene'` → `goToScene(scene || id de zone, data)`.
+  **Chute dans le vide (2026-10-24)** : tant que la zone a une règle `fall`, le bas du monde
+  n'est plus un sol invisible (`syncStoryFallBounds`). Ligne de chute franchie → chute engagée
+  (`Player.startFallOut` : monde gelé, plus de contrôle ni de collision, vitesse de chute ≥
+  `FALL_OUT_MIN_VY`), Agarica sort par le bas de l'écran, fondu au noir, reprise du mode
+  ci-dessus, fondu d'ouverture (`updateStoryFall`, StoryKit). Point sûr = toute la largeur des
+  pieds sur un corps statique, pris loin du bord ; Xara regroupée à côté d'Agarica à la reprise ;
+  une mort en l'air au-dessus du vide passe par la chute. Seuils et règles de reprise inchangés.
   **checkpoints** : redéfinit aussi le point de réapparition à la mort (`player.spawnX/Y`).
 - **Ordre des handlers** : clés de la donnée dans l'ordre, `script` toujours en dernier ;
   chaque handler est protégé par try/catch (console.error). `script.update` ne tourne que
@@ -316,7 +341,8 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
   `SPEAKERS[who].portrait` / `.portraitTint` : portrait Codex d'un autre id (esprit de Kainati).
   HUD : `storyDrawHudArt(scene)` (appelée par `drawHud`, LevelKit) pose les cœurs `hud_coeur*`
   et les icônes `skill_icone_*` en images ; `drawHud` ne dessine plus que le repli.
-  Objets sans art prévu (`note_geralt`) : icône dessinée par code (`STORY_DRAWN_ITEMS`).
+  `note_geralt` a son art depuis le lot n°8 (réextrait du brut) : l'icône dessinée par code
+  (`STORY_DRAWN_ITEMS`) ne sert plus que de repli.
 - **Clé de zone `tileset: 'tuiles_ecorce'`** (TILESET_MANIFEST) : cases chargées sous
   `<id>:<clé>`. Jeu complet → rendu `'blob'` (images remontées de
   `AUTOTILE_BLOB_VISUAL_LIFT` : même ligne de marche que le jeu par défaut) ; jeu
@@ -329,7 +355,8 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
 - **Décors (props)** : `DECOR_SECTIONS` (LevelKit) = sections du menu de l'éditeur
   (bosquet, foret_sombre, grand_arbre, grand_arbre_tronc, foret_flottante,
   foret_corrompue, hutte_morgat) ; planches Codex découpées et nommées par
-  `python tools/crop_deco_items.py --named`, base de l'image au ras du bas.
+  `python tools/crop_deco_items.py --named`, base de l'image au ras du bas. Depuis le lot n°8,
+  plus les sections du manifeste `decor`, `objet`, `rocher` (voir « Lot Codex n°8 : intégration »).
 - **Dev** : `index.html?zone=foret_sombre_1&flags=xaraMet,hearts=2[&load][&enter=id]`.
 
 ### Placement au sol (2026-10-22, rétro-compatible)
@@ -429,7 +456,12 @@ Clés de zone toutes optionnelles (LevelKit) ; sans elles, rendu et caméra hist
   `height` px), crête calée sur `y`, couleur du bas prolongée dessous ; sinon rendu par code
   (mousse = celui de l'épreuve : nappe, surface bosselée, points lumineux). Bulles : VFX
   `vfx_mousse_toxique` (`bulle`) si l'art existe, sinon cercles. Visuel seul : la chute
-  reste `fall`. `scene.liquidFloor`.
+  reste `fall`. `scene.liquidFloor`. Calage des images (lot n°8, `LIQUID_IMAGE_ANCHOR_ROW`) :
+  mousse toxique = sa crête médiane (rangée 82) sur `y` ; brume = sa rangée la plus dense
+  (rangée 80) sur `y`, teintée de `color` (sarcelle au monde spirituel), sans rectangle de fond
+  dessous ; eau = ligne de surface sur le liseré du fond. La brume de premier plan
+  (`front: true`, `couche_brume_avant`) n'est posée nulle part (H2 écartée : invisible pendant
+  la montée de la forêt flottante 1, elle masquerait le sol en tombant) ; pas de `frontY`.
 - **Bords du fond lointain** : dès que la caméra défile verticalement (`tallLevel`,
   `camera.vertical`) ou avec une ligne de base, l'image de fond est prolongée en haut et en
   bas par sa propre couleur de bord (plus de bande vide en haut de l'écran en montant).
@@ -452,9 +484,12 @@ Clés de zone toutes optionnelles (LevelKit) ; sans elles, rendu et caméra hist
   sous-bois qui s'efface, nuages en parallaxe lente, rayons de soleil additifs, feuilles qui
   tombent dans la canopée, éclat doux à la sortie de la canopée (`flashAt`). Images du
   manifest utilisées si présentes (lot Codex n°8, anciens noms en repli) : ciel `couche_ciel_jour`
-  (couvre l'écran sans déformation), nuages `couche_nuage_0..4`, soleil `couche_soleil` (additif,
+  (couvre l'écran sans déformation), nuages `couche_nuage_0..4` (répartis sur la plage de ciel
+  réellement visible, un par ~260 px, au plus `clouds` : 5 en forêt flottante 1 et 2, chaque
+  image une fois ; `couche_nuage_4` rogné de 44 px à gauche), soleil `couche_soleil` (additif,
   fixé à l'écran), nappes `couche_nappe_nuages` (2 copies en parallaxe, alpha en cloche autour de
-  la sortie de la canopée) ; sinon rendu par code.
+  la sortie de la canopée) ; sinon rendu par code. Fond peint qui a déjà son soleil
+  (`BACKGROUNDS_WITH_SUN`, ex. `fond_foret_flottante`) : pas de second soleil (`rays: false`).
   À utiliser avec `camera.vertical`. `scene.__sky.progress` (0 → 1).
 - Valeurs conseillées : forêt flottante 1 `levelTop` selon l'ascension (ex. -1300),
   `camera: { vertical: true, deadzoneTop: 0.35, deadzoneBottom: 0.7, lerp: 0.08, lookAhead: 60 }`,
@@ -478,8 +513,22 @@ cinématique. Images du lot Codex n°8 utilisées dès qu'elles existent (`fx_*`
   `drop`, `bubble`, `streak`, `petal`, `wing`, `uiShard`, `uiStar` — `ui*` fixées à l'écran) avec
   `opts` `{count, angle: [min, max] (degrés), speed: [min, max] | power, lifespan, tint, spread}`.
   Les images Codex déjà colorées ne sont pas teintées (sauf `fx_grain_lumiere`, `fx_bulle`).
+  **Depuis Moteur 3 (2026-10-24)**, la teinte, l'angle, la vitesse (`speed` / `power`) et la
+  durée de vie demandés par l'appelant sont vraiment appliqués à chaque émission :
+  `juiceEmitterOp(e, name, value)` recharge l'opérateur de l'émetteur (`loadConfig`) -- les
+  raccourcis de Phaser 3.80 ignoraient une valeur en tableau ou `{min, max}`. Une teinte
+  demandée sur une recette dont l'art est déjà coloré émet avec la texture de repli blanche de
+  la même recette (sinon rouge × vert ≈ noir). Lot n°8 : `artSize` par recette = taille quand
+  l'image Codex est affichée (braise 11, grain et lueur 19, papillon 16 ; le repli garde sa
+  taille) ; `spark` = traînée dessinée teintable, `dust` = poussière lavande dessinée (R10) ;
+  recette `purif` (`fx_etincelle`), émise à chaque purification.
   Image unique : `juiceBurstImage(scene, 'glow'|'ring'|'rays'|'item', x, y, {size, color, ms, flat,
-  ui})`, `juiceShockRing(scene, x, y, {size, color, variant: 'talisman'|'toxique', flat})`.
+  ui})` (halo peint agrandi de `JUICE_HALO_ART_BOOST` = 1,28 pour garder l'emprise réglée par
+  Juice), `juiceShockRing(scene, x, y, {size, color, ms, variant?, flat, depth})` : `variant`
+  est **facultatif** (défaut `null`) -- l'art `vfx_anneau_choc` (déjà coloré, non teintable)
+  ne sert QUE pour `variant: 'talisman'` ou `'toxique'` (`mossBreak` passe `'toxique'`) ; sans
+  variante, anneau dessiné teinté de `color` (avant, l'anneau ambre du talisman sortait
+  partout). L'anneau peint est mis à l'échelle sur son trait (287 px) et non sur le canevas.
 - **Temps** : `juiceHitStop(scene, ms)` (physique Arcade en pause + anims quasi figées, temps réel,
   plafonné à 90 ms, pas de rattrapage), `juiceSlowMo(scene, {ms, physics, anims})` (timeScale
   Arcade et anims ; le ralenti de la plume de l'aigle y passe), `juiceZoomPulse(scene, {zoom, ms})`.
@@ -497,14 +546,14 @@ cinématique. Images du lot Codex n°8 utilisées dès qu'elles existent (`fx_*`
 - **Son** : `playSfx(id, opts)` = points d'accroche VIDES (`SFX_HOOKS[id] = fn` ou `SFX_HOOKS['*']`
   pour brancher l'audio un jour). Ids posés : jump, jump_air, land, slash, wolf_bite, pogo,
   slash_obstacle, feather_shot, enemy_hit, enemy_defeat, player_hurt, heart_lost, energy_full,
-  skill_denied, skill_<id>, ours_slam, transform_<forme>, vine_grab, vine_release, butterfly_flap,
-  butterfly_dash, pickup, campfire_rest, totem_activate, form_unlock, lantern_light,
+  skill_denied, skill_<id>, ours_slam, transform_<forme>, vine_grab, vine_release,
+  pickup, campfire_rest, totem_activate, form_unlock, lantern_light,
   platform_reveal, moss_crack, moss_break, moss_melt, purify, boss_end, zone_exit, banner,
   title_card, dialogue_line, dialogue_blip, dialogue_next, dialogue_choice, menu_move, menu_ok,
   overlay_open.
 - **Où c'est branché** : Agarica (Player.js) — étirement au saut, écrasement + poussière à
   l'atterrissage (∝ vitesse de chute), bouffées de pas et de demi-tour, loup penché + traînée,
-  plumes de l'aigle, silhouettes du dash papillon et du lâcher de liane, éclat à chaque
+  plumes de l'aigle, silhouettes du lâcher de liane, éclat à chaque
   changement de forme, fracas de l'ours, impact de l'arc sur le décor (une fois par coup),
   coup reçu (flash blanc puis rouge, recul au dessin, hit-stop 60 ms, voile rouge
   `juiceHurtVignette`), **tampon de saut** `JUMP_BUFFER_MS` = 120 ms (le « coyote time »
@@ -531,6 +580,232 @@ cinématique. Images du lot Codex n°8 utilisées dès qu'elles existent (`fx_*`
   menus (surbrillance qui glisse, entrée qui grossit, appui qui rebondit), sac/carte/feu de camp
   (ouverture `juiceOverlayIn`), écran de fin (lucioles, pétales).
 
+### Interface ancrée dans le monde : toujours dans l'écran (2026-10-24, Moteur 3, rétro-compatible)
+Règle commune (LevelKit) : tout élément d'interface posé dans le MONDE (invites « E : … »,
+textes flottants, bulles de parole) reste dans la vue de la caméra, à `WORLD_UI_MARGIN` (8 px)
+des bords, recalé à chaque image (POST_UPDATE, puis au `FOLLOW_UPDATE` de la caméra : pas
+d'image de retard). Le propriétaire continue de poser l'objet sur son ancre ; le recalage
+s'applique par-dessus et s'annule seul quand l'ancre revient dans la vue.
+- `keepWorldUiInView(obj, { prompt })` → obj : inscrit un texte, une image ou un conteneur
+  (idempotent). `prompt: true` = invite d'interaction : si son ancre passe au-dessus du haut de
+  l'écran, elle se pose à hauteur de la tête d'Agarica, à l'aplomb de la cible.
+- `worldUiAddLayout(scene, id, fn)` : mise en page sur mesure appelée aux mêmes moments,
+  `fn(view, { hud, characters })` ; peut renvoyer les rectangles (monde) qu'elle occupe, que
+  les invites évitent (bulles de StoryKit : la pointe suit le personnage).
+- `worldUiView(scene, margin?)` → `{ left, top, right, bottom }` : vue actuelle (monde), marge
+  déduite, calculée depuis `scrollX/scrollY` et le zoom.
+- `worldUiHudRects(scene)` → rectangles (monde) du HUD : cœurs + énergie en haut à gauche (cadre
+  de la barre peinte compris), cases de compétences en bas ; obstacles que tout élément évite.
+- `worldUiAddScreenObstacle(obj)` : objet fixé à l'écran ajouté aux obstacles tant qu'il est
+  affiché (toast d'aide ; zone invisible qui suit Agarica pendant le duel de Geralt).
+- `worldUiFreeSpot(rect, view, durs, mous, gap?)` → `{ dx, dy }` : place libre la plus proche
+  pour une bulle (sort des obstacles durs -- HUD, autres bulles -- en évitant si possible les
+  personnages).
+
+### Lot Codex n°8 : intégration (2026-10-25, rétro-compatible)
+Toutes les clés ci-dessous sont facultatives : sans elles, rendu d'avant. Chaque image branchée
+garde son repli si la texture manque (`hasManifestArt` / `scene.textures.exists`) ; aucune
+hitbox, aucun timing ni aucune durée de cinématique n'a changé. Détail du plan :
+`PLAN_INTEGRATION_LOT_8.md`.
+
+**Clés de zone**
+- `farLayers: [{ id, y, scale?, scrollX = 0.25, scrollY = 0.3, alpha = 1, tint?, fill = false,
+  fadeInX?: [x0, x1], withSky = false }]` (LevelKit `addFarLayers` / `updateFarLayers`, via
+  `zoneBackdropSpec`) : bandes lointaines du manifest répétées en largeur, entre le ciel (et ses
+  nappes) et la forêt du fond. `y` = haut de la bande ; `tint` multiplie, donc ne fait
+  qu'assombrir ; `fill` pose sous la bande la couleur de son bas (teinte comprise) ; `fadeInX` :
+  apparaît quand le centre de l'écran va de x0 à x1 ; `withSky` : suit le ciel qui se révèle.
+  Fondus recalculés chaque image, monde gelé compris. Image absente = rien. Posées : forêt
+  flottante 1 (horizon malade à **y 125**, pas 95 : à 95 il masquait le pied des îles peintes),
+  forêt flottante 2 (horizon + îles lointaines discrètes, alpha 0,5, teinte bleutée 0xa8c4e8),
+  hutte de Morgat. Horizon malade = `couche_horizon_malade` assombri par le code
+  (teinte 0x3c4e44, échelle 0,45 ; Q1).
+- `lights: [{ id, x, y, w?, h?, tint?, alpha, pulse?: [min, max, ms], layer: 'back' |
+  'aboveAmbient', requires?, forbids? }]` (StoryKit) : `id` ∈ `fx_rai_lumiere` (`y` = BAS du rai),
+  `fx_lueur_sol`, `fx_halo_doux`, `fx_halo_rayons` (`y` = centre) ; images en ADD ; `'back'`
+  (défaut) derrière les personnages, `'aboveAmbient'` à la profondeur 950, au-dessus du voile ;
+  une lumière à condition s'éteint ou se rallume en fondu si le drapeau change pendant la
+  visite. Posées : bosquet (rai de lune, alpha 0,38), retour au bosquet (aube), forêt sombre 1
+  (souche), trou sombre.
+- `ambient.vignette` : `false` = pas de vignette ; nombre 0..1 = sa force ; absente =
+  `Clamp(0,35 + darkness × 0,6, 0,35, 0,85)`. Image `couche_vignette` plein écran en MULTIPLY,
+  **jamais teintée**, profondeur 999,5. `vignette: false` au bosquet, aux racines, au monde
+  spirituel et à l'épreuve : vignette seulement sur les zones sombres (forêts sombres 1-2, forêt
+  corrompue 1, arène de Ghil't, trou sombre).
+- `ambientLife.spores: n` (LevelKit) : spores toxiques `fx_spore_toxique` d'ambiance, 10-12 px,
+  dérive lente, petit point vert en repli. Forêt corrompue 1 : 14.
+
+**Décors (props) et éditeur**
+- Clés d'une entrée de `props` : `flipX: true` (retournée) ; `angle: deg` (rotation, pas de
+  recalage au sol, `y` = point d'enfoncement, le décor passe derrière le sol pour cacher la
+  partie enfoncée) ; `hang: true` (origine (0,5 ; 0) en `y`) ; `free: true` (origine
+  (0,5 ; 0,5)) ; `flatY: k` (échelle Y × k) ; `front: true` (profondeur
+  `DECOR_FOREGROUND_DEPTH - 3`). Les clés de l'entrée l'emportent sur `DECOR_PROP_PLACEMENT`.
+  Les décors `hang`, `free` et `angle` ne servent pas de surface aux PNJ (`propTopYAt`).
+  Flèche plantée (pivot au milieu du fût) : `y ≈ 442` au sol.
+- `MANIFEST_DECOR_SECTIONS = ['decor', 'objet', 'rocher']` (sections d'ITEM_MANIFEST posables) ;
+  `propDefaultScale(type)` = échelle du manifest, sinon `PROP_SCALE` ;
+  `DECOR_PROP_PLACEMENT` = placement par défaut (`decor_mousse_lumineuse_plafond: {hang}`,
+  `_tronc: {free}`, `decor_empreinte_boue: {flatY: 0.5}`) ; `propTextureKey(scene, type)` se
+  rabat sur `item-<id>` si `prop-<id>` n'est pas chargé. BootScene ne précharge ces sections que
+  si l'image est livrée (plus de 404). Un décor dont l'image manque n'est pas dessiné.
+- Éditeur : sections « Décors (Codex) », « Objets posés (Codex) », « Rochers (Codex) » (décors
+  absents non proposés) ; échelle par défaut du manifest ; taille par pas de ×1,1, minimum 0,02,
+  arrondie à 4 décimales ; aperçu fidèle des clés de props (`editorPropPlacement`, copie de la
+  règle de `buildLevelFromData` : à garder alignées) ; ces clés se règlent par « Propriétés… »
+  (JSON). Sauvegarde sans perte de `farLayers`, `lights`, `ambient.vignette`, `ambientLife` ni
+  des clés de props. Objets ramassables : préfixes de décor exclus (`EDITOR_NON_PICKUP_ITEM`).
+
+**Interface peinte (StoryKit, sauf mention)**
+- `addUiSliced(scene, id, x, y, w, h, { scale, depth, container, scrollFactor })` → Container |
+  null : panneau découpé selon `nineSlice` {left, right, top, bottom} (px source, manifest) ;
+  coins à l'échelle `scale` (défaut : manifest), bords et centre étirés, jointures au pixel ;
+  `top = bottom = 0` → 3 morceaux horizontaux, hauteur = texH × scale (`h` ignoré) ; bornes
+  `w ≥ (left + right) × scale`, `h ≥ (top + bottom) × scale` ; origine en haut à gauche ; null si
+  la texture manque. Le panneau porte `setUiSize(w, h)` et `uiW` / `uiH`. Pas de
+  `scene.add.nineslice` (WebGL seulement en Phaser 3.80). `storyUiScale(id, repli)` lit
+  l'échelle d'une image d'interface dans le manifest.
+- `createStoryPromptLabel(scene, { depth, originY })` → objet qui imite un Text (Container) :
+  pilule `ui_invite` (24 px de haut) + pastille `ui_touche` (lettre sombre #2a1f45) + texte ;
+  `setText` découpe `/^([A-Z]) : (.*)$/` et ne fait rien si le libellé n'a pas changé ;
+  `setText` / `setPosition` / `setVisible` / `setDepth` chaînables, `setOrigin` sans effet ;
+  `visible`, `active`, `text`, `getBounds`. Sans `ui_invite` : le Text d'avant.
+  `ensureStoryPrompt` l'utilise ; LevelKit aussi pour « E : te reposer » (feux) et
+  « E : se recueillir » (totems), profondeur 1050.
+- Bulles de parole sur `ui_bulle` + `ui_bulle_pointe` (pointe à 21 px des coins au moins) ;
+  toast sur `ui_bulle` ; bannière « objet obtenu » `ui_banniere` de **128 px** (textes à
+  y + 30 / 41 / 66, icône de 46 px dans `ui_anneau_objet`) ; carte-titre avec
+  `ui_ornement_titre` ; HUD : cases vides `ui_case_competence` (profondeur 1000,8 : sous la
+  lettre) et pastilles `ui_touche` ; barre de boss `ui_boss_cadre` 448x32, remplissage dans la
+  rainure 378x8 ; barre d'énergie peinte (LevelKit `juiceEnergyArt` /
+  `juiceDrawEnergyBarArt`) : cadre 150x22, remplissage rogné dans la rainure 114x7, traîne,
+  pointe et refus conservés. Indicateur « suite » du dialogue = `ui_bulle_pointe` à 0,26
+  (18x13 ; ▼ en repli). Touches A/F/R du feu de camp peintes (`ui_touche`, 20 px). Les touches
+  de l'écran Contrôles restent dessinées (bois clair en jeu seulement, Q32).
+- Réplique `{ who, text, mood }` : joue l'anim `mood` du PNJ (ex. `xara_extra.excited`) au lieu
+  de `talk` si l'art existe ; vaut pour la boîte de dialogue, pas pour les bulles.
+- Lanternes de reprise : `decor_lanterne_*` à 0,15 (30x51), globe à 0,63 de la hauteur, halo de
+  110 px, lueur au sol alpha 0,45.
+
+| Élément | Profondeur |
+|---|---|
+| Personnages | `CHARACTER_DEPTH` = 10 |
+| Voile `ambient` | 900 |
+| Éclat du ciel, `lights` `aboveAmbient` | 950 |
+| Feuilles | 999 |
+| Vignette | 999,5 |
+| `hudGraphics`, premier plan (`DECOR_FOREGROUND_DEPTH`) | 1000 |
+| Barre d'énergie peinte | 1000,2 à 1000,6 |
+| Cases de compétence vides peintes | 1000,8 |
+| Cœurs du HUD | 1001 |
+| Barre de boss | 1001,5 à 1003 |
+| Bulles de parole | 1040 |
+| Invites | 1050 |
+
+**PNJ créés en cours de visite (StoryKit)**
+- `registerStoryNpc(scene, npc)` → npc | null : inscrit un PNJ créé par un script (invite
+  « E : parler » comme ceux de la donnée), sans doublon ; retrouve sa clé dans `scene.npcs`
+  (sinon son id de manifest) et l'y inscrit si la place est libre ; retire au passage les PNJ
+  détruits. Chaque image purge aussi les PNJ détruits.
+- `unregisterStoryInteractable(scene, objOrNpc)` → bool : retire l'entrée (PNJ, image, donnée,
+  mur ou entrée) ; le PNJ reste dans `scene.npcs`. Usage : Clak (duel de Geralt, revisite du
+  bosquet ; `a2RegisterNpc` passe par `registerStoryNpc`).
+
+**Moteur, entités, effets**
+- `levelSceneOn(scene, event, fn)` (LevelKit) : écouteur de scène retiré à l'arrêt de la scène
+  (plus de fuite d'écouteurs `update` des totems et feux à chaque redémarrage).
+- Totem qui « s'éveille » : `addAbilityShrine` choisit l'image selon le drapeau
+  (`WAKING_TOTEM_FLAGS = ['hasMonkeyForm']` : `totem_monkey_dim` avant la forme, `_lit` après).
+- Halos : `fx_halo_doux` réimporté en vrai dégradé (plus faible qu'un disque plein) ; compensé
+  par `JUICE_HALO_ART_BOOST` (1,28 : feu, totem, `juiceBurstImage 'glow'`) et, dans les entités,
+  par `entityHaloTexture(scene, repli)` (MousseCreature.js, ×1,12). Feu de camp : flaque
+  `fx_lueur_sol` au pied, qui respire avec le halo.
+- Transformations : anims créées seulement si leurs images sont chargées
+  (`createAnimIfLoaded(scene, config)`, `animPlayable(scene, key)`, Player.js) -- sans image, la
+  forme change net, sans erreur ; `TRANSFO_FRAME_CALIBRATION` recale `transfo-wolf-2` sur la
+  surface de `loup-run-0` (hitbox inchangée).
+- Ennemis corrompus guéris : art `mousse_creature_guerie_0/1` (0,2), `singe_gueri` ; pieds gardés
+  au même endroit par `corruptedFeetGap(e)` / `corruptedKeepFeet(e, gap)` (MousseCreature.js) ;
+  éclat `vfx_purification` à 2,4 × la taille de l'animal (72 à 130 px). Pierre du singe corrompu
+  = art `pierre` (12 px) ; `calmSingesCorrompus(scene, filter?, ms = 8000)` (SingeCorrompu.js)
+  immobilise les singes sans lancer (PV, patrouille et portée inchangés) et brise les pierres en
+  vol : utilisé à la prise de
+  la forme singe au totem des racines (8 s ; 5 s à l'arrivée par l'entrée `totem_singe`).
+- Ghil't : souffle `vfx_souffle_toxique` étiré sur sa zone de dégâts (330 px), plus de cône
+  translucide quand l'art existe, triangle de dégâts identique (Q8) ; boule de crachat peinte
+  (hitbox de rayon 11 inchangée) ; anim `hit` en idle ou en récupération seulement.
+- Plateformes cachées : contour `decor_plateforme_fantome` calé sur la case ; empreintes du loup
+  qui apparaissent une à une. Courants d'air : traits `fx_trait_vent`. Fil de Xara :
+  tileSprite `fx_fil_soie` de 3 px.
+- Pose papillon de la compétence : voir « Détails compétences » plus bas.
+
+**Histoire (helpers)**
+- `acte1Particles(scene, x, y, { …, fx: [ids] })` (acte1.js) : images `fx_*` en alternance
+  (ADD seulement pour `fx_braise`) ; sans `fx`, comportement d'avant. Utilisé aussi par
+  acte1_arbre.js.
+- `acte1DrawMossDecor` : taches au format `[x, y, r, kind, flipX]`.
+- `acte1PutAboveProps(scene, obj)` / `a2PutAboveProps(scene, obj)` : objet de script posé juste
+  devant les décors de la zone, derrière les personnages (`storyPutBehindPlayer` le mettait
+  derrière TOUS les décors : bête d'Amanite cachée par l'arbre, plaque du bosquet par la hutte).
+- `arbreGlowPassage(scene, x, y, h = 120, color, open = true)` → `{ glow, core, setOpen(v), art }`
+  (acte1_arbre.js) : fente `decor_fente_ouverte` / `_fermee` posée au sol + halo ; `glow` et
+  `core` portent `__sx` / `__sy` (tweener `scaleX` / `scaleY`, jamais `scale`).
+- `CLAIRIERE_MOUSSE_VARIANTE` (acte2.js) = `'touffes'` (autres : `'lisere'`, `'aucune'`) :
+  mousse de la clairière en touffes et plaques du lot 8 teintées presque noires, absentes à
+  moins de 150 px du cercle sain.
+- Arène de Ghil't : trou d'effondrement à 0,16 ; cercle d'herbe saine (H11) ; créatures guéries
+  qui sortent de la mousse tombée de Ghil't et s'enfuient à l'arrivée d'Amanite (H16) ; arène
+  calme : décor à la profondeur 9 (sous les personnages), rai alpha 0,3. Trou sombre :
+  `ghLiftCharacters(scene, depth)` passe Agarica et Xara au-dessus du halo (0,28).
+
+**Importeur et manifeste** (`tools/import_codex_assets.py`, `src/data/asset_manifest.js`)
+- Options d'import : `trimAlpha` et `cropTop` (rognage), `pad`, `falloff` et `desaturate`
+  (retouches des halos et de la flaque au sol), `align: "ring"` (anneau recentré sur son trait,
+  canevas 316x336). Les frames sont collées sans masque alpha (l'alpha n'est plus élevé au carré
+  sur les bords adoucis ; profite aux frames réimportées avec `--force`).
+- Interface : découpes `nineSlice` et échelles de `ui_bulle`, `ui_bulle_pointe`, `ui_invite`,
+  `ui_banniere` (128 px), `ui_touche`, `ui_ornement_titre`, barres (énergie 150x22, rainure
+  114x7 ; boss 448x32, rainure 378x8) ; lanternes à 0,15 ; vignette non teintée.
+
+### Duel de Geralt — `GeraltDuel` (`src/entities/GeraltDuel.js`, 2026-10-24)
+Mécanique seule ; l'histoire (rencontre, bulles de Xara, fin, carte) reste dans `acte2.js`.
+- `new GeraltDuel(scene, { geralt, minX, maxX, groundY, spawn, resetX, onEvent, noTrap })` :
+  `geralt` = PNJ `scene.npcs.geralt` (pieds = y) ; `minX`/`maxX` = murs de l'arène ; `spawn` =
+  réapparition d'Agarica pendant le duel ; `resetX` = place de Geralt à la reprise ; `noTrap` =
+  plages `[x0, x1]` sans collet ; `onEvent(name, data)` reçoit les événements du duel
+  (`lob`, `shot`, `jump-shot`, `crash`, `trap`, `geralt-hit`, `geralt-trapped`,
+  `player-trapped`, `player-clamped`, `invoke`, `invoke-target`, `column-hit`, `clak-spawned`,
+  `clak-charge`, `clak-hit`, `clak-stunned`, `clak-landed`, `parry`, `heal`, `player-down`,
+  `restart`, `victory`).
+- `start()` ; `update(delta)` (appelé seulement monde NON gelé : tout s'arrête avec lui) ;
+  `ratio()` (barre de boss) ; `destroy({ keepActors = true })`.
+- Règles (`GERALT_DUEL_CFG`) : 8 coups pour gagner, Clak invoqué au 4e (colonne de lumière à
+  esquiver), phase 2 où Clak charge et pince (on l'étourdit sans le vaincre) ; flèche en cloche
+  annoncée par un marqueur, tir droit, saut en cloche avec tir plongeant puis réception ratée
+  (fenêtre de frappe) ; collets où Agarica ET Geralt peuvent tomber (le 2e de chaque série de 3
+  est posé derrière lui) ; dernier cœur perdu = reprise dans l'arène, avec un peu plus de répit
+  à chaque défaite (`ease`, `teleEase`). Tirages reproductibles (graine fixe).
+- Coups vers le bas sur Geralt ou Clak = rebond (`scene.pogoTargets`) ; Agarica est un obstacle
+  de la règle « interface dans l'écran » pendant le duel (`worldUiAddScreenObstacle`) ; Clak
+  inscrit / retiré par `registerStoryNpc` / `unregisterStoryInteractable`, calmé et posé au sol à
+  la victoire comme à la défaite.
+- Poses de combat : manifest `geralt_combat` (prompt Codex n°9, à générer) dès qu'il existe,
+  sinon les poses actuelles (`GERALT_POSES`).
+
+### Kainati (2026-10-25)
+- Combat au sol (`src/entities/Kainati.js`, script `kainati_arene`) : charge, pierres, onde de
+  choc (front à 800 px/s), vague de mousse, éboulement pleine largeur esquivés sur **2 lianes**
+  (x 792 et 1192, y 64, longueur 170 : aucun point à plus de ~245 px d'une liane) ; frappable à
+  tout moment, contact blessant, sonné après la charge ; épargné et inerte à la fin.
+- Télégraphes : grandes attaques 1250 ms (phase 1) / 1200 ms (phase 2), préparation de la charge
+  1200 ms ; vitesse de charge 620 / 700. Il attend que ses pierres aient touché le sol avant
+  l'action suivante ; Agarica dans son dos → sa prochaine action est une charge vers l'autre
+  bout ; en rentrant à son poste il s'arrête 120 px devant elle ; la pierre de la canopée vise
+  la liane d'Agarica (ombre `fx_ombre_sol` + marqueur `fx_marqueur_danger`).
+- Sans forme singe (ou aigle choisi au feu de camp), le combat ne démarre pas : Xara explique,
+  le retour vers les racines reste libre. Poses `kainati_calme` (prompt Codex n°9, à générer)
+  utilisées dès qu'elles existent.
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |
@@ -538,9 +813,9 @@ cinématique. Images du lot Codex n°8 utilisées dès qu'elles existent (`fx_*`
 | 1 | `bosquet` → BosquetScene | habitants vs mousse, aide (gratter), 3 bébés cochons, père → talisman ours, vol idole par Amanite, Agarica ment, bannissement | `talismanOurs` (item `talisman_ours`), `banished` |
 | 2 | `foret_sombre_1` | désespoir, rencontre Xara, amas de mousse bloquant, talisman réagit → compétence ours, 1er ennemi corrompu | `xaraMet`, skill `ours` |
 | 3 | `foret_sombre_2` | totem du loup, ravins, pistes, mare aux 3 poissons, plante résistante visible inaccessible (en hauteur), mur de mousse (repulsif, acte 2), vue sur le grand arbre | `hasWolfForm`, `planteVue` |
-| 4 | `grand_arbre_racines` | racines, pierres qui tombent, ennemis, feu de camp, lianes visibles mais inutilisables ; au bout de la grande branche, TOTEM DU SINGE (E : `totem_monkey_dim` → `totem_monkey_lit`) → monde spirituel ; au retour, les 2 lianes de la cime (forme singe obligatoire) mènent seules à l'arène | `totemSingeActif` |
-| 5 | `monde_spirituel` | l'esprit simien ancestral éprouve Agarica (question) et donne la forme singe, puis la guide de liane en liane → retour au totem | `hasMonkeyForm`, `mondeSpirituelFini` |
-| 6 | `grand_arbre_arene` | Boss Kainati (script `kainati_arene`) au sol : charge, pierres, attaques pleine largeur (onde de choc, vague de mousse, éboulement) esquivées sur 4 lianes → épargné (inerte, parle), ouvre la route des hauteurs | `kainatiIntroSeen`, `kainatiDefeated`, `kainatiCalmX` |
+| 4 | `grand_arbre_racines` | racines, pierres qui tombent, ennemis, feu de camp, lianes visibles mais inutilisables ; au bout de la grande branche, TOTEM DU SINGE (clé `totems` comme le loup et l'aigle ; E : `totem_monkey_dim` → `totem_monkey_lit`) qui donne DIRECTEMENT la forme singe (décision du 2026-10-25 : plus de monde spirituel) ; les singes corrompus de la branche se calment 8 s ; bulle de Xara + rappel des lianes ; les 2 lianes de la cime (forme singe obligatoire) mènent seules à l'arène | `totemSingeActif`, `hasMonkeyForm` |
+| 5 | `monde_spirituel` | **hors du chemin depuis le 2026-10-25** (fichiers gardés, jouable par « Zones de test ») ; une ancienne sauvegarde qui y reprend retombe devant le totem des racines (entrée `totem_singe`, qui remplace `from_monde_spirituel`) ; ses deux sorties mènent à cette entrée | — (`mondeSpirituelFini` n'est plus posé) |
+| 6 | `grand_arbre_arene` | Boss Kainati (script `kainati_arene`) au sol : charge, pierres, attaques pleine largeur (onde de choc, vague de mousse, éboulement) esquivées sur 2 lianes → épargné (inerte, parle), ouvre la route des hauteurs ; pas de combat sans forme singe (voir « Kainati ») | `kainatiIntroSeen`, `kainatiDefeated`, `kainatiCalmX` |
 | 7 | `epreuve_singe` (optionnel) | longue course de lianes en 5 sections de difficulté croissante (24 lianes pendues sous des blocs, 12 288 px de large, ~14 000 px de parcours dont ~800 px d'escalade le long des lianes ; une lanterne par section, chute = lanterne ; mousse toxique `liquidFloor` en contrebas ; clés de script : pierres en rythme `rhythmRocks` (couloirs `{x, top, offset}`), marée `tides`, plateformes qui s'effritent `crumble`, pierres `rockfalls` ; singe corrompu) → talisman du singe au sommet (bout droit) | `talismanSinge`, skill `pierre` |
 | 8 | `foret_flottante_1` | Geralt + Clak, duel comique (s'ouvre sur l'« Invocation du Crabe Ancestral »), carte ; puis ASCENSION verticale (P1-P9, `camera.vertical`, `levelTop: -1200`, `skyReveal`) jusqu'au belvédère au-dessus des cimes, sortie en haut à droite vers les îles | `geraltMet`, item `carte_geralt` |
 | 9 | `foret_flottante_2` | îles, totem de poche cassé, Amanite (1re rencontre), totem de l'aigle, courants d'air | item `totem_poche_casse`, `amaniteMet`, `hasEagleForm` |
@@ -584,11 +859,11 @@ ZoneAquatique) restent intactes, accessibles depuis le menu titre « Zones de te
   (le joueur peut rester coincé contre, à cause de la hitbox 3/4 des tuiles
   d'herbe) — préférer des marches d'une case.
 
-Formes : emplacement **sol** = loup ; emplacement **aérien** = singe OU aigle OU papillon
-(exclusifs, choix au feu de camp) ; sans forme aérienne, un seul saut (le double saut de
-base a été retiré). Singe : saut moins haut + accroche auto aux lianes + balancement ;
-Aigle : double saut plus haut + plané (+ courants d'air). Pieuvre : conservée (emplacement
-eau) mais hors histoire.
+Formes : emplacement **sol** = loup ; emplacement **aérien** = singe OU aigle (exclusifs,
+choix au feu de camp) ; sans forme aérienne, un seul saut (le double saut de base a été
+retiré). Singe : saut moins haut + accroche auto aux lianes + balancement ; Aigle : double
+saut plus haut + plané (+ courants d'air). Pieuvre : conservée (emplacement eau) mais hors
+histoire. Le papillon n'est qu'une compétence (soin), jamais une forme ni un 2e saut.
 
 Compétences : `ours` (existante, fracas — détruit `mossBlocks`), `pierre` (talisman du
 singe : projectile de pierre en cloche), `papillon` (soin : touche un ennemi `corrupted`
@@ -608,12 +883,22 @@ Détails compétences (agent Formes) :
   → singe qui lance (anim `throw` du manifest `singe_extra`, repli `singe`, si l'art existe, sinon singe debout +
   élan du corps, 260 ms ; la pierre part à 45 % du geste, de la main) → transfo inverse
   (150 ms) ; relance pendant la pose = nouveau lancer sans retransformation. **Papillon** :
-  transfo `transfo_papillon` (130 ms) → forme papillon (anim `cast` de `forme_papillon_extra`, repli
-  `forme_papillon` cast, si l'art existe, sinon
-  `glide`/`flap`) centrée 48 px au-dessus des pieds, AU CENTRE de la nuée qui tourbillonne
-  autour d'elle 420 ms (`PAPILLON_HOLD_MS`) puis file devant et finit au même endroit
-  qu'avant (portée du soin inchangée) → transfo inverse. Sans art de transfo : gerbe de
-  feuilles / poussière lumineuse. Interrompue par un coup reçu, une pose narrative, une liane.
+  transfo `transfo_papillon` (180 ms) → papillon qui incante (anim `cast` de
+  `forme_papillon_extra`, repli `forme_papillon` cast, si l'art existe, sinon `glide`/`flap`,
+  400 ms) → transfo inverse (160 ms) : 740 ms au total comme avant
+  (`SKILL_FORM_POSE_MS.papillon`). Papillon centré 48 px au-dessus des pieds, AU CENTRE de la
+  nuée qui tourbillonne autour de lui 420 ms (`PAPILLON_HOLD_MS`) puis file devant et finit au
+  même endroit qu'avant (portée du soin inchangée). Depuis le lot n°10 (vrai papillon lunaire,
+  mêmes ids) : images tirées de l'horloge de la pose (un ralenti ne coupe plus l'incantation,
+  chaque image de la transfo est montrée), échelle et hauteur interpolées d'Agarica au
+  papillon (plus de saut ×1,46 ni de pieds décollés), étincelles d'ailes
+  `fx_etincelle_papillon` toutes les 110 ms, petite lueur au début et à la fin, traînée
+  `fx_trainee_papillon` derrière chaque papillon de la nuée. `player.retimeSkillFormPose(now,
+  { in, act, out })` change les durées d'une pose EN COURS sans saut d'image (sauvetage de
+  Ghil't : `GH_SOIN_POSE_MS` = 290 / 640 / 290 ms, rythme peint, via `ghFinishSkillPose` qui
+  termine ensuite la pose et ramène Agarica au repos pendant le panoramique : durée de la
+  cinématique inchangée). Sans art de transfo : gerbe de feuilles / poussière lumineuse.
+  Interrompue par un coup reçu, une pose narrative, une liane.
 - **Règle pour LevelKit (Fondation)** : si une boucle générique applique une hitbox de
   compétence aux ennemis, elle DOIT appeler `SKILL_DEFS[id].onHitEnemy(player, enemy)`
   quand il existe AU LIEU de `takeHit`/`defeat` (papillon → `heal()`, ne tue jamais).
@@ -641,7 +926,7 @@ Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
   x dans la case) ; dans un enchaînement, écarts réglés pour le lâcher puissant (il
   faut de l'élan, la liane précédente seule n'atteint jamais l'appui suivant).
   Racines : 2 + 2 lianes à 448 px (épreuve à gauche, cime à droite) ; monde spirituel : 4 (2 par vide, tutoriel) ;
-  arène de Kainati : 4 (sous la canopée, bas à y=234) ; épreuve : 24.
+  arène de Kainati : 2 (x 792 et 1192, y 64, longueur 170 ; 4 avant le 2026-10-25) ; épreuve : 24.
 - **Saut simple sur le chemin critique** (avant le singe) : marches de 1-2 cases, ravin
   de 5 cases de la forêt sombre 2 précédé de 3 cases plates (fenêtre d'appel du loup
   x ≈ 1180-1340) ; aucune marche de 3 cases avant le singe.

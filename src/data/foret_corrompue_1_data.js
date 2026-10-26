@@ -56,7 +56,9 @@ const FORET_CORROMPUE_1_DATA = {
     // (`angle` : pointe enfoncée, empennage en l'air ; `y` = milieu du fût,
     // 6 px au-dessus du sol, comme les tirs d'entraînement de la forêt
     // flottante 1). « Si tu lis ceci, c'est que je suis passé par là. »
-    { type: 'objet_collet', x: 1470, y: 448 },
+    // Collet à 0,164 (42 px de large, comme ceux du duel, cf. GeraltDuel
+    // trapW) : à 0,13 (33 px), un fil brun d'un pixel, invisible sur l'herbe.
+    { type: 'objet_collet', x: 1470, y: 448, scale: 0.164 },
     { type: 'objet_fleche', x: 1525, y: 442, angle: 70 },
     { type: 'bosquet_crates', x: 1560, y: 448, scale: 0.28 },
     { type: 'bosquet_log_pile', x: 1690, y: 448, scale: 0.3 },   // à côté de la note (x 1600), pas devant

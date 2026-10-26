@@ -150,7 +150,11 @@ function throwSingeStone(scene, x, y, targetX, targetY) {
     }));
   }
   if (scene.ground) colliders.push(scene.physics.add.collider(stone, scene.ground, shatter));
-  stone.once('destroy', () => colliders.forEach((c) => c.destroy()));
+  // Pierres en vol, par scène : calmSingesCorrompus les brise d'un coup.
+  const flying = scene.__singeStones || (scene.__singeStones = new Set());
+  stone.__shatter = shatter;
+  flying.add(stone);
+  stone.once('destroy', () => { flying.delete(stone); colliders.forEach((c) => c.destroy()); });
   scene.time.delayedCall(4000, shatter);
   return stone;
 }
@@ -273,6 +277,20 @@ class SingeCorrompu extends Phaser.Physics.Arcade.Sprite {
     if (this.useManifestArt) enemyPlayArt(this, vx !== 0 ? 'run' : 'idle');
   }
 
+  // Calmé pour `ms` (moment d'histoire, cf. calmSingesCorrompus) : lancer en
+  // cours annulé, immobile, pose de repos ; il ne relance pas dès la fin du
+  // calme (délai normal entre deux lancers compté depuis cette fin).
+  calm(ms) {
+    if (this.defeated || this.healed) return;
+    const now = this.scene.time.now;
+    this.stunnedUntil = Math.max(this.stunnedUntil || 0, now + ms);
+    this.lastThrow = Math.max(this.lastThrow, now + ms);
+    this.state = 'roam';
+    this.angle = 0;
+    if (this.body) this.setVelocityX(0);
+    this.setPose('idle');
+  }
+
   takeHit(source) {
     if (this.state === 'windup') {
       // Un coup interrompt le lancer.
@@ -320,6 +338,26 @@ class SingeCorrompu extends Phaser.Physics.Arcade.Sprite {
     this.angle = 0;
     enemyFadeOutDefeat(this);
   }
+}
+
+// Calme les singes corrompus de la scène qui passent `filter(singe)` pendant
+// `ms` et brise les pierres déjà en vol (les leurs comme les autres : elles
+// visaient Agarica pendant un moment où elle ne peut pas les voir, bannière
+// de forme, arrivée d'une sauvegarde). Purement défensif : ni PV, ni patrouille,
+// ni portée ne changent. Renvoie le nombre de singes calmés.
+function calmSingesCorrompus(scene, filter = null, ms = 8000) {
+  if (!scene || !scene.enemies) return 0;
+  let n = 0;
+  scene.enemies.getChildren().forEach((e) => {
+    if (!(e instanceof SingeCorrompu) || !e.active || e.defeated || e.healed) return;
+    if (filter && !filter(e)) return;
+    e.calm(ms);
+    n++;
+  });
+  for (const stone of [...(scene.__singeStones || [])]) {
+    if (stone.active && stone.__shatter) stone.__shatter();
+  }
+  return n;
 }
 
 if (typeof ENEMY_REGISTRY !== 'undefined') {

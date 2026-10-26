@@ -1831,8 +1831,18 @@ function a2DrawSpiralTree(scene, x) {
 // pied, la rotation d'a2UpdateMossTufts pivote donc autour de lui. Repli :
 // les triangles dessinés.
 const A2_TOUFFES = ['decor_touffe_mousse_petite', 'decor_touffe_mousse_moyenne', 'decor_touffe_mousse_grande'];
+// Variante penchée (option H13, image du lot 8 jusque-là jamais affichée) :
+// quand Agarica est tout près (< 40 px), la touffe se courbe vers elle --
+// `decor_touffe_mousse_penchee` (courbée vers la droite, pied à 40 % de sa
+// largeur ; 60 % retournée). Fondu enchaîné avec la touffe droite (~150 ms)
+// plutôt qu'une bascule : pas de saut. Hauteur : 80 % de la touffe droite
+// (une tige courbée est plus basse), jamais plus haute qu'elle.
+const A2_TOUFFE_PENCHEE = 'decor_touffe_mousse_penchee';
+const A2_TOUFFE_BEND_PX = 40;
+const A2_TOUFFE_BEND_MS = 150;
 
 function a2MakeMossTufts(scene, xs) {
+  const bendArt = scene.textures.exists(`item-${A2_TOUFFE_PENCHEE}`);
   return xs.map((x, i) => {
     const id = A2_TOUFFES[i % 3];
     if (scene.textures.exists(`item-${id}`)) {
@@ -1841,7 +1851,14 @@ function a2MakeMossTufts(scene, xs) {
         .setScale((getItemManifest()[id] || {}).scale || 0.18);
       setVisibleBottomY(img, foot);
       storyPutBehindPlayer(scene, img);
-      return { g: img, x, phase: i * 0.7, size: i % 3 };
+      let bent = null;
+      if (bendArt) {
+        bent = scene.add.image(x, foot, `item-${A2_TOUFFE_PENCHEE}`).setOrigin(0.4, 1).setAlpha(0);
+        bent.setScale((img.displayHeight * 0.8) / bent.height);
+        setVisibleBottomY(bent, foot);
+        storyPutBehindPlayer(scene, bent);
+      }
+      return { g: img, bent, bendK: 0, x, phase: i * 0.7, size: i % 3 };
     }
     // Pied 2 px sous la ligne de marche (cf. GROUND_STAND_SINK), planté dans l'herbe.
     const y = storyGroundY(scene, x, 448) + GROUND_STAND_SINK + 2;
@@ -1860,10 +1877,21 @@ function a2MakeMossTufts(scene, xs) {
 
 function a2UpdateMossTufts(scene, time) {
   const p = scene.player;
+  const step = Math.min(1, (scene.game.loop.delta || 16) / A2_TOUFFE_BEND_MS);
   for (const t of scene.__a2.tufts || []) {
     const dx = p.x - t.x;
+    const sway = Math.sin(time / 500 + t.phase) * 0.08;
     const lean = Math.abs(dx) < 200 ? Phaser.Math.Clamp(dx / 200, -1, 1) * 0.6 : 0;
-    t.g.rotation = lean + Math.sin(time / 500 + t.phase) * 0.08;
+    t.g.rotation = lean + sway;
+    if (!t.bent) continue;
+    // Tout près : la touffe penchée (déjà courbée, elle ne garde que le
+    // balancement), tournée vers Agarica, prend la place de la droite.
+    const near = Math.abs(dx) < A2_TOUFFE_BEND_PX;
+    t.bendK = Phaser.Math.Clamp(t.bendK + (near ? step : -step), 0, 1);
+    if (near) t.bent.setFlipX(dx < 0).setOrigin(dx < 0 ? 0.6 : 0.4, 1);
+    t.bent.rotation = sway;
+    t.bent.setAlpha(t.bendK);
+    t.g.setAlpha(1 - t.bendK);
   }
 }
 

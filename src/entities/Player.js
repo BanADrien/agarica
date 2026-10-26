@@ -774,7 +774,18 @@ const FORM_FLAG_BY_ID = {
 // --- Pose PAPILLON de la compétence de soin ---------------------------------
 // Durée de la transformation humaine -> papillon (art `transfo_papillon`,
 // recréée à cette durée) : la phase 'in' de SKILL_FORM_POSE_MS.papillon.
-const BUTTERFLY_TRANSFO_MS = 130;
+const BUTTERFLY_TRANSFO_MS = 180;
+// Images de la pose papillon tirées de son horloge (et non jouées par
+// l'anim) : un ralenti (juiceSlowMo du soin de Ghil't) ne coupe plus
+// l'incantation, et chaque image de la transfo est montrée. Échelle et
+// hauteur passent progressivement de celles d'Agarica (1re image de la
+// transfo, pieds au sol) à celles du papillon de l'incantation (dernière) :
+// plus de saut de taille (×1,46 avant) ni de pieds décollés (12 px).
+// Étincelles d'ailes (`fx_etincelle_papillon`, recette 'wingDust') pendant
+// l'incantation, toutes les BUTTERFLY_DUST_EVERY_MS ; petite lueur douce au
+// début de la transfo et au retour à la forme humaine (fondu de silhouette).
+const BUTTERFLY_DUST_EVERY_MS = 110;
+const BUTTERFLY_POSE_GLOW = { size: 96, color: 0xf3dcff, alpha: 0.45, ms: 300 };
 // Poussière lumineuse de la pose (centrée sur le buste, pas aux pieds).
 const BUTTERFLY_CENTER_ABOVE_FEET = 38;
 const BUTTERFLY_DUST_COLORS = [0x9ff3ff, 0x6fd8ff, 0xffb3f0, 0xfff6a0];
@@ -896,10 +907,13 @@ const THROW_POSE_MS = 220;
 // Compétences « avec la forme » (cf. startSkillFormPose) : durées des phases
 // transfo -> geste -> transfo inverse (ms) ; `releaseAt` = fraction du geste
 // où la pierre quitte la main. Pierre ~0,56 s, papillon ~0,74 s (sous son
-// délai de 1 s) : courtes mais lisibles.
+// délai de 1 s) : courtes mais lisibles. Papillon (lot n°10) : 4 images de
+// transfo en 180 ms (130 avant : une image sur deux sautait), les 4 images
+// de l'incantation en 400 ms (leur rythme peint, 10 i/s), retour en 160 ms ;
+// même total de 740 ms (nuée, énergie et délai inchangés).
 const SKILL_FORM_POSE_MS = {
   pierre: { in: 150, act: 260, out: 150, releaseAt: 0.45 },
-  papillon: { in: 130, act: 480, out: 130, releaseAt: 0 },
+  papillon: { in: 180, act: 400, out: 160, releaseAt: 0 },
 };
 // Papillon du soin : centre du dessin au-dessus des pieds = centre de la nuée
 // pendant le battement (cf. PapillonSwarm, Projectiles.js).
@@ -3372,6 +3386,23 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (p.phase === 'in' || p.phase === 'out') {
       const k = p.phase === 'in' ? progress(p.start, p.inEnd) : progress(p.actEnd, p.end);
       if (!this.butterflyTransfoKey || !frameAt(this.butterflyTransfoKey, k, p.phase === 'out')) return false;
+      // Lueur douce au tout début de la transfo et à la dernière image du
+      // retour (masque la bascule de silhouette, sans changer la pose).
+      if (p.phase === 'in' && !p.glowIn) { p.glowIn = true; this.butterflyPoseGlow(); }
+      if (p.phase === 'out' && k > 0.7 && !p.glowOut) { p.glowOut = true; this.butterflyPoseGlow(); }
+      const place = this.butterflyTransfoPlacement(k, p.phase === 'out');
+      if (place) {
+        // Échelle / hauteur interpolées (cf. butterflyTransfoPlacement).
+        this.applyBodyForScale(place.scale, place.body);
+        this.setFlipX(this.facingDir < 0);
+        this.setRotation(0);
+        this.setOrigin(0.5, place.originY);
+        const W = this.frame.realWidth;
+        const H = this.frame.realHeight;
+        this.body.setOffset(place.body.offsetX + (this.displayOriginX - W / 2), place.body.offsetY + (this.displayOriginY - H));
+        this.vineArtAnchored = true;
+        return true;
+      }
       cfg = agaricaSheetPoseConfig(sc, 'transfo_papillon', 'transform');
     } else if (hasManifestArt(sc, 'forme_papillon_extra', 'cast')) {
       // Incantation du soin : `forme_papillon_extra` (lot n°8). Calibrée sur
@@ -3380,7 +3411,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // prend donc l'échelle de `forme_papillon` (FORMS.butterfly) -- sans cet
       // art, FORMS.butterfly est le placeholder à l'échelle 1 : on garde alors
       // la calibration propre. Hitbox : même gabarit humain, recentré.
-      playManifestOn(this, 'forme_papillon_extra', 'cast');
+      // Image tirée de l'horloge de la pose (les 4 sur la durée du geste) :
+      // l'anim jouée était ralentie par le ralenti du soin de Ghil't et
+      // s'arrêtait avant l'orbe (images 3 et 4 jamais vues).
+      if (!frameAt('forme_papillon_extra-cast', progress(p.inEnd, p.actEnd))) playManifestOn(this, 'forme_papillon_extra', 'cast');
       const c = agaricaSheetPoseConfig(sc, 'forme_papillon_extra', 'cast', { method: 'area' });
       const s = this.butterflyArt ? FORMS.butterfly.scale : c.scale;
       cfg = { ...c, scale: s, body: transfoBodyConfig(c.frameWidth, c.frameHeight, s) };
@@ -3393,11 +3427,19 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.anims.play(ANIM_BUTTERFLY_PH_KEY, true);
     }
+    // Étincelles d'ailes peintes (`fx_etincelle_papillon`, recette 'wing')
+    // autour du papillon pendant le geste.
+    if (p.phase === 'act' && now >= (p.dustAt || 0) && typeof spawnFx === 'function') {
+      p.dustAt = now + BUTTERFLY_DUST_EVERY_MS;
+      spawnFx(sc, 'wingDust', this.x, this.y - SKILL_BUTTERFLY_CENTER_ABOVE_FEET, { count: 2, spread: 16 });
+    }
     this.applyBodyForScale(cfg.scale, cfg.body);
     this.setFlipX(this.facingDir < 0);
     this.setRotation(0);
-    // Léger flottement pendant le soin.
-    const hover = p.phase === 'act' ? Math.sin((now - p.inEnd) / 90) * 2.5 : 0;
+    // Léger flottement pendant le soin, nul au début et à la fin du geste
+    // (raccord sans saut avec la transfo, cf. butterflyTransfoPlacement).
+    const kAct = progress(p.inEnd, p.actEnd);
+    const hover = p.phase === 'act' ? Math.sin((now - p.inEnd) / 90) * 2.5 * Math.sin(Math.PI * kAct) : 0;
     const W = this.frame.realWidth;
     const H = this.frame.realHeight;
     this.setOrigin(0.5, 0.5 + (SKILL_BUTTERFLY_CENTER_ABOVE_FEET + hover) / (H * this.scaleY));
@@ -3405,6 +3447,100 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.body.setOffset(b.offsetX + (this.displayOriginX - W / 2), b.offsetY + (this.displayOriginY - H));
     this.vineArtAnchored = true;
     return true;
+  }
+
+  // Placement d'une image de la transfo papillon (`k` = progression de la
+  // phase, `reverse` pour le retour) : { scale, originY, body }, ou null
+  // (pixels illisibles : on garde la calibration d'avant). Image i sur n :
+  // échelle et centre visible interpolés entre « Agarica » (i = 0 : même
+  // hauteur visible que l'idle, même bas visible, aux pieds) et « papillon »
+  // (i = n-1 : échelle de l'incantation, centre à
+  // SKILL_BUTTERFLY_CENTER_ABOVE_FEET, comme elle). Avant : toute la transfo
+  // à une échelle unique, centrée 48 px au-dessus des pieds -- Agarica
+  // rapetissait et décollait de 12 px à la 1re image, puis le papillon
+  // grossissait d'un coup (×1,46) en passant à l'incantation.
+  butterflyTransfoPlacement(k, reverse = false) {
+    const sc = this.scene;
+    const key = this.butterflyTransfoKey;
+    const frames = key && sc.anims.exists(key) ? sc.anims.get(key).frames : null;
+    if (!frames || frames.length < 2 || typeof visibleBounds !== 'function') return null;
+    const ends = this.butterflyTransfoEnds(frames);
+    if (!ends) return null;
+    const n = frames.length;
+    const i0 = Math.min(n - 1, Math.floor(k * n));
+    const i = reverse ? n - 1 - i0 : i0;
+    const vb = visibleBounds(sc, frames[i].textureKey);
+    if (!vb || vb.empty) return null;
+    const t = i / (n - 1);
+    const scale = ends.s0 + (ends.s1 - ends.s0) * t;
+    const c = ends.c0 + (ends.c1 - ends.c0) * t; // centre visible au-dessus des pieds (px monde)
+    const ty = (vb.y0 + vb.y1) / 2;
+    return { scale, originY: (ty + c / scale) / vb.frameH, body: transfoBodyConfig(vb.frameW, vb.frameH, scale) };
+  }
+
+  // Bornes de l'interpolation (mises en cache) : cf. butterflyTransfoPlacement.
+  butterflyTransfoEnds(frames) {
+    if (this.butterflyEnds !== undefined) return this.butterflyEnds;
+    const sc = this.scene;
+    const first = visibleBounds(sc, frames[0].textureKey);
+    const idle = sc.textures.exists('agarica-idle-0') ? visibleBounds(sc, 'agarica-idle-0') : null;
+    let ends = null;
+    // Sans aucun art de papillon (placeholder à l'échelle 1) : calibration
+    // d'avant, l'image de transfo n'a pas de papillon peint auquel se raccorder.
+    const hasCast = hasManifestArt(sc, 'forme_papillon_extra', 'cast');
+    if (first && !first.empty && idle && !idle.empty && (hasCast || this.butterflyArt)) {
+      const idleH = (idle.y1 - idle.y0) * HUMAN_SCALE;
+      // Idle : origine (0.5, 1), bas du cadre aux pieds.
+      const idleCenter = (idle.frameH - (idle.y0 + idle.y1) / 2) * HUMAN_SCALE;
+      let castScale = FORMS.butterfly.scale;
+      if (hasCast && !this.butterflyArt) {
+        castScale = agaricaSheetPoseConfig(sc, 'forme_papillon_extra', 'cast', { method: 'area' }).scale;
+      }
+      ends = { s0: idleH / (first.y1 - first.y0), c0: idleCenter, s1: castScale, c1: SKILL_BUTTERFLY_CENTER_ABOVE_FEET };
+    }
+    this.butterflyEnds = ends;
+    return ends;
+  }
+
+  // Lueur douce derrière Agarica (début de la transfo, fin du retour).
+  butterflyPoseGlow() {
+    if (typeof juiceBurstImage !== 'function') return;
+    const g = BUTTERFLY_POSE_GLOW;
+    juiceBurstImage(this.scene, 'glow', this.x, this.y - SKILL_BUTTERFLY_CENTER_ABOVE_FEET, {
+      size: g.size, from: 0.5, to: 1.1, ms: g.ms, color: g.color, alpha: g.alpha, depth: this.depth - 1,
+    });
+  }
+
+  // Change les durées d'une pose EN COURS sans saut : la phase et sa
+  // progression (donc l'image affichée) sont gardées, seule la suite est
+  // allongée ou raccourcie. Une phase absente (pas d'art de transfo) le
+  // reste. Sert à la cinématique du soin de Ghil't (boss_ghilt.js), qui joue
+  // la transfo, l'incantation et le retour à leur rythme peint.
+  retimeSkillFormPose(now, ms = {}) {
+    const p = this.skillFormPose;
+    if (!p) return;
+    const t = { in: p.inEnd - p.start, act: p.actEnd - p.inEnd, out: p.end - p.actEnd };
+    const nt = {
+      in: t.in > 0 ? (ms.in ?? t.in) : 0,
+      act: ms.act ?? t.act,
+      out: t.out > 0 ? (ms.out ?? t.out) : 0,
+    };
+    const frac = (a, d) => (d > 0 ? Phaser.Math.Clamp((now - a) / d, 0, 1) : 1);
+    if (now < p.inEnd) {
+      p.start = now - frac(p.start, t.in) * nt.in;
+      p.inEnd = p.start + nt.in;
+      p.actEnd = p.inEnd + nt.act;
+    } else if (now < p.actEnd) {
+      p.inEnd = now - frac(p.inEnd, t.act) * nt.act;
+      p.start = p.inEnd - nt.in;
+      p.actEnd = p.inEnd + nt.act;
+    } else {
+      p.actEnd = now - frac(p.actEnd, t.out) * nt.out;
+      p.inEnd = p.actEnd - nt.act;
+      p.start = p.inEnd - nt.in;
+    }
+    p.end = p.actEnd + nt.out;
+    p.releaseAt = p.inEnd + nt.act * ((SKILL_FORM_POSE_MS[p.kind] || {}).releaseAt || 0);
   }
 
   // Bascule sans art de transformation : gerbe de feuilles (singe) ou de
@@ -3548,7 +3684,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (!hasManifestArt(sc, 'vfx_slash', this.slashDir)) return;
     if (!this.slashSprite || !this.slashSprite.active) {
       this.slashSprite = sc.add.sprite(this.x, this.y, manifestFrameKey('vfx_slash', this.slashDir, 0))
-        .setOrigin(0.5, 0.5).setDepth(CHARACTER_DEPTH + 1).setVisible(false);
+        .setOrigin(0.5, 0.5).setDepth(this.depth + 1).setVisible(false);
     }
   }
 

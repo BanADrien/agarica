@@ -142,6 +142,11 @@ const PAPILLON_ORBIT_SPEED = 3.2; // rad/s
 const PAPILLON_COLORS = [0x9ff3ff, 0xffb3f0, 0xfff6a0, 0xc8ffb0];
 const PAPILLON_TEXTURE_KEY = 'fx-papillon';
 const PAPILLON_GLOW_KEY = 'fx-papillon-glow';
+// Traînée des papillons de la nuée : échelle du manifeste (0,3 -> 38x8 px,
+// un peu plus longue qu'un papillon de 30 px), translucide.
+const PAPILLON_TRAIL_KEY = 'item-fx_trainee_papillon';
+const PAPILLON_TRAIL_SCALE = 0.3;
+const PAPILLON_TRAIL_ALPHA = 0.75;
 
 // Pixels visibles de l'anneau `vfx_soin_papillon` (union des frames de swirl).
 function papillonSwirlBox(scene) {
@@ -206,12 +211,15 @@ class PapillonSwarm {
     this.elapsed = 0;
     this.active = true;
     this.healed = new Set();
+    // Profondeurs relatives à Agarica (CHARACTER_DEPTH partout, sauf le trou
+    // sombre où elle passe au-dessus du voile : la nuée reste autour d'elle).
+    const baseDepth = player.depth || CHARACTER_DEPTH;
     // Halo : `fx_halo_doux` (lot n°8) si l'art existe (cf. entityHaloTexture,
     // MousseCreature.js : même éclat que le dégradé dessiné), mêmes teinte,
     // alpha et profondeur ; la zone de soin (this.rect) n'en dépend pas.
     const halo = typeof entityHaloTexture === 'function' ? entityHaloTexture(scene, PAPILLON_GLOW_KEY) : { key: PAPILLON_GLOW_KEY, comp: 1 };
     this.glow = scene.add.image(this.cx, this.cy, halo.key)
-      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff8ff).setAlpha(0).setDepth(CHARACTER_DEPTH + 1);
+      .setBlendMode(Phaser.BlendModes.ADD).setTint(0xbff8ff).setAlpha(0).setDepth(baseDepth + 1);
     this.glow.setDisplaySize(PAPILLON_RECT_W * 1.25 * halo.comp, PAPILLON_RECT_H * 1.25 * halo.comp);
     // Anneau : affiché à la taille où ses pixels VISIBLES (union des frames
     // de `swirl`) remplissent le rectangle de soin.
@@ -219,7 +227,7 @@ class PapillonSwarm {
     if (hasManifestArt(scene, 'vfx_soin_papillon', 'swirl')) {
       ensureManifestAnims(scene, 'vfx_soin_papillon');
       this.swirl = addManifestSprite(scene, this.cx, this.cy, 'vfx_soin_papillon', 'swirl', { origin: [0.5, 0.5] })
-        .setAlpha(0).setDepth(CHARACTER_DEPTH + 1);
+        .setAlpha(0).setDepth(baseDepth + 1);
       const box = papillonSwirlBox(scene);
       const kx = box ? box.w / (box.x1 - box.x0) : 1.12;
       const ky = box ? box.h / (box.y1 - box.y0) : 1.12;
@@ -228,7 +236,15 @@ class PapillonSwarm {
     const flyArt = hasManifestArt(scene, 'papillon');
     this.flyArt = flyArt;
     const count = flyArt ? PAPILLON_ART_COUNT : PAPILLON_COUNT;
+    // Traînée lumineuse `fx_trainee_papillon` (lot n°8, tête à droite) derrière
+    // chaque papillon, orientée selon sa vitesse (cf. update) ; sans l'image,
+    // pas de traînée (la nuée reste lisible sans elle).
+    const trailArt = scene.textures.exists(PAPILLON_TRAIL_KEY);
     this.flies = Array.from({ length: count }, (_, i) => {
+      const trail = trailArt
+        ? scene.add.image(this.cx, this.cy, PAPILLON_TRAIL_KEY).setOrigin(1, 0.5).setScale(PAPILLON_TRAIL_SCALE)
+          .setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(baseDepth + 1)
+        : null;
       let sprite;
       if (flyArt) {
         sprite = addManifestSprite(scene, this.cx, this.cy, 'papillon', 'idle', { origin: [0.5, 0.5] }).setAlpha(0);
@@ -239,9 +255,9 @@ class PapillonSwarm {
           .setBlendMode(Phaser.BlendModes.ADD)
           .setAlpha(0);
       }
-      sprite.setDepth(CHARACTER_DEPTH + 2);
+      sprite.setDepth(baseDepth + 2);
       return {
-        sprite, a0: (i / count) * Math.PI * 2,
+        sprite, trail, px: this.cx, py: this.cy, a0: (i / count) * Math.PI * 2,
         ax: 20 + Math.random() * 40, ay: 12 + Math.random() * 40,
         fx: 1.5 + Math.random() * 2, fy: 2 + Math.random() * 2.5, ph: Math.random() * Math.PI * 2,
       };
@@ -287,6 +303,16 @@ class PapillonSwarm {
         f.sprite.setPosition(x, y).setAlpha(fade);
         f.sprite.setScale(1, 0.4 + 0.6 * Math.abs(Math.sin(t * 14 + f.ph))); // battement d'ailes
       }
+      if (f.trail) {
+        // Tête de la traînée sur le papillon, queue vers l'arrière de sa
+        // course (déplacement depuis l'image précédente ; gardée à l'arrêt).
+        const vx = f.sprite.x - f.px;
+        const vy = f.sprite.y - f.py;
+        if (vx * vx + vy * vy > 0.09) f.trail.setRotation(Math.atan2(vy, vx));
+        f.trail.setPosition(f.sprite.x, f.sprite.y).setAlpha(fade * PAPILLON_TRAIL_ALPHA);
+      }
+      f.px = f.sprite.x;
+      f.py = f.sprite.y;
     }
     if (this.swirl) this.swirl.setPosition(this.cx, this.cy).setAlpha(fade);
     this.checkTargets();
@@ -320,7 +346,10 @@ class PapillonSwarm {
     this.scene.events.off('update', this.update, this);
     this.glow.destroy();
     if (this.swirl) this.swirl.destroy();
-    for (const f of this.flies) f.sprite.destroy();
+    for (const f of this.flies) {
+      f.sprite.destroy();
+      if (f.trail) f.trail.destroy();
+    }
     if (this.player && this.player.papillonSwarm === this) this.player.papillonSwarm = null;
   }
 }

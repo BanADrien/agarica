@@ -726,7 +726,8 @@ function addLiquidFloor(scene, cfg, levelWidth, levelHeight) {
 // (`ciel_jour`, `nuages`, `rayons_soleil`), sinon rendu par code.
 //   skyReveal: { start: 0.1, end: 0.85 (fractions de la course verticale de
 //   la caméra), low: [haut, bas], high: [haut, bas] (couleurs du dégradé),
-//   shade: 0.55 (voile du fond en bas), clouds: 7, rays: true, leaves: true,
+//   shade: 0.55 (voile du fond en bas), clouds: 7 (au plus : un par ~260 px
+//   de la plage visible, cf. addSkyRevealBackLayers), rays: true, leaves: true,
 //   flashAt: 0.55, treesScrollY: 0.6, farScrollY: 0.08 }
 // ---------------------------------------------------------------------------
 const SKY_DEFAULTS = {
@@ -768,13 +769,22 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
   st.shade = scene.add.rectangle(0, 0, width, height, cfg.shadeColor, cfg.shade).setOrigin(0, 0).setScrollFactor(0);
   // Nuages : dans le haut de la course de la caméra, parallaxe lente.
   st.clouds = [];
-  const n = cfg.clouds || 0;
   const cloudScroll = 0.25;
+  // Parallaxe horizontale 0,12 : un nuage en `cx` n'est à l'écran que si
+  // cx < largeur + défilement max × 0,12. Avant, les nuages s'étalaient sur
+  // levelWidth × 0,35 + largeur (2 214 px en forêt flottante 1, contre
+  // 1 275 visibles) : les 3 derniers, dont le seul `couche_nuage_4`, restaient
+  // toujours à droite de l'écran. Ils se répartissent maintenant sur la plage
+  // réellement visible, un nuage par ~260 px (5 en forêt flottante 1 et 2 :
+  // les 5 images une fois chacune), au plus `clouds`.
+  const cloudSf = 0.12;
+  const span = width + Math.max(0, levelWidth - width) * cloudSf;
+  const n = Math.min(cfg.clouds || 0, Math.max(3, Math.round(span / 260)));
   const rnd = new Phaser.Math.RandomDataGenerator(['ciel-nuages']);
   for (let i = 0; i < n; i++) {
     const s = camHigh + (camLow - camHigh) * rnd.realInRange(0, 0.45);
     const cy = s * cloudScroll + rnd.between(40, Math.round(height * 0.45));
-    const cx = ((levelWidth * 0.35 + width) * i) / Math.max(1, n) + rnd.between(0, 200);
+    const cx = (span * (i + 0.5)) / n + rnd.between(-50, 50);
     let c;
     // Nuages isolés `couche_nuage_0..4` (lot n°8), repli ancien `nuages`.
     const cloudId = [`couche_nuage_${i % 5}`, 'couche_nuage_0', 'nuages'].find((id) => scene.textures.exists(`item-${id}`));
@@ -795,8 +805,12 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
         c.fillEllipse(rnd.between(-w * 0.42, w * 0.42), rnd.between(-14, 6), rnd.between(56, 104), rnd.between(30, 50));
       }
     }
-    c.setScrollFactor(0.12, cloudScroll).setAlpha(0);
-    scene.tweens.add({ targets: c, x: cx + rnd.between(120, 260), duration: rnd.between(40000, 70000), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    // Dérive lente AUTOUR de sa place (avant : seulement vers la droite, donc
+    // hors de l'écran pour les derniers).
+    const drift = rnd.between(60, 120);
+    c.setScrollFactor(cloudSf, cloudScroll).setAlpha(0);
+    c.x = cx - drift;
+    scene.tweens.add({ targets: c, x: cx + drift, duration: rnd.between(40000, 70000), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     st.clouds.push(c);
   }
   // Rayons de soleil (coin haut droit), additifs, fixés à l'écran.
@@ -4845,6 +4859,15 @@ const FX_PARTICLES = {
     art: 'fx_petale_rose', tex: 'juice-leaf', size: 9, depth: 'front',
     lifespan: [800, 1300], speed: [40, 140], angle: [0, 360], gravityY: 120,
     scale: [1, 0.7], alpha: [1, 0], tint: [0xff9fc9, 0xffd0e6], spin: true,
+  },
+  // Purification d'un corrompu (MousseCreature, purifyCorruptedEnemy) :
+  // étoile `fx_etincelle` (lot n°8, vert menthe, NON teintable : jamais pour
+  // un appel teinté -- cf. juiceParticles), 14 px ; repli : étoile dessinée
+  // dans les mêmes tons. Quelques-unes, lentes, qui montent un peu.
+  purif: {
+    art: 'fx_etincelle', tex: 'juice-star', size: 11, artSize: 14, depth: 'front', add: true,
+    lifespan: [520, 900], speed: [25, 80], angle: [200, 340], gravityY: -30,
+    scale: [1, 0.15], alpha: [1, 0], tint: [0xe8fff2, 0x9fffd0, 0xffffff], spin: true,
   },
   wing: {
     art: 'fx_etincelle_papillon', tex: 'juice-star', size: 9, artSize: 16, depth: 'front', add: true,

@@ -1,5 +1,18 @@
 # Plan d'intégration du lot Codex n°8
 
+> **Statut : intégré le 2026-10-25** (12 lots : Manifeste, LK, SK, EN, Interface, A1, AR, A2, GH, Combats, Singe, Zones ; commits `6c35c94` et `9dcd77c`, puis corrections finales non commitées). Décisions du §8 : la recommandation du plan partout, sinon l'option la plus sobre. Contrat d'API : `PLAN_DEV.md` (« Lot Codex n°8 : intégration ») ; résumé : `COMPTE_RENDU.md` (session du 2026-10-25) ; état des dessins : `INVENTAIRE_DESSINS_CODE.md`.
+>
+> **Écarts au plan retenus** : horizon de la forêt flottante 1 à y 125 (pas 95) ; halo des lanternes 110 px (pas 80) ; textes de la bannière à y + 30 / 41 / 66 ; pointe du dialogue à 0,26 ; halos agrandis (×1,28 moteur, ×1,12 entités) pour compenser le dégradé réimporté ; Q1 : horizon actuel assombri par le code (l'ancienne version peinte n'est pas réutilisable) ; Q7 : refonte de Kainati déjà faite, seuls les visuels restants intégrés ; totem du singe direct (le monde spirituel n'est plus sur le chemin) ; îles lointaines de la forêt flottante 2 posées, plus discrètes (alpha 0,5, teinte bleutée).
+>
+> **Ce qui reste** :
+> - non fait volontairement (sobriété, ou sans recommandation) : brume de premier plan (H2, et `liquidFloor.frontY`), fleur perchée rose (H9 : plante blanche choisie), tapis de mousse de la clairière (variante « touffes » à la place) et tapis aspiré de l'arène de Ghil't (H14), autel du sommet (H5), marches de racines (H6), restes de bête en forêt corrompue (H17), rocher roulant en décor (H21 : utilisé par Kainati), anims du porteur, du garde et de Xara joyeuse (H22), cercle sain sous la fleur de FS2 et petite araignée au pied de la toile (H12, H23), étoiles sur Ghil't affaibli (EN-2f), humeur de Xara (A2-17), habillage de `addWaterZone` (LK-11), touches peintes de l'écran Contrôles (UI-4, Q32), anim de coup de Kainati sonné ;
+> - retouches d'images à la main, facultatives (§7.1, 7.3 à 7.6) : raccord du lac de mousse toxique, encoche de la brume avant, nuages 3 et 4 (le code rogne le 4), nappe de nuages, îles lointaines ;
+> - images non utilisées : `decor_marches_racines`, `decor_autel_sommet`, `fx_eclaboussure_toxique`, `couche_brume_avant` (et en second choix `decor_fleur_perchee`, `decor_tapis_mousse`), posables dans l'éditeur pour les décors ;
+> - petits points : boîte de dialogue qui cache l'horizon pendant `ff1_vue` ; carte « Continuer » d'une vieille sauvegarde arrêtée au monde spirituel (chapitre du bosquet affiché jusqu'à la reprise) ; aperçu des lianes dans l'éditeur non vérifié ;
+> - art Codex n°9 (`geralt_combat`, `kainati_calme`) à générer, puis playtest humain.
+>
+> Le reste de ce document est le plan tel qu'il a servi de brief (numéros de ligne d'époque).
+
 *Version du 2026-10-24 (révision de 20 h 45), établie sur les six plans **contre-vérifiés** (groupes A à F). Elle remplace la version de 14 h 03 du même document et le brouillon du matin, qui reposait sur des plans A, C, D et E non vérifiés. Changements de cette révision : complétude recomptée par script, résumé ramené à 10 lignes, ordre réel du harnais de test (section 9), état des fichiers à 20 h 40, petites corrections de contrats.*
 
 Ce document sert de brief aux agents d'intégration. Il fait la synthèse de six audits en lecture seule, un par groupe d'images :

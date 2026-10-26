@@ -296,6 +296,16 @@ function arbreCimeLight(scene, levelWidth) {
   return cime;
 }
 
+// Singes corrompus de la GRANDE BRANCHE HAUTE (au-dessus du sol, à l'est de
+// la branche intermédiaire) : ceux qui ont le totem du singe à portée. Le
+// singe du toit de racines (y 150, x < 1200) n'est pas concerné.
+const ARBRE_TOTEM_CALM_MS = 8000;   // bannière (~2,6 s) + bulle de Xara (5,2 s)
+const ARBRE_ARRIVAL_CALM_MS = 5000; // fondu d'arrivée + quelques pas
+function arbreCalmBranchMonkeys(scene, ms) {
+  if (typeof calmSingesCorrompus !== 'function') return 0;
+  return calmSingesCorrompus(scene, (e) => e.y < 0 && e.x > 2200, ms);
+}
+
 ZONE_SCRIPTS.grand_arbre_racines = {
   create(scene, data) {
     // `hadMonkey` : forme singe déjà là en arrivant ; sinon, le totem
@@ -331,6 +341,12 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     arbreMotes(scene, 1300, levelWidth - 100, -500, 400, 18, [0x9bff5a, 0xbfe8a0, 0xff9ad5]);
     // (Le totem du singe, au bout de la grande branche, est la clé de zone
     // `totems` : LevelKit le pose et le gère comme les autres totems.)
+    // Arrivée DEVANT le totem (entrée `totem_singe` : ancienne sauvegarde du
+    // monde spirituel) : à portée du singe de la grande branche, qui tirait
+    // avant même le fondu d'arrivée (2 cœurs en 3,5 s). Il se calme le temps
+    // de se repérer ; la suite (patrouille, lancers) est inchangée.
+    const sd = (scene.sys.settings && scene.sys.settings.data) || {};
+    if (sd.enterId === 'totem_singe') arbreCalmBranchMonkeys(scene, ARBRE_ARRIVAL_CALM_MS);
   },
 
   update(scene, time, delta) {
@@ -344,6 +360,12 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     if (st && !st.hadMonkey && storyGet('hasMonkeyForm')) {
       st.hadMonkey = true;
       storySet({ totemSingeActif: true, trig_grand_arbre_racines_cime_singe: true });
+      // Le monde n'est pas gelé pendant la bannière « Forme du singe » (~2,6 s)
+      // puis la bulle de Xara (5,2 s) : le singe de la grande branche, à
+      // portée du totem, la bombardait pendant qu'elle lisait (bannière
+      // par-dessus, pierre invisible : 3 cœurs perdus en 9 s). Il se calme
+      // le temps de ce moment-là ; ses pierres en vol se brisent.
+      arbreCalmBranchMonkeys(scene, ARBRE_TOTEM_CALM_MS);
       runCutscene(scene, 'racines_singe_eveil');
     }
     // Le feu de camp de la fourche sert aussi de point de reprise : une

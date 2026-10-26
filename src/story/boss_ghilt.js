@@ -693,18 +693,32 @@ function ghiltWeakenedHint(scene, st) {
 // Player.startSkillFormPose) ; ghLock gèle aussitôt le monde, donc
 // player.update() ne tourne plus : Agarica restait PAPILLON, la nuée figée
 // autour d'elle, jusqu'à la 1re réplique, qui la remettait d'un coup en pose
-// `talk`. On fait avancer la pose avec SES propres durées (fin du battement
-// puis transfo inverse : 0,74 s au plus, pendant le panoramique de 700 ms),
-// puis Agarica reprend l'idle ; la nuée gelée file vers Ghil't en s'effaçant
+// `talk`. On fait avancer la pose (fin de la transfo, incantation, transfo
+// inverse, au rythme de GH_SOIN_POSE_MS ci-dessous), puis Agarica reprend l'idle ; la nuée gelée file vers Ghil't en s'effaçant
 // et les papillons de la cinématique prennent le relais. Aucune durée de la
 // cinématique ne change. Sans pose en cours (compétence lancée sous une autre
 // forme, déclenchement direct en test) : rien à faire.
+// Revue du 2026-10-26 (« l'animation de transformation est coupée ») : en
+// jeu, la pose dure 740 ms (transfo 180, geste 400, retour 160) et le soin
+// tombe en pleine transfo ; ses images défilaient trop vite pour être vues,
+// et le ralenti du soin (juiceSlowMo) arrêtait l'incantation avant l'orbe.
+// Ici, monde gelé, la suite de la pose est rejouée à son rythme peint
+// (GH_SOIN_POSE_MS, Player.retimeSkillFormPose : même image, pas de saut) :
+// fin de la transfo (4 images à 14 i/s), incantation entière pendant que les
+// papillons de la cinématique s'envolent vers Ghil't, retour à la forme
+// humaine ; ~1,2 s au plus, avant l'éclat de purification (1,5 s), sans
+// toucher aux durées de la cinématique.
+const GH_SOIN_POSE_MS = { in: 290, act: 640, out: 290 };
+
 function ghFinishSkillPose(scene, tx, ty) {
   const p = scene.player;
   if (!p || !p.active) return;
   const swarm = p.papillonSwarm;
   if (swarm && swarm.active) ghReleaseSwarm(scene, swarm, tx, ty);
   if (!p.skillFormPose || typeof p.tickSkillFormPose !== 'function' || typeof p.drawSkillFormPose !== 'function') return;
+  if (p.skillFormPose.kind === 'papillon' && typeof p.retimeSkillFormPose === 'function') {
+    p.retimeSkillFormPose(scene.time.now, GH_SOIN_POSE_MS);
+  }
   const stop = () => scene.events.off('update', step);
   // Écouteur 'update' de la scène (pas ZONE_SCRIPTS.update, coupé par le gel).
   function step() {
@@ -745,7 +759,10 @@ function ghReleaseSwarm(scene, swarm, tx, ty) {
     targets: s, x: tx + Phaser.Math.Between(-110, 110), y: ty + Phaser.Math.Between(-70, 50), alpha: 0,
     duration: 650, delay: i * 40, ease: 'Sine.easeIn',
   }));
-  const rest = [swarm.glow, swarm.swirl].filter((o) => o && o.active);
+  // Leurs traînées (fx_trainee_papillon) ne suivent plus, monde gelé : elles
+  // s'éteignent avec le halo et l'anneau.
+  const trails = (swarm.flies || []).map((f) => f.trail);
+  const rest = [swarm.glow, swarm.swirl, ...trails].filter((o) => o && o.active);
   if (rest.length) scene.tweens.add({ targets: rest, alpha: 0, duration: 350 });
   scene.time.delayedCall(700 + flies.length * 40, () => {
     if (swarm.active && typeof swarm.destroy === 'function') swarm.destroy();
@@ -1061,8 +1078,15 @@ ZONE_SCRIPTS.trou_sombre = {
     ghInstallTick(scene);
     // Halo d'Agarica dans le noir : 300 px avec le halo peint (plan GH-4 : son
     // profil, plus doux au centre, éclaire moins loin à taille égale), 240 sans.
+    // Revue du lot 8 : posé (ADD, profondeur 950) PAR-DESSUS Agarica, restée
+    // sous le voile (900), il la couvrait d'un voile laiteux gris-blanc (la
+    // silhouette perdait son contraste, lu comme du brouillard). Agarica et
+    // Xara passent donc au-dessus du halo, nettes comme les papillons qui
+    // l'éclairent ; le halo reste dessous en flaque de lumière, un peu plus
+    // chaude et moins forte (0,28 au lieu de 0,35) pour ne pas voiler le décor.
     const ownGlow = scene.textures.exists(GH_GLOW_ART.doux.key) ? 300 : 240;
-    scene.__ghPlayerGlow = ghGlow(scene, scene.player.x, scene.player.y - 45, ownGlow, 0xfff2c8, 0.35);
+    scene.__ghPlayerGlow = ghGlow(scene, scene.player.x, scene.player.y - 45, ownGlow, 0xffe2b4, 0.28);
+    ghLiftCharacters(scene, GH_GLOW_DEPTH + 1);
     const exits = scene.__exits || [];
     if (ghGet(scene, 'trouSombreFait', false)) {
       TROU_PATH.forEach((pt) => ghPapillon(scene, pt.x, pt.y));
@@ -1073,6 +1097,25 @@ ZONE_SCRIPTS.trou_sombre = {
   },
   update() {},
 };
+
+// Agarica (et ce qui se dessine avec elle : arc de coup, Xara et son fil) à
+// `depth`, au-dessus du voile sombre et des halos : lisible dans le noir.
+// Les effets créés ensuite autour d'elle suivent sa profondeur (nuée du
+// papillon, arc peint : `player.depth + 1`).
+function ghLiftCharacters(scene, depth) {
+  const p = scene.player;
+  if (p) {
+    p.setDepth(depth);
+    if (p.slashGfx) p.slashGfx.setDepth(depth + 1);
+    if (p.slashSprite && p.slashSprite.active) p.slashSprite.setDepth(depth + 1);
+  }
+  const x = scene.xara;
+  if (x && x.active) {
+    if (x.thread) x.thread.setDepth(depth);
+    if (x.threadArt) x.threadArt.setDepth(depth);
+    x.setDepth(depth);
+  }
+}
 
 // Objet de cinématique : 1,6x sa taille d'inventaire, au-dessus du voile sombre.
 function ghBigItem(scene, x, y, id) {

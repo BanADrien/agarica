@@ -175,6 +175,9 @@ function purifyCorruptedEnemy(enemy, { onClean, fleeDistance = 200, fleeMs = 180
   if (typeof juiceShockRing === 'function') {
     juiceShockRing(scene, cx, cy, { size: 96, ms: 460, color: 0xfff6c2 });
     spawnFx(scene, 'star', cx, cy, { count: 6, tint: [0xfff6c2, 0x9ffcff, 0xffb6e8], power: 1 });
+    // Étoiles de purification peintes (`fx_etincelle`, recette 'purif', sans
+    // teinte demandée : l'art garde son vert menthe, la couleur du « sain »).
+    spawnFx(scene, 'purif', cx, cy, { count: 5, spread: 10 });
     playSfx('purify');
   }
   scene.time.delayedCall(180, () => {
