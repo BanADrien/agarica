@@ -67,6 +67,25 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P1] Agarica au feu de camp (prompt Codex n°11) : elle s'assoit (sit, joué
+  // une fois) puis reste assise et respire (sit_idle, en boucle). La frame 0 de
+  // sit est debout neutre : c'est elle qui cale toute la feuille sur l'idle
+  // (manifestSheetScale). Sans elle, la pose assise serait prise pour la
+  // hauteur debout et agrandie. ~250 px debout, ~180 px assise en px source.
+  agarica_repos: {
+    dir: "assets/sprites/agarica_repos_frames", prefix: "agarica_repos",
+    anims: {
+      sit: { row: 0, frames: 4, fps: 8, repeat: 0 },
+      sit_idle: { row: 1, frames: 4, fps: 4, repeat: -1 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 70, h: 62, color: 0x3f7d3a, label: "Agarica" },
+    sheets: [
+      { file: "assets/sprites/agarica_repos.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P1] Forme du singe (Agarica transformée)
   singe: {
     dir: "assets/sprites/singe_frames", prefix: "singe",
@@ -655,6 +674,23 @@ const ASSET_MANIFEST = {
     placeholder: { w: 110, h: 80, color: 0x9fffd0, label: "Slash" },
     sheets: [
       { file: "assets/vfx/vfx_slash.png", rows: [0, 1, 2] },
+    ],
+    cut: "grid", align: "center",
+  },
+  // [P1] VFX - morsure du loup (prompt Codex n°11) : deux rangées de crocs
+  // clairs qui se referment devant la gueule, trait vert lunaire, même finition
+  // que vfx_slash. Dessiné vers la droite (flipX pour la gauche). Fermeture
+  // complète (l'impact) à la frame 2.
+  vfx_croc: {
+    dir: "assets/vfx/vfx_croc_frames", prefix: "vfx_croc",
+    anims: {
+      bite: { row: 0, frames: 5, fps: 20, repeat: 0 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 80, h: 70, color: 0x9fffd0, label: "Croc" },
+    sheets: [
+      { file: "assets/vfx/vfx_croc.png", rows: [0] },
     ],
     cut: "grid", align: "center",
   },
@@ -2042,6 +2078,54 @@ const ITEM_MANIFEST = {
     placeholder: { w: 727, h: 540, color: 0x2a1e14, label: "Feu de camp" },
     src: { file: "assets/items/firecamp_menu/interface.png" },
     norm: { mode: "trim" },
+  },
+  // [P1] Lot Codex n°11 : pièces de branches et de tronc du grand arbre, pour
+  // que les plateformes (arène de Kainati, racines, épreuve du singe) se lisent
+  // comme de vraies branches. Cf. docs/production/PROMPT_CODEX_11.md.
+  // Mode height + trim_x avec value = hauteur de la case : ni rognage vertical
+  // ni redimension (pixels source intacts). La ligne de marche reste donc à
+  // une rangée FIXE : 256 sur 512 pour les 4 branches, soit le milieu de
+  // l'image (setOrigin(x, 0.5) posé sur la surface). Pièces dessinées tronc à
+  // gauche, pointe à droite (flipX pour l'autre sens). Milieu tuilable en
+  // largeur (1536 px, soit 384 px = 6 cases à 0,25).
+  branche_milieu: {
+    path: "assets/decors/elements/branche_milieu.png", scale: 0.25,
+    placeholder: { w: 384, h: 128, color: 0x4a2c28, label: "Branche" },
+    src: { planche: "assets/_codex_src/branches_milieu_fourche.png", grid: [1, 2], cell: 0, cut: "grid" },
+    norm: { mode: "height", value: 512, trim_x: true },
+  },
+  branche_fourche: {
+    path: "assets/decors/elements/branche_fourche.png", scale: 0.25,
+    placeholder: { w: 256, h: 128, color: 0x4a2c28, label: "Fourche" },
+    src: { planche: "assets/_codex_src/branches_milieu_fourche.png", grid: [1, 2], cell: 1, cut: "grid" },
+    norm: { mode: "height", value: 512, trim_x: true },
+  },
+  branche_base: {
+    path: "assets/decors/elements/branche_base.png", scale: 0.25,
+    placeholder: { w: 160, h: 128, color: 0x4a2c28, label: "Branche base" },
+    src: { planche: "assets/_codex_src/branches_base_bout.png", grid: [1, 2], cell: 0, cut: "grid" },
+    norm: { mode: "height", value: 512, trim_x: true },
+  },
+  branche_bout: {
+    path: "assets/decors/elements/branche_bout.png", scale: 0.25,
+    placeholder: { w: 112, h: 128, color: 0x4a2c28, label: "Branche bout" },
+    src: { planche: "assets/_codex_src/branches_base_bout.png", grid: [1, 2], cell: 1, cut: "grid" },
+    norm: { mode: "height", value: 512, trim_x: true },
+  },
+  // Tronc : segment tuilable en hauteur (1536 px, soit 384 px = 6 cases à 0,25 ;
+  // fût de 768 px, soit 3 cases) et pied, dont le haut se raccorde au bas du
+  // segment. Ligne de sol du pied : rangée 960 sur 1024, setOrigin(0.5, 0.9375).
+  tronc_segment: {
+    path: "assets/decors/elements/tronc_segment.png", scale: 0.25,
+    placeholder: { w: 192, h: 384, color: 0x4a2c28, label: "Tronc" },
+    src: { file: "assets/_codex_src/tronc_segment.png" },
+    norm: { mode: "height", value: 1536, trim_x: true },
+  },
+  tronc_base: {
+    path: "assets/decors/elements/tronc_base.png", scale: 0.25,
+    placeholder: { w: 350, h: 256, color: 0x4a2c28, label: "Tronc base" },
+    src: { file: "assets/_codex_src/tronc_base.png" },
+    norm: { mode: "height", value: 1024, trim_x: true },
   },
 };
 
