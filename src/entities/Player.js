@@ -180,7 +180,11 @@ const LOUP_ATTACK_ANIM_ROWS = [
   { row: 0, count: 4 },
   { row: 1, count: 4 },
 ];
-const LOUP_ATTACK_FRAME_COUNT = 8;
+// Coup de croc : images gardées de la feuille pour un coup vif (toute la feuille
+// = 400 ms, bien plus que la dague). 0_2 = élan, 0_3 = gueule ouverte, 1_0 =
+// morsure, 1_1 = gueule fermée, 1_3 = retour. Sans 1_2 : le loup s'y cabrait,
+// pose de fin de ruée. Durée = celle d'un coup de dague, cf. SLASH_TOTAL_MS.
+const WOLF_BITE_FRAMES = [2, 3, 4, 5, 7];
 const ANIM_WOLF_RUN_KEY = 'loup-run';
 const ANIM_WOLF_ATTACK_KEY = 'loup-attack';
 // Comme pour le saut humain (cf. JUMP_RISE_TEXTURE/JUMP_FALL_TEXTURE) : pas
@@ -207,6 +211,12 @@ const WOLF_SCALE = 0.4;
 // légèrement plus grande le temps du saut, hitbox réappliquée juste après
 // (cf. plus bas) pour rester cohérente avec ce visuel agrandi.
 const WOLF_JUMP_SCALE = 0.46;
+// La feuille d'attaque est dessinée plus grande que celle de course (surface
+// visible x 1,73 en moyenne sur les 5 images du coup, soit x 1,31 en longueur) :
+// à WOLF_SCALE, le loup grossissait pendant les 280 ms du croc puis rétrécissait
+// d'un coup. 0,4 / 1,315 : même taille que la course. La hitbox, elle, ne change
+// pas (WOLF_BITE_BODY = même boîte monde que FORMS.wolf.body).
+const WOLF_BITE_SCALE = 0.304;
 
 function loupAnimFrames(name, indices) {
   return indices.map((i) => ({ key: `loup-${name}-${i}` }));
@@ -333,13 +343,6 @@ const JUMP_SCALE = 0.29;
 // personnage affichée (cf. tools, script de découpe ponctuel).
 const ANIM_AGARICA_ATTACK_KEY = 'agarica-attack';
 const AGARICA_ATTACK_FRAME_COUNT = 4;
-// Durée propre à l'attaque humaine, DÉCOUPLÉE de `this.attackDuration`
-// (constructeur) : ce dernier reste calé sur les 8 frames à 20fps de la
-// morsure du Loup (400ms, cf. ANIM_WOLF_ATTACK_KEY) -- le réduire aussi
-// pour accélérer l'anim humaine aurait raccourci la fenêtre d'attaque du
-// Loup au point de couper sa propre anim avant la fin (et raccourci sa
-// ruée, cf. attackDashActive). 4 frames à 14fps, cf. ensurePlayerAnimations.
-const AGARICA_ATTACK_DURATION = Math.round((AGARICA_ATTACK_FRAME_COUNT / 14) * 1000);
 const AGARICA_ATTACK_FRAME_WIDTH = 1424;
 const AGARICA_ATTACK_FRAME_HEIGHT = 366;
 // Un peu plus petite que HUMAN_SCALE (retour utilisateur : "un peu trop
@@ -394,6 +397,13 @@ const SLASH_ARCS = {
   side: { cx: 62, cy: -40, w: 104, h: 80 },
   up: { cx: 8, cy: -92, w: 108, h: 72 },
   down: { cx: 0, cy: 12, w: 100, h: 80 },
+  // Coup de croc du Loup (slashDir = 'bite') : même règle, zone = crocs affichés.
+  // Courte et devant la gueule (corps jusqu'à +43 px) : la morsure doit se
+  // placer, là où l'ancienne ruée touchait de tout le corps. Calée sur la gueule
+  // du loup à WOLF_BITE_SCALE (bout du museau ~ +54 px, gueule ~ 28 px au-dessus
+  // des pieds) : à (76, -42), réglage d'avant à l'échelle 0,4, les crocs
+  // flottaient devant elle une fois le loup ramené à sa taille de course.
+  bite: { cx: 60, cy: -32, w: 64, h: 52 },
 };
 // Échelle de l'art `agarica_slash`/`vfx_slash` au moment où SLASH_ARCS a été
 // réglé : les positions d'arc suivent l'échelle calibrée de la pose (cf.
@@ -411,6 +421,13 @@ const SLASH_FADE_MS = 70;
 // plus pâle, pendant l'effacement) : la zone qui touche = leur union.
 const SLASH_VFX_ACTIVE_FRAMES = [0, 1];
 const SLASH_TOTAL_MS = SLASH_WINDUP_MS + SLASH_ACTIVE_MS + SLASH_RECOVERY_MS;
+// Art des crocs (lot Codex n°11, 5 images : ouverture pendant l'élan, 2 images
+// actives = zone qui touche, 2 d'effacement) ; repli : drawBiteJaws.
+const BITE_VFX_ID = 'vfx_croc';
+const BITE_VFX_ACTIVE_FRAMES = [1, 2];
+// Vitesse au sol pendant la morsure (fraction de la vitesse de course) : le coup
+// pèse sans propulser. En l'air, rien : un saut d'élan garde sa portée (ravins).
+const WOLF_BITE_GROUND_SPEED = 0.8;
 // Rebond (« pogo ») : un coup vers le bas qui touche un ennemi, un amas de
 // mousse ou un danger relance Agarica vers le haut (~140 px).
 const POGO_VELOCITY = -600;
@@ -479,6 +496,58 @@ function drawSlashCrescent(g, r, dir, facing, alpha) {
   g.strokePath();
 }
 
+// Crocs dessinés tant que l'art `vfx_croc` n'existe pas : deux mâchoires en
+// croissant (trait vert lunaire) et leurs rangées de crocs clairs, décalées d'une
+// rangée à l'autre pour s'emboîter une fois fermées. `r` = zone qui touche,
+// `close` 0 (grande ouverte, bords de la zone) à 1 (fermée).
+function drawBiteJaws(g, r, facing, close, alpha) {
+  const cx = r.centerX;
+  const cy = r.centerY;
+  const hw = r.width / 2;
+  // Bord des crocs : `BASE` au centre de l'arc, `ARCH` en plus au milieu.
+  const BASE = 7;
+  const ARCH = 5;
+  const gap = (1 - close) * (r.height / 2 - BASE - ARCH);
+  const px = (u) => cx + facing * u * hw;
+  // u : -1 (arrière) à 1 (museau) ; `side` : -1 mâchoire du haut, +1 du bas.
+  const edgeY = (u, side) => cy + side * (gap + BASE + ARCH * (1 - u * u));
+  for (const side of [-1, 1]) {
+    const inner = [];
+    const outer = [];
+    for (let i = 0; i <= 14; i++) {
+      const u = -1 + (2 * i) / 14;
+      inner.push({ x: px(u), y: edgeY(u, side) });
+      // Croissant effilé aux deux bouts.
+      outer.push({ x: px(u), y: edgeY(u, side) + side * (1 + 3.5 * (1 - u * u)) });
+    }
+    const teeth = side < 0 ? [-0.8, -0.42, -0.04, 0.34, 0.72] : [-0.61, -0.23, 0.15, 0.53, 0.9];
+    for (const u of teeth) {
+      // Plus longs côté museau (canines), comme une vraie gueule.
+      const len = 8 + 5 * Math.max(0, (u + 0.6) / 1.5);
+      const tw = u > 0.6 ? 0.15 : 0.12;
+      const y0 = edgeY(u - tw, side);
+      const y1 = edgeY(u + tw, side);
+      const tipY = edgeY(u, side) - side * len;
+      g.fillStyle(SLASH_COLORS.core, alpha);
+      g.fillTriangle(px(u - tw), y0, px(u + tw), y1, px(u), tipY);
+      g.lineStyle(1, SLASH_COLORS.glow, 0.85 * alpha);
+      g.strokeTriangle(px(u - tw), y0, px(u + tw), y1, px(u), tipY);
+    }
+    g.lineStyle(6, SLASH_COLORS.glow, 0.28 * alpha);
+    g.strokePoints(outer, false);
+    g.fillStyle(SLASH_COLORS.body, alpha);
+    g.fillPoints(inner.concat(outer.slice().reverse()), true);
+  }
+  // Fermeture : petit éclat côté museau (liseré rose, comme l'arc de la dague).
+  if (close >= 1) {
+    const x0 = cx + facing * (hw + 2);
+    g.lineStyle(2, SLASH_COLORS.edge, 0.9 * alpha);
+    for (const a of [-0.55, 0, 0.55]) {
+      g.lineBetween(x0, cy + a * 7, x0 + facing * Math.cos(a) * 10, cy + a * 7 + Math.sin(a) * 10);
+    }
+  }
+}
+
 function agaricaAnimFrames(name, indices) {
   return indices.map((i) => ({ key: `agarica-${name}-${i}` }));
 }
@@ -498,9 +567,8 @@ function ensurePlayerAnimations(scene) {
     frameRate: 12,
     repeat: -1,
   });
-  // 4 frames à 14fps = ~286ms, calé pile sur attackDuration (cf.
-  // constructeur) — jouée une seule fois sur la fenêtre d'attaque. Accélérée
-  // depuis 10fps/400ms (retour utilisateur : "l'animation d'attaque
+  // 4 frames à 14fps = ~286ms — jouée une seule fois sur la fenêtre d'attaque.
+  // Accélérée depuis 10fps/400ms (retour utilisateur : "l'animation d'attaque
   // d'agarica est trop lente").
   scene.anims.create({
     key: ANIM_AGARICA_ATTACK_KEY,
@@ -515,11 +583,11 @@ function ensurePlayerAnimations(scene) {
     frameRate: 12,
     repeat: -1,
   });
-  // Jouée une seule fois sur la fenêtre d'attaque : cf. attackDuration.
+  // Jouée une seule fois par coup de croc, calée sur sa durée (SLASH_TOTAL_MS).
   scene.anims.create({
     key: ANIM_WOLF_ATTACK_KEY,
-    frames: Array.from({ length: LOUP_ATTACK_FRAME_COUNT }, (_, i) => ({ key: `loup-attack-${i}` })),
-    frameRate: 20,
+    frames: WOLF_BITE_FRAMES.map((i) => ({ key: `loup-attack-${i}` })),
+    frameRate: WOLF_BITE_FRAMES.length / (SLASH_TOTAL_MS / 1000),
     repeat: 0,
   });
 
@@ -595,11 +663,6 @@ function ensurePlayerAnimations(scene) {
 // égales sur les 4, contrairement aux planches Ours/Crapaud qui ont eu
 // besoin d'un outil de découpe dédié aligné à un bord).
 const PLAYER_BODY_FRACTION = 0.8;
-// Cf. getAttackHitbox() plus bas : fraction de la silhouette PLEINE (pas
-// PLAYER_BODY_FRACTION) gardée en hauteur pour la zone de dégâts de la
-// dague/morsure -- "réduite en hauteur" (retour utilisateur), une bande
-// centrée sur le torse plutôt que la pleine hauteur de la silhouette.
-const ATTACK_HITBOX_HEIGHT_FRACTION = 0.6;
 // { x0, y0, x1, y1 } = bbox mesurée (PIL .getbbox()) sur la texture de
 // référence de chaque forme, dans l'espace RAW du canvas (avant échelle).
 const AGARICA_BODY_BBOX = { x0: 22, y0: 5, x1: 209, y1: 353 };
@@ -620,10 +683,7 @@ function playerBodyFromBBox(bbox) {
 // main"), donc pas touché ici pour ne pas re-modifier Loup/Aigle/Pieuvre en
 // même temps -- ce resserrement supplémentaire, "un poil" (0.9), ne
 // s'applique qu'à la LARGEUR du corps de collision passive d'Agarica.
-// N'affecte PAS getAttackHitbox() (cf. playerFullDisplaySize plus bas,
-// recalculée directement depuis la bbox brute plutôt qu'en redivisant
-// `body.width` -- sans ça la zone de dégâts de l'attaque aurait rétréci
-// avec, jamais demandé).
+// N'affecte PAS getAttackHitbox() (zone = arc affiché, cf. SLASH_ARCS).
 // Retour utilisateur (round suivant) : "toujours un trop épaisse" -- resserré
 // une seconde fois, plus franchement que le "un poil" (0.9) d'origine.
 const AGARICA_BODY_WIDTH_FRACTION = 0.7;
@@ -682,30 +742,16 @@ for (const cfg of Object.values(FORMS)) {
   cfg.body.offsetY = cfg.frameHeight - cfg.body.height;
 }
 
-// Taille affichée de la silhouette RÉELLE (pas réduite par
-// PLAYER_BODY_FRACTION, contrairement à FORMS[form].body ci-dessus) pour la
-// forme donnée -- cf. getAttackHitbox(), qui a besoin de la pleine largeur
-// ("toute l'image"), la hitbox de collision passive ayant elle besoin de la
-// version réduite. Recalculée directement depuis la bbox brute (PAS en
-// redivisant `cfg.body.width` par PLAYER_BODY_FRACTION comme avant) :
-// AGARICA_BODY_WIDTH_FRACTION (cf. plus haut) réduit maintenant la largeur
-// du corps de collision d'Agarica d'un cran de PLUS que les 3 autres
-// formes -- rediviser seulement par PLAYER_BODY_FRACTION aurait alors
-// aussi rétréci la zone de dégâts de son attaque, jamais demandé.
-const FORM_BODY_BBOX = {
-  agarica: AGARICA_BODY_BBOX, eagle: EAGLE_BODY_BBOX, wolf: WOLF_BODY_BBOX, octopus: OCTOPUS_BODY_BBOX,
-};
-function playerFullDisplaySize(form) {
-  // Singe : pas de bbox mesurée (art Codex pas encore là) -- même gabarit
-  // de frappe que l'humaine plutôt qu'une bbox humaine à l'échelle du singe.
-  if (form === 'monkey') form = 'agarica';
-  const cfg = FORMS[form] || FORMS.agarica;
-  const bbox = FORM_BODY_BBOX[form] || FORM_BODY_BBOX.agarica;
-  return {
-    width: (bbox.x1 - bbox.x0) * cfg.scale,
-    height: (bbox.y1 - bbox.y0) * cfg.scale,
-  };
-}
+// Hitbox du loup pendant le croc, affiché à WOLF_BITE_SCALE : la MÊME boîte
+// monde que la course (taille en px de texture × WOLF_SCALE / WOLF_BITE_SCALE,
+// centrée, pieds en bas). Le visuel rapetisse, le corps physique ne bouge pas :
+// aucun mur ni plafond ne peut le coincer à la fin du coup.
+const WOLF_BITE_BODY = (() => {
+  const k = WOLF_SCALE / WOLF_BITE_SCALE;
+  const width = FORMS.wolf.body.width * k;
+  const height = FORMS.wolf.body.height * k;
+  return { width, height, offsetX: (WOLF_FRAME_WIDTH - width) / 2, offsetY: WOLF_FRAME_HEIGHT - height };
+})();
 
 // Hitbox pendant une anim de transfo (Loup ou Aigle) : `setForm()` a déjà
 // posé la hitbox de la forme CIBLE (cf. plus bas, ex: 55x105 pour le Loup à
@@ -1484,17 +1530,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Interagir (sanctuaires de capacité, cf. addAbilityShrine dans
     // LevelKit.js) : plus de récupération automatique au simple contact.
     this.interactKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-    // 400ms : laisse le temps aux 8 frames de la séquence de morsure du Loup
-    // de s'afficher lisiblement (cf. ANIM_WOLF_ATTACK_KEY) — profite aussi à
-    // la ruée (attackDashActive dure toute la fenêtre), qui va d'autant plus loin.
-    this.attackDuration = 400;
     this.attackCooldown = 300;
     this.isAttacking = false;
     this.attackEndTime = 0;
     this.attackCooldownEndTime = 0;
-    // Coup directionnel en cours (cf. SLASH_ARCS) : 'side' | 'up' | 'down' |
-    // null (Loup : morsure-ruée, Aigle : plume). Sens figé à l'appui.
+    // Coup en cours (cf. SLASH_ARCS) : 'side' | 'up' | 'down' (dague), 'bite'
+    // (crocs du Loup) | null (Aigle : plume). Sens figé à l'appui.
     this.slashDir = null;
+    // Anim de morsure à lancer à la prochaine pose (une seule fois par coup).
+    this.biteAnimPending = false;
     this.slashFacing = 1;
     this.slashStart = 0;
     this.pogoDone = false;
@@ -1513,13 +1557,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // plané (vitesse verticale positive, qui montrerait sinon la pose de
     // glisse figée) — pour bien vendre "elle bat des ailes pour tirer".
     this.featherFlapEndTime = 0;
-    // Attaque en forme Loup : ruée franche vers l'avant pendant toute la
-    // fenêtre d'attaque. Nettement plus rapide que le sprint (396) pour
-    // qu'on voie clairement la ruée au lieu qu'elle se confonde avec la
-    // course normale.
-    this.wolfAttackDashSpeed = 780;
-    this.attackDashActive = false;
-    this.attackDashDir = 1;
 
     this.jumpVelocity = -680;
     // Gravité additionnelle appliquée uniquement pendant la chute (pas à la
@@ -1858,38 +1895,38 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // bas dans update() -- juste le flash de teinte générique et la
       // hitbox qui restaient actifs malgré l'absence de vraie animation).
       this.isAttacking = true;
-      if (this.form === 'wolf') {
-        // Loup : morsure-ruée (inchangée), durée calée sur ses 8 frames.
-        this.slashDir = null;
-        this.attackEndTime = now + this.attackDuration;
+      // Humaine / singe : coup directionnel (cf. SLASH_ARCS). `this.onGround`
+      // = état de l'image précédente (le sol n'est relu que plus bas).
+      // Loup : coup de croc, toujours devant lui, sans propulsion (l'ancienne
+      // ruée à 780 px/s, retirée à la demande de l'utilisateur, était trop puissante).
+      const bite = this.form === 'wolf';
+      this.slashDir = bite ? 'bite' : (upHeld ? 'up' : (downHeld && !this.onGround ? 'down' : 'side'));
+      // Sens : la direction tenue à cet instant (sinon le sens courant) --
+      // `facingDir` n'est mis à jour que plus bas dans update().
+      const heldDir = left && !right ? -1 : right && !left ? 1 : 0;
+      this.slashFacing = heldDir || (this.facingDir >= 0 ? 1 : -1);
+      this.slashStart = now;
+      this.pogoDone = false;
+      this.attackEndTime = now + SLASH_TOTAL_MS;
+      this.startSlashVfx();
+      // Juice : impact de l'arc sur un obstacle (une fois par coup, cf.
+      // updateSlashObstacleFx) ; petit élan du corps.
+      this.slashObstacleDone = false;
+      if (bite) {
+        // La transfo d'entrée (267 ms) masquerait la morsure alors que la zone
+        // touche déjà : le coup la coupe, comme la prise d'une liane.
+        this.formTransitionActive = false;
+        this.biteAnimPending = true;
+        juiceSquash(this, 1.08, 0.94, 140);
         playSfx('wolf_bite');
-        // Juice : ruée -- traits de vitesse derrière le loup.
-        spawnFx(this.scene, 'streaks', this.x, this.y - 22, { dir: this.facingDir, count: 3, spread: 14 });
       } else {
-        // Humaine / singe : coup directionnel (cf. SLASH_ARCS). `this.onGround`
-        // = état de l'image précédente (le sol n'est relu que plus bas).
-        this.slashDir = upHeld ? 'up' : (downHeld && !this.onGround ? 'down' : 'side');
-        // Sens : la direction tenue à cet instant (sinon le sens courant) --
-        // `facingDir` n'est mis à jour que plus bas dans update().
-        const heldDir = left && !right ? -1 : right && !left ? 1 : 0;
-        this.slashFacing = heldDir || (this.facingDir >= 0 ? 1 : -1);
-        this.slashStart = now;
-        this.pogoDone = false;
-        this.attackEndTime = now + SLASH_TOTAL_MS;
-        this.startSlashVfx();
-        // Juice : impact de l'arc sur un obstacle (une fois par coup, cf.
-        // updateSlashObstacleFx) ; petit élan du corps.
-        this.slashObstacleDone = false;
         juiceSquash(this, 1.05, 0.96, 140);
         playSfx('slash', { dir: this.slashDir });
       }
       this.attackCooldownEndTime = now + this.attackCooldown;
-      this.attackDashActive = this.form === 'wolf';
-      this.attackDashDir = this.facingDir;
     }
     if (this.isAttacking && now >= this.attackEndTime) {
       this.isAttacking = false;
-      this.attackDashActive = false;
       this.slashDir = null;
     }
 
@@ -1941,9 +1978,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const sprinting = this.wolfSprintActive;
     const acceleration = sprinting ? this.wolfAcceleration : this.moveAcceleration;
     const webSlowed = this.inWeb && !sprinting;
-    const maxSpeed = this.attackDashActive
-      ? this.wolfAttackDashSpeed
-      : sprinting ? this.wolfMaxSpeed : webSlowed ? this.moveMaxSpeed * this.webSlowMultiplier : this.moveMaxSpeed;
+    const biteSlow = onGround && this.slashDir === 'bite' ? WOLF_BITE_GROUND_SPEED : 1;
+    const maxSpeed = biteSlow * (sprinting ? this.wolfMaxSpeed
+      : webSlowed ? this.moveMaxSpeed * this.webSlowMultiplier : this.moveMaxSpeed);
 
     this.body.maxVelocity.x = maxSpeed;
     this.setDragX(onGround ? this.groundDrag : this.airDrag);
@@ -1958,14 +1995,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setAccelerationX(0);
     }
 
-    // Ruée d'attaque Loup : écrase le contrôle normal pour toute la fenêtre
-    // d'attaque, direction figée au moment du coup (cf. déclenchement plus
-    // haut), qu'une touche de déplacement soit tenue ou non.
-    if (this.attackDashActive) {
-      this.setAccelerationX(0);
-      this.setVelocityX(this.attackDashDir * this.wolfAttackDashSpeed);
-    }
-
     if (onGround) {
       this.jumpsUsed = 0;
       this.wolfJumpCarry = false;
@@ -1975,8 +2004,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.lastGroundedAt = now;
     }
 
-    // Lianes (forme singe, cf. Liane.js) : accroche automatique en l'air,
-    // balancement pendulaire (Q/D ou gauche/droite pompe l'élan), Z/↑ monte et
+    // Lianes (forme singe, cf. Liane.js) : accroche automatique, mais seulement
+    // une fois Agarica vraiment transformée en singe (demande utilisateur) : après
+    // le double saut qui déclenche la transformation, ou un lâcher de liane (qui
+    // compte comme ce double saut, cf. releaseVine : on enchaîne donc les lianes).
+    // Balancement pendulaire (Q/D ou gauche/droite pompe l'élan), Z/↑ monte et
     // S/↓ descend le long de la liane (S tout en bas = se laisser tomber),
     // Saut = lâcher avec l'élan (le saut du singe : compte comme le double
     // saut, cf. releaseVine). Sans singe actif (forme humaine, aigle, loup) :
@@ -2002,7 +2034,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.setDrag(0, 0);
         this.body.maxVelocity.set(VINE_BODY_MAX_SPEED, VINE_BODY_MAX_SPEED);
       }
-    } else if (monkeyActive && !onGround && typeof findGrabbableVine === 'function') {
+    } else if (monkeyActive && !onGround && this.airJumpForm === 'monkey' && typeof findGrabbableVine === 'function') {
       const vine = findGrabbableVine(this.scene, this, now);
       if (vine) this.grabVine(vine, now);
     }
@@ -2041,8 +2073,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         jumpActed = true;
         this.jumpBufferedAt = -Infinity;
       } else if (!swimming && airForm === 'monkey' && this.jumpsUsed < 2) {
-        // Saut court du singe (transformation visuelle singe, cf. sélection
-        // de forme plus bas). Sans forme aérienne : AUCUN saut en l'air.
+        // Saut court du singe = LE double saut : transforme en singe (cf.
+        // sélection de forme plus bas) et rend les lianes accrochables. Même
+        // règle que l'aigle (décision utilisateur du 2026-11-05) : en chute
+        // depuis un rebord, le 1er appui reste un saut humain, seul le 2e
+        // transforme. Sans forme aérienne : AUCUN saut en l'air.
         this.jumpsUsed += 1;
         jumpActed = true;
         juiceJump = 'air';
@@ -2126,8 +2161,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Eau : sans la Pieuvre, piège façon ancienne fosse (reset) ; avec,
     // nage libre 4 directions, gravité coupée, vitesse imposée directement
-    // (comme la ruée Loup/le piqué Aigle : on écrase après la logique
-    // normale plutôt que de bâtir un système à part). `swimming` calculé
+    // (comme le piqué Aigle : on écrase après la logique normale plutôt que
+    // de bâtir un système à part). `swimming` calculé
     // plus haut (cf. commentaire dessus).
     if (this.inWater && !(this.hasOctopusForm && this.formEquipped('octopus'))) {
       this.hitByEnemy();
@@ -2149,14 +2184,17 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setForm('eagle');
     } else if (!onGround && this.airJumpForm === 'monkey') {
       this.setForm('monkey');
-    } else if (this.attackDashActive || sprinting || (this.wolfJumpCarry && this.jumpsUsed < 2)) {
-      // attackDashActive : garde la forme Loup figée pendant toute la ruée,
-      // insensible à un micro-rebond d'une frame de `onGround` (rebond
-      // physique observé au moment où la vitesse de ruée est imposée) qui
-      // ferait sinon retomber sprinting à faux et clignoter vers Agarica.
+    } else if (this.slashDir === 'bite' || sprinting || (this.wolfJumpCarry && this.jumpsUsed < 2)) {
+      // 'bite' : le Loup reste jusqu'au bout du coup, même Maj relâchée
+      // (sinon Agarica apparaîtrait à la place du loup, crocs encore affichés).
       this.setForm('wolf');
     } else {
       this.setForm('agarica');
+    }
+    // Morsure coupée par une autre forme (double saut, eau) : plus de crocs.
+    if (this.slashDir === 'bite' && this.form !== 'wolf') {
+      this.isAttacking = false;
+      this.slashDir = null;
     }
 
     // Entrée/sortie du Loup, sortie de l'Aigle (l'entrée de l'Aigle est
@@ -2221,12 +2259,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.beginFormTransition(now, ANIM_TRANSFO_TO_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);
     } else if (!transitionTriggeredThisFrame && leavingOctopus) {
       this.beginFormTransition(now, ANIM_TRANSFO_TO_HUMAN_FROM_OCTOPUS_KEY, this.octopusTransformDuration, TRANSFO_PIEUVRE_SCALE, TRANSFO_PIEUVRE_BODY, false);
-    } else if (this.vine && this.form === 'monkey' && !wasMonkeyForm) {
-      // Prise de liane directement depuis la forme humaine : la transfo
-      // dessinée (poses accroupies AU SOL, ancrées aux pieds) s'affichait
-      // suspendue sous la liane puis sautait sur la pose de prise -- on passe
-      // directement à la pose suspendue, la bascule masquée par une gerbe de feuilles.
-      this.spawnVineGrabPuff();
     } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming
       && this.monkeyTransfoAnimKey && this.form === 'monkey' && !wasMonkeyForm) {
       // Transfo singe (manifest `transfo_singe`) : seulement si l'art existe,
@@ -2402,8 +2434,18 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           this.body.offset.y,
         );
       } else if (this.form === 'wolf') {
-        if (this.isAttacking) {
-          this.anims.play(ANIM_WOLF_ATTACK_KEY, true);
+        if (this.slashDir === 'bite') {
+          // Une seule fois par coup : relancée à chaque image, une anim qui
+          // vient de finir repartirait de sa 1re image (sursaut).
+          if (this.biteAnimPending) {
+            this.biteAnimPending = false;
+            this.anims.play(ANIM_WOLF_ATTACK_KEY);
+          }
+          // Feuille d'attaque dessinée plus grande : ramenée à la taille de la
+          // course (cf. WOLF_BITE_SCALE), hitbox inchangée.
+          this.applyBodyForScale(WOLF_BITE_SCALE, WOLF_BITE_BODY);
+          // Sens figé à l'appui, comme les crocs (loup de face à droite).
+          this.setFlipX(this.slashFacing < 0);
         } else if (justLandedThisFrame) {
           this.anims.stop();
           this.setTexture(WOLF_LANDING_TEXTURE);
@@ -2582,7 +2624,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const r = this.getSlashRect();
     // Zone d'essai resserrée : le bas d'un coup de côté frôle toujours le sol.
     const t = new Phaser.Geom.Rectangle(r.x + 6, r.y + 6, r.width - 12, r.height - 12);
-    if (this.slashDir === 'side') t.height = Math.max(4, Math.min(t.height, this.y - 14 - t.y));
+    const side = this.slashDir === 'side' || this.slashDir === 'bite';
+    if (side) t.height = Math.max(4, Math.min(t.height, this.y - 14 - t.y));
     if (t.width <= 0 || t.height <= 0) return;
     const bodies = sc.physics.overlapRect(t.x, t.y, t.width, t.height, false, true);
     let hit = null;
@@ -2601,7 +2644,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const b = hit.b;
     let x;
     let y;
-    if (this.slashDir === 'side') {
+    if (side) {
       x = this.slashFacing > 0 ? Math.max(t.x, b.left) : Math.min(t.right, b.right);
       y = Phaser.Math.Clamp(t.centerY, b.top, b.bottom);
     } else {
@@ -2612,7 +2655,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       spawnFx(sc, 'chip', x, y, { count: 6, power: 0.8 });
       spawnFx(sc, 'drop', x, y, { count: 2 });
     } else {
-      spawnFx(sc, 'wallHit', x, y, { dir: this.slashDir === 'side' ? this.slashFacing : 1 });
+      spawnFx(sc, 'wallHit', x, y, { dir: side ? this.slashFacing : 1 });
     }
     juiceShake(sc, 'tiny');
     playSfx('slash_obstacle', { moss: hit.moss });
@@ -2688,36 +2731,20 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.formTransitionFacesRight = facesRight;
   }
 
-  // Rectangle (espace monde) de la zone qui touche, ou null : arc du coup
-  // directionnel en cours (humaine/singe, images actives seulement, cf.
-  // SLASH_ARCS), piqué de l'Aigle (tout le corps), morsure du Loup (toute la
-  // silhouette, réduite en hauteur et centrée sur le corps, cf.
-  // ATTACK_HITBOX_HEIGHT_FRACTION). API utilisée par LevelKit, Kainati,
+  // Rectangle (espace monde) de la zone qui touche, ou null : arc de la dague
+  // (humaine/singe) ou crocs du Loup, images actives seulement (cf. SLASH_ARCS),
+  // piqué de l'Aigle (tout le corps). API utilisée par LevelKit, Kainati,
   // Ghil't, les scripts d'actes (jeton anti-double-coup : `attackEndTime`).
   getAttackHitbox() {
     // Piqué Aigle (S maintenu en forme Aigle) : le contact seul inflige des
     // dégâts, pas de fenêtre d'attaque dédiée — clin d'œil au piqué du
     // Corbeau, qui touche aussi au simple contact.
     if (this.eagleDiving) return this.getBounds();
-    if (!this.isAttacking) return null;
-    // Coup directionnel (humaine, singe) : l'arc affiché, et seulement
-    // pendant ses images actives (cf. SLASH_ARCS) -- null pendant l'élan et
-    // le retour. Même rectangle que celui que dessine drawSlashArc().
-    if (this.slashDir) return this.isSlashActive(this.scene.time.now) ? this.getSlashRect() : null;
-    // Loup : morsure sur toute la silhouette (inchangé).
-    const fullSize = playerFullDisplaySize(this.form);
-    const attackWidth = fullSize.width;
-    const attackHeight = fullSize.height * ATTACK_HITBOX_HEIGHT_FRACTION;
-    // `facingDir` plutôt que `flipX` : ce dernier a un sens inversé selon la
-    // forme (le loup/l'aigle font face à droite par défaut, cf. setFlipX
-    // dans update()), alors que facingDir reste la direction réelle voulue.
-    const x = this.facingDir >= 0 ? this.x : this.x - attackWidth;
-    // this.y = pieds (origine ancrée en bas) ; centre du corps = pieds -
-    // moitié de la silhouette pleine. La bande réduite reste centrée sur ce
-    // même point quelle que soit la forme, au lieu d'un décalage fixe.
-    const bodyCenterY = this.y - fullSize.height / 2;
-    const y = bodyCenterY - attackHeight / 2;
-    return new Phaser.Geom.Rectangle(x, y, attackWidth, attackHeight);
+    if (!this.isAttacking || !this.slashDir) return null;
+    // L'arc ou les crocs affichés, et seulement pendant leurs images actives
+    // (cf. SLASH_ARCS) -- null pendant l'élan et le retour. Même rectangle que
+    // celui que dessine drawSlashArc().
+    return this.isSlashActive(this.scene.time.now) ? this.getSlashRect() : null;
   }
 
   // Rectangle (espace monde) de la compétence active, pendant sa courte
@@ -3099,15 +3126,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         alpha: 0, scale: base * 0.3, duration: Phaser.Math.Between(260, 420), ease: 'Quad.easeOut', onComplete: () => dot.destroy(),
       });
     }
-  }
-
-  // Gerbe de feuilles autour des mains à la prise d'une liane depuis la forme
-  // humaine (cf. update() : pas de transfo dessinée suspendue).
-  spawnVineGrabPuff() {
-    const hy = this.y - (typeof VINE_HANG_OFFSET === 'number' ? VINE_HANG_OFFSET : 58) + 20;
-    // Recette commune du juice (art `fx_feuille` s'il existe) + petit éclat vert.
-    spawnFx(this.scene, 'leaves', this.x, hy, { count: 8, power: 0.9 });
-    spawnFx(this.scene, 'star', this.x, hy, { count: 3, tint: [FORM_FX_COLORS.monkey, 0xffffff], power: 0.6 });
   }
 
   // Pose suspendue (art `singe`, dessiné face à DROITE) : choisie d'après
@@ -3596,19 +3614,32 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     return hasManifestArt(this.scene, 'vfx_slash', dir) ? this.slashArtScale() / SLASH_ARCS_ART_SCALE : 1;
   }
 
-  // Pixels visibles de l'arc `vfx_slash` d'une direction (union des images
-  // montrées pendant la phase active), relatifs au CENTRE du sprite, en px
-  // affichés, art non retourné. null si l'art manque.
+  // Échelle des crocs `vfx_croc` : leur largeur visible = SLASH_ARCS.bite.w. À
+  // l'échelle du manifeste (0,34), la zone faisait 82 x 80 px, presque celle de la
+  // dague alors que la morsure doit rester courte ; ainsi réglés, les crocs
+  // enserrent juste le museau.
+  biteArtScale() {
+    if (this.biteScaleCache) return this.biteScaleCache;
+    const b = textureOpaqueBox(this.scene, manifestFrameKey(BITE_VFX_ID, 'bite', BITE_VFX_ACTIVE_FRAMES[0]));
+    this.biteScaleCache = b ? SLASH_ARCS.bite.w / (b.x1 - b.x0) : ((getAssetManifest()[BITE_VFX_ID] || {}).scale || 1);
+    return this.biteScaleCache;
+  }
+
+  // Pixels visibles de l'effet d'un coup (arc `vfx_slash` d'une direction, crocs
+  // `vfx_croc` : union des images montrées pendant la phase active), relatifs au
+  // CENTRE du sprite, en px affichés, art non retourné. null si l'art manque.
   slashArtBounds(dir) {
     this.slashBoundsCache = this.slashBoundsCache || {};
     if (dir in this.slashBoundsCache) return this.slashBoundsCache[dir];
     const sc = this.scene;
+    const bite = dir === 'bite';
+    const id = bite ? BITE_VFX_ID : 'vfx_slash';
     let res = null;
-    if (hasManifestArt(sc, 'vfx_slash', dir)) {
-      const scale = this.slashArtScale();
+    if (hasManifestArt(sc, id, dir)) {
+      const scale = bite ? this.biteArtScale() : this.slashArtScale();
       let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
-      for (const i of SLASH_VFX_ACTIVE_FRAMES) {
-        const b = textureOpaqueBox(sc, manifestFrameKey('vfx_slash', dir, i));
+      for (const i of bite ? BITE_VFX_ACTIVE_FRAMES : SLASH_VFX_ACTIVE_FRAMES) {
+        const b = textureOpaqueBox(sc, manifestFrameKey(id, dir, i));
         if (!b) continue;
         x0 = Math.min(x0, b.x0 - b.w / 2); x1 = Math.max(x1, b.x1 - b.w / 2);
         y0 = Math.min(y0, b.y0 - b.h / 2); y1 = Math.max(y1, b.y1 - b.h / 2);
@@ -3678,12 +3709,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
-  // Prépare le sprite d'arc `vfx_slash` (sinon : croissant dessiné par code).
+  // Prépare le sprite de l'effet, arc `vfx_slash` ou crocs `vfx_croc` (sinon :
+  // croissant ou mâchoires dessinés par code).
   startSlashVfx() {
     const sc = this.scene;
-    if (!hasManifestArt(sc, 'vfx_slash', this.slashDir)) return;
+    const id = this.slashDir === 'bite' ? BITE_VFX_ID : 'vfx_slash';
+    if (!hasManifestArt(sc, id, this.slashDir)) return;
     if (!this.slashSprite || !this.slashSprite.active) {
-      this.slashSprite = sc.add.sprite(this.x, this.y, manifestFrameKey('vfx_slash', this.slashDir, 0))
+      this.slashSprite = sc.add.sprite(this.x, this.y, manifestFrameKey(id, this.slashDir, 0))
         .setOrigin(0.5, 0.5).setDepth(this.depth + 1).setVisible(false);
     }
   }
@@ -3700,11 +3733,18 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const now = this.scene.time.now;
     const t = now - this.slashStart;
     const after = t - SLASH_WINDUP_MS - SLASH_ACTIVE_MS;
-    if (!this.isAttacking || !this.slashDir || t < SLASH_WINDUP_MS || after >= SLASH_FADE_MS) {
+    // Crocs visibles dès l'élan : c'est le geste de se refermer qui se lit
+    // (ils ne touchent qu'aux images actives, cf. isSlashActive).
+    const bite = this.slashDir === 'bite';
+    if (!this.isAttacking || !this.slashDir || (!bite && t < SLASH_WINDUP_MS) || after >= SLASH_FADE_MS) {
       if (spr) spr.setVisible(false);
       return;
     }
     const alpha = after < 0 ? 1 : 0.6 * (1 - after / SLASH_FADE_MS);
+    if (bite) {
+      this.drawBiteFx(g, spr, t, after, t < SLASH_WINDUP_MS ? 0.75 : alpha);
+      return;
+    }
     const dir = this.slashDir;
     if (spr && hasManifestArt(this.scene, 'vfx_slash', dir)) {
       const a = SLASH_ARCS[dir];
@@ -3720,6 +3760,28 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     drawSlashCrescent(g, this.getSlashRect(), dir, this.slashFacing, alpha);
   }
 
+  // Crocs du coup en cours : art `vfx_croc` (image 0 pendant l'élan, 1-2 pendant
+  // la phase active, 3-4 pendant l'effacement), sinon mâchoires dessinées, fermées
+  // à mi-phase active (`close` en carré : elles se referment d'un coup sec).
+  drawBiteFx(g, spr, t, after, alpha) {
+    const facing = this.slashFacing;
+    if (spr && hasManifestArt(this.scene, BITE_VFX_ID, 'bite')) {
+      const a = SLASH_ARCS.bite;
+      const frame = after >= 0 ? (after < SLASH_FADE_MS / 2 ? 3 : 4)
+        : t < SLASH_WINDUP_MS ? 0 : (t - SLASH_WINDUP_MS < SLASH_ACTIVE_MS / 2 ? 1 : 2);
+      const key = manifestFrameKey(BITE_VFX_ID, 'bite', frame);
+      if (this.scene.textures.exists(key)) spr.setTexture(key);
+      // Alpha 1 : l'apparition et l'effacement sont peints dans les images.
+      spr.setVisible(true).setScale(this.biteArtScale())
+        .setPosition(this.x + facing * a.cx, this.y + a.cy)
+        .setFlipX(facing < 0).setAlpha(1);
+      return;
+    }
+    if (spr) spr.setVisible(false);
+    const close = Phaser.Math.Clamp(t / (SLASH_WINDUP_MS + SLASH_ACTIVE_MS / 2), 0, 1);
+    drawBiteJaws(g, this.getSlashRect('bite', facing), facing, close * close, alpha);
+  }
+
   // Quelque chose de frappable sous un coup vers le bas ? (cf. POGO_VELOCITY)
   // Ennemis (dont Ghil't), amas de mousse, Kainati et ses projectiles, et
   // `scene.pogoTargets` : liste libre pour les scripts de zone (objets avec
@@ -3729,7 +3791,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const hit = (r) => !!r && Phaser.Geom.Intersects.RectangleToRectangle(rect, r);
     if (sc.enemies && sc.enemies.getChildren) {
       for (const e of sc.enemies.getChildren()) {
-        if (e && e.active && !e.defeated && !e.healed && typeof e.getBounds === 'function' && hit(e.getBounds())) return true;
+        if (!e || !e.active || e.defeated || e.healed) continue;
+        // Même zone frappable que la mêlée (cf. tryPlayerMeleeHit, LevelKit).
+        if (typeof e.getMeleeBounds === 'function' ? hit(e.getMeleeBounds()) : typeof e.getBounds === 'function' && hit(e.getBounds())) return true;
       }
     }
     for (const m of (sc.__story && sc.__story.mossBlocks) || []) {
@@ -3792,7 +3856,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.fallingOut = true;
     this.isAttacking = false;
     this.slashDir = null;
-    this.attackDashActive = false;
     this.eagleDiving = false;
     this.formTransitionActive = false;
     this.vineFlight = false;

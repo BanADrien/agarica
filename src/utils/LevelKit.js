@@ -257,6 +257,8 @@ function addProceduralForest(scene, height, levelWidth, avoidRanges = [], canopy
       // Au camp de Geralt, le pied du décor reste au bas du cadre.
       // Les autres forêts gardent leur ancrage vertical dans le monde.
       .setScrollFactor(0.35, screenBottom ? 0 : (base ? base.scrollY : 1));
+    // Rendu de cohésion (LookKit) : couche lointaine (flou, brume).
+    img.lookRole = 'back';
     if (base) {
       // Le plan défile à `scrollY` : il est posé là où sa base coïncide avec
       // la ligne de base quand la caméra est au plus bas (camLow).
@@ -299,7 +301,9 @@ function addProceduralGroundPlants(scene, height, levelWidth, avoidRanges = []) 
   scatterAlongLevel(scene, levelWidth, avoidRanges, PLANTE_BUSH_SPACING_MIN, PLANTE_BUSH_SPACING_MAX, (x) => {
     const variant = Phaser.Utils.Array.GetRandom(PLANTE_BUSH_INDICES);
     const scale = PLANTE_BUSH_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.2);
-    scene.add.image(x, height + PLANTE_BUSH_OVERLAP * scale, `${PLANTE_BUSH_PREFIX}${variant}`)
+    // Rendu de cohésion (LookKit) : décor, gamma d'origine (décision du
+    // 2026-10-28 : pas de silhouette assombrie au premier plan).
+    const plant = scene.add.image(x, height + PLANTE_BUSH_OVERLAP * scale, `${PLANTE_BUSH_PREFIX}${variant}`)
       .setOrigin(0.5, 1)
       .setScale(scale)
       .setFlipX(Math.random() < 0.5)
@@ -311,6 +315,7 @@ function addProceduralGroundPlants(scene, height, levelWidth, avoidRanges = []) 
       // la même hauteur).
       .setScrollFactor(1.08)
       .setDepth(DECOR_FOREGROUND_DEPTH);
+    plant.lookRole = 'prop';
   });
 }
 
@@ -318,7 +323,7 @@ function addProceduralHangingPlants(scene, levelWidth) {
   scatterAlongLevel(scene, levelWidth, [], PLANTE_HANGING_SPACING_MIN, PLANTE_HANGING_SPACING_MAX, (x) => {
     const variant = Phaser.Utils.Array.GetRandom(PLANTE_HANGING_INDICES);
     const scale = PLANTE_HANGING_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.2);
-    scene.add.image(x, -PLANTE_HANGING_OVERLAP * scale, `${PLANTE_HANGING_PREFIX}${variant}`)
+    const liane = scene.add.image(x, -PLANTE_HANGING_OVERLAP * scale, `${PLANTE_HANGING_PREFIX}${variant}`)
       .setOrigin(0.5, 0)
       .setScale(scale)
       .setFlipX(Math.random() < 0.5)
@@ -327,6 +332,8 @@ function addProceduralHangingPlants(scene, levelWidth) {
       // plaquées au bord haut de l'écran au lieu de suivre le plafond réel.
       .setScrollFactor(0.4)
       .setAlpha(0.85);
+    // Rendu de cohésion (LookKit) : couche lointaine (parallaxe 0,4).
+    liane.lookRole = 'back';
   });
 }
 
@@ -353,6 +360,8 @@ function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], bac
     .setOrigin(0, 0)
     .setTileScale(scale, scale)
     .setScrollFactor(FAR_BG_SCROLL, farScroll);
+  // Rendu de cohésion (LookKit) : fond, précalculé (flou, brume) à l'entrée.
+  far.lookRole = 'back';
   scene.__farBackground = far;
   // Caméra qui défile verticalement (tallLevel, camera.vertical) ou fond
   // décalé : bords haut/bas prolongés dans la couleur de l'image (plus de
@@ -454,10 +463,13 @@ function addFarLayers(scene, layers, { levelWidth, width }) {
       .setOrigin(0, 0).setTileScale(k, k).setScrollFactor(sx, sy).setAlpha(alpha);
     if (L.tint != null) t.setTint(L.tint);
     const parts = [t];
+    // Rendu de cohésion (LookKit) : lointain = plan du fond.
+    t.lookRole = 'back';
     if (L.fill) {
       const color = multiplyColor(textureEdgeColor(scene, key, 'bottom'), L.tint);
       const f = scene.add.rectangle(-100, L.y + h - 1, t.width, FAR_LAYER_FILL_DEPTH, color)
         .setOrigin(0, 0).setScrollFactor(sx, sy).setAlpha(alpha);
+      f.lookRole = 'back';
       parts.unshift(f);
     }
     // Ciel qui se révèle : derrière ses nappes de nuages (la bande est plus
@@ -551,12 +563,16 @@ function addFarBackgroundCaps(scene, far, key, { top, height, coverWidth, camLow
   }
   parts.push(mirror(top + height));
   g.fillStyle(bottomColor, 1).fillRect(-100, top + 2 * height - 1, coverWidth, Math.max(600, reach + 600));
+  // Rendu de cohésion (LookKit) : même plan que le fond (même traitement,
+  // sinon une couture apparaîtrait entre l'image et ses prolongements).
+  for (const o of parts) o.lookRole = 'back';
   // Derrière le fond lointain dans la liste d'affichage.
   for (const o of parts) scene.children.moveBelow(o, far);
   // Ciel qui se révèle : filet de raccord DEVANT l'image (son 1er rang, filtré
   // en boucle, mélange le bas de l'image -> trait sombre sur le ciel).
   if (skyFade) {
     const seam = scene.add.graphics().setScrollFactor(FAR_BG_SCROLL, farScroll);
+    seam.lookRole = 'back';
     seam.fillStyle(topColor, 1).fillRect(-100, top - 1, coverWidth, 3);
     scene.children.moveAbove(seam, far);
   }
@@ -743,6 +759,7 @@ function addSkyGradient(scene, sky) {
   scene.__sky = st;
   const grad = (top, bottom) => {
     const g = scene.add.graphics().setScrollFactor(0).setDepth(-20);
+    g.lookRole = 'back';
     g.fillGradientStyle(top, top, bottom, bottom, 1);
     g.fillRect(0, 0, width, height);
     return g;
@@ -758,6 +775,8 @@ function addSkyGradient(scene, sky) {
     st.high = grad(cfg.high[0], cfg.high[1]).setDepth(-19);
   }
   st.high.setAlpha(0);
+  // Rendu de cohésion (LookKit) : ciel = plan le plus lointain.
+  st.high.lookRole = 'back';
 }
 
 // Voile, nuages et rayons : entre le fond lointain et la forêt du fond.
@@ -767,6 +786,9 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
   const cfg = st.cfg;
   const { width, height } = scene.scale;
   st.shade = scene.add.rectangle(0, 0, width, height, cfg.shadeColor, cfg.shade).setOrigin(0, 0).setScrollFactor(0);
+  // Rendu de cohésion (LookKit) : voile, nuages, soleil et nappes sont des
+  // couches lointaines (posé en fin de fonction pour les nuages / nappes).
+  st.shade.lookRole = 'back';
   // Nuages : dans le haut de la course de la caméra, parallaxe lente.
   st.clouds = [];
   const cloudScroll = 0.25;
@@ -809,6 +831,7 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
     // hors de l'écran pour les derniers).
     const drift = rnd.between(60, 120);
     c.setScrollFactor(cloudSf, cloudScroll).setAlpha(0);
+    c.lookRole = 'back';
     c.x = cx - drift;
     scene.tweens.add({ targets: c, x: cx + drift, duration: rnd.between(40000, 70000), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     st.clouds.push(c);
@@ -837,6 +860,7 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
       }
     }
     st.rays.setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    st.rays.lookRole = 'back';
     scene.tweens.add({ targets: st, raySway: { from: -1, to: 1 }, duration: 5200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
   // Nappes de nuages `couche_nappe_nuages` (lot n°8, tuilables) : deux copies
@@ -852,6 +876,7 @@ function addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh }) {
       const n = scene.add.tileSprite(0, mid * py + height * at, levelWidth * px + width + 40, nsrc.height * nk, 'item-couche_nappe_nuages')
         .setOrigin(0, 0.5).setTileScale(nk, nk).setScrollFactor(px, py).setAlpha(0);
       n.tilePositionX = i * 420;
+      n.lookRole = 'back';
       st.nappes.push(n);
     });
   }
@@ -1426,9 +1451,10 @@ const UNLOCK_POPUP_TEXT_OFFSET_Y = 600 - 1086 / 2;
 // Texte écrit à la main (retour utilisateur explicite : pas dans les
 // images) -- nom de la forme + le geste qui la déclenche, même vocabulaire
 // que les commentaires de Player.js (sprint/double-saut/nage auto).
+// Singe : seule Agarica devenue singe (2e saut) s'accroche aux lianes.
 const FORM_UNLOCK_LABEL = {
-  monkey: 'Forme Singe\nAccroche aux lianes',
-  wolf: 'Forme Loup\nSprint (Shift ou double-tap)',
+  monkey: 'Forme Singe\n2e saut, puis lianes',
+  wolf: 'Forme Loup\nSprint (Shift) · croc (K)',
   eagle: 'Forme Aigle\nDouble-saut',
   octopus: 'Forme Pieuvre\nNage automatique',
 };
@@ -2361,6 +2387,8 @@ function addLevelPrompt(scene, x, y, label) {
       padding: { x: 6, y: 3 },
     }).setOrigin(0.5).setDepth(LEVEL_PROMPT_DEPTH).setVisible(false);
   }
+  // Rendu de cohésion (LookKit) : interface.
+  prompt.lookRole = 'ui';
   return prompt;
 }
 
@@ -2396,6 +2424,8 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   // passage lumineux -> éteint (setTexture plus bas).
   y += TOTEM_GROUND_SINK;
   const marker = scene.physics.add.staticSprite(x, y, textureKey);
+  // Rendu de cohésion (LookKit) : décor, gamma d'origine.
+  marker.lookRole = 'prop';
   marker.setOrigin(0.5, 1);
   marker.setScale(scale);
   anchorVisibleFeet(marker);
@@ -2558,6 +2588,9 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
     .setOrigin(0.5, 1)
     .setScale(scale)
     .play(ANIM_CAMPFIRE_BURN_KEY);
+  // Rendu de cohésion (LookKit) : décor (les bûches gardent leur gamma) ;
+  // c'est aussi une source de lumière (règle 'feu').
+  fire.lookRole = 'prop';
   anchorVisibleFeet(fire);
   fire.y = footY + GROUND_CONTACT_SINK;
   // Juice : halo chaud qui respire derrière la flamme, braises qui montent et
@@ -3265,6 +3298,8 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
         tile.body.setOffset(0, top);
       }
     }
+    // Case d'une branche : le corps ci-dessus, l'image est celle de la branche.
+    if (options.noArt && options.noArt.has(gridCellKey(gx, gy))) continue;
     const displayHeight = baseSize * heightBoost;
     const tileCenterY = cy - (displayHeight - baseSize) / 2 - AUTOTILE_BLOB_VISUAL_LIFT + mossShift;
     // Retour utilisateur : "les tuiles terre arriere plan ne doivent pas
@@ -3297,13 +3332,21 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
     // second (leur vrai fond, jamais un aplat gris, doit se voir au
     // travers dans les deux cas).
     if (isBackLayer && !AUTOTILE_GRASS_TOP_POSITIONS.has(pos)) {
-      images.push(scene.add.rectangle(cx, cy - AUTOTILE_BLOB_VISUAL_LIFT, GROUND_TILE_SIZE, GROUND_TILE_SIZE, AUTOTILE_BACKLAYER_TINT, 1));
+      const plug = scene.add.rectangle(cx, cy - AUTOTILE_BLOB_VISUAL_LIFT, GROUND_TILE_SIZE, GROUND_TILE_SIZE, AUTOTILE_BACKLAYER_TINT, 1);
+      plug.lookRole = 'world';
+      plug.lookTile = 'back';
+      images.push(plug);
     }
     const img = scene.add.image(cx, tileCenterY, visualKey)
       .setDisplaySize(baseSize, displayHeight)
       .setFlipX(flipAngleX)
       .setFlipY(flipAngleY);
     if (isBackLayer) img.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
+    // Rendu de cohésion (LookKit) : plan de jeu ; `lookTile` choisit la
+    // teinte du jeu de tuiles ('blob' : herbe dessinée dans la case ; 'back' :
+    // sol de second plan, garde sa teinte sombre).
+    img.lookRole = 'world';
+    img.lookTile = isBackLayer ? 'back' : 'blob';
     images.push(img);
   }
   // Un corps STATIQUE redimensionné après coup (cf. AUTOTILE_GRASS_TOP_POSITIONS
@@ -3457,9 +3500,15 @@ function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
       }
       tileBodies.push(body);
     }
+    // Case d'une branche : le corps ci-dessus, l'image est celle de la branche.
+    if (options.noArt && options.noArt.has(gridCellKey(gx, gy))) continue;
     const img = scene.add.image(cx, cy, `${AUTOTILE_ATLAS_PREFIX}${tile}`)
       .setDisplaySize(GROUND_TILE_SIZE, GROUND_TILE_SIZE);
     if (isBackLayer) img.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
+    // Rendu de cohésion (LookKit) : corps de la case (masse sombre) ou sol de
+    // second plan (garde sa teinte sombre), cf. lookTintTile.
+    img.lookRole = 'world';
+    img.lookTile = isBackLayer ? 'back' : 'body';
     images.push(img);
     if (grass) grassCells.push([gx, gy, grass]);
   }
@@ -3471,6 +3520,9 @@ function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
     const g = scene.add.image(gx * GROUND_TILE_SIZE + spec.dx * scale, gy * GROUND_TILE_SIZE, `${AUTOTILE_ATLAS_PREFIX}${spec.file}`)
       .setOrigin(0, 0).setScale(scale);
     if (isBackLayer) g.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
+    // Herbe : bord de marche clair (teinte propre), cf. lookTintTile.
+    g.lookRole = 'world';
+    g.lookTile = isBackLayer ? 'back' : 'grass';
     images.push(g);
   }
   if (groundGroup && !isBackLayer) {
@@ -3543,10 +3595,13 @@ function pickUndergrowthVariant(scene, candidates, x, baseY) {
 function addUndergrowthImage(scene, x, baseY, variant, scale, flipX) {
   if (!scene.__undergrowthPlants) scene.__undergrowthPlants = [];
   scene.__undergrowthPlants.push({ x, baseY, variant });
-  return scene.add.image(x, baseY, `${SOUS_BOIS_TEXTURE_PREFIX}${variant}`)
+  const img = scene.add.image(x, baseY, `${SOUS_BOIS_TEXTURE_PREFIX}${variant}`)
     .setOrigin(0.5, 1)
     .setScale(scale)
     .setFlipX(flipX);
+  // Rendu de cohésion (LookKit) : décor, gamma d'origine.
+  img.lookRole = 'prop';
+  return img;
 }
 
 // Uniquement sur le SOL PRINCIPAL (groundCells), jamais au-dessus d'un vide :
@@ -3561,13 +3616,20 @@ function addUndergrowthImage(scene, x, baseY, variant, scale, flipX) {
 // avoir la place en hauteur (pas enfoncé dans un plafond de sol principal)
 // et rester hors de l'eau.
 function addUndergrowth(scene, data) {
-  const front = new Set((data.groundCells || []).map(([gx, gy]) => gridCellKey(gx, gy)));
+  const frontCells = zoneGroundCells(data);
+  const front = new Set(frontCells.map(([gx, gy]) => gridCellKey(gx, gy)));
   const isOpen = (gx, gy) => !front.has(gridCellKey(gx, gy));
   const water = (data.water || []).map((w) => new Phaser.Geom.Rectangle(w.x, w.y, w.width, w.height));
 
+  // Pas de plantes sur les cases écrites à la main d'une branche (attaches de
+  // lianes, canopée) : sa surface dessinée ne suit pas le haut de ces cases.
+  const noPlants = new Set();
+  for (const br of data.branches || []) {
+    if (br && br.cells) for (const [gx, gy] of br.cells) noPlants.add(gridCellKey(gx, gy));
+  }
   const surfaceRows = new Map();
-  for (const [gx, gy] of data.groundCells || []) {
-    if (!isOpen(gx, gy - 1)) continue;
+  for (const [gx, gy] of frontCells) {
+    if (!isOpen(gx, gy - 1) || noPlants.has(gridCellKey(gx, gy))) continue;
     if (!surfaceRows.has(gy)) surfaceRows.set(gy, new Set());
     surfaceRows.get(gy).add(gx);
   }
@@ -3674,6 +3736,54 @@ function groundRow(gxStart, gxEnd, gyList, material = 'dirt') {
   return cells;
 }
 
+// Cases de collision d'une branche (clé de zone `branches`, image dans
+// BrancheKit.js) : `cells` écrites à la main, sinon, pour une branche plate, ses
+// `rows` rangées de from.x à to.x sous sa surface. Une branche courbe sans `cells`
+// n'a pas de collision (c'est un décor), `solid: false` non plus.
+function branchCollisionCells(b) {
+  if (!b || b.solid === false || !b.from || !b.to) return [];
+  if (b.cells) return b.cells;
+  const [ax, ay] = b.from;
+  const [cx, cy] = b.to;
+  if (ay !== cy || (b.via && b.via.length) || b.bend) return [];
+  const gy = Math.floor(ay / GROUND_TILE_SIZE);
+  const gys = [];
+  for (let i = 0; i < (b.rows || 1); i++) gys.push(gy + i);
+  return groundRow(Math.round(Math.min(ax, cx) / GROUND_TILE_SIZE), Math.round(Math.max(ax, cx) / GROUND_TILE_SIZE), gys);
+}
+
+// Toutes les cases pleines de la zone : sol peint + branches (sans doublon).
+// À utiliser partout où l'on raisonne sur le sol depuis la donnée.
+function zoneGroundCells(data) {
+  const cells = data.groundCells || [];
+  if (!data.branches || !data.branches.length) return cells;
+  const seen = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
+  const out = cells.slice();
+  for (const b of data.branches) {
+    for (const cell of branchCollisionCells(b)) {
+      const key = gridCellKey(cell[0], cell[1]);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(cell);
+    }
+  }
+  return out;
+}
+
+// Cases portées par une branche et absentes du sol peint : corps de collision
+// oui, image de tuile non (la branche a la sienne), cf. `noArt` de renderAutotileGrid.
+function zoneBranchOnlyCellKeys(data) {
+  const painted = new Set((data.groundCells || []).map(([gx, gy]) => gridCellKey(gx, gy)));
+  const keys = new Set();
+  for (const b of data.branches || []) {
+    for (const cell of branchCollisionCells(b)) {
+      const key = gridCellKey(cell[0], cell[1]);
+      if (!painted.has(key)) keys.add(key);
+    }
+  }
+  return keys;
+}
+
 // Retour utilisateur : "les maps s'actualise dans le mode edit mais pas
 // dans le mode de base" -- une zone RÉELLE (zone1, zone3...) charge sa
 // `const XXX_DATA` figée depuis une balise <script> (cf. index.html),
@@ -3760,6 +3870,497 @@ function getExitTriggerRect(exit) {
   return new Phaser.Geom.Rectangle(exit.x - EXIT_TRIGGER_WIDTH / 2, y, EXIT_TRIGGER_WIDTH, height);
 }
 
+// --- Sorties de bord -------------------------------------------------------
+// Retour utilisateur : « on change de zone dans seulement deux cas : au bord
+// d'une zone, par une porte ». Une sortie est un BORD de la zone :
+//   exits: [{ edge: 'left'|'right'|'top'|'bottom', from, to, targetScene, data, hint, panneau }]
+// from/to bornent le passage le long du bord : altitude des PIEDS pour
+// left/right (`to` = sol du passage), x pour top/bottom ; sans eux, tout le bord.
+// Le changement part quand le corps a entièrement franchi le bord (elle est
+// vraiment sortie de l'écran). Les autres côtés restent des murs ; un bas sans
+// sortie reste un trou (règle `fall`). Détail dans PLAN_DEV.md.
+const EDGE_EXIT_SIDES = ['left', 'right', 'top', 'bottom'];
+// Marge ouverte derrière un bord franchissable (bornes propres au joueur, cf.
+// syncStoryFallBounds) : largement de quoi sortir pendant le fondu, même en sprint.
+const EDGE_EXIT_OPEN_MARGIN = 400;
+// Les pieds peuvent déborder de quelques px du sol du passage (`to`).
+const EDGE_EXIT_FEET_TOLERANCE = 12;
+// Arrivée : centre du corps juste après un bord latéral ; pieds sous un bord haut.
+const EDGE_ARRIVAL_INSET = 44;
+const EDGE_ARRIVAL_TOP_FEET = 96;
+// Hauteur du bond d'arrivée par un bord bas (`rise` sur l'entrée) : on remonte
+// d'un trou, il faut de quoi retomber à côté (2 cases + marge).
+const EDGE_ARRIVAL_RISE = 190;
+const EDGE_ARRIVAL_RISE_PUSH = 190;
+// Boîte de la forme humaine (cf. FORMS, Player.js) pour tester l'arrivée.
+const EDGE_ARRIVAL_BODY_HALF = 25;
+const EDGE_ARRIVAL_BODY_HEIGHT = 83;
+// Arrivée par le côté même où l'on vient de sortir (Racines <-> Épreuve) : la
+// touche est encore tenue vers ce bord. Il reste un mur tant qu'elle n'est pas
+// repartie à cette distance, sinon aller-retour sans fin entre les deux zones.
+const EDGE_REARM_DISTANCE = 120;
+
+function edgeExitIsLateral(edge) {
+  return edge === 'left' || edge === 'right';
+}
+
+// Le corps d'Agarica fait-il face au passage de cette sortie ?
+function edgeExitFaces(exit, player) {
+  const from = exit.from ?? -Infinity;
+  const to = exit.to ?? Infinity;
+  if (edgeExitIsLateral(exit.edge)) {
+    return player.y >= from - EDGE_EXIT_FEET_TOLERANCE && player.y <= to + EDGE_EXIT_FEET_TOLERANCE;
+  }
+  const x = player.body.center.x;
+  return x >= from && x <= to;
+}
+
+// Sortie ouverte de chaque côté pour cette image (null : mur). Une fois le
+// corps engagé derrière le bord, le passage reste acquis même si l'altitude
+// quitte `from`/`to` (saut au dernier moment) : sinon le bord refermé la
+// ramènerait d'un coup en arrière.
+function updateEdgeOpenings(scene, player) {
+  const lim = scene.__edgeLimits;
+  if (!lim) return null;
+  const open = scene.__edgeOpen || (scene.__edgeOpen = { left: null, right: null, top: null, bottom: null });
+  const b = player.body;
+  const exits = scene.__exits || [];
+  const past = { left: b.left < lim.left, right: b.right > lim.right, top: b.top < lim.top, bottom: b.bottom > lim.bottom };
+  const disarmed = scene.__edgeDisarmed;
+  if (disarmed) {
+    const away = { left: b.left - lim.left, right: lim.right - b.right, top: b.top - lim.top, bottom: lim.bottom - b.bottom }[disarmed];
+    if (away > EDGE_REARM_DISTANCE) scene.__edgeDisarmed = null;
+  }
+  for (const side of EDGE_EXIT_SIDES) {
+    if (scene.__edgeDisarmed === side) { open[side] = null; continue; }
+    if (past[side] && open[side] && exits.includes(open[side])) continue;
+    open[side] = exits.find((e) => e && e.edge === side && e.targetScene && edgeExitFaces(e, player)) || null;
+  }
+  return open;
+}
+
+function edgeExitCrossed(scene, exit, player) {
+  const lim = scene.__edgeLimits;
+  const b = player.body;
+  if (exit.edge === 'left') return b.right <= lim.left;
+  if (exit.edge === 'right') return b.left >= lim.right;
+  if (exit.edge === 'top') return b.bottom <= lim.top;
+  return b.top >= lim.bottom;
+}
+
+// Vrai si elle tombe dans le passage d'une sortie basse : la règle `fall` ne
+// s'applique pas (cf. updateStoryFall), ce trou-là mène ailleurs.
+function edgeExitBelowPlayer(scene, player) {
+  return (scene.__exits || []).some((e) => e && e.edge === 'bottom' && e.targetScene && edgeExitFaces(e, player));
+}
+
+// Quitte la zone par ce bord : position le long du bord, élan et état de la
+// forme voyagent dans les données de scène (cf. edgeArrivalSpawn et
+// applyEdgeArrivalState à l'arrivée).
+function leaveByEdgeExit(scene, exit) {
+  const p = scene.player;
+  const b = p.body;
+  const arrival = {
+    edge: exit.edge,
+    from: exit.from ?? null,
+    to: exit.to ?? null,
+    along: edgeExitIsLateral(exit.edge) ? p.y : b.center.x,
+    vx: b.velocity.x,
+    vy: b.velocity.y,
+    grounded: b.blocked.down,
+    form: p.form,
+    jumpsUsed: p.jumpsUsed,
+    airJumpForm: p.airJumpForm,
+    facing: p.facingDir,
+    wolfJumpCarry: p.wolfJumpCarry,
+    wolfSprintActive: p.wolfSprintActive,
+    tapSprintDirection: p.tapSprintDirection,
+    vineMomentumSpeed: p.vineMomentumSpeed,
+    vineFlight: p.vineFlight,
+  };
+  goToScene(scene, exit.targetScene, { ...(exit.data || {}), edgeArrival: arrival });
+}
+
+// Position le long du bord d'arrivée. Latéral : même hauteur au-dessus du sol
+// du passage quand les deux passages ont un sol (`to`), sinon même altitude.
+// Haut/bas : même proportion dans le passage, sinon même x.
+function edgeArrivalAlong(entry, arrival, fallback) {
+  const lateral = edgeExitIsLateral(entry.edge);
+  if (lateral !== edgeExitIsLateral(arrival.edge)) return fallback;
+  let along = arrival.along;
+  if (lateral) {
+    if (arrival.to != null && entry.to != null) along = entry.to - (arrival.to - arrival.along);
+  } else if (arrival.from != null && arrival.to != null && entry.from != null && entry.to != null && arrival.to > arrival.from) {
+    along = entry.from + ((arrival.along - arrival.from) / (arrival.to - arrival.from)) * (entry.to - entry.from);
+  }
+  return Phaser.Math.Clamp(along, entry.from ?? -Infinity, entry.to ?? Infinity);
+}
+
+function edgeArrivalBlocked(scene, x, feetY) {
+  const water = scene.water || [];
+  return scene.physics.overlapRect(x - EDGE_ARRIVAL_BODY_HALF, feetY - EDGE_ARRIVAL_BODY_HEIGHT, EDGE_ARRIVAL_BODY_HALF * 2, EDGE_ARRIVAL_BODY_HEIGHT - 2, false, true)
+    .some((b) => !water.includes(b.gameObject));
+}
+
+// Un appui existe-t-il sous (x, feetY), avant le bas de la zone ?
+function edgeArrivalHasGroundBelow(scene, x, feetY) {
+  const bottom = scene.__edgeLimits.bottom + 64;
+  if (feetY >= bottom) return false;
+  const water = scene.water || [];
+  return scene.physics.overlapRect(x - EDGE_ARRIVAL_BODY_HALF, feetY - 2, EDGE_ARRIVAL_BODY_HALF * 2, bottom - feetY, false, true)
+    .some((b) => !water.includes(b.gameObject));
+}
+
+// Point d'arrivée juste après le bord de l'entrée `entry`. Jamais dans un mur
+// (remonté à l'air libre) ni au-dessus d'un trou mortel (sauf `entry.overVoid`) :
+// retombe alors sur le point écrit à la main de l'entrée.
+function edgeArrivalSpawn(scene, entry, arrival, fallback) {
+  const lim = scene.__edgeLimits;
+  const inset = entry.inset ?? EDGE_ARRIVAL_INSET;
+  let x;
+  let y;
+  if (edgeExitIsLateral(entry.edge)) {
+    x = entry.edge === 'left' ? lim.left + inset : lim.right - inset;
+    y = edgeArrivalAlong(entry, arrival, entry.to ?? fallback.y);
+  } else {
+    x = edgeArrivalAlong(entry, arrival, entry.x ?? fallback.x);
+    x = Phaser.Math.Clamp(x, lim.left + inset, lim.right - inset);
+    y = entry.edge === 'top' ? lim.top + EDGE_ARRIVAL_TOP_FEET : lim.bottom - 8;
+  }
+  // Par le bas, on surgit d'un trou : sous l'écran, pas de sol à chercher.
+  if (entry.edge === 'bottom') return { x, y };
+  for (let lift = 0; lift <= 256 && edgeArrivalBlocked(scene, x, y); lift += 8) y -= 8;
+  if (edgeArrivalBlocked(scene, x, y)) return fallback;
+  if (scene.__edgeZoneHasFall && !entry.overVoid && !edgeArrivalHasGroundBelow(scene, x, y)) return fallback;
+  return { x, y };
+}
+
+// Touches tenues à travers le changement de scène : chaque scène a ses propres
+// objets Key, qui repartent « relâchés », et le clavier ne répète que la
+// dernière touche pressée (Maj + flèche : le sprint retombait à l'arrivée).
+const EDGE_HELD_KEYCODES = new Set();
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', (e) => EDGE_HELD_KEYCODES.add(e.keyCode), true);
+  window.addEventListener('keyup', (e) => EDGE_HELD_KEYCODES.delete(e.keyCode), true);
+  window.addEventListener('blur', () => EDGE_HELD_KEYCODES.clear());
+}
+
+// Repose l'élan et la forme sur le nouveau joueur. Sens de marche : vers
+// l'intérieur (c'est le même sens quand on sort par le bord opposé, le cas
+// normal ; seul Racines <-> Épreuve, même côté, se retourne).
+function applyEdgeArrivalState(player, entry, arrival) {
+  const body = player.body;
+  let vx = arrival.vx || 0;
+  let vy = arrival.vy || 0;
+  if (entry && entry.edge === 'left') vx = Math.abs(vx);
+  else if (entry && entry.edge === 'right') vx = -Math.abs(vx);
+  if (entry && entry.edge === 'top') vy = Math.max(vy, 60);
+  if (entry && entry.edge === 'bottom') {
+    const g = player.scene.physics.world.gravity.y || 1300;
+    vy = Math.min(vy, -Math.sqrt(2 * g * (entry.rise ?? EDGE_ARRIVAL_RISE)));
+  }
+  player.facingDir = Math.sign(vx) || (entry && entry.edge === 'left' ? 1 : entry && entry.edge === 'right' ? -1 : player.facingDir);
+  // Touches d'abord : update() relit le sprint et la direction dès l'image suivante.
+  for (const key of [...Object.values(player.cursors), ...Object.values(player.keys)]) {
+    if (key && EDGE_HELD_KEYCODES.has(key.keyCode)) {
+      key.isDown = true;
+      key.isUp = false;
+      key._justDown = false;
+    }
+  }
+  if (arrival.form && arrival.form !== 'octopus') player.setForm(arrival.form);
+  player.jumpsUsed = arrival.jumpsUsed ?? player.jumpsUsed;
+  player.airJumpForm = arrival.airJumpForm ?? null;
+  player.wolfJumpCarry = !!arrival.wolfJumpCarry;
+  player.wolfSprintActive = !!arrival.wolfSprintActive;
+  player.tapSprintDirection = arrival.tapSprintDirection ?? null;
+  player.vineMomentumSpeed = arrival.vineMomentumSpeed || 0;
+  player.vineFlight = !!arrival.vineFlight;
+  // Par le bas, sans élan, elle retomberait droit dans le trou d'où elle sort :
+  // poussée vers l'avant, freinée comme un élan de liane, de quoi gagner la lèvre.
+  if (entry && entry.edge === 'bottom' && Math.abs(vx) < EDGE_ARRIVAL_RISE_PUSH) {
+    vx = (arrival.facing || 1) * EDGE_ARRIVAL_RISE_PUSH;
+    player.vineMomentumSpeed = EDGE_ARRIVAL_RISE_PUSH;
+  }
+  // Vitesse max du tour d'avant : sans ça, le premier pas de physique
+  // écrêterait l'élan du loup à la marche (update() la remet ensuite à jour).
+  if (Math.abs(vx) > body.maxVelocity.x) body.maxVelocity.x = Math.abs(vx);
+  player.setVelocity(vx, vy);
+  player.wasOnGround = !!arrival.grounded;
+  if (arrival.grounded) player.lastGroundedAt = player.scene.time.now;
+}
+
+// --- Lisibilité des bords ----------------------------------------------------
+// Retour utilisateur : « au bord de l'écran, on doit pouvoir distinguer un trou
+// d'un passage vers le bas ». Automatique à partir des données :
+//   - sortie basse : lueur chaude qui monte, grains qui tombent, panneau de bois
+//     à flèche sur la lèvre du trou ;
+//   - trou mortel (règle `fall`, hors sortie basse) : le fond du trou s'enfonce
+//     dans l'obscurité, ni lueur ni panneau (`fall: { shade: false }` la coupe) ;
+//   - sortie haute : lueur ; sortie latérale : lueur seulement si le passage est
+//     en hauteur (au ras du sol, marcher jusqu'au bord suffit à le trouver).
+// Par sortie : `hint: false` (rien), `hint: 'lueur'` (lueur seule, ou lueur forcée
+// sur un côté), `hint: 'panneau'` (lueur + panneau), et `panneau: 'prop-…'`
+// (texture du panneau), `panneauX` (où le poser).
+const EDGE_HINT_WARM = 0xffa64d;
+const EDGE_HINT_SOFT = 0xffe9c0;
+const EDGE_HINT_DARK = 0x04030c;
+const EDGE_HINT_SIGN_TEXTURE = 'prop-bosquet_signpost';
+// Hauteur du panneau et centre de sa planche (mesurés sur l'image, 88 x 148).
+const EDGE_HINT_SIGN_HEIGHT = 86;
+const EDGE_HINT_SIGN_PLANK_Y = 0.72;
+// Hauteur du dégradé de la lueur basse / de la brume sombre au-dessus du bas de l'écran.
+const EDGE_HINT_RISE = 190;
+const EDGE_HINT_SHADE_RISE = 128;
+
+function edgeHintEnsureTextures(scene) {
+  juiceEnsureTextures(scene); // grain `juice-dot` des particules
+  const tm = scene.textures;
+  if (tm.exists('edge-fade-up')) return;
+  const make = (key, w, h, draw) => {
+    const t = tm.createCanvas(key, w, h);
+    draw(t.getContext(), w, h);
+    t.refresh();
+  };
+  const fadeUp = (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.42)');
+    g.addColorStop(1, 'rgba(255,255,255,1)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+  };
+  // Bords francs : la brume sombre s'arrête aux parois du trou.
+  make('edge-fade-up', 32, 128, fadeUp);
+  // Bords adoucis : les lueurs ne dessinent pas de rectangle.
+  make('edge-glow-up', 64, 128, (c, w, h) => {
+    fadeUp(c, w, h);
+    c.globalCompositeOperation = 'destination-out';
+    for (const [x0, x1] of [[0, w * 0.3], [w, w * 0.7]]) {
+      const side = c.createLinearGradient(x0, 0, x1, 0);
+      side.addColorStop(0, 'rgba(0,0,0,1)');
+      side.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = side;
+      c.fillRect(Math.min(x0, x1), 0, w * 0.3, h);
+    }
+  });
+  // Lueur latérale : vive au bord (gauche de l'image), bas et haut adoucis.
+  make('edge-glow-side', 64, 64, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.4, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'destination-out';
+    for (const [y0, y1] of [[0, h * 0.25], [h, h * 0.75]]) {
+      const side = c.createLinearGradient(0, y0, 0, y1);
+      side.addColorStop(0, 'rgba(0,0,0,1)');
+      side.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = side;
+      c.fillRect(0, Math.min(y0, y1), w, h * 0.25);
+    }
+  });
+}
+
+// Devant le fond, derrière le sol et les personnages.
+function edgeHintPlace(scene, obj) {
+  const anchor = scene.__frontGroundFirstImage;
+  if (anchor) {
+    obj.setDepth(anchor.depth);
+    scene.children.moveBelow(obj, anchor);
+  }
+  return obj;
+}
+
+// Colonnes (gx) sans sol au bas de l'écran : rangée qui couvre le bas visible.
+function edgeHintFallRanges(data, limits) {
+  const cells = zoneGroundCells(data);
+  const row = Math.floor((limits.bottom - 8) / GROUND_TILE_SIZE);
+  const solid = new Set();
+  for (const [gx, gy] of cells) if (gy === row) solid.add(gx);
+  const width = Math.ceil(limits.right / GROUND_TILE_SIZE);
+  const ranges = [];
+  let start = null;
+  for (let gx = 0; gx <= width; gx += 1) {
+    const hole = gx < width && !solid.has(gx);
+    if (hole && start === null) start = gx;
+    if (!hole && start !== null) {
+      ranges.push([start * GROUND_TILE_SIZE, gx * GROUND_TILE_SIZE]);
+      start = null;
+    }
+  }
+  return ranges;
+}
+
+// Retire d'un intervalle les passages des sorties basses.
+function edgeHintSubtract(ranges, cuts) {
+  let out = ranges;
+  for (const [a, b] of cuts) {
+    const next = [];
+    for (const [x0, x1] of out) {
+      if (b <= x0 || a >= x1) { next.push([x0, x1]); continue; }
+      if (a > x0) next.push([x0, a]);
+      if (b < x1) next.push([b, x1]);
+    }
+    out = next;
+  }
+  return out;
+}
+
+function addEdgeHints(scene, data) {
+  scene.__edgeHints = new Map();
+  if (!scene.__edgeLimits || !scene.add) return;
+  edgeHintEnsureTextures(scene);
+  // `mode: 'scene'` : cette chute mène ailleurs, elle n'a pas à faire peur.
+  if (!data.fall || data.fall.shade === false || data.fall.mode === 'scene') return;
+  const lim = scene.__edgeLimits;
+  const passages = (data.exits || []).filter((e) => e && e.edge === 'bottom')
+    .map((e) => [e.from ?? -Infinity, e.to ?? Infinity]);
+  for (const [x0, x1] of edgeHintSubtract(edgeHintFallRanges(data, lim), passages)) {
+    edgeHintPlace(scene, scene.add.image(x0, lim.bottom, 'edge-fade-up').setOrigin(0, 1)
+      .setDisplaySize(x1 - x0, EDGE_HINT_SHADE_RISE).setTint(EDGE_HINT_DARK).setAlpha(0.96));
+  }
+}
+
+// Passage en hauteur : son sol est au-dessus du sol le plus bas de ce côté.
+function edgeHintElevated(scene, exit) {
+  if (!edgeExitIsLateral(exit.edge) || exit.to == null) return false;
+  const lim = scene.__edgeLimits;
+  const edgeX = exit.edge === 'left' ? lim.left + 8 : lim.right - 8;
+  const tiles = typeof openGroundTilesAt === 'function' ? openGroundTilesAt(scene, edgeX) : [];
+  const lowest = tiles.reduce((m, t) => Math.max(m, t.y - t.displayHeight / 2 + GROUND_STAND_SINK), -Infinity);
+  return lowest !== -Infinity && exit.to < lowest - 32;
+}
+
+// Panneau de bois à flèche, posé sur le sol près du bord (`exit.panneauX` ou la
+// lèvre du trou) ; sans sol à portée, la flèche seule flotte au-dessus du passage.
+function edgeHintSign(scene, exit, list) {
+  const lim = scene.__edgeLimits;
+  const lateral = edgeExitIsLateral(exit.edge);
+  const refY = lateral ? (exit.to ?? lim.bottom - 92) : (exit.edge === 'bottom' ? lim.bottom - 92 : lim.top + 300);
+  let spots;
+  if (exit.panneauX != null) spots = [exit.panneauX];
+  else if (lateral) spots = [exit.edge === 'left' ? lim.left + 84 : lim.right - 84];
+  else {
+    const from = exit.from ?? lim.left;
+    const to = exit.to ?? lim.right;
+    spots = [from - 40, to + 40, (from + to) / 2];
+  }
+  let x = null;
+  let y = null;
+  for (const spot of spots) {
+    if (spot < lim.left + 16 || spot > lim.right - 16) continue;
+    const ground = groundSurfaceYAt(scene, spot, refY);
+    if (ground != null && Math.abs(ground - refY) < 200) { x = spot; y = ground + GROUND_STAND_SINK; break; }
+  }
+  const texture = exit.panneau || EDGE_HINT_SIGN_TEXTURE;
+  let arrowX;
+  let arrowY;
+  if (x != null && scene.textures.exists(texture)) {
+    const sign = scene.add.image(x, y + 2, texture).setOrigin(0.5, 1);
+    sign.setScale(EDGE_HINT_SIGN_HEIGHT / sign.height);
+    list.push(sign);
+    arrowX = x;
+    arrowY = y + 2 - sign.displayHeight * EDGE_HINT_SIGN_PLANK_Y;
+    if (scene.player) scene.children.moveBelow(sign, scene.player);
+  } else {
+    const from = exit.from ?? lim.left;
+    const to = exit.to ?? lim.right;
+    arrowX = lateral ? (exit.edge === 'left' ? lim.left + 60 : lim.right - 60) : (from + to) / 2;
+    arrowY = lateral ? (exit.to ?? lim.bottom - 92) - 110 : (exit.edge === 'bottom' ? lim.bottom - 140 : lim.top + 60);
+  }
+  const angle = { bottom: 0, top: 180, left: 90, right: -90 }[exit.edge];
+  const g = scene.add.graphics({ x: arrowX, y: arrowY });
+  g.setAngle(angle);
+  // Flèche épaisse : claire sur le bois, liseré sombre (lisible aussi sans panneau).
+  const shape = [[-5, -11], [5, -11], [5, 1], [12, 1], [0, 13], [-12, 1], [-5, 1]].map(([px, py]) => new Phaser.Geom.Point(px, py));
+  g.fillStyle(0x2a1a0e, 1);
+  g.fillPoints(shape.map((pt) => new Phaser.Geom.Point(pt.x * 1.34, pt.y * 1.26)), true);
+  g.fillStyle(0xffe9b0, 1);
+  g.fillPoints(shape, true);
+  if (scene.player) scene.children.moveBelow(g, scene.player);
+  list.push(g);
+  // Petit balancement : le regard accroche la flèche sans qu'elle s'impose.
+  scene.tweens.add({ targets: g, y: arrowY + 3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+}
+
+function buildEdgeExitHint(scene, exit) {
+  const hint = { list: [], emitter: null, shown: true };
+  const lim = scene.__edgeLimits;
+  if (exit.hint === false || !lim) return hint;
+  const wantsSign = exit.hint === 'panneau' || (exit.edge === 'bottom' && exit.hint !== 'lueur');
+  const wantsGlow = exit.hint === 'lueur' || exit.hint === 'panneau' || exit.hint === true
+    || exit.edge === 'bottom' || exit.edge === 'top' || edgeHintElevated(scene, exit);
+  if (wantsGlow) {
+    const from = exit.from ?? (edgeExitIsLateral(exit.edge) ? (exit.to ?? lim.bottom) - 170 : lim.left);
+    const to = exit.to ?? (edgeExitIsLateral(exit.edge) ? lim.bottom : lim.right);
+    let glow;
+    let low = 0.32;
+    let high = 0.58;
+    if (exit.edge === 'bottom') {
+      // Plus large que le trou : la lueur déborde sur les parois et monte au-dessus du sol.
+      glow = scene.add.image((from + to) / 2, lim.bottom, 'edge-glow-up').setOrigin(0.5, 1)
+        .setDisplaySize((to - from) * 1.5, EDGE_HINT_RISE).setTint(EDGE_HINT_WARM);
+      low = 0.6;
+      high = 0.95;
+    } else if (exit.edge === 'top') {
+      glow = scene.add.image((from + to) / 2, lim.top, 'edge-glow-up').setOrigin(0.5, 0).setFlipY(true)
+        .setDisplaySize((to - from) * 1.3, 150).setTint(EDGE_HINT_SOFT);
+      low = 0.45;
+      high = 0.75;
+    } else {
+      // Passage en hauteur : on éclaire juste au-dessus de son sol, pas tout le ciel.
+      const span = Math.min(to - from, 200);
+      glow = scene.add.image(exit.edge === 'left' ? lim.left : lim.right, to + 8 - span / 2, 'edge-glow-side')
+        .setOrigin(0, 0.5).setDisplaySize(90, span + 16).setTint(EDGE_HINT_SOFT);
+      if (exit.edge === 'right') glow.setFlipX(true).setOrigin(1, 0.5);
+    }
+    glow.setBlendMode(Phaser.BlendModes.ADD).setAlpha(low);
+    edgeHintPlace(scene, glow);
+    scene.tweens.add({ targets: glow, alpha: high, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    hint.list.push(glow);
+    if (exit.edge === 'bottom') {
+      // Grains de lumière aspirés vers le bas : le trou « appelle », à l'inverse
+      // d'un trou mortel où rien ne bouge.
+      hint.emitter = scene.add.particles(0, 0, 'juice-dot', {
+        x: { min: from + 10, max: to - 10 },
+        y: { min: lim.bottom - 150, max: lim.bottom - 70 },
+        speedY: { min: 30, max: 75 },
+        speedX: { min: -8, max: 8 },
+        scale: { start: 0.55, end: 0.1 },
+        alpha: { start: 0.9, end: 0 },
+        tint: [EDGE_HINT_WARM, EDGE_HINT_SOFT],
+        lifespan: 1500,
+        frequency: 150,
+        blendMode: 'ADD',
+      });
+      edgeHintPlace(scene, hint.emitter);
+      hint.list.push(hint.emitter);
+    }
+  }
+  if (wantsSign) edgeHintSign(scene, exit, hint.list);
+  return hint;
+}
+
+// Indices créés à la première apparition d'une sortie (une sortie ajoutée par un
+// script, même après le combat, a les siens), cachés tant qu'elle est retirée.
+function syncEdgeHints(scene) {
+  const hints = scene.__edgeHints;
+  if (!hints) return;
+  const exits = scene.__exits || [];
+  for (const exit of exits) {
+    if (exit && exit.edge && !hints.has(exit)) hints.set(exit, buildEdgeExitHint(scene, exit));
+  }
+  for (const [exit, hint] of hints) {
+    const shown = exits.includes(exit);
+    if (hint.shown === shown) continue;
+    hint.shown = shown;
+    for (const o of hint.list) o.setVisible(shown);
+    if (hint.emitter) { if (shown) hint.emitter.start(); else hint.emitter.stop(); }
+  }
+}
+
 // Construit une scène complète à partir des données exportées par
 // EditorScene.js (voir son docstring pour le schéma). Sert à la fois à
 // `PlayedLevelScene` (une nouvelle Zone créée à partir d'un niveau exporté,
@@ -3842,7 +4443,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // PHYSIQUE uniquement, jamais visible/traversée en pratique par un
   // niveau normal) plutôt qu'un correctif propre au Loup : n'importe quelle
   // forme future, plus large encore, en profite pareil sans y retoucher.
-  const levelRightPad = 200;
+  // Sorties de bord (cf. plus haut) : les côtés sans sortie sont des murs,
+  // cette marge ne reste que pour les anciennes sorties {x, y, height}.
+  const levelRightPad = (data.exits || (data.exit ? [data.exit] : [])).some((e) => e && !e.edge) ? 200 : 0;
 
   // Course verticale de la caméra (cf. plus bas : tallLevel / camera.vertical) :
   // calculée dès ici pour caler les fonds (ligne de base, ciel, bords).
@@ -3861,6 +4464,8 @@ function buildLevelFromData(scene, data, sceneData) {
   setupDebugToggle(scene);
 
   ensureGroundHitboxTexture(scene);
+  // Troncs (clé `trunks`, cf. BrancheKit.js) : derrière le sous-bois et le sol.
+  addZoneTrunks(scene, data);
   // Sol en second plan (cf. AUTOTILE_BACKLAYER_*) : peint indépendamment
   // dans l'éditeur (outil 'ground-back', jamais automatique), rendu AVANT
   // le sol normal pour rester derrière lui -- purement visuel, aucun corps
@@ -3876,7 +4481,14 @@ function buildLevelFromData(scene, data, sceneData) {
   // Premier visuel du sol principal : repère pour glisser juste derrière lui
   // des objets créés plus tard (totems et leurs plantes, cf.
   // sendBehindFrontGround).
-  scene.__frontGroundFirstImage = renderAutotileGrid(scene, scene.ground, data.groundCells || [], { tileset: data.tileset })[0];
+  // Branches (clé `branches`) : leurs cases passent dans le même rendu que le sol
+  // (mêmes corps, faces internes comprises), sans image de tuile. Construites ici
+  // et non dans un handler : totems, décors et feux se calent sur le sol juste après.
+  const frontImages = renderAutotileGrid(scene, scene.ground, zoneGroundCells(data), {
+    tileset: data.tileset, noArt: zoneBranchOnlyCellKeys(data),
+  });
+  const branchImages = addZoneBranches(scene, data);
+  scene.__frontGroundFirstImage = frontImages[0] || branchImages[0];
   // Bande de liquide/brume devant les fonds (cf. addLiquidFloor) : masque le
   // bas des arbres du fond au-dessus d'un vide (épreuve du singe…).
   if (data.liquidFloor) addLiquidFloor(scene, data.liquidFloor, levelWidth, levelHeight);
@@ -3909,6 +4521,13 @@ function buildLevelFromData(scene, data, sceneData) {
   // vertical` ouvre la même course que tallLevel, cf. setupZoneCamera.)
   scene.cameras.main.setBounds(0, cameraTop, levelWidth, cameraHeight);
   scene.levelWidth = levelWidth;
+  // Bords de la zone pour les sorties de bord : ce que la caméra peut montrer.
+  // (Le monde physique va plus loin : marge d'édition en haut, fosse sous
+  // l'écran en bas ; « sortir de l'écran » se juge sur ces limites-ci.)
+  scene.__edgeLimits = { left: 0, right: levelWidth, top: cameraTop, bottom: cameraTop + cameraHeight };
+  scene.__edgeOpen = null;
+  scene.__edgeDisarmed = null;
+  scene.__edgeZoneHasFall = !!data.fall;
 
   // Point d'entrée précis (cf. commentaire de fonction ci-dessus) : une
   // sortie reliée via "Arrivée dans ..." (openConnectPicker) passe
@@ -3938,6 +4557,11 @@ function buildLevelFromData(scene, data, sceneData) {
   // Désarmé pour ce seul `portalId` jusqu'à ce que le joueur cesse de
   // toucher son rectangle une première fois (cf. updateLevelFromData).
   scene.__spawnPortalId = (enteredAt && enteredAt.portalId) || null;
+  // Arrivée par un bord (cf. leaveByEdgeExit) : juste après le bord, même
+  // altitude. Sans `edgeArrival` (cinématique, reprise de sauvegarde, menu des
+  // chapitres) : le point écrit à la main de l'entrée, comme avant.
+  const edgeArrival = sceneData && sceneData.edgeArrival;
+  if (edgeArrival && enteredAt && enteredAt.edge) spawn = edgeArrivalSpawn(scene, enteredAt, edgeArrival, spawn);
   // Retour utilisateur : "je ne peux plus retourner a la zone1, ça me met
   // un écran vide" (partie 2, après le fix de `__transitioningAway`
   // ci-dessus) -- vérifié empiriquement : après un aller-retour de zone,
@@ -3968,6 +4592,16 @@ function buildLevelFromData(scene, data, sceneData) {
     if (currentLevelScene === scene) currentLevelScene = null;
   });
   scene.player = new Player(scene, spawn.x, spawn.y);
+  if (edgeArrival) {
+    applyEdgeArrivalState(scene.player, enteredAt, edgeArrival);
+    scene.__edgeDisarmed = enteredAt && enteredAt.edge === edgeArrival.edge ? edgeArrival.edge : null;
+    // Réapparition (mort, chute) : le point écrit à la main, sûr ; l'arrivée
+    // par le bord peut être en l'air.
+    if (enteredAt && enteredAt.edge && enteredAt.x != null && enteredAt.y != null) {
+      scene.player.spawnX = enteredAt.x;
+      scene.player.spawnY = enteredAt.y;
+    }
+  }
   // Xara peut être absente (`xara: false`, ou zone de l'histoire avant sa
   // rencontre) : cf. shouldSpawnXara dans StoryKit.js pour la règle.
   scene.xara = shouldSpawnXara(scene, data) ? new Xara(scene, scene.player) : null;
@@ -4082,6 +4716,9 @@ function buildLevelFromData(scene, data, sceneData) {
     // Pendu, centré ou tourné : pas une surface où poser un PNJ (propTopYAt).
     if (place.hang || place.free || place.angle) img.__noPropSurface = true;
     img.propType = p.type;
+    // Rendu de cohésion (LookKit) : décor posé = gamma d'origine, aucune
+    // ombre (décision du 2026-10-28) ; seules les lumières l'éclairent.
+    img.lookRole = 'prop';
     scene.props.push(img);
   }
 
@@ -4105,6 +4742,10 @@ function buildLevelFromData(scene, data, sceneData) {
   // sous_grotte/zone_aquatique) -- pas besoin de les migrer à la main,
   // juste normalisé en tableau d'un seul élément ici.
   scene.__exits = data.exits || (data.exit ? [data.exit] : []);
+  // Lisibilité des bords (cf. addEdgeHints) : brume sombre des trous mortels ici,
+  // indices des sorties à la première image (les scripts de zone trient encore
+  // `__exits` pendant leur create).
+  addEdgeHints(scene, data);
 
   createHud(scene);
 
@@ -4114,6 +4755,12 @@ function buildLevelFromData(scene, data, sceneData) {
   storyOnZoneEnter(scene, data, sceneData);
   // Juice : temps (hit-stop), regard caméra, lucioles/papillons d'ambiance.
   juiceSetupLevel(scene, data);
+  // Rendu de cohésion (clé `look`, cf. LookKit.js) : posé en dernier, quand
+  // tous les objets de la zone existent (ceux créés plus tard sont rangés à
+  // leur première image). Sans clé `look` ou option « Effets visuels »
+  // désactivée : rien. Démonté à l'arrêt de la scène (sortie, redémarrage).
+  // Garde `typeof` : prototype/coherence.html charge LevelKit sans LookKit.
+  if (typeof lookAttach === 'function') lookAttach(scene, data);
 }
 
 // Mêlée / piqué de l'aigle contre UN ennemi : vrai si la portée de l'attaque
@@ -4125,7 +4772,10 @@ function buildLevelFromData(scene, data, sceneData) {
 function tryPlayerMeleeHit(scene, player, enemy) {
   if (!enemy || enemy.defeated || !enemy.active) return false;
   const hitbox = player.getAttackHitbox();
-  if (!hitbox || !Phaser.Geom.Intersects.RectangleToRectangle(hitbox, enemy.getBounds())) return false;
+  // `getMeleeBounds` : zone frappable propre à l'ennemi quand son image est bien
+  // plus grande que lui (crapaud : canevas de la langue) ; sinon son image.
+  const target = typeof enemy.getMeleeBounds === 'function' ? enemy.getMeleeBounds() : enemy.getBounds();
+  if (!hitbox || !Phaser.Geom.Intersects.RectangleToRectangle(hitbox, target)) return false;
   const token = player.isAttacking ? `melee-${player.attackEndTime}` : `dive-${Math.floor(scene.time.now / 400)}`;
   if (damageEnemy(scene, enemy, { kind: player.isAttacking ? 'melee' : 'dive', player, token })) {
     // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT).
@@ -4198,6 +4848,8 @@ function createHud(scene) {
   // `setScrollFactor(0)` + position dérivée de scene.scale pour rester
   // ancré au coin de l'écran quelle que soit la caméra.
   scene.hudGraphics = scene.add.graphics().setScrollFactor(0).setDepth(1000);
+  // Rendu de cohésion (LookKit) : interface, jamais étalonnée.
+  scene.hudGraphics.lookRole = 'ui';
   // Lettres des touches de compétence (cf. HUD_SKILL_LABELS) : 3 Text
   // créés une seule fois ici, repositionnés/retextés chaque frame dans
   // drawHud -- même raisonnement que hudGraphics, éviter de recréer des
@@ -4205,6 +4857,7 @@ function createHud(scene) {
   scene.hudSkillTexts = HUD_SKILL_LABELS.map(() => scene.add.text(0, 0, '', {
     fontFamily: 'sans-serif', fontSize: '14px', color: '#ffe9f5', fontStyle: 'bold',
   }).setOrigin(0.5).setScrollFactor(0).setDepth(1001));
+  for (const t of scene.hudSkillTexts) t.lookRole = 'ui';
 }
 
 // Appelée depuis updateLevelFromData -- redessine tout depuis zéro chaque
@@ -4352,6 +5005,14 @@ function updateLevelFromData(scene, time, delta) {
     let stillTouchingSpawnPortal = false;
     for (const exit of scene.__exits || []) {
       if (!exit) continue;
+      // Sortie de bord : seul le franchissement complet du bord compte.
+      if (exit.edge) {
+        if (scene.__edgeOpen && scene.__edgeOpen[exit.edge] === exit && edgeExitCrossed(scene, exit, scene.player)) {
+          leaveByEdgeExit(scene, exit);
+          break;
+        }
+        continue;
+      }
       const touching = Phaser.Geom.Intersects.RectangleToRectangle(playerBodyRect, getExitTriggerRect(exit));
       if (!touching) continue;
       // Cf. scene.__spawnPortalId (posé dans buildLevelFromData) : on
@@ -4390,6 +5051,7 @@ function updateLevelFromData(scene, time, delta) {
   // disparaître au Shift+A/Shift+J pendant que le menu est ouvert.
   drawCombatDebugOverlays(scene);
   drawHud(scene);
+  syncEdgeHints(scene);
   // Fondus des lointains peints (clé `farLayers`) : suivent la caméra.
   updateFarLayers(scene);
 }

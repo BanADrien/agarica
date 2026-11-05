@@ -71,11 +71,13 @@ const HUTTE_MORGAT_DATA = {
     { id: 'pas_encore', x: 2560, w: 64, cutscene: 'hutte_pas_encore', once: false, forbids: { item: 'repulsif' } },
   ],
   entries: [
-    { id: 'from_clairiere', x: 110, y: 400, height: 128 },
-    { id: 'from_foret_sombre', x: 420, y: 400, height: 128 },
+    { id: 'from_clairiere', x: 110, y: 400, height: 128, edge: 'left', to: 448 },
+    // Par le trou du vieux sentier (sortie basse de la forêt sombre) : elle tombe
+    // du haut de l'écran, à côté du panneau.
+    { id: 'from_foret_sombre', x: 420, y: 400, height: 128, edge: 'top', from: 370, to: 470 },
   ],
   exits: [
-    { x: 16, y: 400, height: 128, targetScene: 'ClairierePlanteScene', data: { enterId: 'from_hutte' } },
+    { edge: 'left', to: 448, targetScene: 'ClairierePlanteScene', data: { enterId: 'from_hutte' } },
   ],
   script: 'acte2_hutte',
   hutte: { x: 1000, sentierX: 420, rampeX: 2688 },

@@ -140,6 +140,15 @@ class Crapaud extends Phaser.Physics.Arcade.Sprite {
     this.body.setOffset(CRAPAUD_BODY_OFFSET_X, CRAPAUD_BODY_OFFSET_Y);
   }
 
+  // Zone frappable par la dague, le croc et le rebond (LevelKit
+  // tryPlayerMeleeHit, Player.pogoTargetHit) : le corps physique, déjà étiré
+  // avec la langue. getBounds() rendrait tout le canevas (373 px, celui de la
+  // langue à l'apogée) : un croc dans le vide, 270 px plus loin, le touchait.
+  getMeleeBounds() {
+    const b = this.body;
+    return new Phaser.Geom.Rectangle(b.x, b.y, b.width, b.height);
+  }
+
   update(player) {
     if (this.defeated) return;
     const now = this.scene.time.now;

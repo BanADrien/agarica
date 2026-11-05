@@ -154,19 +154,56 @@ function arbreMossDecor(scene, x, y, w, flip = false) {
 // l'aurait gonflée à 380 px) ; avec l'art, alpha cible × 1,3 (plafonné à 1) :
 // le bord doux éclaircit l'ombre, qui doit rester lisible sur l'herbe.
 // Taille, durée et position inchangées : seul le dessin change.
-function arbreRockShadow(scene, x, y, w, h, alpha, growX, growY, alphaTo) {
+function arbreRockShadow(scene, x, y, w, h, alpha, growX, growY, alphaTo, ms = 1000) {
+  const marker = arbreDangerMarker(scene, x, y, w * growX, h * growY, ms);
   if (scene.textures.exists('item-fx_ombre_sol')) {
     const s = scene.add.image(x, y, 'item-fx_ombre_sol').setDisplaySize(w, h).setAlpha(alpha).setDepth(990);
-    return { obj: s, to: { scaleX: s.scaleX * growX, scaleY: s.scaleY * growY, alpha: Math.min(1, alphaTo * 1.3) } };
+    return { obj: s, marker, to: { scaleX: s.scaleX * growX, scaleY: s.scaleY * growY, alpha: Math.min(1, alphaTo * 1.3) } };
   }
   const s = scene.add.ellipse(x, y, w, h, 0x12000c, 1).setAlpha(alpha).setDepth(990);
-  return { obj: s, to: { scaleX: growX, scaleY: growY, alpha: alphaTo } };
+  return { obj: s, marker, to: { scaleX: growX, scaleY: growY, alpha: alphaTo } };
+}
+
+// Marqueur rouge au ras du sol, sous l'ombre (même anneau que la pierre de la
+// canopée de Kainati, `fx_marqueur_danger`, Kainati.js) : l'ombre seule, sombre
+// sur une écorce sombre, ne se voyait presque pas (revue du 2026-11-05, ~10 L*
+// d'écart) alors qu'elle est le seul signal avant la pierre et que Xara dit de
+// la regarder. Il grandit avec l'ombre et pulse ; détruit à l'impact
+// (arbreClearRockShadow). Sans l'art : rien de plus, l'ombre reste le signal.
+function arbreDangerMarker(scene, x, y, wEnd, hEnd, ms) {
+  if (!scene.textures.exists('item-fx_marqueur_danger')) return null;
+  const m = scene.add.image(x, y, 'item-fx_marqueur_danger').setDisplaySize(40, 10)
+    .setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(990);
+  const born = scene.time.now;
+  // Taille finale : un peu plus large que l'ombre pleine, comme chez Kainati.
+  const W = Math.max(40, wEnd * 1.6);
+  const H = Math.max(14, hEnd * 1.3);
+  m.__tick = scene.time.addEvent({
+    delay: 16, loop: true,
+    callback: () => {
+      if (!m.active) return;
+      const t = scene.time.now - born;
+      const e = Math.sin((Math.min(1, t / ms) * Math.PI) / 2);
+      m.setDisplaySize(40 + (W - 40) * e, 10 + (H - 10) * e)
+        .setAlpha(Math.min(1, t / 120) * (0.55 + 0.35 * (0.5 + 0.5 * Math.sin(t / 80))));
+    },
+  });
+  return m;
+}
+
+// Retire l'ombre et son marqueur (impact de la pierre).
+function arbreClearRockShadow(sh) {
+  if (sh.obj && sh.obj.active) sh.obj.destroy();
+  const m = sh.marker;
+  if (!m) return;
+  if (m.__tick) m.__tick.remove(false);
+  if (m.active) m.destroy();
 }
 
 function arbreDropRock(scene, x, surfaceY, telegraph = 1000) {
   // Opacité portée par l'objet (pas par le remplissage) : le tween d'alpha
   // ci-dessous la fait monter jusqu'à 0,6 (avant : ~0,15, invisible sur l'herbe).
-  const sh = arbreRockShadow(scene, x, surfaceY - 3, 22, 8, 0.25, 3, 2.2, 0.6);
+  const sh = arbreRockShadow(scene, x, surfaceY - 3, 22, 8, 0.25, 3, 2.2, 0.6, telegraph);
   const shadow = sh.obj;
   scene.tweens.add({
     targets: shadow,
@@ -174,7 +211,7 @@ function arbreDropRock(scene, x, surfaceY, telegraph = 1000) {
     duration: telegraph,
     ease: 'Sine.easeIn',
     onComplete: () => {
-      if (!scene.sys || !scene.sys.isActive()) return;
+      if (!scene.sys || !scene.sys.isActive()) { arbreClearRockShadow(sh); return; }
       const rock = typeof addKainatiStoneImage === 'function'
         ? addKainatiStoneImage(scene, x, surfaceY - 320)
         : scene.add.circle(x, surfaceY - 320, 12, 0x6d6a70).setStrokeStyle(2, 0x1e1a24).setDepth(991);
@@ -196,7 +233,7 @@ function arbreDropRock(scene, x, surfaceY, telegraph = 1000) {
           }
         },
         onComplete: () => {
-          shadow.destroy();
+          arbreClearRockShadow(sh);
           if (typeof spawnKainatiImpact === 'function') spawnKainatiImpact(scene, rock.x, surfaceY);
           rock.destroy();
           if (!hit && scene.player && Math.abs(scene.player.x - x) < 300) scene.cameras.main.shake(90, 0.003);
@@ -260,10 +297,10 @@ CUTSCENES.racines_cime = cutsceneBulles([
 // 2026-10-25) : rappel des lianes de la cime. Le totem allumé pendant la
 // visite joue `racines_singe_eveil` à la place (et coche ce déclencheur).
 CUTSCENES.racines_cime_singe = cutsceneBulles([
-  'Tes mains de singe, maintenant. Les lianes te porteront jusqu\'à la cime.',
+  'Tes mains de singe, maintenant. Saute, puis saute encore : une fois singe, tu saisis les lianes jusqu\'à la cime.',
   { who: 'agarica', text: 'Et là-haut, le roi des singes. Je ne veux pas me battre contre lui.' },
   'Prends de l\'élan, lâche quand la liane remonte.',
-], 'Lianes : ← → pour se balancer · Espace pour lâcher · Z/S pour monter/descendre');
+], 'Lianes : double saut pour devenir singe et s\'y accrocher\n← → pour se balancer · Espace pour lâcher · Z/S pour monter/descendre');
 
 // Totem du singe allumé (E, clé de zone `totems` -> addAbilityShrine, comme
 // le loup et l'aigle) : la forme est donnée sur-le-champ, avec l'éclat et la
@@ -271,8 +308,8 @@ CUTSCENES.racines_cime_singe = cutsceneBulles([
 // lianes, APRÈS la bannière (~2,6 s, même délai que le loup en forêt
 // sombre 2) : la route des lianes de la cime mène à l'arène.
 CUTSCENES.racines_singe_eveil = cutsceneBulles([
-  'Les mains du peuple singe ! En l\'air, approche-toi d\'une liane : elle te portera jusqu\'à la cime.',
-], { text: 'Lianes : ← → se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5200 }, 2600);
+  'Les mains du peuple singe ! Saute, puis saute encore près d\'une liane : une fois singe, tu la saisis.',
+], { text: 'Lianes : double saut pour devenir singe et s\'y accrocher\n← → se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5600 }, 2600);
 
 // Le totem lui-même est une donnée de zone (`totems`, grand_arbre_racines_data.js) :
 // art `totem_monkey_dim`, puis `totem_monkey_lit` une fois la forme prise
@@ -306,6 +343,24 @@ function arbreCalmBranchMonkeys(scene, ms) {
   return calmSingesCorrompus(scene, (e) => e.y < 0 && e.x > 2200, ms);
 }
 
+// Cases traversables par en dessous (on retombe dessus) : la marche d'une case
+// au bout du toit (x 1280-1344, y 256-320). Au pied de la butte, la niche de
+// 64 px (x 1344-1408) est plus étroite que le loup (86 px) : en sprint, il
+// passait en partie sous la marche et chaque saut s'y cognait (0 passage sur 6,
+// Maj tenue). Élargir la niche cassait le saut butte → marche à pied ; ainsi les
+// deux passent. Rectangles monde [x0, y0, x1, y1] ; collision gardée en dessus
+// et sur les côtés.
+const ARBRE_RACINES_ONE_WAY = [[1280, 256, 1344, 320]];
+function arbreOneWayCells(scene, rects) {
+  const bodies = scene.ground && scene.ground.getChildren ? scene.ground.getChildren() : [];
+  for (const o of bodies) {
+    const b = o.body;
+    if (!b) continue;
+    const inside = rects.some(([x0, y0, x1, y1]) => b.left >= x0 - 1 && b.right <= x1 + 1 && b.top >= y0 - 1 && b.bottom <= y1 + 1);
+    if (inside) b.checkCollision.down = false;
+  }
+}
+
 ZONE_SCRIPTS.grand_arbre_racines = {
   create(scene, data) {
     // `hadMonkey` : forme singe déjà là en arrivant ; sinon, le totem
@@ -313,20 +368,12 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     const st = { cfg: (data && data.rockfall) || null, timer: 600, hadMonkey: !!storyGet('hasMonkeyForm') };
     scene.__arbre = st;
     const levelWidth = (data && data.levelWidth) || 3840;
-    // Plus de tronc au premier plan (retour utilisateur) : ni le tronc
-    // provisoire dessiné par code, ni le collage de pans d'écorce
-    // (`grand_arbre_tronc_*`, dont sève corrompue et fenêtre de lune) qui
-    // l'avait remplacé ; le fond `fond_grand_arbre` montre l'arbre.
+    // Le tronc est la clé de zone `trunks` (cf. BrancheKit.js), juste derrière
+    // le plan de jeu : plus de tronc dessiné ici ni de collage de pans d'écorce.
     // Décors `grand_arbre_tronc_*` de la donnée : derrière les branches (les
     // décors sont sinon dessinés devant les tuiles).
     sendBehindFrontGround(scene, (scene.props || []).filter((p) => p.propType && p.propType.startsWith('grand_arbre_tronc_')));
-    // Bord droit : mur invisible (le monde physique continue 200 px plus
-    // loin). Pas de pilier de tuiles : un mur de 2 cases ou plus partant du
-    // sol coince Agarica contre l'angle des tuiles.
-    const wall = scene.add.zone(levelWidth + 16, 270, 32, 1200);
-    scene.physics.add.existing(wall, true);
-    scene.physics.add.collider(scene.player, wall);
-    if (scene.enemies) scene.physics.add.collider(scene.enemies, wall);
+    // (Bord droit : un mur, hors du passage de la corniche, cf. sorties de bord.)
     // La fente de l'épreuve du singe, au bout des lianes (corniche gauche).
     arbreGlowPassage(scene, 40, -190, 120);
     // Lumière de la cime, au-dessus du vide des lianes (route de l'arène).
@@ -347,6 +394,7 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     // de se repérer ; la suite (patrouille, lancers) est inchangée.
     const sd = (scene.sys.settings && scene.sys.settings.data) || {};
     if (sd.enterId === 'totem_singe') arbreCalmBranchMonkeys(scene, ARBRE_ARRIVAL_CALM_MS);
+    arbreOneWayCells(scene, ARBRE_RACINES_ONE_WAY);
   },
 
   update(scene, time, delta) {
@@ -485,9 +533,9 @@ CUTSCENES.esprit_arrivee = [
   { wait: 900 },
   { say: [
     espritDit('Mais des mains ne suffisent pas. Montre-moi qu\'elles ont compris.'),
-    espritDit('En l\'air, approche-toi d\'une liane : tes mains s\'y accrocheront. Balance-toi, puis lâche avec l\'élan. Suis mes mouvements.'),
+    espritDit('Saute, puis saute encore : devenue singe, tes mains saisiront la liane. Balance-toi, puis lâche avec l\'élan. Suis mes mouvements.'),
   ] },
-  { toast: { text: 'Forme du singe : en l\'air, accroche-toi aux lianes.\n← → : se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5200 } },
+  { toast: { text: 'Forme du singe : double saut pour devenir singe et s\'accrocher aux lianes.\n← → : se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5600 } },
 ];
 
 CUTSCENES.esprit_fin = [
@@ -585,7 +633,7 @@ CUTSCENES.epreuve_intro = [
   { camera: { x: 1250, y: 120, ms: 1700 } },
   { wait: 900 },
   { cameraFollow: true },
-  { toast: { text: '← → : prendre de l\'élan · Espace : lâcher quand la liane monte · Z/S : monter/descendre\nUne chute ramène à la dernière lanterne allumée.', ms: 5600 } },
+  { toast: { text: 'Double saut : devenue singe, tu saisis la 1re liane.\n← → : prendre de l\'élan · Espace : lâcher quand la liane monte · Z/S : monter/descendre\nUne chute ramène à la dernière lanterne allumée.', ms: 6000 } },
 ];
 
 CUTSCENES.epreuve_s2 = cutsceneBulles([
@@ -641,7 +689,7 @@ CUTSCENES.epreuve_talisman = [
 // jetterait Agarica.
 const EPREUVE_SINGE_SOMMET_X = 12088;
 const EPREUVE_SINGE_SOMMET_Y = -128;
-const EPREUVE_SINGE_SORTIE_SOMMET = { x: 12272, y: -186, height: 128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
+const EPREUVE_SINGE_SORTIE_SOMMET = { edge: 'right', to: -128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
 
 // Fente du sommet : posée FERMÉE dès l'arrivée tant que le talisman n'est
 // pas pris (option H7 : on voit de loin qu'un passage attend au bout du
@@ -772,12 +820,12 @@ function epreuveUpdateCrumbles(scene, list, now) {
 function epreuveDropRock(scene, x, surfaceY, telegraph, topY) {
   const top = topY != null ? topY : surfaceY - 320;
   const fallMs = Math.round(340 * Math.sqrt(Math.max(1, surfaceY - 12 - top) / 308));
-  const sh = arbreRockShadow(scene, x, surfaceY - 5, 24, 8, 0.3, 3, 2, 0.8);
+  const sh = arbreRockShadow(scene, x, surfaceY - 5, 24, 8, 0.3, 3, 2, 0.8, telegraph);
   const shadow = sh.obj;
   scene.tweens.add({
     targets: shadow, ...sh.to, duration: telegraph, ease: 'Sine.easeIn',
     onComplete: () => {
-      if (!scene.sys || !scene.sys.isActive()) return;
+      if (!scene.sys || !scene.sys.isActive()) { arbreClearRockShadow(sh); return; }
       const rock = typeof addKainatiStoneImage === 'function'
         ? addKainatiStoneImage(scene, x, top)
         : scene.add.circle(x, top, 12, 0x6d6a70).setStrokeStyle(2, 0x1e1a24).setDepth(991);
@@ -794,7 +842,7 @@ function epreuveDropRock(scene, x, surfaceY, telegraph, topY) {
           }
         },
         onComplete: () => {
-          shadow.destroy();
+          arbreClearRockShadow(sh);
           if (typeof spawnKainatiImpact === 'function') spawnKainatiImpact(scene, rock.x, surfaceY);
           rock.destroy();
           if (!hit && scene.player && Math.abs(scene.player.x - x) < 300) scene.cameras.main.shake(90, 0.003);

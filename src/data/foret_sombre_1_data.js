@@ -21,6 +21,9 @@ const FORET_SOMBRE_1_DATA = {
   // Pas encore de fond dédié au manifest : le ciel nocturne par défaut
   // (plan4) + un voile bleu nuit suffisent à l'ambiance.
   ambient: { tint: 0x070b22, darkness: 0.3 },
+  // Rendu de cohésion (LookKit.js, PLAN_DEV.md « Rendu de cohésion ») :
+  // profil de référence, réglé sur cette zone (prototype, variante C).
+  look: 'foret_sombre',
   // Un rai de lune sur la souche de la rencontre avec Xara (lot Codex n°8,
   // clé `lights`, H15) : bas posé sur le haut du bloc de la souche (y 384) ;
   // 420 px de haut pour que le haut net du rai sorte de l'écran.
@@ -93,9 +96,10 @@ const FORET_SOMBRE_1_DATA = {
   ],
   entries: [
     { id: 'from_bosquet', x: 140, y: 400, height: 128 },
-    { id: 'from_foret_sombre_2', x: 3700, y: 400, height: 128 },
+    { id: 'from_foret_sombre_2', x: 3700, y: 400, height: 128, edge: 'right' },
   ],
   exits: [
-    { x: 3824, targetScene: 'ForetSombre2Scene', data: { enterId: 'from_foret_sombre_1' } },
+    // Bord gauche : un mur (Agarica est bannie, pas de retour au bosquet).
+    { edge: 'right', targetScene: 'ForetSombre2Scene', data: { enterId: 'from_foret_sombre_1' } },
   ],
 };

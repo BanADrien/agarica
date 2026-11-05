@@ -1,7 +1,8 @@
 // Lianes accrochables (forme singe) — agent Formes.
 // Donnée de zone : `vines: [{x, y, length}]` — (x, y) = point d'attache EN
 // HAUT, `length` en px. Sans la forme singe active, simple décor qui oscille.
-// Avec : Player.update() appelle findGrabbableVine() en l'air, puis
+// Avec : une fois Agarica transformée (double saut ou lâcher d'une liane),
+// Player.update() appelle findGrabbableVine() en l'air, puis
 // stepSwing() chaque pas de physique (pendule : gravité + pompe gauche/droite,
 // montée/descente le long de la liane avec Z/↑ et S/↓).
 // Visuel : item `liane` du manifest étiré (si l'art existe), sinon tracé
@@ -41,7 +42,9 @@ const VINE_MAX_CARRY_SPEED = 760;
 const VINE_FLIGHT_DRAG = 60;
 // Prise en pleine montée : l'élan vertical restant fait « grimper » les mains
 // le long de la liane (fraction de la hauteur balistique restante).
-const VINE_CLIMB_FRACTION = 0.6;
+// 0,35 (0,6 avant) : la prise suit un double saut, ~370 px/s vers le haut au lieu
+// de ~290 px/s (1er saut) ; même remontée qu'avant, ~20 px.
+const VINE_CLIMB_FRACTION = 0.35;
 const VINE_CLIMB_SPEED = 380; // px/s
 // Montée / descente volontaire le long de la liane (Z/↑, S/↓) : vitesse, et
 // distance minimale mains -> attache (la tête reste juste sous l'attache).
@@ -51,7 +54,11 @@ const VINE_CLIMB_TOP_R = 28;
 // en pleine montée (après un double saut) faisait remonter les mains presque
 // jusqu'à l'attache -> balancier trop court, lâcher sans élan. Une prise plus
 // haute que ce seuil redescend doucement jusqu'à lui (même vitesse).
-const VINE_MIN_SWING_FRACTION = 0.6;
+// 0,8 (0,6 avant) : toute 1re prise suit maintenant un double saut, plus rapide
+// et plus haute. Avec 0,6, le balancier raccourci (102-138 px contre ~156 px sur
+// les lianes de Kainati) revenait sous la pierre de la canopée (phase 2) avant
+// sa chute : 3 à 12 coups sur 18 esquives, 0 avant la nouvelle règle.
+const VINE_MIN_SWING_FRACTION = 0.8;
 const VINE_COLOR = 0x3f7a3a;
 const VINE_LEAF_COLOR = 0x6fbf5a;
 // Attache DESSINÉE (retour utilisateur 2026-10-25, capture : « les lianes ne

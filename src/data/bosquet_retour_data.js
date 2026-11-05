@@ -58,7 +58,7 @@ const BOSQUET_RETOUR_DATA = {
     { id: 'fin', x: 1880, w: 64, cutscene: 'bosquet_retour_revoir_fin', once: false, requires: { demoFinished: true } },
   ],
   entries: [
-    { id: 'from_arene', x: 110, y: 400, height: 128 },
+    { id: 'from_arene', x: 110, y: 400, height: 128, edge: 'left', to: 448 },
   ],
   exits: [],
   script: 'acte2_bosquet_retour',

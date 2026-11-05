@@ -77,9 +77,9 @@ const MONDE_SPIRITUEL_DATA = {
   ],
   exits: [
     // Le passage derrière l'arbre spirituel : retour au totem des racines.
-    { x: 2864, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'totem_singe' } },
+    { edge: 'right', targetScene: 'GrandArbreRacinesScene', data: { enterId: 'totem_singe' } },
     // Retour possible à tout moment par où l'on est venue (le totem).
-    { x: 16, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'totem_singe' } },
+    { edge: 'left', targetScene: 'GrandArbreRacinesScene', data: { enterId: 'totem_singe' } },
   ],
   entries: [
     { id: 'from_racines', x: 200, y: 400, height: 100 },

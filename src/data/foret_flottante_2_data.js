@@ -54,6 +54,10 @@ const FORET_FLOTTANTE_2_DATA = {
     ...groundRow(37, 48, [8]),      // N filet de sécurité (surface 512)
     ...groundRow(45, 49, [3]),      // T2 (surface 192)
     ...groundRow(50, 54, [3]),      // T3 rampe d'envol (surface 192)
+    // I5 : île du bord droit (surface 192), là où l'on atterrit en revenant de la
+    // clairière : le bord droit donnait sinon sur 640 px de vide, et l'arrivée
+    // par ce bord aurait été un trou mortel.
+    ...groundRow(60, 64, [3]),
   ],
   avoidRanges: [[0, 4096]],
   playerSpawn: { x: 120, y: 280 },
@@ -87,10 +91,21 @@ const FORET_FLOTTANTE_2_DATA = {
     { id: 'amanite', x: 1720, w: 64, cutscene: 'amanite_rencontre', forbids: { amaniteMet: true } },
     { id: 'envol', x: 3330, w: 64, cutscene: 'ff2_envol', requires: { hasEagleForm: true } },
   ],
+  // Corbeaux adoucis comme ceux de la forêt flottante 1 (revue du 2026-11-05) :
+  // piqué sur une Agarica posée seulement, plus lent, plus rare, et patrouille
+  // courte au-dessus du milieu d'une île, hors de l'arc des sauts qui y arrivent
+  // ou en partent. Au-dessus du saut T2 → T3, le second frappait 16 sauts sur 16
+  // en plein vide (coup + chute) ; le premier couvrait le saut I2 → I3.
+  // Piqué jusqu'à hauteur de tête d'une Agarica debout, sans toucher le sol ; patrouille
+  // assez haute pour qu'il mette ~0,5 s à l'atteindre : qui passe en marchant
+  // l'évite, qui s'arrête dessous est touchée (à 40 px au-dessus de T2, il frappait
+  // 16 passages sur 16, même en marchant).
   enemies: [
-    { type: 'corbeau', x: 760, y: 90, patrolMinX: 560, patrolMaxX: 980, diveDepth: 220 },
+    { type: 'corbeau', x: 608, y: 90, patrolMinX: 563, patrolMaxX: 653, diveDepth: 220, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
     { type: 'mousse_creature', x: 1290, y: 260, patrolMinX: 1150, patrolMaxX: 1340 },
-    { type: 'corbeau', x: 3150, y: 60, patrolMinX: 2950, patrolMaxX: 3350, diveDepth: 120 },
+    // Côté gauche de T2 : un saut vers T3 pris sous son piqué (bord droit de la
+    // patrouille à 3053) le prenait encore en plein vide, 1 fois sur 12.
+    { type: 'corbeau', x: 2975, y: -30, patrolMinX: 2935, patrolMaxX: 3015, diveDepth: 180, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
   ],
   windCurrents: [
     // Décor avant l'aigle (entre I1 et I2) : on voit le vent monter.
@@ -99,13 +114,15 @@ const FORET_FLOTTANTE_2_DATA = {
     { x: 2690, y: 90, w: 120, h: 422, force: 330 },
   ],
   entries: [
-    { id: 'from_ff1', x: 110, y: 250, height: 120 },
-    { id: 'from_clairiere', x: 3420, y: 150, height: 80 },
+    { id: 'from_ff1', x: 110, y: 250, height: 120, edge: 'left', from: -400, to: 320 },
+    // Bas de plage (from) : posée sur I5 avant d'avoir plané au-delà de l'île.
+    { id: 'from_clairiere', x: 4000, y: 150, height: 80, edge: 'right', from: 130, to: 192 },
   ],
   exits: [
-    { x: 16, y: 250, height: 140, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_ff2' } },
+    // Sous l'île d'arrivée, le bord gauche reste un mur au-dessus du vide.
+    { edge: 'left', from: -400, to: 320, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_ff2' } },
     // Bord droit, toute la hauteur : on l'atteint en planant depuis T3.
-    { x: 4080, y: 270, height: 640, targetScene: 'ClairierePlanteScene', data: { enterId: 'from_ff2' } },
+    { edge: 'right', targetScene: 'ClairierePlanteScene', data: { enterId: 'from_ff2' } },
   ],
   script: 'acte2_ff2',
 };

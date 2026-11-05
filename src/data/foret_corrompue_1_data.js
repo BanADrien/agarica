@@ -96,10 +96,10 @@ const FORET_CORROMPUE_1_DATA = {
   ],
   entries: [
     { id: 'from_crash', x: 160, y: 400, height: 128 },
-    { id: 'from_arene_ghilt', x: 4040, y: 400, height: 128 },
+    { id: 'from_arene_ghilt', x: 4040, y: 400, height: 128, edge: 'right', to: 448 },
   ],
   exits: [
-    { x: 4144, y: 400, height: 128, targetScene: 'AreneGhiltScene', data: { enterId: 'from_foret_corrompue' } },
+    { edge: 'right', to: 448, targetScene: 'AreneGhiltScene', data: { enterId: 'from_foret_corrompue' } },
   ],
   script: 'acte2_fc1',
 };

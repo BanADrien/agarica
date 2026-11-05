@@ -633,10 +633,11 @@ function unlockSkillFromStory(scene, skillId, { silent = false } = {}) {
 }
 
 const STORY_FORM_INFO = {
-  hasWolfForm: { type: 'wolf', name: 'Forme du loup', desc: 'Sprint (Shift ou double appui) : cours, franchis les ravins, suis les pistes.' },
+  hasWolfForm: { type: 'wolf', name: 'Forme du loup', desc: 'Sprint (Shift ou double appui) : cours, franchis les ravins, suis les pistes. K : coup de croc.' },
   // Sans forme aérienne, Agarica n'a qu'un saut : c'est la forme qui donne le double saut.
   hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: 'Donne le double saut (plus haut) et le plané.' },
-  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: 'Donne le double saut ; accroche aux lianes et balancement.' },
+  // Lianes : seule Agarica devenue singe s'y accroche (cf. Player.js).
+  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: 'Donne le double saut ; devenue singe, accroche aux lianes et balancement.' },
   hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Nage automatique.' },
 };
 
@@ -1099,6 +1100,7 @@ function showStoryBanner(scene, { kicker, title, desc = '', itemId = null, color
     const x = (scene.scale.width - w) / 2;
     const y = 70;
     const c = scene.add.container(0, 0).setScrollFactor(0).setDepth(2100).setAlpha(0);
+    c.lookRole = 'ui';
     const bg = art ? addUiSliced(scene, 'ui_banniere', x, y, w, h, { scale: storyUiScale('ui_banniere', 0.65), scrollFactor: 0 }) : null;
     if (bg) {
       c.add(bg);
@@ -1210,6 +1212,7 @@ function showToast(scene, text, ms = 2600) {
     t = scene.add.container(scene.scale.width / 2, STORY_TOAST_Y, [bg, label]);
   }
   t.setScrollFactor(0).setDepth(2050).setAlpha(0);
+  t.lookRole = 'ui';
   scene.__storyToast = t;
   // Règle commune (LevelKit) : bulles et invites ne se posent pas dessous.
   if (typeof worldUiAddScreenObstacle === 'function') worldUiAddScreenObstacle(t);
@@ -1338,6 +1341,8 @@ function buildSpeechBubble(scene, text) {
   // qu'à la pointe dessinée si son image manque.
   const parts = bg ? [bg, g, tail, label].filter(Boolean) : [g, label];
   const c = scene.add.container(0, 0, parts).setDepth(SPEECH_BUBBLE_DEPTH).setAlpha(0);
+  // Rendu de cohésion (LookKit) : interface (bulle et texte nets).
+  c.lookRole = 'ui';
   const b = { container: c, g, label, w, h, bg, tail };
   if (bg) b.tailMargin = A.tailMargin;
   return b;
@@ -1738,6 +1743,7 @@ function showTitleCard(scene, title, sub, { hold = 1600 } = {}) {
     const { width } = scene.scale;
     const y = 225;
     const c = scene.add.container(0, 0).setScrollFactor(0).setDepth(2200).setAlpha(0);
+    c.lookRole = 'ui';
     const band = scene.add.graphics();
     const bandH = sub ? 150 : 120;
     band.fillGradientStyle(0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0, 0, 0.55, 0.55);
@@ -1827,6 +1833,10 @@ function showBossBar(scene, name, getRatio) {
     fill.setDisplaySize(A.grooveW, A.grooveH);
   }
   const g = scene.add.graphics().setScrollFactor(0).setDepth(1002);
+  // Rendu de cohésion (LookKit) : interface.
+  g.lookRole = 'ui';
+  if (fill) fill.lookRole = 'ui';
+  if (frame) frame.lookRole = 'ui';
   const label = scene.add.text(scene.scale.width / 2, y + (frame ? A.labelY : -8), name, {
     fontFamily: STORY_UI.serif, fontSize: '16px', color: '#ffe9f5', fontStyle: 'bold',
     stroke: '#15101f', strokeThickness: 4,
@@ -2562,10 +2572,12 @@ const STORY_PROMPT_ART = { h: 24, padL: 10, key: 19, gap: 4, padR: 12, scale: 0.
 
 function createStoryPromptLabel(scene, { depth = STORY_PROMPT_DEPTH, originY = 1 } = {}) {
   if (!scene.textures.exists('item-ui_invite')) {
-    return scene.add.text(0, 0, '', {
+    const t = scene.add.text(0, 0, '', {
       fontFamily: 'sans-serif', fontSize: '13px', color: '#ffe9f5',
       backgroundColor: '#2a1f45', padding: { x: 6, y: 3 },
     }).setOrigin(0.5, originY).setDepth(depth);
+    t.lookRole = 'ui';
+    return t;
   }
   const A = STORY_PROMPT_ART;
   const c = scene.add.container(0, 0).setDepth(depth);
@@ -2615,6 +2627,8 @@ function createStoryPromptLabel(scene, { depth = STORY_PROMPT_DEPTH, originY = 1
     return this;
   };
   c.setText('');
+  // Rendu de cohésion (LookKit) : interface.
+  c.lookRole = 'ui';
   return c;
 }
 
@@ -2719,6 +2733,10 @@ LEVEL_DATA_HANDLERS.ambient = (scene, amb) => {
   const { width, height } = scene.scale;
   scene.ambientOverlay = scene.add.rectangle(0, 0, width, height, amb.tint ?? 0x000000, amb.darkness ?? 0.35)
     .setOrigin(0, 0).setScrollFactor(0).setDepth(900);
+  // Rendu de cohésion (LookKit) : voile et vignette rendus TELS QUELS (rôle
+  // 'ui' = aucun shader) ; le rendu règle l'alpha du voile lui-même et les
+  // objets dessinés dessous compensent (cf. LookKit.js, `overlay`).
+  scene.ambientOverlay.lookRole = 'ui';
   scene.ambientVignette = null;
   const vig = amb.vignette ?? true;
   if (vig !== false && scene.textures.exists('item-couche_vignette')) {
@@ -2727,6 +2745,7 @@ LEVEL_DATA_HANDLERS.ambient = (scene, amb) => {
     scene.ambientVignette = scene.add.image(width / 2, height / 2, 'item-couche_vignette')
       .setDisplaySize(width, height).setScrollFactor(0).setBlendMode(Phaser.BlendModes.MULTIPLY)
       .setAlpha(force).setDepth(STORY_VIGNETTE_DEPTH);
+    scene.ambientVignette.lookRole = 'ui';
   }
 };
 
@@ -2796,11 +2815,15 @@ function mossVisualFootY(scene, x, bottom) {
 // Visuel d'un amas/mur : art du manifest si présent, sinon mousse dessinée.
 function drawMossVisual(scene, x, y, w, h, artId, wall) {
   const footY = mossVisualFootY(scene, x, y + h / 2);
+  // Rendu de cohésion (LookKit) : la mousse vert acide est un signal
+  // d'histoire (la corruption) : décor gardé à son gamma d'origine.
   if (scene.textures.exists(`item-${artId}`)) {
     const img = scene.add.image(x, y + h / 2, `item-${artId}`).setOrigin(0.5, 1).setDisplaySize(w * 1.15, h * 1.1);
+    img.lookRole = 'prop';
     return setVisibleBottomY(img, footY);
   }
   const g = scene.add.graphics({ x, y: footY - h / 2 });
+  g.lookRole = 'prop';
   const rnd = new Phaser.Math.RandomDataGenerator([`${x},${y}`]);
   const blobs = Math.max(5, Math.round((w * h) / 1800));
   g.fillStyle(0x10200f, 1);
@@ -2948,6 +2971,9 @@ LEVEL_DATA_HANDLERS.checkpoints = (scene, list) => {
       }
     };
     draw(false);
+    // Rendu de cohésion (LookKit) : la lanterne est un décor (gamma
+    // d'origine) ; allumée, c'est une source de lumière (règle 'lanterne').
+    (img || g).lookRole = 'prop';
     // Ordre d'affichage : lueur au sol, halo, lanterne (puis le joueur).
     if (pool) storyPutBehindPlayer(scene, pool);
     if (halo) storyPutBehindPlayer(scene, halo);
@@ -3406,16 +3432,29 @@ const STORY_FALL_LIQUID_SINK = 6;
 
 // Bornes du joueur = celles du monde (relues à chaque image : des scripts les
 // changent, cf. a2Ceiling), prolongées vers le bas s'il y a une règle `fall`.
+// Sorties de bord (cf. updateEdgeOpenings, LevelKit) : le côté d'une sortie
+// qu'Agarica a en face s'ouvre aussi ; tous les autres restent des murs.
 function syncStoryFallBounds(scene, player, open) {
   const st = scene.__story;
   const body = player.body;
   const world = scene.physics.world.bounds;
-  if (!open) {
+  const edges = updateEdgeOpenings(scene, player);
+  const anyEdge = edges && (edges.left || edges.right || edges.top || edges.bottom);
+  if (!open && !anyEdge) {
     if (body.customBoundsRectangle !== world) body.setBoundsRectangle(null);
     return;
   }
   if (!st.fallBounds) st.fallBounds = new Phaser.Geom.Rectangle();
-  st.fallBounds.setTo(world.x, world.y, world.width, world.height + STORY_FALL_BOUNDS_EXTRA);
+  let { x, y, width, height } = world;
+  if (open) height += STORY_FALL_BOUNDS_EXTRA;
+  if (anyEdge) {
+    const margin = EDGE_EXIT_OPEN_MARGIN;
+    if (edges.left) { x -= margin; width += margin; }
+    if (edges.right) width += margin;
+    if (edges.top) { y -= margin; height += margin; }
+    if (edges.bottom && !open) height += margin;
+  }
+  st.fallBounds.setTo(x, y, width, height);
   if (body.customBoundsRectangle !== st.fallBounds) body.setBoundsRectangle(st.fallBounds);
 }
 
@@ -3497,6 +3536,9 @@ function updateStoryFall(scene) {
     st.safePos = { x: player.x, y: player.y };
   }
   if (!fall) return;
+  // Fondu de sortie lancé, ou trou qui mène ailleurs (sortie basse) : ce n'est
+  // pas une chute, la sortie de bord prend le relais sous l'écran.
+  if (scene.__transitioningAway || edgeExitBelowPlayer(scene, player)) return;
   // Mêmes seuils qu'avant : la ligne `fall.y`, ou le bas du monde physique
   // (`levelHeight`, 540, plus haut que `fall.y` = 600 dans plusieurs zones).
   // `player.y` (pieds) et non le corps : celui-ci n'est recalé qu'au pas de
@@ -3816,9 +3858,22 @@ function openStoryOverlay(scene, key) {
 function openInventory(scene) { openStoryOverlay(scene, 'InventoryScene'); }
 function openMap(scene) { openStoryOverlay(scene, 'MapScene'); }
 
+// Xara n'est pas retenue par les bornes du monde et son ancre est à gauche
+// d'Agarica : arrivée par le bord gauche (x 44), l'ancre sort du niveau, Xara
+// tombait hors de la zone et ne revenait qu'une fois Agarica éloignée du bord.
+function updateStoryXaraInZone(scene) {
+  const xara = scene.xara;
+  if (!xara || !xara.active || !xara.body || xara.state !== 'ground' || xara.transitionActive) return;
+  const over = 0 - xara.body.left;
+  if (over <= 0) return;
+  xara.x += over;
+  if (xara.body.velocity.x < 0) xara.body.velocity.x = 0;
+}
+
 function storyUpdateHook(scene, time, delta) {
   if (!scene.__story || !scene.player || !scene.player.body) return;
   updateStoryFall(scene);
+  updateStoryXaraInZone(scene);
   updateStoryXaraRescue(scene);
   updateStoryCheckpoints(scene);
   updateStoryLights(scene);

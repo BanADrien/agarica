@@ -1209,25 +1209,6 @@ function acte1Fs2DrawCoeur(scene) {
   return { g, glow };
 }
 
-// Le vieux sentier vers la hutte, au fond de la poche : une lueur rose qui
-// descend des hauteurs (l'arche de racines est un décor de la donnée ; les
-// anciennes « marches » dessinées par code, des formes sombres, sont retirées).
-// Lot n°8 (A1-9) : rai peint `fx_rai_lumiere` rose, posé par le bas sur le
-// sol de la poche, en ADD. Son haut est net : il passe derrière le sol, et
-// le surplomb (bas des cases en y 256) le cache. Repli : le triangle dessiné.
-function acte1Fs2DrawSentier(scene) {
-  if (scene.textures.exists('item-fx_rai_lumiere')) {
-    const ray = scene.add.image(5090, 448, 'item-fx_rai_lumiere').setOrigin(0.5, 1).setDisplaySize(90, 200)
-      .setTint(0xff9fc9).setAlpha(0.35).setBlendMode(Phaser.BlendModes.ADD);
-    if (typeof sendBehindFrontGround === 'function' && scene.__frontGroundFirstImage) sendBehindFrontGround(scene, [ray]);
-    else storyPutBehindPlayer(scene, ray);
-    return;
-  }
-  const g = scene.add.graphics();
-  g.fillStyle(0xff9fc9, 0.12).fillTriangle(5050, 448, 5120, 448, 5120, 256);
-  storyPutBehindPlayer(scene, g);
-}
-
 function acte1Fs2TakeCoeur(scene) {
   const st = scene.__acte1;
   st.coeurTaken = true;
@@ -1259,7 +1240,8 @@ ZONE_SCRIPTS.foret_sombre_2 = {
     acte1Fs2DrawMudPrints(scene, 300, 1120, 448);
     acte1Fs2DrawMare(scene);
     acte1Fs2DrawPlante(scene);
-    acte1Fs2DrawSentier(scene);
+    // (Le vieux sentier, au fond de la poche, est une sortie basse : sa lueur et
+    // son panneau viennent des données de sortie, cf. addEdgeHints dans LevelKit.)
     // Lot n°8 (A1-3, §5) : sous le surplomb contre le mur de mousse (4280,
     // pendue ; remplace la tache qui flottait en 4300, 140), SUR le surplomb
     // (4900, refY 192 ; remplaçait 4900, 130), et au sol en évitant le

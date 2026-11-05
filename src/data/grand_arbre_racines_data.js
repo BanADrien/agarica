@@ -3,7 +3,8 @@
 // caméra de y=-576 à 540). Logique (pierres qui tombent, totem du singe,
 // remarques de Xara) : src/story/acte1_arbre.js (ZONE_SCRIPTS.grand_arbre_racines).
 //
-// Plan (grille 64 ; surface d'une case gy = gy*64 ; sol y=448) :
+// Plan (grille 64 ; surface d'une case gy = gy*64 ; sol y=448). Tronc en x 1752-2148 ;
+// toutes les plateformes sont des clés `branches` (cf. BrancheKit.js) :
 //   x 0-256      pied de l'arbre : arrivée de la forêt sombre (bas-gauche)
 //   x 256-1280   TUNNEL de racines (plafond gy 3-4) : créature de mousse ;
 //                son toit (y=192) est un chemin de racines (singe corrompu)
@@ -43,39 +44,92 @@ const GRAND_ARBRE_RACINES_DATA = {
   // sombre) ; ici l'arbre est encore sain, la mousse ne fait que monter.
   ambient: { tint: 0x0b1424, darkness: 0.18, vignette: false },
   script: 'grand_arbre_racines',
-  groundCells: [
-    // (groundRow : borne de fin exclue)
-    ...groundRow(0, 60, [7, 8]),    // sol au pied de l'arbre, sur toute la largeur
-    ...groundRow(4, 20, [3, 4]),    // plafond du tunnel = toit de racines (x 256-1280, y=192)
+  // Le grand tronc : la fourche s'y raccorde à gauche, la grande branche à droite,
+  // et la branche intermédiaire y fait une console. Juste derrière le plan de jeu.
+  trunks: [
+    { x: 1950, top: -640, bottom: RACINES_SURFACE_Y, scale: 0.5, base: true, tint: 0xa097aa },
+  ],
+  // Toutes les plateformes sont des branches ou des racines, avec EXACTEMENT les
+  // cases de collision des anciennes tuiles (vérifié corps par corps) : `from`/`to`
+  // plats = cases de la rangée sous la surface ; courbes = `cells` écrites à la
+  // main, le reste de la courbe n'est qu'un décor. L'ordre = du fond vers l'avant.
+  branches: [
+    // --- Hauteurs : les deux grandes branches qui portent les lianes. Décor,
+    // sauf la case d'accroche de chaque liane. Dessous (surface + 58) = attache.
+    // Teinte d'arrière-plan franche (0x6e6878, comme à l'épreuve) : avec sa mousse
+    // vive, la branche passait pour un sol, alors qu'on traverse tout sauf la case.
+    {
+      from: [1800, -560], via: [[1300, -480], [864, -442], [416, -442]], to: [372, -436],
+      attach: 'right', thickness: 60, tint: 0x6e6878,
+      cells: [...groundRow(13, 14, [-7]), ...groundRow(6, 7, [-7])],
+    },
+    {
+      from: [2110, -566], via: [[2560, -530], [3040, -506], [3488, -506]], to: [3532, -500],
+      attach: 'left', thickness: 60, tint: 0x6e6878,
+      cells: [...groundRow(47, 48, [-8]), ...groundRow(54, 55, [-8])],
+    },
+    // --- La racine maîtresse (décor) : du pied du tronc jusque sous le toit du
+    // tunnel. Marche et butte en sortent ; plus sombre, c'est le plan d'arrière.
+    { from: [1150, 206], via: [[1330, 262], [1560, 356]], to: [1760, 430], attach: 'right', thickness: 104, scaleX: 0.36, tint: 0x7f7688 },
     // Marche d'une case au bout du toit (x 1280-1344, y=256), hors de l'aplomb
     // de la fourche : la butte est SOUS la fourche (dessous y≈112), qui
     // coupait le saut simple butte → toit (1 essai sur 12 à pied). Butte →
     // marche = +64 px, marche → toit = +64 px. Dessous : 144 px libres, comme
-    // le tunnel.
-    ...groundRow(20, 21, [4]),
-    ...groundRow(9, 11, [6]),       // racine en travers du tunnel (petit saut)
+    // le tunnel. Plate (ses pentes ressemblaient à des rampes) ; traversable par
+    // en dessous pour le loup coincé au pied de la butte (script de zone,
+    // ARBRE_RACINES_ONE_WAY).
+    { from: [1280, 256], to: [1344, 256], tip: 'both', thickness: 48 },
+    // Toit de racines = plafond du tunnel (x 256-1280, y=192, 2 rangées).
+    { from: [256, 192], to: [1280, 192], rows: 2, thickness: 112, scaleX: 0.36, tip: 'both' },
     // Butte de racine (x 1408-1536, y=320) avec une marche d'une case de chaque
     // côté (y=384) : jamais de mur de 2 cases au ras du sol (on s'y coince
-    // contre l'angle intérieur des tuiles, cf. rapport Acte 1 – Arbre).
-    ...groundRow(21, 22, [6]),
-    ...groundRow(22, 24, [5, 6]),
-    ...groundRow(24, 25, [6]),
-    ...groundRow(21, 27, [1]),      // branche de la fourche (x 1344-1728, y=64)
-    ...groundRow(15, 19, [-2]),     // branche d'élan vers les lianes (x 960-1216, y=-128)
-    ...groundRow(0, 5, [-2]),       // corniche de l'épreuve du singe (x 0-320, y=-128)
-    ...groundRow(29, 32, [-1]),     // branche intermédiaire (x 1856-2048, y=-64)
-    ...groundRow(34, 46, [-3]),     // grande branche haute (x 2176-2944, y=-192) + totem au bout
-    ...groundRow(13, 14, [-7]), ...groundRow(6, 7, [-7]), // accroches des deux lianes de l'épreuve
-    // Vide de la cime : accroches des 2 lianes (rangée -8), filet et marche
-    // de retour (bond du singe), puis la corniche de la cime.
-    ...groundRow(47, 48, [-8]), ...groundRow(54, 55, [-8]),
-    // Filet (x 3008-3840, y=128) sous tout le vide et la corniche : une chute
-    // des lianes y retombe ; 320 px sous la corniche, jamais un raccourci.
-    ...groundRow(47, 60, [2]),
-    ...groundRow(46, 47, [0]),      // marche (x 2944-3008, y=0) : filet +128, puis +192 = bond du singe
-    ...groundRow(56, 60, [-3]),     // corniche de la cime (x 3584-3840, y=-192)
+    // contre l'angle intérieur des tuiles, cf. rapport Acte 1 – Arbre). Deux
+    // arches qui sortent du sol ; la basse, dessinée après, couvre le pied de la
+    // haute. Virages élargis (points intermédiaires) : les coudes serrés
+    // cassaient l'écorce en éclats triangulaires.
+    {
+      from: [1384, 396], via: [[1396, 350], [1408, 320], [1536, 320], [1548, 350]], to: [1560, 396], thickness: 66, scaleX: 0.3,
+      cells: groundRow(22, 24, [5]),
+    },
+    {
+      from: [1318, 474], via: [[1332, 424], [1344, 384], [1600, 384], [1612, 424]], to: [1626, 474], thickness: 60, scaleX: 0.3,
+      cells: groundRow(21, 25, [6]),
+    },
+    // Racine en travers du tunnel (petit saut) : une arche qui sort du sol.
+    {
+      from: [552, 474], via: [[566, 424], [576, 384], [704, 384], [716, 424]], to: [730, 474], thickness: 50, scaleX: 0.28,
+      cells: groundRow(9, 11, [6]),
+    },
+    // Sol au pied de l'arbre, sur toute la largeur : la racine qui court au sol.
+    { from: [0, RACINES_SURFACE_Y], to: [3840, RACINES_SURFACE_Y], rows: 2, thickness: 100, attach: 'none' },
+    // --- La fourche et ses rameaux.
+    // Branche d'élan vers les lianes (x 960-1216, y=-128) : un rameau de la
+    // fourche, coupé en deux. Sa partie courbe (dessinée avant, sans case,
+    // teinte d'arrière-plan) ne se lit plus comme une rampe : on la traversait
+    // en tombant, sa mousse ressemblait au vrai sol.
+    { from: [1190, -128], via: [[1240, -112], [1296, -76]], to: [1424, 56], attach: 'right', thickness: 48, tint: 0x6e6878, solid: false },
+    { from: [960, -128], to: [1216, -128], tip: 'both', thickness: 48 },
+    // Branche de la fourche (x 1344-1728, y=64) : feu de camp.
+    { from: [1344, 64], to: [1728, 64], attach: 'right', thickness: 56 },
+    // Corniche de l'épreuve du singe (x 0-320, y=-128) : sort de l'écran à gauche.
+    { from: [0, -128], to: [320, -128], tip: 'right', thickness: 56 },
+    // Branche intermédiaire (x 1856-2048, y=-64) : console sur le tronc.
+    { from: [1856, -64], to: [2048, -64], tip: 'both', thickness: 56 },
+    // Grande branche haute (x 2176-2944, y=-192) + totem au bout. Fourche : un
+    // rameau (décor) au-dessus du passage des pierres.
+    { from: [2176, -192], to: [2944, -192], attach: 'left', thickness: 56, forks: [{ at: 60 }] },
+    // --- Vide de la cime. Filet (x 3008-3840, y=128) sous tout le vide et la
+    // corniche : une chute des lianes y retombe ; 320 px sous la corniche, jamais
+    // un raccourci. Il sort de l'écran à droite.
+    // Marche (x 2944-3008, y=0) : filet +128, puis +192 = bond du singe. Un rameau
+    // du filet (dessiné avant lui : le filet couvre son départ), coupé comme celui
+    // de l'élan : marche plate, partie courbe en décor teinté (on la traversait).
+    { from: [2990, 0], via: [[3070, 44]], to: [3190, 150], attach: 'right', thickness: 42, tint: 0x6e6878, solid: false },
+    { from: [2944, 0], to: [3008, 0], tip: 'both', thickness: 42 },
+    { from: [3008, 128], to: [3840, 128], tip: 'left', thickness: 56, forks: [{ at: 420 }] },
+    // Corniche de la cime (x 3584-3840, y=-192) : sort de l'écran à droite.
+    { from: [3584, -192], to: [3840, -192], tip: 'left', thickness: 56 },
   ],
-  // Le tronc (x ~1540-2120) est dessiné par le script de zone, derrière les branches.
   playerSpawn: { x: 110, y: 412 },
   // (x, y = attache en haut ; chaque liane pend sous un bloc.)
   // Épreuve (à gauche, depuis la branche d'élan) : écart 448 px pour le lâcher
@@ -141,15 +195,18 @@ const GRAND_ARBRE_RACINES_DATA = {
     { id: 'cime_singe', x: 2900, y: -240, w: 60, h: 120, requires: { hasMonkeyForm: true }, forbids: { kainatiDefeated: true }, cutscene: 'racines_cime_singe' },
   ],
   exits: [
-    { x: 16, y: 380, height: 160, targetScene: 'ForetSombre2Scene', data: { enterId: 'from_racines' } },
-    { x: 16, y: -190, height: 160, targetScene: 'EpreuveSingeScene', data: { enterId: 'from_racines' } },
+    // Bord gauche, deux passages séparés par la corniche : le pied de l'arbre…
+    { edge: 'left', from: -64, to: 448, targetScene: 'ForetSombre2Scene', data: { enterId: 'from_racines' } },
+    // … et la fente de l'épreuve, sur la corniche. Même côté à l'arrivée : l'épreuve
+    // part de son bord gauche (cf. PLAN_DEV : passage à revoir, une porte conviendrait).
+    { edge: 'left', from: -576, to: -128, targetScene: 'EpreuveSingeScene', data: { enterId: 'from_racines' } },
     // Au bout de la corniche de la cime : l'arène de Kainati.
-    { x: 3824, y: -250, height: 160, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_racines' } },
+    { edge: 'right', from: -576, to: -192, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_racines' } },
   ],
   entries: [
-    { id: 'from_foret_sombre', x: 110, y: 400, height: 100 },
-    { id: 'from_epreuve', x: 150, y: -170, height: 80 },
-    { id: 'from_arene', x: 3700, y: -230, height: 80 },
+    { id: 'from_foret_sombre', x: 110, y: 400, height: 100, edge: 'left', from: -64, to: 448 },
+    { id: 'from_epreuve', x: 150, y: -170, height: 80, edge: 'left', from: -576, to: -128 },
+    { id: 'from_arene', x: 3700, y: -230, height: 80, edge: 'right', from: -576, to: -192 },
     // Devant le totem, côté branche : reprise d'une ancienne sauvegarde
     // arrêtée au monde spirituel (qui n'est plus sur le chemin de
     // l'histoire, cf. ZONE_SCRIPTS.monde_spirituel) et sorties de cette zone de test.

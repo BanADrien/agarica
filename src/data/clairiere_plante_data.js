@@ -41,14 +41,14 @@ const CLAIRIERE_PLANTE_DATA = {
   ],
   windCurrents: [{ x: 0, y: 40, w: 112, h: 410, force: 330 }],
   entries: [
-    { id: 'from_ff2', x: 230, y: 110, height: 60 },
-    { id: 'from_hutte', x: 2140, y: 400, height: 128 },
+    { id: 'from_ff2', x: 230, y: 110, height: 60, edge: 'left', from: 90, to: 170 },
+    { id: 'from_hutte', x: 2140, y: 400, height: 128, edge: 'right', to: 448 },
   ],
   exits: [
     // Haut du courant d'air, à gauche : retour vers les îles (T3).
-    { x: 24, y: 90, height: 160, targetScene: 'ForetFlottante2Scene', data: { enterId: 'from_clairiere' } },
+    { edge: 'left', from: 0, to: 170, targetScene: 'ForetFlottante2Scene', data: { enterId: 'from_clairiere' } },
     // Retirée par le script tant que la fleur n'est pas prélevée.
-    { x: 2224, y: 400, height: 128, targetScene: 'HutteMorgatScene', data: { enterId: 'from_clairiere' } },
+    { edge: 'right', to: 448, targetScene: 'HutteMorgatScene', data: { enterId: 'from_clairiere' } },
   ],
   script: 'acte2_clairiere',
   // Paramètres lus par le script.

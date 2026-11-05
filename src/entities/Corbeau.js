@@ -64,7 +64,10 @@ class Corbeau extends Phaser.Physics.Arcade.Sprite {
     if (this.isDiving) {
       this.anims.play(ANIM_PIAF_DIVE_KEY, true);
       this.setVelocityY(this.diveSpeed);
-      if (this.y >= this.patrolY + this.diveDepth) {
+      // Sol atteint avant la profondeur voulue (île plus haute que prévu sous
+      // la patrouille) : il remonte aussi, sinon il restait posé sur le chemin,
+      // piqué sans fin (forêt flottante 2, revue du 2026-11-05).
+      if (this.y >= this.patrolY + this.diveDepth || this.body.blocked.down) {
         this.isDiving = false;
         this.isReturning = true;
         this.lastDiveEndTime = now;
@@ -74,6 +77,11 @@ class Corbeau extends Phaser.Physics.Arcade.Sprite {
       this.setVelocityY(-this.returnSpeed);
       if (this.y <= this.patrolY) {
         this.y = this.patrolY;
+        this.setVelocityY(0);
+        this.isReturning = false;
+      } else if (this.body.blocked.up) {
+        // Même garde à la remontée : sous un plafond, il patrouille là où il
+        // est au lieu de rester bloqué (sans être téléporté au travers).
         this.setVelocityY(0);
         this.isReturning = false;
       }

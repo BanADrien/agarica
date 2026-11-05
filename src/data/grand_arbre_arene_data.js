@@ -8,8 +8,9 @@
 //   x 0-512     palier d'arrivée (depuis les racines) + feu de camp
 //   x 512-1472  l'arène, exactement un écran : caméra figée pendant le combat,
 //               rideaux de mousse aux deux bords (créés par le script) ;
-//               canopée (rangée 0) d'où pendent 2 lianes. Plus de branches
-//               basses : sous les grandes attaques, seul abri = une liane.
+//               grand tronc au milieu, juste derrière le combat, d'où partent les
+//               2 branches hautes (rangée 0) qui portent les 2 lianes. Plus de
+//               branches basses : sous les grandes attaques, seul abri = une liane.
 //   x 1472-1920 au-delà du rideau droit (ouvert après la victoire) : la
 //               route des hauteurs (-> ForetFlottante1Scene, créée après la victoire).
 const GRAND_ARBRE_ARENE_SURFACE_Y = 448;
@@ -21,11 +22,30 @@ const GRAND_ARBRE_ARENE_DATA = {
   // Même écorce et même fond que les racines : on est dans les branches du grand arbre.
   background: 'fond_grand_arbre',
   tileset: 'tuiles_ecorce',
-  groundCells: [
-    // (groundRow : borne de fin exclue)
-    ...groundRow(0, 30, [7, 8]), // grosse branche-plancher sur toute la largeur
-    // Canopée au-dessus de l'arène (x 512-1472, y 0-64) : les lianes pendent dessous.
-    ...groundRow(8, 23, [0]),
+  // Pas de grands arbres du fond : dans le tronc, leur feuillage brouille le
+  // combat, et le fond montre déjà la masse de l'arbre.
+  largeTrees: false,
+  // Le grand tronc, au milieu de l'arène et juste derrière le combat : un peu
+  // assombri pour que Kainati et ses bandes d'alerte restent lisibles devant.
+  trunks: [
+    { x: 992, top: -120, bottom: GRAND_ARBRE_ARENE_SURFACE_Y, scale: 0.36, base: true, tint: 0x94899f },
+  ],
+  // Mêmes cases de collision qu'avec les anciennes tuiles (rangées 7-8 sur toute
+  // la largeur, rangée 0 de x 512 à 1472) : seul le dessin change. Les deux
+  // branches hautes partent du tronc ; leur dessous passe PAR l'attache des
+  // lianes (y=64, x 792 et 1192), à 2 px près : ni vide, ni liane sur l'écorce.
+  branches: [
+    {
+      from: [858, -24], via: [[792, -2]], to: [508, 30], attach: 'right', thickness: 66, taper: [0.8, 1],
+      cells: groundRow(8, 15, [0]),
+    },
+    {
+      from: [1126, -24], via: [[1192, -2]], to: [1476, 30], attach: 'left', thickness: 66, taper: [1, 0.8],
+      cells: groundRow(15, 23, [0]),
+    },
+    // L'énorme branche-plancher, qui sort de l'écran des deux côtés. Sa fourche
+    // (décor, sans collision), passé le rideau droit : le combat reste dégagé.
+    { from: [0, GRAND_ARBRE_ARENE_SURFACE_Y], to: [1920, GRAND_ARBRE_ARENE_SURFACE_Y], rows: 2, thickness: 100, attach: 'none', forks: [{ at: 1480 }] },
   ],
   avoidRanges: [[512, 1472]],
   playerSpawn: { x: 110, y: 412 },
@@ -38,8 +58,8 @@ const GRAND_ARBRE_ARENE_DATA = {
     { type: 'grand_arbre_champignon_etagere', x: 1560, y: GRAND_ARBRE_ARENE_SURFACE_Y, scale: 0.28 },
     { type: 'grand_arbre_nid_singe', x: 1760, y: GRAND_ARBRE_ARENE_SURFACE_Y, scale: 0.26 },
   ],
-  // Lianes d'Agarica (x, y = attache sous la canopée, length vers le bas) :
-  // bas à y=234 -- un saut simple les attrape (mains à ~218 au sommet) ;
+  // Lianes d'Agarica (x, y = attache sous les branches hautes, length vers le bas) :
+  // bas à y=234, à portée du double saut qui donne la forme singe ;
   // suspendue, ses pieds restent ≥ 156 px au-dessus du sol : au-dessus de la
   // charge et de la bande où blessent les grandes attaques (onde, mousse,
   // rochers -- ceux qui tombent de la canopée ne blessent qu'une fois au ras
@@ -71,7 +91,7 @@ const GRAND_ARBRE_ARENE_DATA = {
     recoil: 200,        // rebond après le fracas contre le rideau : sonné à 817 / 1167, sous les lianes, puis retour au poste
     calmX: 1300,        // Kainati apaisé (revisite, si sa place n'a pas été mémorisée)
     exitsAfterVictory: [
-      { x: 1896, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_arbre' } },
+      { edge: 'right', to: 448, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_arbre' } },
     ],
   },
   // Filet (ancienne sauvegarde sans la forme singe, démarrage de test) : la
@@ -80,11 +100,11 @@ const GRAND_ARBRE_ARENE_DATA = {
     { id: 'sans_singe', x: 1850, w: 40, once: false, requires: { kainatiDefeated: true }, forbids: { hasMonkeyForm: true }, cutscene: 'arene_sans_singe' },
   ],
   exits: [
-    { x: 16, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_arene' } },
+    { edge: 'left', to: 448, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_arene' } },
   ],
   entries: [
-    { id: 'from_racines', x: 110, y: 380, height: 140 },
-    { id: 'from_foret_flottante', x: 1810, y: 380, height: 140 },
+    { id: 'from_racines', x: 110, y: 380, height: 140, edge: 'left', to: 448 },
+    { id: 'from_foret_flottante', x: 1810, y: 380, height: 140, edge: 'right', to: 448 },
     // Ancien passage du totem (sauvegardes d'avant la refonte) : au palier.
     { id: 'from_monde_spirituel', x: 110, y: 380, height: 140 },
   ],

@@ -31,6 +31,15 @@ class OptionsScene extends MenuOverlayScene {
         action: () => this.cycleShake(1),
         onLeft: () => this.cycleShake(-1), onRight: () => this.cycleShake(1),
       },
+      {
+        // Rendu de cohésion des zones (LookKit) : étalonnage, lumières,
+        // fonds adoucis. « Désactivés » = rendu d'avant, sans aucun coût
+        // (petites machines) ; appliqué tout de suite à la zone en pause.
+        label: 'Effets visuels',
+        value: () => (typeof lookEnabled === 'function' && lookEnabled() ? '◂ Activés ▸' : '◂ Désactivés ▸'),
+        action: () => this.toggleVisualFx(),
+        onLeft: () => this.toggleVisualFx(), onRight: () => this.toggleVisualFx(),
+      },
       { label: 'Musique', disabled: true, value: () => 'bientôt' },
       { label: 'Effets sonores', disabled: true, value: () => 'bientôt' },
       { label: 'Voir les contrôles', value: () => '›', action: () => menuOpenChild(this, 'ControlsScene') },
@@ -97,6 +106,11 @@ class OptionsScene extends MenuOverlayScene {
     const i = order.indexOf(juiceShakeLevel());
     juiceSetShakeLevel(order[(i + dir + order.length) % order.length]);
     juiceShake(this, 'medium', 220);
+  }
+
+  toggleVisualFx() {
+    if (typeof lookSetEnabled === 'function') lookSetEnabled(!lookEnabled());
+    else menuSetOption('visualFx', menuOptions().visualFx === false);
   }
 
   async eraseSave() {

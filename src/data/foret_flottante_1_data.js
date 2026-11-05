@@ -118,20 +118,21 @@ const FORET_FLOTTANTE_1_DATA = {
     // dessus de P8, il frappait au moment du saut vers le belvédère).
     { type: 'corbeau', x: 2980, y: -420, patrolMinX: 2935, patrolMaxX: 3025, diveDepth: 150, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
     { type: 'corbeau', x: 2330, y: -650, patrolMinX: 2285, patrolMaxX: 2375, diveDepth: 160, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
-    { type: 'mousse_creature', x: 3480, y: -940, patrolMinX: 3420, patrolMaxX: 3540 },
+    // Patrouille écartée du bord droit : on arrive des îles juste après lui (x 3540).
+    { type: 'mousse_creature', x: 3290, y: -940, patrolMinX: 3220, patrolMaxX: 3360 },
   ],
   // Visible mais inutilisable sans l'aigle (il n'agit que sur le plané) : on le
   // remarque ici, on s'en sert dans les îles flottantes (au retour, il remonte
   // l'aigle le long de l'ascension).
   windCurrents: [{ x: 3120, y: -760, w: 60, h: 1240, force: 300 }],
   entries: [
-    { id: 'from_arbre', x: 110, y: 400, height: 128 },
-    { id: 'from_ff2', x: 3490, y: -950, height: 120 },
+    { id: 'from_arbre', x: 110, y: 400, height: 128, edge: 'left', to: 448 },
+    { id: 'from_ff2', x: 3490, y: -950, height: 120, edge: 'right', from: -1200, to: -896 },
   ],
   exits: [
-    { x: 16, y: 400, height: 128, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_foret_flottante' } },
+    { edge: 'left', to: 448, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_foret_flottante' } },
     // En haut à droite, au bout du belvédère : les îles flottantes.
-    { x: 3568, y: -960, height: 160, targetScene: 'ForetFlottante2Scene', data: { enterId: 'from_ff1' } },
+    { edge: 'right', from: -1200, to: -896, targetScene: 'ForetFlottante2Scene', data: { enterId: 'from_ff1' } },
   ],
   script: 'acte2_ff1',
 };

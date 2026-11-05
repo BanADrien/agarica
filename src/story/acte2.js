@@ -1288,7 +1288,8 @@ ZONE_SCRIPTS.acte2_clairiere = {
     if (a2EnterId(scene) === 'from_ff2' && p.hasEagleForm) {
       p.jumpsUsed = 2;
       p.airJumpForm = 'eagle';
-      p.setVelocityX(120);
+      // Arrivée par le bord : son élan est déjà repris (cf. applyEdgeArrivalState).
+      if (!p.body.velocity.x) p.setVelocityX(120);
       st.arrivalPending = !storyGet('clairiereArrivee');
     }
     st.exitHutte = scene.__exits.find((e) => e.targetScene === 'HutteMorgatScene');

@@ -35,8 +35,9 @@
 const CAMPFIRE_TOTEMS_LOCKED = typeof DEMO_TOTEMS_LOCKED !== 'undefined' ? DEMO_TOTEMS_LOCKED : true;
 
 const FORM_INFO = {
-  wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), perçoit les pistes cachées.' },
-  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court), s\'accroche aux lianes (gauche/droite pour se balancer, Espace pour lâcher, S pour tomber).' },
+  wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), coup de croc (K), perçoit les pistes cachées.' },
+  // Lianes : seule Agarica devenue singe s'y accroche, donc après le double saut.
+  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court) ; après lui, s\'accroche aux lianes (gauche/droite pour se balancer, Espace pour lâcher, S pour tomber).' },
   eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : donne le double saut (plus haut) puis le plané, porté par les courants d\'air (S = piqué).' },
   octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
 };
@@ -121,10 +122,16 @@ class CampfireMenuScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.player = data.player;
+    this.player = data && data.player;
   }
 
   create() {
+    // Toujours ouvert depuis une zone avec le joueur (LevelKit) ; lancé seul
+    // (harnais de test, démarrage direct), il se referme au lieu de planter.
+    if (!this.player) {
+      this.scene.stop();
+      return;
+    }
     this.totemsLocked = CAMPFIRE_TOTEMS_LOCKED;
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
     // Voile sombre : fond du menu ET repli si le panneau peint manque.
@@ -745,6 +752,7 @@ class CampfireMenuScene extends Phaser.Scene {
   }
 
   update() {
+    if (!this.player) return;
     if (Phaser.Input.Keyboard.JustDown(this.player.interactKey) || Phaser.Input.Keyboard.JustDown(this.escKey)) {
       this.scene.stop();
     }

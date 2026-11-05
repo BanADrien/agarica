@@ -81,6 +81,33 @@ function kainatiFrozen(scene) {
   return typeof isWorldFrozen === 'function' ? isWorldFrozen(scene) : scene.scene.isActive('CampfireMenuScene');
 }
 
+// Agarica = obstacle de la règle « interface dans l'écran » (LevelKit,
+// worldUiAddScreenObstacle) pendant le combat, comme dans le duel de Geralt
+// (playerGuard, GeraltDuel.js) : les alertes de Xara se posaient sur sa tête
+// au moment précis où il faut lire l'attaque. Rectangle invisible fixé à
+// l'écran, recalé sur sa silhouette à chaque image ; masqué hors combat.
+function kainatiMakePlayerGuard(scene) {
+  if (typeof worldUiAddScreenObstacle !== 'function') return null;
+  const z = scene.add.zone(0, -999, 1, 1).setOrigin(0, 0).setScrollFactor(0).setVisible(false);
+  worldUiAddScreenObstacle(z);
+  return z;
+}
+
+function kainatiSyncPlayerGuard(scene, st) {
+  const z = st.playerGuard;
+  if (!z || !z.active) return;
+  const p = scene.player;
+  const on = (st.fightActive || st.starting) && !st.downFired && !st.won && p && p.active && p.visible && p.body;
+  z.setVisible(!!on);
+  if (!on) return;
+  const box = typeof worldUiBodyBox === 'function' ? worldUiBodyBox(p) : null;
+  const b = box || { left: p.body.left, right: p.body.right, top: p.body.top, bottom: p.body.bottom };
+  const cam = scene.cameras.main;
+  const pad = 3;
+  z.setPosition(b.left - cam.scrollX - pad, b.top - cam.scrollY - pad);
+  z.setSize(Math.max(1, b.right - b.left + 2 * pad), Math.max(1, b.bottom - b.top + 2 * pad));
+}
+
 // Forme singe : 'ready' (active, les lianes portent Agarica), 'other' (débloquée
 // mais l'aigle est choisi au feu de camp), 'none' (pas encore obtenue). Sans
 // elle, aucune grande attaque ne s'esquive : le combat ne doit pas commencer.
@@ -241,7 +268,9 @@ async function kainatiStartFight(scene, st) {
   st.fightActive = true;
   st.starting = false;
   if (firstTime) {
-    kainatiToast(scene, 'Ses grandes attaques couvrent tout le sol : saute sous une liane pour t\'y accrocher (Z/S : monter, descendre).\nFrappe-le quand tu peux ; après une charge, il est sonné : coups doublés !', 5200);
+    // Règle des lianes (Player.js) : seule Agarica devenue singe, donc après le
+    // double saut, s'accroche ; un saut simple passe à travers.
+    kainatiToast(scene, 'Ses grandes attaques couvrent tout le sol : double saut sous une liane, devenue singe tu t\'y accroches (Z/S : monter, descendre).\nFrappe-le quand tu peux ; après une charge, il est sonné : coups doublés !', 5200);
   }
 }
 
@@ -328,6 +357,7 @@ ZONE_SCRIPTS.kainati_arene = {
     };
     if (scene.__kainati) scene.__kainati.disposed = true;
     scene.__kainati = st;
+    st.playerGuard = kainatiMakePlayerGuard(scene);
 
     st.boss = new KainatiBoss(scene, {
       minX: cfg.minX, maxX: cfg.maxX, floorY: cfg.floorY, ceilingY: cfg.ceilingY,
@@ -411,6 +441,7 @@ ZONE_SCRIPTS.kainati_arene = {
     const st = scene.__kainati;
     if (!st || st.disposed || !scene.player || !scene.player.body) return;
     if (typeof currentLevelScene !== 'undefined' && scene !== currentLevelScene) return;
+    kainatiSyncPlayerGuard(scene, st);
     if (kainatiFrozen(scene)) return;
     const p = scene.player;
     const dt = Math.min(delta, 50);

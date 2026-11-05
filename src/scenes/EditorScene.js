@@ -165,7 +165,74 @@ function editorNpcFootY(ed, e, sprite = null) {
   return e.y != null ? e.y : ed.groundYOr(e.x, 400);
 }
 
+// Déplace une branche (points, et cases à la case près : ses cases écrites à la
+// main restent sous le même dessin).
+function editorShiftBranch(b, dx, dy) {
+  for (const pt of [b.from, ...(b.via || []), b.to]) { pt[0] += dx; pt[1] += dy; }
+  if (b.cells) {
+    const dgx = Math.round(dx / GROUND_TILE_SIZE);
+    const dgy = Math.round(dy / GROUND_TILE_SIZE);
+    b.cells = b.cells.map(([gx, gy, m]) => [gx + dgx, gy + dgy, m]);
+  }
+}
+
 const EDITOR_STORY_KINDS = {
+  // Branche (clé `branches`) : glisser = surface de marche, calée sur la grille
+  // (une case de large au moins). Courbe, raccord au tronc, épaisseur, cases :
+  // « Propriétés (JSON) ». Molette : longueur (plate) ou épaisseur (courbe).
+  branche: {
+    defaultSize: { w: 256, h: 0 },
+    key: 'branches', shape: 'hline', label: 'Branche',
+    create(ed, g) {
+      const T = GROUND_TILE_SIZE;
+      const x1 = Math.round(g.x / T) * T;
+      const x2 = Math.max(x1 + T, Math.round((g.x + g.w) / T) * T);
+      const y = Math.round(g.y / T) * T;
+      return { from: [x1, y], to: [x2, y], attach: 'none', tip: 'both', thickness: 56 };
+    },
+    draw(ed, e) {
+      ed.scheduleGroundRedraw();
+      const mid = EDITOR_STORY_KINDS.branche.anchor(ed, e);
+      const w = Math.max(32, Math.abs(e.to[0] - e.from[0]));
+      const rect = ed.add.rectangle(mid.x, mid.y, w, Math.max(12, Math.abs(e.to[1] - e.from[1])), 0xd9a066, 0.12)
+        .setStrokeStyle(1, 0xffd9a0, 0.75).setDepth(400);
+      const solid = branchCollisionCells(e).length;
+      return [rect, ed.markerLabel(mid.x, mid.y - 8, `Branche (${solid} case(s), raccord : ${e.attach || 'none'})`, '#ffd9a0')];
+    },
+    anchor: (ed, e) => ({ x: (e.from[0] + e.to[0]) / 2, y: (e.from[1] + e.to[1]) / 2 }),
+    move(ed, e, x, y) {
+      const T = GROUND_TILE_SIZE;
+      const mid = EDITOR_STORY_KINDS.branche.anchor(ed, e);
+      editorShiftBranch(e, Math.round((x - mid.x) / T) * T, Math.round((y - mid.y) / T) * T);
+    },
+    wheel(e, sign) {
+      const flat = e.from[1] === e.to[1] && !(e.via && e.via.length) && !e.bend && !e.cells;
+      if (!flat) { e.thickness = Math.max(24, (e.thickness || 56) + sign * 4); return; }
+      const right = e.to[0] >= e.from[0] ? e.to : e.from;
+      const left = right === e.to ? e.from : e.to;
+      right[0] = Math.max(left[0] + GROUND_TILE_SIZE, right[0] + sign * GROUND_TILE_SIZE);
+    },
+  },
+  // Tronc (clé `trunks`) : posé sur le sol sous le clic, avec son pied. Molette : échelle.
+  tronc: {
+    key: 'trunks', shape: 'point', label: 'Tronc',
+    create: (ed, g) => ({ x: Math.round(g.x), top: ed.worldTop(), bottom: ed.snapY(g.x, g.y), scale: 0.25, base: true }),
+    draw(ed, e) {
+      ed.scheduleGroundRedraw();
+      const top = e.top ?? ed.worldTop();
+      const bottom = e.bottom ?? (ed.data.levelHeight || 540);
+      const w = TRONC_SEGMENT_COLS * (e.scale || 0.25);
+      const rect = ed.add.rectangle(e.x, (top + bottom) / 2, w, bottom - top, 0xd9a066, 0.08)
+        .setStrokeStyle(1, 0xffd9a0, 0.75).setDepth(400);
+      return [rect, ed.markerLabel(e.x, bottom - 120, `Tronc (échelle ${e.scale || 0.25})`, '#ffd9a0')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: (e.bottom ?? (ed.data.levelHeight || 540)) - 120 }),
+    move(ed, e, x, y) {
+      e.x = Math.round(x);
+      if (e.base) e.bottom = ed.snapY(x, y + 120);
+    },
+    wheel(e, sign) { e.scale = Phaser.Math.Clamp(+((e.scale || 0.25) + sign * 0.05).toFixed(2), 0.1, 1); },
+  },
   npc: {
     key: 'npcs', shape: 'point', label: 'PNJ',
     create(ed, g, subtype) {
@@ -589,7 +656,20 @@ class EditorScene extends Phaser.Scene {
       cell[0] += dgx;
       cell[1] += dgy;
     }
+    for (const b of this.data.branches || []) editorShiftBranch(b, dgx * GROUND_TILE_SIZE, dgy * GROUND_TILE_SIZE);
+    for (const t of this.data.trunks || []) {
+      t.x += dgx * GROUND_TILE_SIZE;
+      if (t.top != null) t.top += dgy * GROUND_TILE_SIZE;
+      if (t.bottom != null) t.bottom += dgy * GROUND_TILE_SIZE;
+    }
     this.redrawGround();
+  }
+
+  // Marqueur Branche / Tronc modifié (glisser, molette, propriétés) : leur image
+  // fait partie du sol. Regroupé : le glisser appelle ceci à chaque mouvement.
+  scheduleGroundRedraw() {
+    clearTimeout(this.groundRedrawTimer);
+    this.groundRedrawTimer = setTimeout(() => { if (this.sys.isActive()) this.redrawGround(); }, 120);
   }
 
   // Haut du monde éditable : la marge par défaut, ou plus haut pour une zone
@@ -650,6 +730,10 @@ class EditorScene extends Phaser.Scene {
       this.portalDragStart = { x: p.x, y: p.y };
       return;
     }
+    if (this.tool === 'edge-exit') {
+      this.edgeExitDragStart = { x: p.x, y: p.y };
+      return;
+    }
     const storyDef = EDITOR_STORY_KINDS[this.tool];
     if (storyDef) {
       if (storyDef.shape === 'point') this.placeStoryElement(this.tool, { x: p.x, y: p.y });
@@ -694,6 +778,8 @@ class EditorScene extends Phaser.Scene {
       this.updateWaterPreview(p.x, p.y);
     } else if (this.tool === 'portal' && this.portalDragStart) {
       this.updatePortalPreview(p.x, p.y);
+    } else if (this.tool === 'edge-exit' && this.edgeExitDragStart) {
+      this.updateEdgeExitPreview(p.x, p.y);
     } else if (this.shapeDragStart && EDITOR_STORY_KINDS[this.tool]) {
       this.updateShapePreview(p.x, p.y);
     } else if (this.tool === 'delete') {
@@ -717,6 +803,10 @@ class EditorScene extends Phaser.Scene {
       const p = this.worldPointFromPointer(pointer);
       this.finishPortalDrag(p.x, p.y);
     }
+    if (this.tool === 'edge-exit' && this.edgeExitDragStart) {
+      const p = this.worldPointFromPointer(pointer);
+      this.finishEdgeExitDrag(p.x, p.y);
+    }
     if (this.shapeDragStart && EDITOR_STORY_KINDS[this.tool]) {
       const p = this.worldPointFromPointer(pointer);
       this.finishShapeDrag(p.x, p.y);
@@ -725,6 +815,7 @@ class EditorScene extends Phaser.Scene {
     this.modifyDragOffset = null;
     this.waterDragStart = null;
     this.portalDragStart = null;
+    this.edgeExitDragStart = null;
     this.lastPaintedCell = null;
   }
 
@@ -785,11 +876,15 @@ class EditorScene extends Phaser.Scene {
     // Même jeu de tuiles que dans le jeu (clé de zone `tileset`, cf.
     // autotileLayoutFor) : un jeu de biome change le rendu ET sa disposition.
     const tileset = this.data.tileset;
+    // Troncs et branches (cf. BrancheKit.js) : mêmes images qu'en jeu, le marqueur
+    // de chaque élément (outils Branche et Tronc) ne fait que le désigner.
+    const trunkImages = addZoneTrunks(this, this.data);
     const backImages = renderAutotileGrid(this, null, this.data.groundBackCells, { back: true, tileset });
     const frontImages = renderAutotileGrid(this, null, this.data.groundCells, { tileset });
-    this.groundImages = [...backImages, ...frontImages];
+    const branchImages = addZoneBranches(this, this.data);
+    this.groundImages = [...trunkImages, ...backImages, ...frontImages, ...branchImages];
     // Repère des décors plantés de travers (cf. layoutPropPreview).
-    this.frontGroundFirstImage = frontImages[0] || null;
+    this.frontGroundFirstImage = frontImages[0] || branchImages[0] || null;
     EditorScene.setStatus(`${this.data.groundCells.length} case(s) de sol, ${this.data.groundBackCells.length} arrière-plan`);
   }
 
@@ -885,6 +980,103 @@ class EditorScene extends Phaser.Scene {
     });
   }
 
+  // Sortie de bord (cf. « Sorties de bord » dans LevelKit.js) : le bord le plus
+  // proche du clic. Un clic = tout le bord ; un glisser le long du bord = un
+  // passage borné (from/to). Comme un portail, elle vient avec son entrée
+  // jumelle, le point d'arrivée de l'autre sens.
+  edgeExitLimits() {
+    const width = this.data.levelWidth;
+    const height = this.data.levelHeight;
+    const tall = this.data.tallLevel || (this.data.camera && this.data.camera.vertical);
+    return { left: 0, right: width, top: tall ? Math.min(-400, this.data.levelTop ?? -400) : 0, bottom: tall ? height : Math.min(height, this.scale.height) };
+  }
+
+  edgeExitNearest(x, y) {
+    const lim = this.edgeExitLimits();
+    const dist = { left: Math.abs(x - lim.left), right: Math.abs(x - lim.right), top: Math.abs(y - lim.top), bottom: Math.abs(y - lim.bottom) };
+    return Object.keys(dist).reduce((a, b) => (dist[b] < dist[a] ? b : a));
+  }
+
+  updateEdgeExitPreview(worldX, worldY) {
+    if (this.edgeExitPreview) this.edgeExitPreview.destroy();
+    const start = this.edgeExitDragStart;
+    const edge = this.edgeExitNearest(start.x, start.y);
+    const lateral = edge === 'left' || edge === 'right';
+    const a = lateral ? start.y : start.x;
+    const b = lateral ? worldY : worldX;
+    const { obj, label } = EditorScene.buildEdgeExitVisual(this, { edge, from: Math.min(a, b), to: Math.max(a, b) });
+    label.destroy();
+    this.edgeExitPreview = obj;
+  }
+
+  finishEdgeExitDrag(worldX, worldY) {
+    if (this.edgeExitPreview) {
+      this.edgeExitPreview.destroy();
+      this.edgeExitPreview = null;
+    }
+    const start = this.edgeExitDragStart;
+    const edge = this.edgeExitNearest(start.x, start.y);
+    const lateral = edge === 'left' || edge === 'right';
+    const a = Math.round(lateral ? start.y : start.x);
+    const b = Math.round(lateral ? worldY : worldX);
+    const bounded = Math.abs(b - a) >= EDITOR_EXIT_MIN_DRAG;
+    this.pushUndo();
+    const promptedTarget = window.prompt('Cible directe de la sortie (nom de scène, optionnel -- laisser vide pour relier plus tard depuis "Zones") :', '');
+    const targetScene = (promptedTarget && promptedTarget.trim()) || null;
+    const passage = bounded ? { from: Math.min(a, b), to: Math.max(a, b) } : {};
+    const { exit, entry } = EditorScene.createEdgeExitPair(this.data, edge, passage, targetScene);
+    const { obj, label } = EditorScene.buildEdgeExitVisual(this, exit);
+    this.markers.push({
+      kind: 'edgeExit', entry: exit, pairEntry: entry, obj: [obj, label], sourceArray: this.data.exits,
+    });
+  }
+
+  // Crée la sortie et son entrée jumelle dans la donnée de zone. Un bord
+  // latéral sans bornes retient quand même son sol (`to`) : à l'arrivée, les
+  // pieds gardent la même hauteur au-dessus du sol, quels que soient les niveaux.
+  static createEdgeExitPair(data, edge, passage, targetScene) {
+    const lateral = edge === 'left' || edge === 'right';
+    const width = data.levelWidth || 960;
+    const portalId = EditorScene.generateEntryId();
+    const exit = { edge, ...passage, targetScene: targetScene || null, data: {}, portalId };
+    // Point écrit à la main de l'entrée (reprise de sauvegarde, réapparition) :
+    // dans le niveau, un peu après le bord.
+    const entryX = edge === 'left' ? 110 : edge === 'right' ? width - 110
+      : ((passage.from ?? 0) + (passage.to ?? width)) / 2;
+    const groundY = EditorScene.groundSurfaceYAtGridStatic(zoneGroundCells(data), entryX, passage.to ?? 400);
+    const height = EDITOR_EXIT_DEFAULT_HEIGHT;
+    if (lateral && exit.to == null && groundY != null) exit.to = groundY;
+    const entry = {
+      id: portalId, x: Math.round(entryX), y: Math.round(groundY != null ? groundY - height / 2 : 400), height, edge, ...passage, portalId,
+    };
+    if (lateral && exit.to != null) entry.to = exit.to;
+    data.exits = data.exits || [];
+    data.entries = data.entries || [];
+    data.exits.push(exit);
+    data.entries.push(entry);
+    return { exit, entry };
+  }
+
+  // Bandeau orange le long du bord, de `from` à `to` (tout le bord sans bornes).
+  static buildEdgeExitVisual(scene, entry) {
+    const lim = scene.edgeExitLimits();
+    const lateral = entry.edge === 'left' || entry.edge === 'right';
+    const from = entry.from ?? (lateral ? lim.top : lim.left);
+    const to = entry.to ?? (lateral ? lim.bottom : lim.right);
+    const thick = 12;
+    const cx = lateral ? (entry.edge === 'left' ? lim.left + thick / 2 : lim.right - thick / 2) : (from + to) / 2;
+    const cy = lateral ? (from + to) / 2 : (entry.edge === 'top' ? lim.top + thick / 2 : lim.bottom - thick / 2);
+    const obj = scene.add.rectangle(cx, cy, lateral ? thick : to - from, lateral ? to - from : thick, 0xffa040, 0.65)
+      .setStrokeStyle(1, 0xffe0b0, 0.95);
+    const name = { left: 'gauche', right: 'droit', top: 'haut', bottom: 'bas' }[entry.edge];
+    const labelX = lateral ? (entry.edge === 'left' ? lim.left + thick + 6 : lim.right - thick - 6) : cx;
+    const labelY = lateral ? cy : (entry.edge === 'top' ? lim.top + thick + 12 : lim.bottom - thick - 12);
+    const label = scene.add.text(labelX, labelY, `Bord ${name} ${entry.targetScene ? `-> ${entry.targetScene}` : '(non relié)'}`, {
+      fontFamily: 'sans-serif', fontSize: '11px', color: '#ffe0b0',
+    }).setOrigin(entry.edge === 'left' ? 0 : entry.edge === 'right' ? 1 : 0.5, 0.5);
+    return { obj, label };
+  }
+
   // Dessin partagé placement/rechargement (cf. finishPortalDrag et
   // applyLevelData) : un fin bandeau vertical de la hauteur définie par
   // l'utilisateur (`entry.height`), violet (ni le rouge "sortie" ni le
@@ -917,7 +1109,7 @@ class EditorScene extends Phaser.Scene {
     const height = entry.height || EDITOR_EXIT_DEFAULT_HEIGHT;
     const obj = scene.add.rectangle(entry.x, entry.y, 6, height, 0x66ccff, 0.6)
       .setStrokeStyle(1, 0xb3e6ff, 0.9);
-    const label = scene.add.text(entry.x, entry.y - height / 2 - 12, 'Entrée (ancienne)', {
+    const label = scene.add.text(entry.x, entry.y - height / 2 - 12, entry.edge ? `Arrivée (${entry.id})` : 'Entrée (ancienne)', {
       fontFamily: 'sans-serif', fontSize: '11px', color: '#b3e6ff',
     }).setOrigin(0.5);
     return { obj, label };
@@ -939,7 +1131,7 @@ class EditorScene extends Phaser.Scene {
   // pour ne pas sauter sur une autre plateforme juste parce qu'elle existe
   // plus haut dans la même colonne.
   groundSurfaceYAtGrid(worldX, referenceY) {
-    return EditorScene.groundSurfaceYAtGridStatic(this.data.groundCells, worldX, referenceY);
+    return EditorScene.groundSurfaceYAtGridStatic(zoneGroundCells(this.data), worldX, referenceY);
   }
 
   // Extrait en static (cf. resolvePortalChoice, qui n'a pas de scène vivante
@@ -1162,6 +1354,7 @@ class EditorScene extends Phaser.Scene {
     const def = EDITOR_STORY_KINDS[m.kind];
     if (def) return def.anchor(this, m.entry);
     if (m.kind === 'water') return { x: m.entry.x + m.entry.width / 2, y: m.entry.y + m.entry.height / 2 };
+    if (m.kind === 'edgeExit') return { x: m.obj[0].x, y: m.obj[0].y };
     return { x: m.entry.x, y: m.entry.y != null ? m.entry.y : (m.displayY ?? 0) };
   }
 
@@ -1253,11 +1446,12 @@ class EditorScene extends Phaser.Scene {
     } else if (best.kind === 'spawn') {
       this.data.playerSpawn = null;
     }
+    if (best.kind === 'branche' || best.kind === 'tronc') this.redrawGround();
     // Portail = paire sortie+entrée (cf. finishPortalDrag) : supprimer la
     // moitié "sortie" ci-dessus ne retire pas sa moitié "entrée" -- sans ce
     // second retrait, une entrée fantôme (plus jamais affichée/éditable,
     // toujours dans data.entries) restait ciblable par un futur `enterId`.
-    if (best.kind === 'portal' && best.pairEntry) {
+    if ((best.kind === 'portal' || best.kind === 'edgeExit') && best.pairEntry) {
       const j = this.data.entries.indexOf(best.pairEntry);
       if (j >= 0) this.data.entries.splice(j, 1);
     }
@@ -1307,6 +1501,19 @@ class EditorScene extends Phaser.Scene {
       entry.x = Math.round(worldX - entry.width / 2);
       entry.y = Math.round(worldY - entry.height / 2);
       m.obj[0].setPosition(entry.x + entry.width / 2, entry.y + entry.height / 2);
+      this.updateSelectionVisual();
+      return;
+    }
+    if (m.kind === 'edgeExit') {
+      if (entry.from == null || entry.to == null) return;
+      const lateral = entry.edge === 'left' || entry.edge === 'right';
+      const len = entry.to - entry.from;
+      entry.from = Math.round((lateral ? worldY : worldX) - len / 2);
+      entry.to = entry.from + len;
+      if (m.pairEntry) { m.pairEntry.from = entry.from; m.pairEntry.to = entry.to; }
+      for (const o of m.obj) o.destroy();
+      const { obj, label } = EditorScene.buildEdgeExitVisual(this, entry);
+      m.obj = [obj, label];
       this.updateSelectionVisual();
       return;
     }
@@ -1377,6 +1584,20 @@ class EditorScene extends Phaser.Scene {
       this.redrawMarker(m);
       this.updateSelectionVisual();
       EditorScene.syncSelectionUI(this);
+      return;
+    }
+    if (m.kind === 'edgeExit') {
+      if (m.entry.from == null || m.entry.to == null) return;
+      this.pushUndo();
+      const step = deltaY < 0 ? GROUND_TILE_SIZE / 2 : -GROUND_TILE_SIZE / 2;
+      if (m.entry.to - m.entry.from + 2 * step < GROUND_TILE_SIZE) return;
+      m.entry.from -= step;
+      m.entry.to += step;
+      if (m.pairEntry) { m.pairEntry.from = m.entry.from; m.pairEntry.to = m.entry.to; }
+      for (const o of m.obj) o.destroy();
+      const { obj, label } = EditorScene.buildEdgeExitVisual(this, m.entry);
+      m.obj = [obj, label];
+      this.updateSelectionVisual();
       return;
     }
     if (!EDITOR_RESIZABLE_KINDS.has(m.kind)) return;
@@ -1901,6 +2122,16 @@ class EditorScene extends Phaser.Scene {
     // (cf. buildEntryVisual) pour rester visible/supprimable.
     const claimedEntryIds = new Set();
     for (const entry of this.data.exits) {
+      // Sortie de bord : bandeau le long du bord, ni x ni y. Son entrée jumelle
+      // (portalId, ou une entrée de zone écrite à la main avec le même `edge`)
+      // n'a pas de marqueur à part quand elle est reliée.
+      if (entry.edge) {
+        const pairEntry = entry.portalId ? this.data.entries.find((e) => e.id === entry.portalId) : null;
+        if (pairEntry) claimedEntryIds.add(pairEntry.id);
+        const { obj, label } = EditorScene.buildEdgeExitVisual(this, entry);
+        this.markers.push({ kind: 'edgeExit', entry, pairEntry, obj: [obj, label], sourceArray: this.data.exits });
+        continue;
+      }
       // Anciennes sorties (format `exit` singulier, jamais de `y`/`height`
       // stockés -- cf. normalisation plus haut) : AFFICHÉES sur le sol réel
       // sous ce x, sans écrire ce `y` dans la donnée (round-trip exact ;
@@ -2217,6 +2448,7 @@ class EditorScene extends Phaser.Scene {
       track: 'Glisser horizontalement le long du sol.',
       hiddenPlatform: 'Glisser horizontalement sur les cases.',
       npc: 'Clic au sol (dialogue demandé).',
+      'edge-exit': 'Clic près du bord = tout le bord. Glisser le long du bord = un passage borné.',
     }[tool];
     if (hint) EditorScene.setStatus(hint);
   }
@@ -2259,6 +2491,7 @@ class EditorScene extends Phaser.Scene {
       const groups = {
         Histoire: ['npc', 'trigger', 'pickup', 'checkpoint'],
         Obstacles: ['mossBlock', 'mossWall', 'web'],
+        'Grand arbre': ['branche', 'tronc'],
         'Formes (singe, loup, aigle)': ['vine', 'track', 'hiddenPlatform', 'windCurrent'],
         Faune: ['animal'],
       };
@@ -2561,7 +2794,7 @@ class EditorScene extends Phaser.Scene {
     ctx.fillRect(0, 0, w, h);
 
     const TILE = 64;
-    const cells = data.groundCells || [];
+    const cells = zoneGroundCells(data);
     const backCells = data.groundBackCells || [];
     let minGX = 0;
     let maxGX = Math.ceil((data.levelWidth || TILE * 10) / TILE);
@@ -2803,13 +3036,18 @@ class EditorScene extends Phaser.Scene {
         const opt = document.createElement('option');
         opt.value = String(i);
         const target = ex.targetScene ? `-> ${ex.targetScene}` : 'non relié';
-        opt.textContent = `Portail ${i + 1} (${target})${ex.portalId ? '' : ' [ancienne sortie]'}`;
+        const kind = ex.edge ? `Bord ${{ left: 'gauche', right: 'droit', top: 'haut', bottom: 'bas' }[ex.edge]}` : `Portail ${i + 1}`;
+        opt.textContent = `${kind} (${target})${ex.portalId || ex.edge ? '' : ' [ancienne sortie]'}`;
         select.appendChild(opt);
       });
-      const newOpt = document.createElement('option');
-      newOpt.value = 'new';
-      newOpt.textContent = '+ Nouveau portail';
-      select.appendChild(newOpt);
+      // Une nouvelle liaison passe par un bord (règle du jeu : plus de sortie au
+      // milieu d'une zone) ; le portail reste proposé pour les zones de test.
+      for (const [value, text] of [['edge-right', '+ Nouvelle sortie : bord droit'], ['edge-left', '+ Nouvelle sortie : bord gauche'], ['new', '+ Nouveau portail']]) {
+        const newOpt = document.createElement('option');
+        newOpt.value = value;
+        newOpt.textContent = text;
+        select.appendChild(newOpt);
+      }
     };
 
     const sourceField = document.createElement('div');
@@ -2818,7 +3056,7 @@ class EditorScene extends Phaser.Scene {
     sourceLabel.textContent = `Portail de "${sourceName}"`;
     const sourceSelect = document.createElement('select');
     buildPortalOptions(sourceSelect, sourceExits);
-    if (sourceExits.length === 0) sourceSelect.value = 'new';
+    if (sourceExits.length === 0) sourceSelect.value = 'edge-right';
     sourceField.appendChild(sourceLabel);
     sourceField.appendChild(sourceSelect);
     modal.appendChild(sourceField);
@@ -2829,7 +3067,7 @@ class EditorScene extends Phaser.Scene {
     targetLabel.textContent = `Portail de "${targetName}"`;
     const targetSelect = document.createElement('select');
     buildPortalOptions(targetSelect, targetExits);
-    if (targetExits.length === 0) targetSelect.value = 'new';
+    if (targetExits.length === 0) targetSelect.value = 'edge-left';
     targetField.appendChild(targetLabel);
     targetField.appendChild(targetSelect);
     modal.appendChild(targetField);
@@ -2876,6 +3114,10 @@ class EditorScene extends Phaser.Scene {
   // groundSurfaceYAtGridStatic) quand il y en a un, et en appliquant LA
   // MÊME valeur aux deux moitiés du portail.
   static resolvePortalChoice(data, exits, choice) {
+    if (choice === 'edge-right' || choice === 'edge-left') {
+      data.exits = exits;
+      return EditorScene.createEdgeExitPair(data, choice === 'edge-right' ? 'right' : 'left', {}, null).exit;
+    }
     if (choice !== 'new') return exits[parseInt(choice, 10)];
     const portalId = EditorScene.generateEntryId();
     const x = EditorScene.nextExitX(data, exits);
@@ -2884,7 +3126,7 @@ class EditorScene extends Phaser.Scene {
     // exposée) : retombe sur une hauteur raisonnable au lieu de planter --
     // reste ajustable à la main ensuite (glisser le portail dans l'éditeur
     // de niveau le replace où on veut, comme n'importe quel portail).
-    const groundY = EditorScene.groundSurfaceYAtGridStatic(data.groundCells || [], x, 400);
+    const groundY = EditorScene.groundSurfaceYAtGridStatic(zoneGroundCells(data), x, 400);
     const y = groundY != null ? groundY - height / 2 : 400;
     const exit = { x, y, height, targetScene: null, data: {}, portalId };
     const entry = { id: portalId, x, y, height, portalId };

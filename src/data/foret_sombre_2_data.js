@@ -53,7 +53,10 @@ const FORET_SOMBRE_2_DATA = {
     ...groundRow(32, 33, [6]),
     ...groundRow(34, 37, [4]),       // branche haute (élan du loup)
     // gx 44-52 : RAVIN DE 9 CASES (plateformes cachées : hiddenPlatforms)
-    ...groundRow(53, 92, [7, 8]),    // clairière, surplomb, sortie
+    ...groundRow(53, 78, [7, 8]),    // clairière, surplomb, sortie
+    // gx 78-79 : le trou du vieux sentier, au fond de la poche (sortie basse
+    // vers la hutte de Morgat) : il n'y a pas d'autre bord à portée de la poche.
+    ...groundRow(80, 92, [7, 8]),
     ...groundRow(55, 58, [1]),       // haute branche : la plante (hors d'atteinte)
     ...groundRow(61, 62, [6]),       // marchepied vers la corniche
     ...groundRow(62, 65, [4]),       // corniche vers le surplomb ; on passe dessous
@@ -104,7 +107,7 @@ const FORET_SOMBRE_2_DATA = {
     { type: 'foret_sombre_fougere_sombre', x: 4980, y: 192, scale: 0.26 },
     { type: 'foret_sombre_pierre_runique', x: 4620, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.32 }, // la poche secrète
     { type: 'foret_sombre_champignons_lumineux', x: 4900, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.26 },
-    { type: 'foret_sombre_racine_arche', x: 5050, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.34 },   // le vieux sentier de la hutte
+    { type: 'foret_sombre_racine_arche', x: 4820, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.34 },   // le vieux sentier de la hutte, avant son trou
     { type: 'foret_sombre_racine_arche', x: 5580, y: FORET_SOMBRE_2_SURFACE_Y, scale: 0.45 }, // vers les racines
   ],
   enemies: [
@@ -130,15 +133,15 @@ const FORET_SOMBRE_2_DATA = {
     { id: 'grand_arbre', x: 5320, w: 40, cutscene: 'fs2_grand_arbre' },
   ],
   entries: [
-    { id: 'from_foret_sombre_1', x: 110, y: 400, height: 128 },
-    { id: 'from_racines', x: 5760, y: 400, height: 128 },
+    { id: 'from_foret_sombre_1', x: 110, y: 400, height: 128, edge: 'left' },
+    { id: 'from_racines', x: 5760, y: 400, height: 128, edge: 'right' },
     // Par le vieux sentier de la hutte de Morgat : on arrive DANS la poche.
     { id: 'from_hutte_morgat', x: 4960, y: 400, height: 128 },
   ],
   exits: [
-    { x: 16, targetScene: 'ForetSombre1Scene', data: { enterId: 'from_foret_sombre_2' } },
-    { x: 5872, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_foret_sombre' } },
-    // Fond de la poche (derrière le mur de répulsif) : le sentier vers la hutte.
-    { x: 5080, y: 352, height: 192, targetScene: 'HutteMorgatScene', data: { enterId: 'from_foret_sombre' } },
+    { edge: 'left', targetScene: 'ForetSombre1Scene', data: { enterId: 'from_foret_sombre_2' } },
+    { edge: 'right', targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_foret_sombre' } },
+    // Fond de la poche (derrière le mur de répulsif) : le trou du sentier vers la hutte.
+    { edge: 'bottom', from: 4992, to: 5120, targetScene: 'HutteMorgatScene', data: { enterId: 'from_foret_sombre' } },
   ],
 };

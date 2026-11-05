@@ -31,7 +31,8 @@ const CONTROLS_GROUPS = [
     rows: [
       { keys: ['←', '→'], alt: ['Q', 'D'], text: 'Marcher' },
       // Le papillon n'est plus une forme aérienne, seulement une compétence.
-      { keys: ['Espace'], text: 'Sauter (2e saut : Singe ou Aigle)' },
+      // Seul le singe s'accroche aux lianes : il faut donc le 2e saut.
+      { keys: ['Espace'], text: 'Sauter (2e saut : Singe, qui s\'accroche aux lianes, ou Aigle)' },
       { keys: ['Shift'], text: 'Courir — forme du Loup (ou double appui ← / →)' },
       { keys: ['Z', '↑'], text: 'Viser vers le haut' },
       { keys: ['S', '↓'], text: "Viser en bas (en l'air, rebond) · piqué de l'Aigle · lâcher une liane" },
@@ -40,7 +41,7 @@ const CONTROLS_GROUPS = [
   {
     title: 'Agir',
     rows: [
-      { keys: ['K'], alt: ['Clic'], text: "Attaquer là où l'on vise (sinon devant)" },
+      { keys: ['K'], alt: ['Clic'], text: "Attaquer là où l'on vise (sinon devant) · en Loup : coup de croc" },
       { keys: ['E'], text: 'Parler, examiner, interagir' },
       { keys: ['A', 'F', 'R'], text: 'Compétences (coûtent de l\'énergie)' },
     ],
@@ -54,8 +55,11 @@ const CONTROLS_GROUPS = [
     ],
   },
 ];
+// Règle du 2e saut (Player.js, décision du 2026-11-05) : même en tombant d'un
+// rebord, le 1er appui est un saut, le 2e la transformation (singe et aigle).
 const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e saut = Singe ou Aigle '
-  + '(sans forme aérienne, un seul saut), eau = Pieuvre. Au feu de camp : soin, sauvegarde, formes et compétences.';
+  + '(en tombant d\'un rebord aussi : 1er appui = saut, 2e = la forme ; sans forme aérienne, un seul saut), '
+  + 'eau = Pieuvre. Au feu de camp : soin, sauvegarde, formes et compétences.';
 // Rappel discret affiché en jeu si l'option est activée.
 const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Shift courir · E agir · A F R compétences · I sac · Échap pause';
 
@@ -166,7 +170,9 @@ function menuStartChapter(scene, index) {
 const MENU_OPTIONS_KEY = 'agarica-options-v1';
 const MENU_PROGRESS_KEY = 'agarica-progress-v1';
 // `screenShake` : 'on' | 'reduced' | 'off' (accessibilité, cf. juiceShake dans LevelKit).
-const MENU_OPTIONS_DEFAULTS = { controlsHint: false, musicVolume: 80, sfxVolume: 80, screenShake: 'on' };
+// `visualFx` : rendu de cohésion des zones (LookKit.js) ; false = rendu
+// d'avant, sans aucun coût (petites machines).
+const MENU_OPTIONS_DEFAULTS = { controlsHint: false, musicVolume: 80, sfxVolume: 80, screenShake: 'on', visualFx: true };
 
 function menuReadJson(key) {
   try {

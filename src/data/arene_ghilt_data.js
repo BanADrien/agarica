@@ -24,15 +24,16 @@ const ARENE_GHILT_DATA = {
   playerSpawn: { x: 110, y: 412 },
   entries: [
     // Depuis la forêt corrompue (sortie droite de ForetCorrompue1Scene).
-    { id: 'from_foret_corrompue', x: 110, y: 400, height: 128 },
+    // `inset` : le mur de mousse du combat est posé juste après le bord (x 10-50).
+    { id: 'from_foret_corrompue', x: 110, y: 400, height: 128, edge: 'left', to: 448, inset: 110 },
     // Retour du trou sombre (phase 2) : les papillons la ramènent sur le bord gauche.
-    { id: 'from_trou', x: 180, y: 400, height: 128 },
+    { id: 'from_trou', x: 180, y: 400, height: 128, edge: 'left', to: 448, inset: 180 },
   ],
   // Le script retire ces sorties tant que Ghil't n'est pas guéri
   // (`ghiltHealed`) : pendant le combat l'arène est fermée par deux murs de mousse.
   exits: [
-    { x: 24, y: 400, height: 128, targetScene: 'ForetCorrompue1Scene', data: { enterId: 'from_arene_ghilt' } },
-    { x: 1320, y: 400, height: 128, targetScene: 'BosquetRetourScene', data: { enterId: 'from_arene' } },
+    { edge: 'left', to: 448, targetScene: 'ForetCorrompue1Scene', data: { enterId: 'from_arene_ghilt' } },
+    { edge: 'right', to: 448, targetScene: 'BosquetRetourScene', data: { enterId: 'from_arene' } },
   ],
   script: 'ghilt_arene',
 };

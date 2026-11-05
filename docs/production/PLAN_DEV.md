@@ -146,11 +146,58 @@ Clés gérées par la **Fondation** :
   (hitbox de compétence qui le touche) ; mémorisé par flag.
 - `mossWalls: [{id, x, y, w, h}]` — mur de mousse ; s'ouvre si le joueur a l'objet
   `repulsif` et appuie sur E devant (petite animation de dissolution), mémorisé.
-- `fall: {y, mode: 'hurt'|'respawn'|'scene', scene?, data?}` — chute dans le vide.
+- `fall: {y, mode: 'hurt'|'respawn'|'scene', scene?, data?, shade?}` — chute dans le vide (`shade: false` :
+  pas d'obscurité au fond des trous, cf. lisibilité des bords, clé `exits`).
 - `script: 'id'` — `ZONE_SCRIPTS[id] = { create(scene), update(scene, time, delta) }`
   pour la logique spécifique d'une zone (boss, événements) sans écrire dans la scène
   (les fichiers Scene restent le gabarit générique de l'éditeur).
 - `checkpoints: [{x, y}]` — point de réapparition (sans menu), utilisé par l'épreuve du singe.
+- `exits` / `entries` — **sorties de bord** (LevelKit, retour utilisateur du 2026-11-04 : « on
+  change de zone au bord d'une zone, ou par une porte »). Plus aucune sortie au milieu d'une zone
+  de la démo.
+  - Sortie : `{ edge: 'left'|'right'|'top'|'bottom', from, to, targetScene, data: { enterId }, hint, panneau, panneauX }`.
+    `from`/`to` bornent le passage le long du bord : altitude des PIEDS pour `left`/`right` (`to` = le
+    sol du passage), x pour `top`/`bottom`. Sans eux, tout le bord.
+  - Le changement part quand le CORPS a entièrement franchi le bord : `body.right <= 0`, `body.left >=
+    levelWidth`, `body.bottom <=` haut, `body.top >=` bas. Haut et bas = ce que la caméra peut montrer
+    (`scene.__edgeLimits` : `levelTop` et `levelHeight` en zone verticale, sinon 0 et 540), pas le monde
+    physique, qui va plus loin. Puis court fondu (`goToScene`).
+  - Côté sans sortie (ou hors de `from`/`to`) : un mur (bornes propres au joueur, `updateEdgeOpenings` +
+    `syncStoryFallBounds`). Bas sans sortie : un trou, règle `fall` inchangée. Le monde n'a plus de marge
+    de 200 px à droite, sauf zone qui garde une ancienne sortie. Une sortie sans `targetScene` reste un mur.
+  - Entrée : `{ id, x, y, height, edge, from, to, inset, rise, overVoid }`. `x`/`y` restent le point écrit à
+    la main : cinématique (`goto`), reprise de sauvegarde, menu des chapitres, réapparition. `edge` : arrivée
+    par ce bord quand on vient d'une sortie de bord (`sceneData.edgeArrival`), juste après lui (`inset`, 44 px
+    par défaut ; 96 px de pieds sous le bord haut). Sans `edge` : arrivée au point écrit à la main.
+  - Altitude conservée : même hauteur au-dessus du sol du passage si sortie ET entrée ont un `to`, sinon
+    même altitude, le tout borné à `from`/`to` de l'entrée. Haut/bas : même proportion dans le passage (ou
+    même x). Sens de marche, élan, forme (loup, singe, aigle), sauts utilisés et touches tenues suivent
+    (`leaveByEdgeExit`, `applyEdgeArrivalState`).
+  - Jamais dans un mur (remontée à l'air libre, sinon point écrit à la main) ni au-dessus d'un trou d'une zone
+    à règle `fall` (point écrit à la main, sauf `overVoid: true`). Arrivée par le bas : bond (`rise`, 190 px par
+    défaut) et poussée vers l'avant pour gagner la lèvre.
+  - Pas d'aller-retour : l'arrivée est à l'intérieur, seul un nouveau franchissement complet ressort. Arrivée
+    du même côté que la sortie (Racines <-> Épreuve) : bord fermé jusqu'à 120 px d'écart
+    (`EDGE_REARM_DISTANCE`), la touche étant encore tenue vers lui.
+  - Scripts : `scene.__exits` reste la liste vivante (retirer une sortie la referme, en ajouter une l'ouvre
+    avec ses indices) ; `kainatiArena.exitsAfterVictory`, `EPREUVE_SINGE_SORTIE_SOMMET` et la sortie de la
+    clairière vers la hutte sont dans ce format.
+  - Rétro-compatibilité : les anciennes sorties `{ x, y, height }` (zones de test, brouillons de l'éditeur) et
+    `exit` (singulier) marchent comme avant, avec `enterRatio` et `portalId`.
+  - **Lisibilité des bords** (automatique, `addEdgeHints`/`syncEdgeHints`). Sortie basse : lueur chaude qui
+    monte, grains qui tombent, panneau de bois à flèche (`prop-bosquet_signpost`) sur la lèvre du trou. Trou
+    mortel (règle `fall`, hors sortie basse) : le bas du trou s'enfonce dans le noir, ni lueur ni panneau
+    (`fall: { shade: false }` la coupe). Sortie haute : lueur. Sortie latérale : lueur seulement si le passage
+    est au-dessus du sol le plus bas de ce côté. Par sortie : `hint: false` (rien), `hint: 'lueur'`, `hint:
+    'panneau'` (avec `panneau: 'clé de texture'`, `panneauX`). `prop-` : tout décor chargé convient.
+  - Éditeur : outil **Sortie de bord** (clic près d'un bord = tout le bord, glisser le long du bord = passage
+    borné) ; bandeau orange, déplaçable et allongeable (molette) avec l'outil Modifier. L'écran « Zones » propose
+    « + Nouvelle sortie : bord droit / gauche ». Le portail reste proposé pour les zones de test.
+  - Passages à revoir, qui demanderaient une vraie porte : **racines <-> épreuve du singe** (la fente) : les deux
+    passages sont du même côté, l'arrivée repart donc vers l'intérieur au lieu de garder le sens de marche ;
+    **poche de la forêt sombre -> hutte de Morgat** : la poche ne touche aucun bord, le sentier est devenu un trou
+    (sortie basse) alors que la hutte est censée être plus haut que la forêt. Le bannissement (bosquet -> forêt
+    sombre) et le retour hutte -> forêt sombre restent des cinématiques (`goto`).
 - Bulles non bloquantes (acte1.js, utilisables partout) : `storyBulle(scene, who, text, ms?, {replace})`, `storyBulles(scene, lignes, toast?, délai?)`, `cutsceneBulles(lignes, toast?, délai?)` (cinématique « vide » pour un déclencheur : ne gèle rien). S'appuient sur `showSpeechBubble` (StoryKit) si elle existe, sinon un toast. Une seule « conversation » de bulles à la fois par zone : un nouveau `storyBulles` annule les répliques pas encore dites du précédent (sa 1re réplique remplace la bulle en cours du même personnage) ; pendant un dialogue bloquant, la suite attend. Règle : seules les scènes importantes (rencontres, révélations, boss, objets) restent des dialogues bloquants, et courts.
 
 Clés gérées par l'agent **Formes** (fichier `src/entities/Liane.js`, `src/entities/Piste.js`,
@@ -188,14 +235,23 @@ Formes (Player.js) — état & API :
 - `player.getActiveAirForm()`, `player.equipForm(id)`, `player.unequipForm(id)`,
   `player.vine` (liane tenue ou null), `player.form` ∈ agarica/wolf/eagle/monkey/octopus.
 - Saut = **Espace seul** (-680, ~172 px ; tolérance de bord 110 ms). **Sans forme aérienne :
-  UN SEUL saut** (plus de double saut de base). 2e appui en l'air : singe = -500 + forme singe +
-  accroche aux lianes ; aigle = -550 + plané (inchangé) — un par saut.
+  UN SEUL saut** (plus de double saut de base). 2e appui en l'air : singe = -500 + forme singe
+  (qui seule s'accroche aux lianes) ; aigle = -550 + plané (inchangé) — un par saut.
+  **Règle à deux appuis, la même pour le singe et l'aigle** (décision de l'utilisateur du
+  2026-11-05) : en chute depuis un rebord (sans avoir sauté, tolérance de bord passée), le
+  1er appui en l'air est un saut humain (-680) et le 2e la transformation. Textes d'aide
+  (Contrôles, feu de camp, popups de forme) alignés sur cette règle.
 - **Totems de bonus verrouillés pour la démo** : `DEMO_TOTEMS_LOCKED = true` (Player.js).
   `recomputeTotemBonuses` calcule alors comme si aucun totem n'était porté, sans toucher à
   `equippedTotem` ni au registre ; le menu du feu de camp lit la même constante
   (`CAMPFIRE_TOTEMS_LOCKED`, chaînes en croix + cadenas, aucune interaction). `false` rouvre tout.
-- Lianes : seule la forme singe s'y accroche ; en forme humaine/aigle/loup elles sont
-  ignorées partout (plus de lianes-tremplins, arène de Kainati comprise).
+- Lianes : seule Agarica **devenue singe** s'y accroche (`airJumpForm === 'monkey'`) : après le
+  double saut qui la transforme, ou après un lâcher de liane (il compte comme ce double saut :
+  on enchaîne les lianes). Un saut simple sous une liane passe au travers, même au sommet de
+  l'arc. En forme humaine/aigle/loup elles sont ignorées partout (plus de lianes-tremplins,
+  arène de Kainati comprise). La prise suivant toujours un double saut (plus rapide vers le
+  haut), `VINE_CLIMB_FRACTION` = 0,35 et `VINE_MIN_SWING_FRACTION` = 0,8 (Liane.js) gardent un
+  balancier de 136-154 px.
   Sur une liane (2026-10-23) : Q/D (←/→) pompe le balancement, plafonné à ~55°
   (`VINE_MAX_ANGLE` ; la pompe s'arrête et la vitesse est plafonnée à ce qui ramène à
   cet angle) ; Z/↑ monte et S/↓ descend le long de la liane (`VINE_CLIMB_MANUAL_SPEED`
@@ -227,7 +283,15 @@ Formes (Player.js) — état & API :
   rectangle de l'ARC AFFICHÉ (art `vfx_slash`) pendant ses images actives seulement, null
   sinon ; jeton d'un coup = `attackEndTime`. Coup vers le bas qui touche (ennemi, amas de
   mousse, Kainati/ses pierres, ou objet de `scene.pogoTargets` : getBounds()/Rectangle)
-  = rebond -600 (événement scène `'player-pogo'`). Loup : morsure-ruée inchangée.
+  = rebond -600 (événement scène `'player-pogo'`). **Loup : coup de croc** (K/clic,
+  `slashDir = 'bite'`, plus de ruée : le corps du loup ne blesse plus). Même logique que la
+  dague : zone = crocs affichés (art `vfx_croc`, largeur visible calée sur 64 px, sinon
+  mâchoires dessinées `drawBiteJaws`), mêmes jetons de coup et retour sur obstacle ; 280 ms
+  (56 d'élan, 112 actives, 112 de retour), zone de +28 à +92 px devant les pieds
+  (`SLASH_ARCS.bite`), vitesse au sol × 0,8 pendant le coup (en l'air : inchangée). Le loup
+  reste affiché jusqu'au bout du coup ; une autre forme le coupe. Affiché à `WOLF_BITE_SCALE`
+  (0,304 : la feuille d'attaque est dessinée 1,31 fois plus longue que la course), hitbox
+  inchangée (`WOLF_BITE_BODY` = même boîte monde que la course).
 - Événement scène `'player-depleted'` (player) au dernier cœur perdu (fiable même au tout
   premier `set('hearts')`, qui n'émet pas `changedata-hearts`).
 
@@ -235,7 +299,10 @@ Ennemis : `ENEMY_REGISTRY[type] = (scene, e) => instance` (Fondation migre les t
 existants : araignee, loup, loupAlpha, corbeau, crapaud). Chaque fichier d'entité s'enregistre
 lui-même en bas de fichier. Combat : si `enemy.takeHit` existe, LevelKit appelle
 `enemy.takeHit(source)` (une seule fois par attaque/compétence grâce à un verrou par
-attaque) sinon `enemy.defeat()`. Ennemis corrompus : `enemy.corrupted = true` et
+attaque) sinon `enemy.defeat()`. Zone frappable par la mêlée (dague, croc) et le rebond :
+`enemy.getMeleeBounds()` s'il existe, sinon `enemy.getBounds()` — à fournir quand l'image est
+bien plus grande que l'ennemi (crapaud : son corps physique, étiré avec la langue, au lieu du
+canevas de 373 px). Ennemis corrompus : `enemy.corrupted = true` et
 `enemy.heal()` (appelée par la compétence `papillon`). `enemy.harmless`, `enemy.noGravity`.
 
 Types d'ennemis enregistrés (agent **Ennemis**), entrée `enemies: [{type, x, y, …}]` :
@@ -245,7 +312,7 @@ Types d'ennemis enregistrés (agent **Ennemis**), entrée `enemies: [{type, x, y
 | `loup` | LoupSanguinaire | `patrolMinX`/`patrolMaxX` (déf. x±150) | 1 ; patrouille, charge si joueur à <220 px. Art `loup_sanguinaire` (patrol/charge/bite) |
 | `araignee` | Araignee | — | 1 ; fixe, `harmless`, `noGravity`. Art `araignee` (idle/attack ; walk inutilisé) |
 | `loupAlpha` | LoupAlpha | `patrolMinX`/`patrolMaxX` (déf. x±150) | 3 (`takeHit`, `maxHp`), boss Zone5 |
-| `corbeau` | Corbeau | `patrolMinX`/`patrolMaxX` (déf. x±150), `diveDepth` (déf. 220) | 1 ; `noGravity`, piqué quand le joueur passe dessous |
+| `corbeau` | Corbeau | `patrolMinX`/`patrolMaxX` (déf. x±150), `diveDepth` (déf. 220), `diveSpeed`, `diveCooldown`, `diveGroundedOnly` (piqué sur une Agarica posée seulement) | 1 ; `noGravity`, piqué quand le joueur passe dessous ; remonte aussi s'il touche le sol avant `diveDepth` |
 | `crapaud` | Crapaud | — | 1 ; fixe, langue vers la droite |
 | `mousse_creature` | MousseCreature | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit, ne les dépasse pas), `hp` (déf. 1) | corrompu ; rampe vers le joueur (<260 px), se tasse 0,4 s puis bondit. Art `mousse_creature` (idle/attack/death) |
 | `singe_corrompu` | SingeCorrompu | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit), `hp` (déf. 2) | corrompu ; garde ses distances (170-360 px), lève une pierre 0,5 s puis la lance en cloche (`player.hitByEnemy()`, brisée au sol). Art `singe_corrompu` (idle/run/throw) |
@@ -597,7 +664,8 @@ s'applique par-dessus et s'annule seul quand l'ancre revient dans la vue.
 - `worldUiHudRects(scene)` → rectangles (monde) du HUD : cœurs + énergie en haut à gauche (cadre
   de la barre peinte compris), cases de compétences en bas ; obstacles que tout élément évite.
 - `worldUiAddScreenObstacle(obj)` : objet fixé à l'écran ajouté aux obstacles tant qu'il est
-  affiché (toast d'aide ; zone invisible qui suit Agarica pendant le duel de Geralt).
+  affiché (toast d'aide ; zone invisible qui suit Agarica pendant le duel de Geralt et le
+  combat de Kainati).
 - `worldUiFreeSpot(rect, view, durs, mous, gap?)` → `{ dx, dy }` : place libre la plus proche
   pour une bulle (sort des obstacles durs -- HUD, autres bulles -- en évitant si possible les
   personnages).
@@ -767,6 +835,63 @@ hitbox, aucun timing ni aucune durée de cinématique n'a changé. Détail du pl
   `ui_banniere` (128 px), `ui_touche`, `ui_ornement_titre`, barres (énergie 150x22, rainure
   114x7 ; boss 448x32, rainure 378x8) ; lanternes à 0,15 ; vignette non teintée.
 
+### Rendu de cohésion (LookKit) (`src/utils/LookKit.js`, décision du 2026-10-28, rétro-compatible)
+Reprise de la variante C du prototype (`prototype/coherence.html`, `src/proto/`, laissés tels quels).
+Décision de l'utilisateur : plus aucune ombre sous les décors, décors à leur gamma d'origine, tout le
+reste appliqué. Zone sans clé `look` : rendu d'avant, aucun coût (zones de test : restent sans look).
+
+**Clé de zone `look`** (donnée simple, compatible éditeur ; lue par `lookAttach(scene, data)` en fin de
+`buildLevelFromData`, démonté seul à la sortie de zone et au redémarrage de scène) :
+- `look: false` ou absente : aucun effet ;
+- `look: 'foret_sombre'` : un profil de `LOOK_PROFILES` (`foret_sombre` = réglages finaux du prototype,
+  `nuit` et `jour` = points de départ à régler à l'image) ;
+- `look: { profile: 'nuit', overlay: 0.8, back: { blur: 1 }, lights: { rules: { feu: { radius: 180 } } } }` :
+  réglages fusionnés par-dessus le profil (objets fusionnés, tableaux et valeurs remplacés).
+
+**Réglages d'un profil** (une clé absente = neutre ; `false` coupe `grade`, `back`, `tiles`, `lights`, `rim`, `shadow`) :
+- `grade` : étalonnage du plan de jeu. `exposure`, `contrast` (autour de `pivot`), `sat`, `map` (3 couleurs :
+  ombres, tons moyens, lumières) et `mapAmt`, `shadowTint` et `shadowAmt`, `highTint` et `highAmt`, `ambient` (RVB multiplié).
+- `overlay` : part gardée du voile `ambient` de la zone (0,5 = moitié moins). Les décors compensent : ils
+  gardent leur valeur d'avant quoi qu'on mette ici.
+- `back` : fonds. `blur` (px d'écran), `bright`, `sat`, `contrast`, `fog` et `fogAmt` (brume uniforme) : précalculés
+  en textures à l'entrée de zone ; `mist` et `mistBand` : brume du bas de l'écran (dans le shader) ;
+  `lightMul` : 0 par défaut, > 0 fait éclairer les fonds par les lumières (poste le plus cher sur puce intégrée).
+- `tiles` : par-dessus le réglage du jeu de tuiles de la zone (`LOOK_TILESETS` : `tuiles`, `floor`,
+  `tuiles_ecorce`, `tuiles_flottantes`, `tuiles_corrompues`). `tint` : `body` et `grass` (jeu en atlas), `blob`
+  (jeux de biomes) ; `grade` : `warm`, `green` (`hue`, `hueAmt`, `sat`, `light`, `contrast`), `greenRange`, `keep` (bande
+  de teinte laissée telle quelle) : pixels des textures recalculés une fois à l'entrée de zone et rendus à la
+  sortie ; `backBright` : valeur du sol de second plan (× après l'étalonnage, 0,55 par défaut).
+- `lights` : `max` (8 au plus), `glow` (halo additif d'ensemble), `propMul` (part reçue par les décors, 0,5),
+  `raiAlpha` et `haloAlpha` (× sur le rai de lune et le halo peint), `rules` (par source : `feu`, `champignons`,
+  `souche`, `mousse`, `rai`, `lanterne` ; `radius`, `intensity`, `glow`, `color`), `fly` (lucioles), `self` (Agarica), `xara`.
+- `rim` : liseré des personnages. `color`, `alpha`, `offsets`, `px`, `lightTint` (couleur tirée vers la lumière proche).
+- `shadow` : ombre sous les personnages. `alpha`. `shadow: false` les coupe toutes.
+
+**Rôles** : `obj.lookRole = 'back' | 'world' | 'prop' | 'ui'`, à poser à la création de l'objet. Sans rôle :
+classement automatique (`lookAutoRole` : profondeur, parallaxe, préfixe de texture).
+- `back` : fonds et couches lointaines (flou, brume, désaturation).
+- `world` (défaut) : tuiles, personnages, effets (étalonnage, lumières). `obj.lookTile = 'body' | 'grass' | 'blob' | 'back'`
+  choisit la teinte d'une tuile ; `'back'` = sol de second plan (`groundBackCells`), assombri après l'étalonnage
+  pour rester un plan arrière texturé (sa teinte 0x404040 seule finirait en aplat noir).
+- `prop` : décors (`props`, sous-bois, plantes de premier plan, totems, feux, mousse, lianes, lanternes) :
+  **aucun étalonnage, aucune ombre, aucun liseré** ; seules les lumières les éclairent, jamais ne les assombrissent.
+- `ui` : HUD, bulles, invites, bannières : intacts.
+
+**Méthode** : étalonnage PAR OBJET dans le shader de lot de Phaser (`MultiPipeline` dérivé, 7 variantes), pas
+d'effet plein écran : chaque objet garde sa place dans la liste d'affichage, un décor derrière Agarica reste
+derrière elle. Coût mesuré (Edge sans fenêtre, Intel UHD, machine chargée, médiane de rendus alternés) :
+forêt sombre 1 de 12,0 à 13,6 ms par image (+1,6), forêt sombre 2 (900 objets) de 9,9 à 10,9 ms (+1,0), 10 appels
+de dessin de plus sur 32. Entrée de zone : 0,3 à 1,2 s (précalcul des fonds), recommencée à chaque entrée.
+
+**Option « Effets visuels »** (`OptionsScene`, Activés / Désactivés, `visualFx` dans `agarica-options-v1`,
+activés par défaut) : appliquée tout de suite à la zone en cours, y compris en pause. Désactivés : rendu d'avant
+au pixel près, aucun coût.
+
+**API** : `lookAttach(scene, data)` (`data` null : celle de la dernière pose), `lookDetach(scene)`, `lookEnabled()`,
+`lookSetEnabled(on)`, `lookResolveConfig(data)`, `lookRoleOf(obj)`. Tests et console : `window.lookKit`
+(`attach`, `detach`, `enabled`, `setEnabled`, `config`, `roleOf`, `info`, `state`, `profiles`, `tilesets` ; `--js` : préférer
+`info` à `state`, qui contient toute la scène et bloque le harnais).
+
 ### Duel de Geralt — `GeraltDuel` (`src/entities/GeraltDuel.js`, 2026-10-24)
 Mécanique seule ; l'histoire (rencontre, bulles de Xara, fin, carte) reste dans `acte2.js`.
 - `new GeraltDuel(scene, { geralt, minX, maxX, groundY, spawn, resetX, onEvent, noTrap })` :
@@ -805,6 +930,61 @@ Mécanique seule ; l'histoire (rencontre, bulles de Xara, fin, carte) reste dans
 - Sans forme singe (ou aigle choisi au feu de camp), le combat ne démarre pas : Xara explique,
   le retour vers les racines reste libre. Poses `kainati_calme` (prompt Codex n°9, à générer)
   utilisées dès qu'elles existent.
+- Pendant le combat, Agarica est un obstacle de la règle « interface dans l'écran »
+  (`kainatiMakePlayerGuard`, comme `playerGuard` du duel de Geralt) : les alertes de Xara se
+  posent au-dessus d'elle, plus sur sa tête. Toast d'entrée : « double saut sous une liane ».
+- Pierres des racines et de l'épreuve (`arbreDropRock`, `epreuveDropRock`, acte1_arbre.js) :
+  l'ombre est doublée du même marqueur `fx_marqueur_danger` au ras du sol (grandit et pulse
+  jusqu'à l'impact) ; sans l'art, l'ombre seule.
+
+### Branches et troncs (`src/utils/BrancheKit.js`, 2026-11-04, rétro-compatible)
+Pour le grand arbre (arène de Kainati, racines, épreuve du singe) : de vraies branches reliées
+à un tronc à la place des rectangles de tuiles. Zones sans ces clés : rien ne change. Construits
+AVEC le sol dans `buildLevelFromData`, pas dans un handler : totems, décors et feux se calent sur
+le sol juste après (`LEVEL_DATA_HANDLERS.branches` / `.trunks` sont des entrées vides).
+
+- `trunks: [{ x, top?, bottom?, scale?, base?, tint?, flipX? }]` — `x` = axe du fût, `top` / `bottom`
+  en px monde (défauts : haut du monde, bas du niveau), `scale` de l'art (0,25 : fût de 198 px).
+  `base: true` : pied `tronc_base` dont la ligne de sol est sur `bottom`. Sans collision, derrière le
+  sous-bois et le sol. `tint` : plus sombre pour le lire juste derrière le plan de jeu.
+- `branches: [{ from: [x, y], to: [x, y], via?, bend?, rows?, cells?, solid?, attach?, tip?, thickness?, scaleX?, taper?, forks?, tint? }]`
+  — ordre du tableau = du fond vers l'avant. `from` / `to` / `via` : points de la **ligne de surface**
+  (haut de la mousse, là où l'on pose les pieds), `via` pour courber : la courbe passe PAR ces
+  points sans les dépasser (monotone en x), une partie plate reste plate au pixel près.
+  `bend` : flèche au milieu, sans `via`.
+  - **Collision** : mêmes cases et mêmes corps que le sol (`renderAutotileGrid`, faces internes
+    comprises). Branche plate : ses `rows` rangées (défaut 1), de `from.x` à `to.x` sous `y` : `x` et
+    `y` multiples de 64. Branche courbe : aucune, sauf `cells` (liste `[gx, gy]`, `groundRow` utilisable) ;
+    le reste de la courbe est un décor. `solid: false` : aucune case.
+  - **Extrémités** : `attach` = côté du raccord au tronc (`'left'`, `'right'`, `'both'`, `'none'` si elle
+    sort de l'écran), `branche_base` dont les colonnes de gauche recouvrent le tronc (64 px à
+    l'échelle 0,25). `tip` = côté effilé (`'left'`, `'right'`, `'both'`, `'none'`), par défaut l'opposé du
+    raccord. La pointe dépasse de la hitbox (32 px à 0,25).
+  - **Dessin** : `thickness` = px entre surface et dessous de l'écorce (défaut 56, soit l'échelle 0,25 ;
+    échelle = `thickness / 224`), `scaleX` = échelle en largeur si différente, `taper: [g, d]` = épaisseur
+    relative à gauche et à droite (sous la surface), `forks: [{ at, flip? }]` = `branche_fourche` à `at` px
+    du début de la surface (le bras haut est un décor), `tint` = branche d'arrière-plan.
+- **Lisibilité** (revue du 2026-11-05) : une branche qui ne porte pas (décor, ou grande branche des
+  lianes dont seule la case d'accroche est solide) prend la teinte d'arrière-plan `0x6e6878` ; un
+  rameau courbe qui mène à une plateforme est coupé en deux : partie courbe en décor (`solid: false`,
+  teinte, dessinée avant) et partie plate claire qui porte (racines : élan et marche du filet ;
+  épreuve : îlot de S3, perchoir du singe, rebord de S4). Racines : la marche du bout du toit
+  (x 1280-1344, y 256) est traversable par en dessous (script, `ARBRE_RACINES_ONE_WAY`) : le loup
+  (86 px) ne passait pas dans la niche de 64 px au pied de la butte.
+- **Pour lire le sol depuis la donnée : `zoneGroundCells(data)`** (sol peint + cases des branches, sans
+  doublon), jamais `data.groundCells` seul. `branchCollisionCells(b)` : les cases d'une branche.
+- **Rendu** : `item-branche_*` et `item-tronc_*` (lot n°11) si chargés, sinon les mêmes pièces dessinées
+  par code (`brancheFallbackPiece`, même format : rangée de marche 256, dessous 480). Composé une fois
+  dans un canvas (`autotile-branche-<signature>-<n>`, plusieurs images au-delà de 2048 px) : pièces mises
+  bout à bout avec un fondu sur l'écorce, puis posées le long de la courbe par tranches. Image remontée
+  de 12 rangées source (`BRANCHE_FOOT_SINK_ROWS`, 3 px à 0,25) : les pieds touchent la mousse, pas le
+  contour sombre qui la surmonte.
+- **Lianes** : le préfixe `autotile-` fait que `vineBlockAbove` (Liane.js) mesure le bas visible de la
+  branche et y rentre le haut de la liane. Pour une liane attachée en (x, y), faire passer la surface
+  en (x, y - thickness + 2) ; contrôle : `vine.drawLift > 0`.
+- **Éditeur** : outils « Branche » (glisser = surface calée sur la grille ; molette : longueur, ou
+  épaisseur si courbe) et « Tronc » (clic ; molette : échelle) dans « Plus d'outils » ; courbe, raccord,
+  cases dans « Propriétés (JSON) ». Maj+flèche les décale avec le sol.
 
 ## Progression & flags d'histoire (noms figés)
 
@@ -842,8 +1022,9 @@ ZoneAquatique) restent intactes, accessibles depuis le menu titre « Zones de te
   pour la sortie gauche des racines), `from_hutte_morgat` (x 4960, DANS la poche
   derrière le mur : le sentier de la hutte y débouche). Sorties : gauche →
   `ForetSombre1Scene` `from_foret_sombre_2` ; droite → `GrandArbreRacinesScene`
-  `{enterId: 'from_foret_sombre'}` ; fond de la poche (x 5080) → `HutteMorgatScene`
-  `{enterId: 'from_foret_sombre'}` (accessible seulement mur ouvert).
+  `{enterId: 'from_foret_sombre'}` ; bord BAS, trou x 4992-5120 au fond de la poche →
+  `HutteMorgatScene` `{enterId: 'from_foret_sombre'}`, où elle tombe du haut de l'écran
+  (accessible seulement mur ouvert).
 - Mur de répulsif : `mossWalls` id **`mur_repulsif_foret_sombre`** (flag
   `mosswall_foret_sombre_2_mur_repulsif_foret_sombre`), x 4384, sous le surplomb ;
   s'ouvre des deux côtés avec l'objet `repulsif`. Derrière : graine de chêne-cœur

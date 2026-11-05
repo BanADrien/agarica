@@ -40,7 +40,8 @@ const TROU_SOMBRE_DATA = {
   // Sortie en haut à droite, retirée par le script tant que le totem de
   // poche n'est pas activé (`trouSombreFait`).
   exits: [
-    { x: 1320, y: 0, height: 128, targetScene: 'AreneGhiltScene', data: { enterId: 'from_trou' } },
+    // `hint: false` : les papillons du script montrent déjà le chemin.
+    { edge: 'right', to: 64, hint: false, targetScene: 'AreneGhiltScene', data: { enterId: 'from_trou' } },
   ],
   script: 'trou_sombre',
 };

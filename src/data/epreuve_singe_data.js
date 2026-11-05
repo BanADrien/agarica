@@ -15,9 +15,10 @@
 // le long d'une liane. Un lâcher plus puissant rendra l'épreuve plus facile,
 // jamais impossible. Fenêtre de lâcher mesurée (amplitude maximale, meilleure
 // prise) : S1 600-900 ms, S3 330-780 ms, S5 200-320 ms (le saut final : 630).
-// Chaque liane pend sous un BLOC (attache = haut de la case + 64, x au
-// centre de la case). `tallLevel` : caméra de y=-400 à 540 ; tout en bas, la
-// mousse toxique (bande `liquidFloor`) : y tomber = retour à la lanterne.
+// Chaque liane pend sous sa case d'accroche, dans une grande branche (attache =
+// haut de la case + 64, x au centre de la case). `tallLevel` : caméra de y=-400
+// à 540 ; tout en bas, la mousse toxique (bande `liquidFloor`) : y tomber = retour
+// à la lanterne.
 //   S1 x 0-3520      « Les premières prises » : 8 lianes basses (320-384 px),
 //                    sans repos, montées et descentes d'une case
 //   S2 x 3264-4544   « La montée » : îlot R1 sous des pierres EN RYTHME (deux
@@ -35,6 +36,12 @@
 //                    une branche qui s'effrite en contrebas, la dernière liane
 //                    à gravir, puis un dernier élan jusqu'au sommet
 const EPREUVE_SINGE_SURFACE_Y = 448;
+const EPREUVE_TRONC_TINT = 0x9d94a6;
+// Grandes branches des lianes : décor sauf la case d'accroche. Teinte franche
+// d'arrière-plan (0xb9b0c0 avant, -27 % seulement) : avec leur mousse vive elles
+// se lisaient comme des sols, on s'y posait puis on tombait au travers. Sert
+// aussi aux parties courbes (décor) des rameaux.
+const EPREUVE_BRANCHE_TINT = 0x6e6878;
 
 const EPREUVE_SINGE_DATA = {
   levelWidth: 12288,
@@ -48,29 +55,83 @@ const EPREUVE_SINGE_DATA = {
   // sombres ; l'épreuve se joue dans la cime, à la lumière.
   ambient: { tint: 0x0b1424, darkness: 0.12, vignette: false },
   script: 'epreuve_singe',
-  groundCells: [
-    // (groundRow : borne de fin exclue ; une case = 64 px)
-    ...groundRow(0, 7, [7, 8]),       // S1 : sol de départ (x 0-448, y=448)
-    ...groundRow(51, 55, [5]),        // S1→S2 : corniche A (lanterne 2) (x 3264-3520, y=320)
-    ...groundRow(57, 64, [5]),        // S2 : îlot R1, pierres en rythme (x 3648-4096, y=320)
-    ...groundRow(66, 71, [-1]),       // S2→S3 : corniche B (lanterne 3) (x 4224-4544, y=-64)
-    ...groundRow(89, 91, [-1]),       // S3 : îlot de repos, pierres (x 5696-5824, y=-64)
-    ...groundRow(102, 105, [1]),      // S3 : perchoir du singe corrompu (x 6528-6720, y=64)
-    ...groundRow(118, 122, [-1]),     // S3→S4 : corniche C (lanterne 4) (x 7552-7808, y=-64)
-    ...groundRow(135, 138, [4]),      // S4 : rebord sûr, au-dessus de la marée (x 8640-8832, y=256)
-    ...groundRow(138, 144, [6]),      // S4 : passage bas P, marée de mousse (x 8832-9216, y=384)
-    ...groundRow(145, 150, [-1]),     // S4→S5 : corniche D (lanterne 5) (x 9280-9600, y=-64)
-    ...groundRow(185, 192, [-2]),     // le sommet (talisman) (x 11840-12288, y=-128)
-    // Blocs d'accroche : une case par liane, la liane pend sous elle
-    // (rangée 0 → attache y=64, 1 → 128, -5 → -256, -6 → -320).
-    ...groundRow(9, 10, [0]), ...groundRow(14, 15, [0]), ...groundRow(19, 20, [1]), ...groundRow(24, 25, [0]),
-    ...groundRow(30, 31, [0]), ...groundRow(36, 37, [1]), ...groundRow(42, 43, [0]), ...groundRow(48, 49, [0]),
-    ...groundRow(62, 63, [-6]),
-    ...groundRow(74, 75, [-6]), ...groundRow(80, 81, [-5]), ...groundRow(86, 87, [-6]), ...groundRow(94, 95, [-6]),
-    ...groundRow(101, 102, [-5]), ...groundRow(107, 108, [-6]), ...groundRow(113, 114, [-6]),
-    ...groundRow(126, 127, [-6]), ...groundRow(132, 133, [-5]), ...groundRow(141, 142, [-6]),
-    ...groundRow(153, 154, [-6]), ...groundRow(161, 162, [-5]), ...groundRow(167, 168, [-6]),
-    ...groundRow(174, 175, [-6]), ...groundRow(181, 182, [-6]),
+  // Troncs juste derrière le plan de jeu : au départ, puis aux corniches. Ils
+  // descendent sous la mousse toxique (seul le premier a un pied, sur le sol).
+  trunks: [
+    { x: 150, top: -460, bottom: EPREUVE_SINGE_SURFACE_Y, scale: 0.3, base: true, tint: EPREUVE_TRONC_TINT },
+    { x: 3584, top: -460, bottom: 560, tint: EPREUVE_TRONC_TINT },
+    { x: 4160, top: -460, bottom: 560, tint: EPREUVE_TRONC_TINT },
+    { x: 7488, top: -460, bottom: 560, tint: EPREUVE_TRONC_TINT },
+    { x: 9248, top: -460, bottom: 560, tint: EPREUVE_TRONC_TINT },
+    { x: 11750, top: -460, bottom: 560, tint: EPREUVE_TRONC_TINT },
+  ],
+  // LA GÉOMÉTRIE DE COLLISION N'A PAS BOUGÉ (vérifié corps par corps) : mêmes cases
+  // que les anciennes tuiles, le parcours est réglé au millimètre. Seul le dessin
+  // change, le reste des courbes n'est qu'un décor, en arrière-plan.
+  // Chaque liane pend sous sa case d'accroche (rangée 0 → attache y=64, 1 → 128,
+  // -5 → -256, -6 → -320) : la grande branche de chaque section passe par ces
+  // cases, son dessous (surface + 56 - 2) à l'attache de la liane.
+  branches: [
+    // S1 : du tronc de départ au tronc de la corniche A.
+    {
+      from: [256, -40],
+      via: [[608, 10], [928, 10], [1248, 74], [1568, 10], [1952, 10], [2336, 74], [2720, 10], [3104, 10]],
+      to: [3500, -30], attach: 'both', tint: EPREUVE_BRANCHE_TINT,
+      cells: [
+        ...groundRow(9, 10, [0]), ...groundRow(14, 15, [0]), ...groundRow(19, 20, [1]), ...groundRow(24, 25, [0]),
+        ...groundRow(30, 31, [0]), ...groundRow(36, 37, [1]), ...groundRow(42, 43, [0]), ...groundRow(48, 49, [0]),
+      ],
+    },
+    // S2 : la liane à gravir pend d'un moignon du tronc de la corniche B.
+    { from: [3930, -376], via: [[4000, -374]], to: [4080, -410], attach: 'right', tint: EPREUVE_BRANCHE_TINT, cells: groundRow(62, 63, [-6]) },
+    // S3 : du tronc de la corniche B au tronc de la corniche C.
+    {
+      from: [4240, -410],
+      via: [[4768, -374], [5152, -310], [5536, -374], [6048, -374], [6496, -310], [6880, -374], [7264, -374]],
+      to: [7410, -410], attach: 'both', tint: EPREUVE_BRANCHE_TINT,
+      cells: [
+        ...groundRow(74, 75, [-6]), ...groundRow(80, 81, [-5]), ...groundRow(86, 87, [-6]), ...groundRow(94, 95, [-6]),
+        ...groundRow(101, 102, [-5]), ...groundRow(107, 108, [-6]), ...groundRow(113, 114, [-6]),
+      ],
+    },
+    // S4 : du tronc de C au tronc de D.
+    {
+      from: [7570, -410], via: [[8096, -374], [8480, -310], [9056, -374]], to: [9170, -410],
+      attach: 'both', tint: EPREUVE_BRANCHE_TINT,
+      cells: [...groundRow(126, 127, [-6]), ...groundRow(132, 133, [-5]), ...groundRow(141, 142, [-6])],
+    },
+    // S5 : du tronc de D au tronc du sommet.
+    {
+      from: [9330, -410],
+      via: [[9824, -374], [10336, -310], [10720, -374], [11168, -374], [11616, -374]],
+      to: [11670, -410], attach: 'both', tint: EPREUVE_BRANCHE_TINT,
+      cells: [
+        ...groundRow(153, 154, [-6]), ...groundRow(161, 162, [-5]), ...groundRow(167, 168, [-6]),
+        ...groundRow(174, 175, [-6]), ...groundRow(181, 182, [-6]),
+      ],
+    },
+    // --- Plateformes, là où l'on pose les pieds.
+    { from: [0, EPREUVE_SINGE_SURFACE_Y], to: [448, EPREUVE_SINGE_SURFACE_Y], rows: 2, thickness: 100, tip: 'right' }, // S1 : sol de départ (y=448)
+    { from: [3264, 320], to: [3520, 320], attach: 'right' },  // S1→S2 : corniche A (lanterne 2)
+    { from: [3648, 320], to: [4096, 320], attach: 'both' },   // S2 : îlot R1, pierres en rythme
+    { from: [4224, -64], to: [4544, -64], attach: 'left' },   // S2→S3 : corniche B (lanterne 3)
+    // Rameaux coupés en deux (revue du 2026-11-05) : la partie courbe, dessinée
+    // avant, est un décor teinté sans case ; seule la partie plate, claire, porte.
+    // D'un seul tenant, la pente moussue se lisait comme une rampe praticable.
+    // S3 : îlot de repos, pierres (x 5696-5824, y=-64) : un rameau qui descend de la
+    // grande branche.
+    { from: [5570, -340], via: [[5640, -190]], to: [5722, -64], attach: 'left', tint: EPREUVE_BRANCHE_TINT, solid: false },
+    { from: [5696, -64], to: [5824, -64], tip: 'both' },
+    // S3 : perchoir du singe corrompu (x 6528-6720, y=64) : monte d'en bas, hors de l'écran.
+    { from: [6400, 580], via: [[6476, 300]], to: [6554, 64], tint: EPREUVE_BRANCHE_TINT, solid: false },
+    { from: [6528, 64], to: [6720, 64], tip: 'both' },
+    { from: [7552, -64], to: [7808, -64], attach: 'left', forks: [{ at: 0 }] },   // S3→S4 : corniche C (lanterne 4)
+    // S4 : rebord sûr, au-dessus de la marée (x 8640-8832, y=256) : monte d'en bas.
+    { from: [8520, 580], via: [[8596, 420]], to: [8666, 256], tint: EPREUVE_BRANCHE_TINT, solid: false },
+    { from: [8640, 256], to: [8832, 256], tip: 'both' },
+    { from: [8832, 384], to: [9216, 384], attach: 'right' },  // S4 : passage bas P, marée de mousse
+    { from: [9280, -64], to: [9600, -64], attach: 'left' },   // S4→S5 : corniche D (lanterne 5)
+    { from: [11840, -128], to: [12288, -128], attach: 'left', tip: 'none' }, // le sommet (talisman), sort de l'écran
   ],
   playerSpawn: { x: 120, y: 412 },
   // Lianes : (x, y) = attache sous son bloc (centre de la case, haut + 64),
@@ -184,12 +245,14 @@ const EPREUVE_SINGE_DATA = {
     { id: 's5', x: 9440, w: 240, y: -170, h: 460, cutscene: 'epreuve_s5' },
   ],
   exits: [
-    { x: 16, y: 380, height: 160, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } },
-    // (La fente du sommet, au bout du parcours, qui redescend vers les
+    { edge: 'left', to: 448, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } },
+    // (La fente du sommet, bord droit du parcours, qui redescend vers les
     // racines, est ajoutée par le script une fois le talisman pris :
     // EPREUVE_SINGE_SORTIE_SOMMET.)
   ],
   entries: [
-    { id: 'from_racines', x: 120, y: 400, height: 100 },
+    // Arrivée par le bord gauche, le même côté qu'à la sortie des racines : elle
+    // repart vers l'intérieur (cf. applyEdgeArrivalState, PLAN_DEV : passage à revoir).
+    { id: 'from_racines', x: 120, y: 400, height: 100, edge: 'left', to: 448 },
   ],
 };
