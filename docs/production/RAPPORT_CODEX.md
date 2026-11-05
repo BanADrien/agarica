@@ -508,3 +508,58 @@ Aucun avertissement.
 
 asset_present.js : 749 fichier(s) présent(s).
 ```
+
+
+<!-- LOT11 -->
+## Lot n°11 — 2026-11-04
+
+Dessins via imagegen ; finition mécanique dans `lot_11.py`, sans modification de l importeur, de `src/` ni du manifeste. Générations, imports et contrôles : [galerie du lot 11](controles/lot_11/index.html), `controles/lot_11/suivi.json`.
+
+| # | Source | État | Contrôles |
+|---|---|---|---|
+| 1 | `assets/vfx/vfx_croc.png` | importe sans avertissement | 5 frames |
+| 2 | `assets/_codex_src/branches_milieu_fourche.png` | importe sans avertissement | branche_milieu: [1536, 512] marche=256.0 dessous=481.0; branche_fourche: [1024, 512] marche=256.0 dessous=481.0 |
+| 3 | `assets/_codex_src/branches_base_bout.png` | importe sans avertissement | branche_base: [640, 512] marche=256.0 dessous=477.0; branche_bout: [448, 512] marche=256.0 dessous=479.0 |
+| 4 | `assets/_codex_src/tronc_segment.png` | importe sans avertissement | tronc_segment: [793, 1536] marche=— dessous=— |
+| 5 | `assets/_codex_src/tronc_base.png` | importe sans avertissement | tronc_base: [1400, 1024] marche=— dessous=— |
+| 6 | `assets/sprites/agarica_repos.png` | importe sans avertissement | 8 frames |
+
+<!-- /LOT11 -->
+
+### Contrôles définitifs du lot n°11
+
+6 sources et 8 entrées livrées, dans l ordre demandé : crocs, milieu/fourche, base/bout, segment de tronc, pied, Agarica au repos. Le travail des branches a commencé par le milieu ; sa matière sert aux autres pièces. Les extrémités ont été générées séparément puis assemblées, comme autorisé. Les versions non retenues et les prompts sont conservés dans les contrôles. Aucune image existante régénérée ou retouchée.
+
+Dimensions ci-dessous mesurées **sur les fichiers après import**. Les 4 branches conservent bien leur case verticale de 512 px, sans rognage vertical ni changement d échelle par l importeur. Ligne de marche : première rangée alpha > 128, médiane sur la partie marchable ; bras haut exclu pour la fourche. Dessous : dernière rangée alpha > 128 sur cette même partie.
+
+| Pièce | Dimensions finales | Marche médiane | Dessous médian |
+|---|---|---:|---:|
+| `branche_milieu` | 1536 × 512 | 256 | 481 |
+| `branche_fourche` | 1024 × 512 | 256 | 481 |
+| `branche_base` | 640 × 512 | 256 | 477 |
+| `branche_bout` | 448 × 512 | 256 | 479 |
+
+`tronc_segment` : 793 × 1536, corps médian proche de 768 px, contours latéraux irréguliers inclus dans la largeur finale. `tronc_base` : 1400 × 1024 ; **axe mesuré x=698.5**, centre de l image x=700, donc écart −1,5 px. Déséquilibre gauche/droite des étendues des racines : 3.0 px (tolérance 8). Fond des racines alpha > 128 : rangée 958, pour la ligne de sol nominale 960.
+
+Montages livrés : [raccord_branche_milieu.png](controles/lot_11/raccord_branche_milieu.png), [raccord_tronc_segment.png](controles/lot_11/raccord_tronc_segment.png), [assemblage_branche.png](controles/lot_11/assemblage_branche.png), [assemblage_tronc.png](controles/lot_11/assemblage_tronc.png). **Δ RGBA maximal = 0** sur les deux répétitions, les 4 jonctions de branches et la jonction segment/pied. Finition par couture et mélange des seuls pixels générés aux raccords ; aucun dessin produit par code.
+
+Le montage des branches comporte 128 px de marge haute pour montrer entièrement Agarica à 344 px de haut : les branches commencent donc à y=128 et la ligne rouge de marche locale 256 apparaît à y=384 dans le montage. Ses pieds reposent sur cette ligne. Le montage du tronc contient 2 segments, le pied centré, et les deux bases de branche symétriques avec 256 px de recouvrement.
+
+`vfx_croc` : **5 frames** `bite`, toutes centrées sur le même point et à distance des bords des cases ; fermeture/interverrouillage à la troisième frame, rebond puis disparition. Lueur sur **vrai alpha doux**, aucune livraison sur fond noir. Opacité maximale des frames : 60 %, 100 %, 100 %, 75 %, 35 %.
+
+`agarica_repos` : **4 sit + 4 sit_idle**, toutes connexes. Debout 250 px ; repos 179, 182, 184, 181 px de haut ; largeur 175 px pour les 4 poses. Sit frame 4 identique pixel pour pixel à sit_idle frame 1 ; bas de l image sur 90 px identique et mêmes bords gauche/droite. Boucle de contrôle : [agarica_sit_idle_controle.gif](controles/lot_11/agarica_sit_idle_controle.gif). La pose est plus compacte en largeur que les ~220 px indicatifs du prompt : 175 px mesurés ; priorité conservée à l échelle du personnage et au rapport de hauteur assis/debout (~72 %).
+
+Audit détaillé : [audit_final.json](controles/lot_11/audit_final.json). Empreintes des assets déjà existants : inchangées. Manifeste et `tools/import_codex_assets.py` inchangés. Aucune édition de code du jeu par ce travail ; `asset_present.js` est mis à jour uniquement par l importeur. Les autres modifications de `src/` observées en parallèle sont listées dans l audit et préservées. Vérifications graphiques et d import effectuées ; aucun branchement ou test de scène en jeu ajouté.
+
+Import complet final : `python tools/import_codex_assets.py`. [Journal complet](imports/final_lot_11_2026-11-04.log).
+
+```text
+================ RAPPORT ================
+Découpés maintenant (0) : -
+Déjà présents (220) : agarica_extra, agarica_slash, agarica_repos, singe, transfo_singe, geralt_invocation, forme_papillon, transfo_papillon, xara_extra, pere_chef, amanite, habitant_druide, habitant_porteur, habitant_garde, geralt, clak, morgat, papillon, cochon_bebe, cochon_bebe_rose, cochon_bebe_gris, cochon_bebe_orange, poisson, kainati, kainati_sol, kainati_esprit, ghilt, ghilt_gueri, loup_sanguinaire, araignee, mousse_creature, crapaud_corrompu, singe_corrompu, vfx_soin_papillon, vfx_slash, vfx_croc, vfx_souffle_toxique, vfx_flaque_mousse, vfx_purification, vfx_piste_loup, vfx_onde_choc, vfx_vague_mousse, vfx_invocation_clak, vfx_impact_pierre, singe_extra, forme_papillon_extra, singe_gueri, vfx_mousse_toxique, vfx_anneau_choc, rocher_roulant, pierre, idole, idole_fragment, talisman_ours, talisman_singe, totem_poche_casse, totem_poche_actif, bocal_antidote, repulsif, fleur_resistante, carte_geralt, lance_amanite, mousse_amas_intact, mousse_amas_fissure, hud_coeur, hud_coeur_vide, totem_monkey_dim, totem_monkey_lit, liane, mousse_mur, porte_mousse, courant_air, form_icone_singe, form_icone_papillon, skill_icone_ours, skill_icone_singe, skill_icone_papillon, dialogue_box, titre_logo, carte_parchemin, portrait_agarica, portrait_xara, portrait_amanite, portrait_pere_chef, portrait_geralt, portrait_morgat, portrait_kainati, portrait_ghilt, fond_bosquet, fond_foret_sombre, fond_grand_arbre, fond_foret_flottante, fond_foret_corrompue, fond_monde_spirituel, fond_trou_sombre, fond_arene_ghilt, liquide_mare_fond, liquide_mare_voile, liquide_mare_surface_0, liquide_mare_surface_1, liquide_mare_surface_2, liquide_mare_surface_3, liquide_mousse_toxique, couche_ciel_jour, couche_nappe_nuages, couche_nappe_brume, couche_brume_avant, couche_nuage_0, couche_nuage_1, couche_nuage_2, couche_nuage_3, couche_nuage_4, couche_soleil, decor_lanterne_eteinte, decor_lanterne_allumee, decor_fente_fermee, decor_fente_ouverte, decor_spirale_gravee, decor_plateforme_fantome, decor_plateforme_ecorce_intacte, decor_plateforme_ecorce_fissuree, decor_plateforme_ecorce_brisee, decor_rampe_lancement, decor_marches_racines, decor_autel_sommet, decor_pont_tronc, decor_cratere, decor_trou_effondre, couche_iles_lointaines, couche_horizon_malade, decor_mare_berge, decor_mare_roseaux, decor_fleur_perchee, decor_plante_resistante_fleurie, decor_plante_resistante_bouton, objet_graine_coeur, decor_tapis_mousse, decor_cercle_sain, decor_mousse_sechee, decor_mousse_plaque_intacte, decor_mousse_plaque_grattee, decor_mousse_plaque_repoussee, decor_mousse_lumineuse_sol, decor_mousse_lumineuse_tronc, decor_mousse_lumineuse_plafond, decor_mousse_lumineuse_petite, decor_touffe_mousse_petite, decor_touffe_mousse_moyenne, decor_touffe_mousse_grande, decor_touffe_mousse_penchee, decor_empreinte_boue, couche_vignette, fx_eclat_mousse, fx_motte_mousse, fx_motte_terre, fx_eclat_ecorce, fx_eclat_pierre, fx_feuille, fx_petale_rose, fx_petale_blanc, fx_goutte_toxique, fx_goutte_antidote, fx_bulle, fx_eclaboussure_toxique, fx_luciole, fx_grain_lumiere, fx_etincelle, fx_etincelle_papillon, fx_trainee_papillon, fx_trait_vent, fx_ombre_sol, fx_marqueur_danger, fx_spore_toxique, fx_bouffee_poussiere, fx_bouffee_toxique, fx_braise, fx_halo_doux, fx_halo_rayons, fx_rai_lumiere, fx_halo_objet, fx_aura_esprit, fx_lueur_sol, araignee_petite_0, araignee_petite_1, araignee_petite_2, bete_mousse_vivante, bete_mousse_touchee, bete_mousse_morte, mousse_creature_guerie_0, mousse_creature_guerie_1, note_geralt, objet_grappin, objet_fleche, objet_collet, objet_corde, fx_fil_soie, ui_bulle, ui_bulle_pointe, ui_invite, ui_banniere, ui_touche, ui_alerte, ui_etoiles_etourdi, ui_case_competence, ui_anneau_objet, ui_ornement_titre, ui_energie_cadre, ui_energie_remplissage, ui_boss_cadre, ui_boss_remplissage, ui_feu_camp, branche_milieu, branche_fourche, branche_base, branche_bout, tronc_segment, tronc_base, tuiles_ecorce, tuiles_flottantes, tuiles_corrompues
+Source manquante (à générer) (3) : geralt_combat, kainati_calme, kainati_esprit_extra
+
+Aucun avertissement.
+
+asset_present.js : 768 fichier(s) présent(s).
+```

@@ -1,0 +1,12 @@
+[agarica_repos] découpe de 1 image(s)
+  rangée 0 sit: 4 frame(s) [OK]
+  rangée 1 sit_idle: 4 frame(s) [OK]
+  canvas uniforme 183x256 -> assets/sprites/agarica_repos_frames
+
+================ RAPPORT ================
+Découpés maintenant (1) : agarica_repos
+Source manquante (à générer) (0) : -
+
+Aucun avertissement.
+
+asset_present.js : 768 fichier(s) présent(s).

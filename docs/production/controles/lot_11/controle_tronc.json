@@ -1,0 +1,18 @@
+{
+  "raccord_tronc_segment": {
+    "edge_rgba_max_difference": 0,
+    "vertical": true
+  },
+  "segment_base_edge_rgba_max_difference": 0,
+  "segment_size": [
+    793,
+    1536
+  ],
+  "base_size": [
+    1400,
+    1024
+  ],
+  "base_axis_measured": 698.5,
+  "base_center": 700.0,
+  "root_extent_balance": 3.0
+}

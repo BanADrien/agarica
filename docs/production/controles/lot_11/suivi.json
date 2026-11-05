@@ -1,0 +1,312 @@
+{
+  "1": {
+    "n": 1,
+    "source": "assets/vfx/vfx_croc.png",
+    "ids": [
+      "vfx_croc"
+    ],
+    "prompt": "Magical VFX for 'Legend of Agarica', same finish as the reference vfx_slash.png: luminous white core, mint edges (#b0f0d0, #8fe3b8), emerald rim (#30b070), soft glow in real alpha, NO near-black outline.\nEFFECT SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background (alpha), NO dark backdrop. Exactly 1 horizontal row of 5 frames, vertically centered on the canvas, read left to right, in cells 307 px wide. Each frame is CENTERED in its cell and stays fully INSIDE it with at least 30 px of margin. Particles may be separate pieces, but every piece of a frame stays inside that frame's cell. Same scale and same palette in every frame. No wolf, no character, no ground, no scenery, no text, no grid lines.\nSUBJECT: a magical BITE seen from the side, biting toward the RIGHT, as if an invisible wolf snapped its jaws just in front of its muzzle. Two rows of pale fangs (ivory white #f4fff6, shaded #bfead2): the upper row points down, the lower row points up. Each row is a thin crescent of light with 5 sharp fangs growing out of it, the biggest canine at the RIGHT end, the smallest at the LEFT end. The two rows are mirror images and keep the same width in every frame (about 230 px). A curved stroke of moonlit green (#8fe3b8, white core) accompanies the bite.\nFrame 1: rows wide open, about 90 px between the fang tips, thin and about 60 percent opaque, faint glow, just appearing.\nFrame 2: rows closing fast, about 40 px between the tips, fully opaque; a moonlit-green stroke hugs the outer edge of each row.\nFrame 3: IMPACT. The fangs interlock on the horizontal mid-line, no gap, the brightest frame; a sharp moonlit-green stroke crosses along the bite line (at most 247 px long), a small burst of leaf-shaped green shards on both sides and one or two tiny rose-pink sparks (#ff9fc9).\nFrame 4: rebound. The rows reopen slightly (about 16 px between the tips), about 75 percent opaque, thinner stroke, shards drifting apart.\nFrame 5: fading. Ghost of both rows at about 35 percent opacity, a thin fading line, the last shards.\nOutput: one PNG, 1536 x 1024 px, transparent background, 1 row of 5 frames.\n",
+    "frames": 5,
+    "placements": [
+      {
+        "cell": 0,
+        "bbox": [
+          31,
+          393,
+          277,
+          631
+        ],
+        "alpha_max": 153,
+        "target_fang_gap": 90
+      },
+      {
+        "cell": 1,
+        "bbox": [
+          339,
+          393,
+          583,
+          631
+        ],
+        "alpha_max": 255,
+        "target_fang_gap": 40
+      },
+      {
+        "cell": 2,
+        "bbox": [
+          646,
+          422,
+          890,
+          602
+        ],
+        "alpha_max": 255,
+        "target_fang_gap": 0
+      },
+      {
+        "cell": 3,
+        "bbox": [
+          953,
+          397,
+          1198,
+          627
+        ],
+        "alpha_max": 191,
+        "target_fang_gap": 16
+      },
+      {
+        "cell": 4,
+        "bbox": [
+          1259,
+          398,
+          1505,
+          627
+        ],
+        "alpha_max": 89,
+        "target_fang_gap": 16
+      }
+    ],
+    "glow": "real alpha",
+    "status": "importe sans avertissement"
+  },
+  "2": {
+    "n": 2,
+    "source": "assets/_codex_src/branches_milieu_fourche.png",
+    "ids": [
+      "branche_milieu",
+      "branche_fourche"
+    ],
+    "prompt": "Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Dark silhouettes in the spirit of Hollow Knight. World palette: night forest in deep violet, indigo and teal, magical accents in luminous moonlit green (#8fe3b8) and touches of rose pink (#ff9fc9). Strict side view (profile).\nMATERIAL: the ancient gnarled bark of the Great Tree, matching the existing bark tiles: knobby, deep flowing grooves, a few knots. Colors: base #4a2c28 and #5a3028, lit planes #6b3d2a and #7a4a30, grooves #2a1818, near-black outline, and a cool violet-indigo shade (#2a2448) on the shadow side so it sits in the moonlit night. The bark stays DARK so characters read clearly in front of it. MOSS: a soft cushion of moss (#588828, #789818) with tiny moonlit-green highlights (#8fe3b8) and a few very small rose-pink lichen dots (#ff9fc9). No mushrooms, no large plants, no vines, no creatures.\nBRANCH SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background (alpha). Two invisible horizontal bands of EXACTLY 512 px each: band 1 = rows 0 to 511, band 2 = rows 512 to 1023. ONE piece per band; nothing crosses into the other band. All pieces belong to the SAME branch, at the SAME scale, drawn with the trunk side on the LEFT and the tip side on the RIGHT. Rows below are counted from the TOP OF THE BAND:\n- WALK LINE = row 256. The top of the moss lies on this line and is nearly FLAT: within 4 px above or below it on every walkable part. It must read clearly as a surface to walk on.\n- Above the walk line, on walkable parts: only a few short moss tufts and tiny fern sprigs, at most 24 px tall, covering less than a quarter of the width.\n- The moss cushion is 24 to 40 px thick, with short rounded drips over the bark, at most 80 px below the walk line.\n- BARK UNDERSIDE = row 480, within 12 px (branch thickness 224 px). Below it: only short hanging moss or root wisps, ending above row 496.\n- JUNCTION EDGE: a perfectly vertical cut with NO dark outline on that side. Bark, grain and moss run straight off the cut, with the top on row 256 and the underside on row 480. Within 40 px of a junction edge: no tuft, no drip, no wisp, no knot.\nNo cast shadow, no ground, no text, no grid lines, no borders.\nBand 1 - BRANCH MIDDLE (TILEABLE): a straight, level section of a huge old branch, spanning the FULL canvas width, touching the left edge and the right edge, SEAMLESSLY TILEABLE HORIZONTALLY: the left and right edges match exactly in shape, height and colour, so copies placed side by side show no seam. Both side edges are JUNCTION EDGES, fully opaque in the bark and moss. Bark grain runs along the length, 3 or 4 irregular knots and bulges, walkable over its whole length.\nBand 2 - BRANCH FORK: the same branch splitting in two, about 1024 px wide, centered in its band (transparent space on both sides). Left and right sides are JUNCTION EDGES: the lower limb runs straight and level from one to the other, walkable over its whole length, with the moss surface on the walk line uninterrupted. The upper limb grows from BEHIND the lower limb at about 40 percent of the width, slightly darker, rising toward the upper right at about 25 degrees, about 110 px thick at its start and tapering to a pointed tip with two or three small leaves touching it, with moss along its top. Its tip stays at least 20 px below the top of the band. A clear V-shaped crotch between the two limbs.\nOutput: one PNG, 1536 x 1024 px, transparent background, 2 bands.\n",
+    "pieces": {
+      "branche_milieu": {
+        "size": [
+          1536,
+          512
+        ],
+        "walk_median": 256.0,
+        "underside_median": 481.0,
+        "walk_range": [
+          256.0,
+          259.0
+        ]
+      },
+      "branche_fourche": {
+        "size": [
+          1024,
+          512
+        ],
+        "walk_median": 256.0,
+        "underside_median": 481.0,
+        "walk_range": [
+          252.0,
+          258.0
+        ]
+      }
+    },
+    "status": "importe sans avertissement"
+  },
+  "3": {
+    "n": 3,
+    "source": "assets/_codex_src/branches_base_bout.png",
+    "ids": [
+      "branche_base",
+      "branche_bout"
+    ],
+    "prompt": "Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Dark silhouettes in the spirit of Hollow Knight. World palette: night forest in deep violet, indigo and teal, magical accents in luminous moonlit green (#8fe3b8) and touches of rose pink (#ff9fc9). Strict side view (profile).\nMATERIAL: the ancient gnarled bark of the Great Tree, matching the existing bark tiles: knobby, deep flowing grooves, a few knots. Colors: base #4a2c28 and #5a3028, lit planes #6b3d2a and #7a4a30, grooves #2a1818, near-black outline, and a cool violet-indigo shade (#2a2448) on the shadow side so it sits in the moonlit night. The bark stays DARK so characters read clearly in front of it. MOSS: a soft cushion of moss (#588828, #789818) with tiny moonlit-green highlights (#8fe3b8) and a few very small rose-pink lichen dots (#ff9fc9). No mushrooms, no large plants, no vines, no creatures.\nBRANCH SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background (alpha). Two invisible horizontal bands of EXACTLY 512 px each: band 1 = rows 0 to 511, band 2 = rows 512 to 1023. ONE piece per band; nothing crosses into the other band. All pieces belong to the SAME branch, at the SAME scale, drawn with the trunk side on the LEFT and the tip side on the RIGHT. Rows below are counted from the TOP OF THE BAND:\n- WALK LINE = row 256. The top of the moss lies on this line and is nearly FLAT: within 4 px above or below it on every walkable part. It must read clearly as a surface to walk on.\n- Above the walk line, on walkable parts: only a few short moss tufts and tiny fern sprigs, at most 24 px tall, covering less than a quarter of the width.\n- The moss cushion is 24 to 40 px thick, with short rounded drips over the bark, at most 80 px below the walk line.\n- BARK UNDERSIDE = row 480, within 12 px (branch thickness 224 px). Below it: only short hanging moss or root wisps, ending above row 496.\n- JUNCTION EDGE: a perfectly vertical cut with NO dark outline on that side. Bark, grain and moss run straight off the cut, with the top on row 256 and the underside on row 480. Within 40 px of a junction edge: no tuft, no drip, no wisp, no knot.\nNo cast shadow, no ground, no text, no grid lines, no borders.\nBand 1 - BRANCH ROOT, where the branch grows out of the trunk (the trunk is off to the LEFT and NOT drawn): about 640 px wide, centered in its band. The RIGHT side is a JUNCTION EDGE. The rightmost 384 px are walkable, flat on the walk line. Further left the branch flares out like a strong shoulder, widening upward and downward: at its left end it is about 420 px tall, rising up to about 190 px above the walk line and ending above row 496. The leftmost 256 px will be drawn ON TOP of the trunk: this left end has NO dark outline and breaks into irregular tongues of bark, with grooves that curve upward and downward as if merging into a vertical trunk.\nBand 2 - BRANCH TIP: about 448 px wide, centered in its band. The LEFT side is a JUNCTION EDGE. The leftmost 320 px are walkable, flat on the walk line. Over the last 128 px the underside rises to meet the top and the top curves down by at most 24 px, ending in a pointed tip with two or three small leaves touching it and a little hanging moss.\nOutput: one PNG, 1536 x 1024 px, transparent background, 2 bands.\n",
+    "pieces": {
+      "branche_base": {
+        "size": [
+          640,
+          512
+        ],
+        "walk_median": 256.0,
+        "underside_median": 477.0,
+        "walk_range": [
+          256.0,
+          259.0
+        ]
+      },
+      "branche_bout": {
+        "size": [
+          448,
+          512
+        ],
+        "walk_median": 256.0,
+        "underside_median": 479.0,
+        "walk_range": [
+          256.0,
+          259.0
+        ]
+      }
+    },
+    "status": "importe sans avertissement"
+  },
+  "4": {
+    "n": 4,
+    "source": "assets/_codex_src/tronc_segment.png",
+    "ids": [
+      "tronc_segment"
+    ],
+    "prompt": "Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Dark silhouettes in the spirit of Hollow Knight. World palette: night forest in deep violet, indigo and teal, magical accents in luminous moonlit green (#8fe3b8) and touches of rose pink (#ff9fc9). Strict side view (profile).\nMATERIAL: the ancient gnarled bark of the Great Tree, matching the existing bark tiles: knobby, deep flowing grooves, a few knots. Colors: base #4a2c28 and #5a3028, lit planes #6b3d2a and #7a4a30, grooves #2a1818, near-black outline, and a cool violet-indigo shade (#2a2448) on the shadow side so it sits in the moonlit night. The bark stays DARK so characters read clearly in front of it. MOSS: a soft cushion of moss (#588828, #789818) with tiny moonlit-green highlights (#8fe3b8) and a few very small rose-pink lichen dots (#ff9fc9). No mushrooms, no large plants, no vines, no creatures.\nA vertical section of the trunk of the Great Tree, perfectly vertical and running from the VERY TOP edge to the VERY BOTTOM edge of the canvas, SEAMLESSLY TILEABLE VERTICALLY: the top and bottom edges match exactly, so copies stack without a seam, and nothing is cut by these edges unless it continues on the other side. The trunk body is 768 px wide, centered on x = 512 (left side about x = 128, right side about x = 896); the sides may wobble by 16 px but return to the same x at the top and at the bottom. Thick near-black outline on the left and right sides only, no outline on the top and bottom. Rounded volume: darker toward both sides. Bark grain runs vertically: deep grooves, 2 or 3 knots, vertical patches and streaks of moss. No branches, no holes, nothing sticking out of the silhouette, at least 90 px of transparent space on both sides. Nothing else on the canvas.\nOutput: one PNG, 1024 x 1536 px, transparent background.\n",
+    "pieces": {
+      "tronc_segment": {
+        "size": [
+          793,
+          1536
+        ],
+        "body_median_width": 767
+      }
+    },
+    "status": "importe sans avertissement"
+  },
+  "5": {
+    "n": 5,
+    "source": "assets/_codex_src/tronc_base.png",
+    "ids": [
+      "tronc_base"
+    ],
+    "prompt": "Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Dark silhouettes in the spirit of Hollow Knight. World palette: night forest in deep violet, indigo and teal, magical accents in luminous moonlit green (#8fe3b8) and touches of rose pink (#ff9fc9). Strict side view (profile).\nMATERIAL: the ancient gnarled bark of the Great Tree, matching the existing bark tiles: knobby, deep flowing grooves, a few knots. Colors: base #4a2c28 and #5a3028, lit planes #6b3d2a and #7a4a30, grooves #2a1818, near-black outline, and a cool violet-indigo shade (#2a2448) on the shadow side so it sits in the moonlit night. The bark stays DARK so characters read clearly in front of it. MOSS: a soft cushion of moss (#588828, #789818) with tiny moonlit-green highlights (#8fe3b8) and a few very small rose-pink lichen dots (#ff9fc9). No mushrooms, no large plants, no vines, no creatures.\nThe FOOT of the same trunk. At the VERY TOP edge of the canvas the trunk body is exactly as in the trunk segment: 768 px wide, centered on x = 768, cut by a straight horizontal line with no outline on the top. Going down, the trunk flares out and splits into 5 to 7 big gnarled roots that spread to the left and to the right like fingers, thinning to points, reaching about x = 68 on the left and about x = 1468 on the right. The roots are not the same on both sides, but they reach equally far. GROUND LINE = row 960: the lower edge of the trunk and roots rests on this line; below it only blunt root ends sinking into the ground, ending above row 1005. Moss on top of the roots. No ground, no grass, no rocks, no shadow, no vines. Nothing else on the canvas.\nOutput: one PNG, 1536 x 1024 px, transparent background.\n",
+    "pieces": {
+      "tronc_base": {
+        "size": [
+          1400,
+          1024
+        ],
+        "axis_source": 768,
+        "axis_final": 698.5,
+        "ground_line": 960,
+        "ground_line_alpha128": 958
+      }
+    },
+    "root_join_y": 742,
+    "status": "importe sans avertissement"
+  },
+  "6": {
+    "n": 6,
+    "source": "assets/sprites/agarica_repos.png",
+    "ids": [
+      "agarica_repos"
+    ],
+    "prompt": "Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Dark silhouettes in the spirit of Hollow Knight. World palette: night forest in deep violet, indigo and teal, magical accents in luminous moonlit green (#8fe3b8) and touches of rose pink (#ff9fc9). Strict side view (profile). Characters are chibi-proportioned (about 2.5 to 3 heads tall) with anime-influenced faces.\nAGARICA (the heroine): a petite teenage female druid, chibi proportions (about 2.5 to 3 heads tall), pointed elf ears, big green eyes, short messy LIGHT AUBURN hair (warm light auburn / copper-chestnut, base colour #B5613A, NOT bright red), dark-green hooded cape embroidered with leaf and vine patterns and closed by a round silver clasp at the collar, sleeveless beige tunic, brown belt with a gold buckle, dark grey trousers, brown leather boots, black fingerless mittens, a pink-red spiral tattoo on her bare upper arm, a small silver dagger sheathed on her belt. Soft anime cel-shaded chibi look, same design as the existing game sprite.\nSPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 2 horizontal rows; each row is ONE animation of 4 frames, read left to right. Each row is a band about 512 px tall; frame cells are 384 px wide; each pose is centered in its cell with the lowest point on the same baseline within a row. Leave at least 40 px of empty space between neighboring frames and at least 60 px between rows. Every frame is ONE single connected silhouette; NO detached particles, sparkles, dust, motion lines, NO cast shadow, NO ground line, NO campfire. Same character, same scale, same colors in every frame. The character faces RIGHT. No text, no grid lines, no borders.\nSEATED POSE (used in row 2, and in the last frame of row 1): she sits on the ground in profile, facing RIGHT toward a campfire that is NOT drawn: legs bent with knees up, boots flat on the ground in front of her on the right, hands resting on her knees, back slightly rounded, head up, hood DOWN, cape pooled on the ground behind her on the left, reaching as far to the left as the boots reach to the right, so that her hips stay in the middle of the cell. Soft half-closed eyes, gentle smile, at peace. About 180 px tall, about 220 px wide. Boots, hips and cape rest on the same baseline.\nRow 1 - \"sit\" (she sits down, played once), 4 frames.\nFrame 1: STANDING NEUTRAL, full height about 250 px, arms relaxed at her sides, no raised arm, no gesture, looking to the right, feet on the baseline.\nFrame 2: knees bending, torso leaning slightly forward, one hand reaching down toward the ground, the cape starting to settle.\nFrame 3: almost seated, one hand on the ground, knees up, the cape spreading on the ground behind her.\nFrame 4: the SEATED POSE, exactly the same picture as row 2 frame 1.\nRow 2 - \"sit_idle\" (seated, calm, breathing, looping), 4 frames, all in the SEATED POSE. Only the head, shoulders, chest and upper arms move. Boots, legs, hips and the cape on the ground are IDENTICAL in all 4 frames.\nFrame 1: breath out, the base pose.\nFrame 2: breathing in, shoulders and chest raised by about 3 px.\nFrame 3: top of the breath, head and shoulders raised by about 5 px, eyes softly closed.\nFrame 4: breathing out, shoulders raised by about 2 px, eyes half closed again.\nOutput: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 4 frames.\n",
+    "frames": 8,
+    "placements": [
+      {
+        "cell": 0,
+        "bbox": [
+          124,
+          200,
+          259,
+          450
+        ],
+        "visible_size": [
+          135,
+          250
+        ]
+      },
+      {
+        "cell": 1,
+        "bbox": [
+          500,
+          237,
+          652,
+          450
+        ],
+        "visible_size": [
+          152,
+          213
+        ]
+      },
+      {
+        "cell": 2,
+        "bbox": [
+          872,
+          264,
+          1047,
+          450
+        ],
+        "visible_size": [
+          175,
+          186
+        ]
+      },
+      {
+        "cell": 3,
+        "bbox": [
+          1256,
+          271,
+          1431,
+          450
+        ],
+        "visible_size": [
+          175,
+          179
+        ]
+      },
+      {
+        "cell": 4,
+        "bbox": [
+          104,
+          783,
+          279,
+          962
+        ],
+        "visible_size": [
+          175,
+          179
+        ]
+      },
+      {
+        "cell": 5,
+        "bbox": [
+          488,
+          780,
+          663,
+          962
+        ],
+        "visible_size": [
+          175,
+          182
+        ]
+      },
+      {
+        "cell": 6,
+        "bbox": [
+          872,
+          778,
+          1047,
+          962
+        ],
+        "visible_size": [
+          175,
+          184
+        ]
+      },
+      {
+        "cell": 7,
+        "bbox": [
+          1256,
+          781,
+          1431,
+          962
+        ],
+        "visible_size": [
+          175,
+          181
+        ]
+      }
+    ],
+    "stand_height": 250,
+    "idle_heights": [
+      179,
+      182,
+      184,
+      181
+    ],
+    "static_lower_pixels": 90,
+    "idle_widths": [
+      175,
+      175,
+      175,
+      175
+    ],
+    "status": "importe sans avertissement"
+  }
+}

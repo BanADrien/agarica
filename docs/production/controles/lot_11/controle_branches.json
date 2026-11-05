@@ -1,0 +1,65 @@
+{
+  "raccord_branche_milieu": {
+    "edge_rgba_max_difference": 0,
+    "vertical": false
+  },
+  "junction_edge_rgba_max_difference": {
+    "branche_base_branche_milieu": 0,
+    "branche_milieu_branche_fourche": 0,
+    "branche_fourche_branche_milieu": 0,
+    "branche_milieu_branche_bout": 0
+  },
+  "branches": {
+    "branche_base": {
+      "size": [
+        640,
+        512
+      ],
+      "walk_median": 256.0,
+      "underside_median": 477.0,
+      "walk_range": [
+        256.0,
+        259.0
+      ]
+    },
+    "branche_milieu": {
+      "size": [
+        1536,
+        512
+      ],
+      "walk_median": 256.0,
+      "underside_median": 481.0,
+      "walk_range": [
+        256.0,
+        259.0
+      ]
+    },
+    "branche_fourche": {
+      "size": [
+        1024,
+        512
+      ],
+      "walk_median": 256.0,
+      "underside_median": 481.0,
+      "walk_range": [
+        252.0,
+        258.0
+      ]
+    },
+    "branche_bout": {
+      "size": [
+        448,
+        512
+      ],
+      "walk_median": 256.0,
+      "underside_median": 479.0,
+      "walk_range": [
+        256.0,
+        259.0
+      ]
+    }
+  },
+  "assembly_walk_global_y": 384,
+  "assembly_branch_y": 128,
+  "hero_visible_height": 344
+}
