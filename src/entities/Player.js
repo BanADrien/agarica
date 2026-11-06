@@ -181,10 +181,15 @@ const LOUP_ATTACK_ANIM_ROWS = [
   { row: 1, count: 4 },
 ];
 // Coup de croc : images gardées de la feuille pour un coup vif (toute la feuille
-// = 400 ms, bien plus que la dague). 0_2 = élan, 0_3 = gueule ouverte, 1_0 =
-// morsure, 1_1 = gueule fermée, 1_3 = retour. Sans 1_2 : le loup s'y cabrait,
-// pose de fin de ruée. Durée = celle d'un coup de dague, cf. SLASH_TOTAL_MS.
-const WOLF_BITE_FRAMES = [2, 3, 4, 5, 7];
+// = 400 ms, bien plus que la dague). 0_3 = gueule ouverte, 1_0 = gueule grande
+// ouverte (morsure), 1_1 = gueule fermée (tenue deux images), 1_3 = retour.
+// Calées une à une sur les crocs `vfx_croc` (cf. drawBiteFx, 56 ms chacune) :
+// crocs ouverts pendant l'élan → gueule ouverte, crocs qui se referment →
+// gueule fermée. Avec 0_2 (gueule close) en tête, tout était décalé d'une
+// image : gueule grande ouverte pile quand les crocs se fermaient. Sans 1_2 :
+// le loup s'y cabrait, pose de fin de ruée. Durée = celle d'un coup de dague,
+// cf. SLASH_TOTAL_MS.
+const WOLF_BITE_FRAMES = [3, 4, 5, 5, 7];
 const ANIM_WOLF_RUN_KEY = 'loup-run';
 const ANIM_WOLF_ATTACK_KEY = 'loup-attack';
 // Comme pour le saut humain (cf. JUMP_RISE_TEXTURE/JUMP_FALL_TEXTURE) : pas

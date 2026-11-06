@@ -41,7 +41,11 @@ const CLAIRIERE_PLANTE_DATA = {
   ],
   windCurrents: [{ x: 0, y: 40, w: 112, h: 410, force: 330 }],
   entries: [
-    { id: 'from_ff2', x: 230, y: 110, height: 60, edge: 'left', from: 90, to: 170 },
+    // Arrivée en plané depuis les îles : `inset` 140, hors du courant d'air
+    // (x 0-112). À 44 px (défaut), l'aigle y naissait et, touches lâchées,
+    // flottait sans fin : il ne se posait jamais, la cinématique d'arrivée
+    // attendait. Le courant reste pour le retour vers la forêt flottante 2.
+    { id: 'from_ff2', x: 230, y: 110, height: 60, edge: 'left', from: 90, to: 170, inset: 140 },
     { id: 'from_hutte', x: 2140, y: 400, height: 128, edge: 'right', to: 448 },
   ],
   exits: [

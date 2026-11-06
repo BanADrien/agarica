@@ -118,8 +118,12 @@ const FORET_FLOTTANTE_1_DATA = {
     // dessus de P8, il frappait au moment du saut vers le belvédère).
     { type: 'corbeau', x: 2980, y: -420, patrolMinX: 2935, patrolMaxX: 3025, diveDepth: 150, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
     { type: 'corbeau', x: 2330, y: -650, patrolMinX: 2285, patrolMaxX: 2375, diveDepth: 160, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
-    // Patrouille écartée du bord droit : on arrive des îles juste après lui (x 3540).
-    { type: 'mousse_creature', x: 3290, y: -940, patrolMinX: 3220, patrolMaxX: 3360 },
+    // Patrouille écartée du bord droit : on arrive des îles juste après lui (x 3540)
+    // et l'élan du sprint porte Agarica jusqu'à x ≈ 3360 (à pied ≈ 3430) ; au-delà de
+    // 3280, la créature l'y attendait (3 retours sur 6 touchés, dont une mort). À
+    // gauche, 3216 : son corps (30 px) reste sur le belvédère (bord x 3200). Côté
+    // montée, inchangé : on se pose à x ≈ 3200-3260, elle se tasse puis bondit.
+    { type: 'mousse_creature', x: 3280, y: -940, patrolMinX: 3216, patrolMaxX: 3280 },
   ],
   // Visible mais inutilisable sans l'aigle (il n'agit que sur le plané) : on le
   // remarque ici, on s'en sert dans les îles flottantes (au retour, il remonte

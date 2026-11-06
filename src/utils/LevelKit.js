@@ -2406,12 +2406,12 @@ const JUICE_HALO_ART_BOOST = 1.28;
 function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
   const totemType = TOTEM_TYPE_BY_FLAG[flagName] || 'wolf';
   const alreadyHas = !!scene.registry.get(flagName);
-  // Art par drapeau : les totems historiques (loup, aigle, pieuvre) sont
-  // lumineux tant que la forme attend et s'éteignent une fois prise ; ceux
-  // qui « s'éveillent » (singe, décision du 2026-10-25 : « allume juste le
-  // totem ») font l'inverse -- `totem_monkey_dim` endormi, puis `_lit` et son
-  // halo une fois la forme prise, pour de bon. Même repli (totemTextureKey).
-  const WAKING_TOTEM_FLAGS = ['hasMonkeyForm'];
+  // Art par drapeau : tous les totems (loup, aigle, pieuvre, singe) sont
+  // lumineux tant que la forme attend et s'éteignent une fois prise. Le singe
+  // faisait l'inverse (« s'éveillait ») : retour utilisateur du 2026-11-06, il
+  // doit se comporter comme les autres. Mécanique gardée pour un futur totem
+  // qui s'éveillerait : y ajouter son drapeau. Même repli (totemTextureKey).
+  const WAKING_TOTEM_FLAGS = [];
   const wakes = WAKING_TOTEM_FLAGS.includes(flagName);
   const stateFor = (has) => (has !== wakes ? 'dim' : 'lit');
   const textureKey = totemTextureKey(scene, totemType, stateFor(alreadyHas));
@@ -3615,11 +3615,16 @@ function addUndergrowthImage(scene, x, baseY, variant, scale, flipX) {
 // doit tenir en entier sur son tronçon (jamais à cheval sur une fosse),
 // avoir la place en hauteur (pas enfoncé dans un plafond de sol principal)
 // et rester hors de l'eau.
+// `undergrowthAvoid: [[x1, x2], …]` (clé de zone facultative, px monde) : bandes
+// sans aucune plante du sous-bois, à toutes les hauteurs (ex. : sol d'une arène,
+// où les plantes se confondaient avec les éclats des attaques). Distincte
+// d'`avoidRanges`, qui ne concerne que les arbres et buissons du fond.
 function addUndergrowth(scene, data) {
   const frontCells = zoneGroundCells(data);
   const front = new Set(frontCells.map(([gx, gy]) => gridCellKey(gx, gy)));
   const isOpen = (gx, gy) => !front.has(gridCellKey(gx, gy));
   const water = (data.water || []).map((w) => new Phaser.Geom.Rectangle(w.x, w.y, w.width, w.height));
+  const avoid = (data.undergrowthAvoid || []).filter((r) => Array.isArray(r) && r.length >= 2);
 
   // Pas de plantes sur les cases écrites à la main d'une branche (attaches de
   // lianes, canopée) : sa surface dessinée ne suit pas le haut de ces cases.
@@ -3639,19 +3644,21 @@ function addUndergrowth(scene, data) {
     let runStart = 0;
     for (let i = 1; i <= gxs.length; i++) {
       if (i < gxs.length && gxs[i] === gxs[i - 1] + 1) continue;
-      scatterUndergrowthOnRun(scene, gxs[runStart], gxs[i - 1], gy, isOpen, water);
+      scatterUndergrowthOnRun(scene, gxs[runStart], gxs[i - 1], gy, isOpen, water, avoid);
       runStart = i;
     }
   }
 }
 
-function scatterUndergrowthOnRun(scene, gxStart, gxEnd, gy, isOpen, water) {
+function scatterUndergrowthOnRun(scene, gxStart, gxEnd, gy, isOpen, water, avoid = []) {
   const left = gxStart * GROUND_TILE_SIZE + SOUS_BOIS_EDGE_INSET;
   const right = (gxEnd + 1) * GROUND_TILE_SIZE - SOUS_BOIS_EDGE_INSET;
   const baseY = gy * GROUND_TILE_SIZE + SOUS_BOIS_SINK;
 
   const fits = (x, width, height) => {
     if (x - width / 2 < left || x + width / 2 > right) return false;
+    // Aucune partie de l'image dans une bande `undergrowthAvoid`.
+    if (avoid.some(([a, b]) => x + width / 2 > Math.min(a, b) && x - width / 2 < Math.max(a, b))) return false;
     const rect = new Phaser.Geom.Rectangle(x - width / 2, baseY - height, width, height);
     if (water.some((w) => Phaser.Geom.Intersects.RectangleToRectangle(rect, w))) return false;
     const gxFrom = Math.floor(rect.left / GROUND_TILE_SIZE);
@@ -4130,10 +4137,15 @@ function edgeHintEnsureTextures(scene) {
     c.fillStyle = g;
     c.fillRect(0, 0, w, h);
   };
+  // Tailles volontairement hors puissance de 2 (127, 63) : en WebGL, une texture
+  // 64 x 128 est répétée (REPEAT) et le filtrage linéaire mélange ses bords
+  // opposés -- le bas opaque débordait en filet clair sur la 1re rangée (lueur
+  // basse, brume) et le bord vif de la lueur latérale sur sa dernière colonne
+  // (filet vertical au bord intérieur). Hors puissance de 2 : bords étirés (CLAMP).
   // Bords francs : la brume sombre s'arrête aux parois du trou.
-  make('edge-fade-up', 32, 128, fadeUp);
+  make('edge-fade-up', 32, 127, fadeUp);
   // Bords adoucis : les lueurs ne dessinent pas de rectangle.
-  make('edge-glow-up', 64, 128, (c, w, h) => {
+  make('edge-glow-up', 63, 127, (c, w, h) => {
     fadeUp(c, w, h);
     c.globalCompositeOperation = 'destination-out';
     for (const [x0, x1] of [[0, w * 0.3], [w, w * 0.7]]) {
@@ -4145,7 +4157,7 @@ function edgeHintEnsureTextures(scene) {
     }
   });
   // Lueur latérale : vive au bord (gauche de l'image), bas et haut adoucis.
-  make('edge-glow-side', 64, 64, (c, w, h) => {
+  make('edge-glow-side', 63, 63, (c, w, h) => {
     const g = c.createLinearGradient(0, 0, w, 0);
     g.addColorStop(0, 'rgba(255,255,255,1)');
     g.addColorStop(0.4, 'rgba(255,255,255,0.35)');

@@ -1264,7 +1264,9 @@ async function a2PlantePick(scene) {
 // Ouvre le chemin vers la hutte (sortie + papillons qui montrent la direction).
 function a2ClairiereOpenPath(scene, animate) {
   const st = scene.__a2;
-  if (st.exitHutte && !scene.__exits.includes(st.exitHutte)) scene.__exits.push(st.exitHutte);
+  // Nouveau tableau, jamais un push : scene.__exits peut être le tableau `exits`
+  // de la donnée de zone elle-même (cf. epreuveOuvrirSommet, acte1_arbre.js).
+  if (st.exitHutte && !scene.__exits.includes(st.exitHutte)) scene.__exits = [...scene.__exits, st.exitHutte];
   if (st.gate) { a2DestroyWalls(st.gate); st.gate = null; }
   if (typeof spawnButterflies !== 'function') return;
   const fromX = animate ? st.cfg.x : 2050;

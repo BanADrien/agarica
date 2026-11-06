@@ -113,7 +113,8 @@ function arbreMotes(scene, x1, x2, y1, y2, count, colors) {
 // - sol (`decor_mousse_lumineuse_sol`, 287 px source) : `w` px de large,
 //   bas sur la surface de marche réelle (+2 : posée dans l'herbe) ;
 // - plafond (`flip`, `decor_mousse_lumineuse_plafond`, 318 px) : accrochée
-//   par son haut en `y` (le dessous VISIBLE du toit du tunnel, 302) ;
+//   par son haut en `y` (296 : rentrée de quelques px sous le dessous visible
+//   du toit du tunnel, ~302 ; à 302 tout juste, elle flottait sous l'écorce) ;
 // - petite touffe des branches (w ≤ 50, `decor_mousse_lumineuse_petite`) à
 //   0,3 (45 px) : la plaque du sol, réduite, s'écrasait en tache.
 // Sans l'art : les pastilles dessinées d'avant.
@@ -312,8 +313,8 @@ CUTSCENES.racines_singe_eveil = cutsceneBulles([
 ], { text: 'Lianes : double saut pour devenir singe et s\'y accrocher\n← → se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5600 }, 2600);
 
 // Le totem lui-même est une donnée de zone (`totems`, grand_arbre_racines_data.js) :
-// art `totem_monkey_dim`, puis `totem_monkey_lit` une fois la forme prise
-// (addAbilityShrine, totems qui « s'éveillent »), invite « E : se recueillir »
+// art `totem_monkey_lit` tant que la forme attend, puis `totem_monkey_dim` une
+// fois prise, comme les autres totems (addAbilityShrine), invite « E : se recueillir »
 // maintenue dans l'écran (le totem est haut sur la branche).
 
 // Lumière de la cime : rai peint `fx_rai_lumiere` (bas en 3170, -192, au
@@ -383,7 +384,7 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     // pierres ; 1950 est sur la branche intermédiaire, le tronc dessiné qui
     // la portait à -192 a été retiré).
     [330, 560, 900, 1110].forEach((x, i) => arbreMossDecor(scene, x, 448, 70 + (i % 2) * 20));
-    [500, 760, 1120].forEach((x) => arbreMossDecor(scene, x, 302, 60, true));
+    [500, 760, 1120].forEach((x) => arbreMossDecor(scene, x, 296, 60, true));
     [[1530, 64], [1950, -64], [2420, -192], [2560, -192]].forEach(([x, y]) => arbreMossDecor(scene, x, y, 50));
     arbreMotes(scene, 1300, levelWidth - 100, -500, 400, 18, [0x9bff5a, 0xbfe8a0, 0xff9ad5]);
     // (Le totem du singe, au bout de la grande branche, est la clé de zone
@@ -701,8 +702,10 @@ const EPREUVE_SINGE_FENTE = { x: 12256, y: -186, h: 110 };
 function epreuveOuvrirSommet(scene, instant) {
   if (scene.__epreuveSommet) return;
   scene.__epreuveSommet = true;
-  scene.__exits = scene.__exits || [];
-  scene.__exits.push(EPREUVE_SINGE_SORTIE_SOMMET);
+  // Nouveau tableau : scene.__exits EST le tableau `exits` de la donnée de zone
+  // (LevelKit) ; y pousser la sortie la laissait ouverte pour toute la page
+  // (nouvelle partie sans le talisman comprise). Même piège que boss_kainati.js.
+  scene.__exits = [...(scene.__exits || []), EPREUVE_SINGE_SORTIE_SOMMET];
   const f = EPREUVE_SINGE_FENTE;
   const closed = scene.__sommetFente;
   if (closed && closed.art && closed.core && closed.core.active) {
@@ -890,22 +893,73 @@ function epreuveUpdateRhythms(scene, list, time, delta) {
 // mort (`top + 10`) sont ceux de la donnée.
 const EPREUVE_TIDE_ART = 'liquide_mousse_toxique';
 const EPREUVE_TIDE_CREST_ROW = 82;
+// Côtés adoucis : la nappe est dessinée EPREUVE_TIDE_FADE px plus large de
+// chaque côté et s'efface en fondu sur ~36 px, à mi-opacité sur le bord de la
+// zone qui blesse (`x`, `x + w`, inchangée). La limite du fondu ondule de ±6 px
+// avec la hauteur : la marée ne monte plus comme un bloc rectangulaire.
+const EPREUVE_TIDE_FADE = 24;
+const EPREUVE_TIDE_FADE_WIDTH = 36;
+
+// Masque (WebGL) : canvas de l'alpha de la nappe, opaque au milieu, en fondu
+// irrégulier sur les côtés ; couvre toute la course verticale de la marée.
+// Sans WebGL (pas de masque bitmap en Canvas) : bords francs, comme avant.
+function epreuveTideMask(scene, tide, objs) {
+  if (!scene.sys.game.renderer || scene.sys.game.renderer.type !== Phaser.WEBGL) return;
+  const F = EPREUVE_TIDE_FADE;
+  const FW = EPREUVE_TIDE_FADE_WIDTH;
+  const w = tide.w + 2 * F;
+  const y0 = Math.floor(Math.min(tide.low, tide.high) - (tide.crest || 0) - 16);
+  const y1 = Math.ceil(Math.max(Math.max(tide.low, tide.high) - (tide.crest || 0) + (tide.band || 0) + 124, 580));
+  const h = y1 - y0;
+  const key = `epreuve-maree-masque-${w}x${h}`;
+  if (!scene.textures.exists(key)) {
+    const tex = scene.textures.createCanvas(key, w, h);
+    const ctx = tex.getContext();
+    const margin = (F * 2 - FW) / 2; // 6 : amplitude de l'ondulation
+    for (let y = 0; y < h; y += 2) {
+      const wobL = Math.sin(y * 0.09) * 0.7 + Math.sin(y * 0.23 + 1.7) * 0.3;
+      const wobR = Math.sin(y * 0.08 + 2.4) * 0.7 + Math.sin(y * 0.21 + 0.5) * 0.3;
+      const l0 = margin + wobL * margin;
+      const r0 = w - margin - wobR * margin;
+      const g = ctx.createLinearGradient(0, 0, w, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(l0 / w, 'rgba(255,255,255,0)');
+      g.addColorStop((l0 + FW) / w, 'rgba(255,255,255,1)');
+      g.addColorStop((r0 - FW) / w, 'rgba(255,255,255,1)');
+      g.addColorStop(r0 / w, 'rgba(255,255,255,0)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, y, w, 2);
+    }
+    tex.refresh();
+  }
+  // Hors de la liste d'affichage : il ne sert qu'au masque (même caméra que la nappe).
+  const img = scene.make.image({ x: tide.x - F, y: y0, key, add: false }).setOrigin(0, 0);
+  const mask = img.createBitmapMask();
+  objs.forEach((o) => o.setMask(mask));
+  scene.events.once('shutdown', () => { mask.destroy(); img.destroy(); });
+}
 
 function epreuveCreateTide(scene, t) {
   const tide = { ...t, phase: 0, t: 0, top: t.low };
+  // Emprise dessinée (plus large que la zone qui blesse, cf. EPREUVE_TIDE_FADE).
+  tide.drawX = t.x - EPREUVE_TIDE_FADE;
+  tide.drawW = t.w + 2 * EPREUVE_TIDE_FADE;
   const key = `item-${EPREUVE_TIDE_ART}`;
   if (scene.textures.exists(key)) {
     const src = scene.textures.get(key).getSourceImage();
     const k = (getItemManifest()[EPREUVE_TIDE_ART] || {}).scale || 0.3;
     tide.crest = EPREUVE_TIDE_CREST_ROW * k;
     tide.band = src.height * k;
-    tide.fill = scene.add.rectangle(t.x, 0, t.w, 120, textureEdgeColor(scene, key, 'bottom', 0x16280f)).setOrigin(0, 0).setAlpha(0.92);
-    tide.img = scene.add.tileSprite(t.x, 0, t.w, tide.band, key).setOrigin(0, 0).setTileScale(k, k).setAlpha(0.92);
+    tide.fill = scene.add.rectangle(tide.drawX, 0, tide.drawW, 120, textureEdgeColor(scene, key, 'bottom', 0x16280f)).setOrigin(0, 0).setAlpha(0.92);
+    tide.img = scene.add.tileSprite(tide.drawX, 0, tide.drawW, tide.band, key).setOrigin(0, 0).setTileScale(k, k).setAlpha(0.92);
     storyPutBehindPlayer(scene, tide.fill);
     storyPutBehindPlayer(scene, tide.img);
+    epreuveTideMask(scene, tide, [tide.fill, tide.img]);
   } else {
     tide.g = scene.add.graphics();
     storyPutBehindPlayer(scene, tide.g);
+    epreuveTideMask(scene, tide, [tide.g]);
   }
   epreuveDrawTide(tide, 0);
   return tide;
@@ -926,11 +980,11 @@ function epreuveDrawTide(tide, time) {
   const top = tide.top;
   const h = 560 - top;
   if (h <= 0) return;
-  const x1 = tide.x;
-  const x2 = tide.x + tide.w;
+  const x1 = tide.drawX;
+  const x2 = tide.drawX + tide.drawW;
   const ph = time / 260;
-  g.fillStyle(0x16280f, 0.86).fillRect(x1, top + 8, tide.w, h);
-  g.fillStyle(0x24401a, 0.9).fillRect(x1, top + 8, tide.w, 26);
+  g.fillStyle(0x16280f, 0.86).fillRect(x1, top + 8, tide.drawW, h);
+  g.fillStyle(0x24401a, 0.9).fillRect(x1, top + 8, tide.drawW, 26);
   for (let x = x1, i = 0; x < x2; x += 24, i++) {
     g.fillStyle(i % 2 ? 0x3e7a2c : 0x2f5a2a, 1).fillEllipse(x + 12, top + 8 + Math.sin(ph + i * 0.9) * 3, 36, 18);
   }

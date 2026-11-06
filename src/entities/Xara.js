@@ -729,7 +729,18 @@ class Xara extends Phaser.GameObjects.Sprite {
       // monde). Seulement pendant qu'elle essaie vraiment d'avancer dans ce
       // sens (sinon elle sauterait sur place devant une marche sans même
       // chercher à s'en approcher).
-      const wantsToMove = distanceToFollowed > XARA_GROUND_ARRIVED_GAP;
+      // Plaquée contre le bord gauche du monde (StoryKit, updateStoryXaraInZone)
+      // alors que son ancre est plus à gauche (Agarica à x ≤ 50 : arrivée par un
+      // bord gauche, ou contre un bord gauche fermé) : elle ne peut pas y aller,
+      // elle n'essaie plus. Sinon `body.blocked.left` / le vide sondé hors du
+      // monde la faisaient sauter sur place sans fin.
+      const wantsToMove = distanceToFollowed > XARA_GROUND_ARRIVED_GAP
+        && !(moveDir < 0 && this.body.left <= 1);
+      // … et s'y tient immobile, sans marcher sur place contre le bord.
+      if (grounded && !wantsToMove) {
+        this.airVelX = 0;
+        this.body.setVelocityX(0);
+      }
       const blockedAhead = grounded && wantsToMove
         && (this.hasStepAhead(this.x + moveDir * XARA_WALL_PROBE_AHEAD)
           || (moveDir > 0 ? this.body.blocked.right : this.body.blocked.left));
@@ -780,7 +791,7 @@ class Xara extends Phaser.GameObjects.Sprite {
       }
       this.setRotation(0);
 
-      const walking = distanceToFollowed > XARA_GROUND_ARRIVED_GAP;
+      const walking = wantsToMove;
       if (!grounded) {
         this.anims.stop();
         this.setTexture(this.body.velocity.y < 0 ? XARA_JUMP_RISE_TEXTURE : XARA_JUMP_FALL_TEXTURE);

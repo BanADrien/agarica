@@ -46,8 +46,14 @@ const GRAND_ARBRE_RACINES_DATA = {
   script: 'grand_arbre_racines',
   // Le grand tronc : la fourche s'y raccorde à gauche, la grande branche à droite,
   // et la branche intermédiaire y fait une console. Juste derrière le plan de jeu.
+  // Bord droit : un second fût, presque hors de l'écran, ferme le bord SOUS la
+  // corniche de la cime (filet et sol y butent : des murs) et laisse libre le
+  // passage au-dessus d'elle, la seule vraie sortie (vers l'arène). Sans lui,
+  // filet, sol et corniche sortaient tous trois de l'écran, rien ne distinguait
+  // le passage des murs. Son haut passe derrière le dessous de la corniche.
   trunks: [
     { x: 1950, top: -640, bottom: RACINES_SURFACE_Y, scale: 0.5, base: true, tint: 0xa097aa },
+    { x: 3900, top: -150, bottom: RACINES_SURFACE_Y, tint: 0xa097aa },
   ],
   // Toutes les plateformes sont des branches ou des racines, avec EXACTEMENT les
   // cases de collision des anciennes tuiles (vérifié corps par corps) : `from`/`to`
@@ -113,8 +119,9 @@ const GRAND_ARBRE_RACINES_DATA = {
     { from: [1344, 64], to: [1728, 64], attach: 'right', thickness: 56 },
     // Corniche de l'épreuve du singe (x 0-320, y=-128) : sort de l'écran à gauche.
     { from: [0, -128], to: [320, -128], tip: 'right', thickness: 56 },
-    // Branche intermédiaire (x 1856-2048, y=-64) : console sur le tronc.
-    { from: [1856, -64], to: [2048, -64], tip: 'both', thickness: 56 },
+    // Branche intermédiaire (x 1856-2048, y=-64) : console sur le tronc, prise
+    // dedans des deux côtés (avec une pointe à chaque bout, on aurait dit une barque).
+    { from: [1856, -64], to: [2048, -64], attach: 'both', thickness: 56 },
     // Grande branche haute (x 2176-2944, y=-192) + totem au bout. Fourche : un
     // rameau (décor) au-dessus du passage des pierres.
     { from: [2176, -192], to: [2944, -192], attach: 'left', thickness: 56, forks: [{ at: 60 }] },
@@ -170,8 +177,8 @@ const GRAND_ARBRE_RACINES_DATA = {
   // Totem du singe, au bout de la grande branche (décision du 2026-10-25 :
   // comme le loup et l'aigle, il s'allume et donne DIRECTEMENT la forme
   // singe ; plus de monde spirituel). Même clé que les autres totems
-  // (LevelKit addAbilityShrine) : art `totem_monkey_dim`, puis
-  // `totem_monkey_lit` une fois la forme prise. Suite : bulle de Xara et
+  // (LevelKit addAbilityShrine) : art `totem_monkey_lit` tant que la forme
+  // attend, puis `totem_monkey_dim` une fois prise. Suite : bulle de Xara et
   // rappel des lianes (script de zone, `racines_singe_eveil`).
   totems: [
     { x: 2860, y: -192, flag: 'hasMonkeyForm', message: 'Forme du singe !' },

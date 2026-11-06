@@ -1499,10 +1499,34 @@ function lookSyncShadow(scene, st, src) {
   if (ground == null || !src.visible) { sh.setVisible(false); return; }
   const h = Math.max(0, ground - feet);
   const k = Phaser.Math.Clamp(1 - h / 150, 0, 1);
-  let base = box ? (box.baseRight - box.baseLeft) : src.displayWidth * 0.4;
-  if (src.body) base = Math.max(base, src.body.width * 0.8);
-  let w = (base < 26 ? base * 1.3 + 6 : base * 1.6 + 18) * (0.55 + 0.45 * k);
-  let cx = box ? (box.baseLeft + box.baseRight) / 2 : src.x;
+  // Largeur d'appui STABLE (retour utilisateur du 2026-11-06 : « elle change de
+  // taille toute seule »). L'appui visible (objectVisibleBox) change à chaque
+  // image de l'animation, jambes serrées ou écartées : l'ombre d'Agarica passait
+  // de 34 à 62 px à l'arrêt, de 32 à 89 px en marchant. Agarica : largeur tirée
+  // de sa hitbox (fixe, sauf changement de forme) et centre de son corps. Les
+  // autres (ennemis, Xara, PNJ, dont le corps ne dit rien de la silhouette) :
+  // appui visible fortement lissé. Dans les deux cas, lissé pour qu'un
+  // changement de forme ne fasse pas sauter l'ombre d'un coup.
+  let target;
+  let off;
+  if (src === scene.player && src.body) {
+    target = src.body.width * 1.3;
+    off = src.body.center.x - src.x;
+  } else {
+    target = box ? (box.baseRight - box.baseLeft) : src.displayWidth * 0.4;
+    if (src.body) target = Math.max(target, src.body.width * 0.8);
+    off = box ? (box.baseLeft + box.baseRight) / 2 - src.x : 0;
+  }
+  const ease = src === scene.player ? 0.25 : 0.08;
+  // Décalage de la silhouette retourné avec elle : pas de lissage à travers
+  // un demi-tour (l'ombre glisserait d'un côté à l'autre).
+  if (sh.__lookFlip !== src.flipX) { sh.__lookOff = off; sh.__lookFlip = src.flipX; }
+  sh.__lookBase = sh.__lookBase == null ? target : sh.__lookBase + (target - sh.__lookBase) * ease;
+  sh.__lookOff = sh.__lookOff == null ? off : sh.__lookOff + (off - sh.__lookOff) * ease;
+  const base = sh.__lookBase;
+  // Courbe continue (l'ancienne sautait de 40 à 60 px à 26 px d'appui).
+  let w = (base < 26 ? base * 1.3 + 6 : base * 1.6 - 1.8) * (0.55 + 0.45 * k);
+  let cx = src.x + sh.__lookOff;
   let y = ground + 2;
   let alphaMul = 1;
   if (onProp) {

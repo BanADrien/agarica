@@ -48,6 +48,9 @@ const GRAND_ARBRE_ARENE_DATA = {
     { from: [0, GRAND_ARBRE_ARENE_SURFACE_Y], to: [1920, GRAND_ARBRE_ARENE_SURFACE_Y], rows: 2, thickness: 100, attach: 'none', forks: [{ at: 1480 }] },
   ],
   avoidRanges: [[512, 1472]],
+  // Pas de sous-bois au sol de l'arène : ses plantes se confondaient avec les
+  // éclats de l'onde de choc et des rochers (LevelKit, addUndergrowth).
+  undergrowthAvoid: [[512, 1472]],
   playerSpawn: { x: 110, y: 412 },
   campfires: [{ x: 300, y: GRAND_ARBRE_ARENE_SURFACE_Y }],
   // Décors (`grand_arbre`) hors de l'arène seulement : le combat (bandes

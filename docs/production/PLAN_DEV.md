@@ -986,6 +986,14 @@ le sol juste après (`LEVEL_DATA_HANDLERS.branches` / `.trunks` sont des entrée
   épaisseur si courbe) et « Tronc » (clic ; molette : échelle) dans « Plus d'outils » ; courbe, raccord,
   cases dans « Propriétés (JSON) ». Maj+flèche les décale avec le sol.
 
+### Sous-bois : bandes sans plantes (`undergrowthAvoid`, 2026-11-05, rétro-compatible)
+- `undergrowthAvoid: [[x1, x2], …]` (px monde, facultatif) : aucune plante du sous-bois
+  (`addUndergrowth`, LevelKit) n'y est posée, même en partie, à toutes les hauteurs. Sans la clé :
+  rien ne change. Distincte d'`avoidRanges`, qui ne concerne que les arbres et buissons du fond.
+  Arène de Kainati : `[[512, 1472]]` (ses plantes se confondaient avec les éclats de l'onde de choc).
+- **Éditeur** : clé non éditée, conservée telle quelle à l'aller-retour JSON (listée dans « Clés
+  conservées sans édition ») ; Maj+flèche ne la décale pas (comme `avoidRanges`).
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |
