@@ -33,7 +33,8 @@ class TitleScene extends Phaser.Scene {
     menuNoteSaveProgress();
     fadeInScene(this);
 
-    if (this.textures.exists('titre-fond')) {
+    const paintedBg = this.textures.exists('titre-fond');
+    if (paintedBg) {
       // Fond peint (image de l'utilisateur) : couvre tout l'écran sans
       // déformation, recadré au centre. Voile léger en bas seulement, pour la
       // lisibilité du menu, sans éteindre le paysage de jour.
@@ -57,7 +58,11 @@ class TitleScene extends Phaser.Scene {
       menuAddFireflies(this, 22);
     }
 
-    this.buildCharacters(width, height);
+    // Sur le fond peint, pas d'Agarica ni de Xara (retour utilisateur du
+    // 2026-11-07) : conteneur vide, les menus le montrent/cachent sans le savoir.
+    // Ils restent sur le décor de nuit de repli, dont ils font partie.
+    if (paintedBg) this.characters = this.add.container(0, 0);
+    else this.buildCharacters(width, height);
     this.buildLogo(width);
 
     this.footer = this.add.text(width - 14, height - 10, TITLE_FOOTER, {

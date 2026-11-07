@@ -1,6 +1,18 @@
 class BootScene extends Phaser.Scene {
   constructor() {
-    super('BootScene');
+    // `pack` : chargé AVANT preload(), pour que l'écran de chargement ait déjà
+    // son fond peint (image de l'utilisateur, 2026-11-07, aussi fond du titre)
+    // et le logo. Même clé que le manifest pour le logo (loadManifestAssets ne
+    // le recharge pas). Fichier absent : l'écran garde son décor dessiné.
+    super({
+      key: 'BootScene',
+      pack: {
+        files: [
+          { type: 'image', key: 'titre-fond', url: 'assets/ui/fond_titre.jpg' },
+          { type: 'image', key: 'item-titre_logo', url: 'assets/ui/titre_logo.png' },
+        ],
+      },
+    });
   }
 
   preload() {
@@ -95,9 +107,6 @@ class BootScene extends Phaser.Scene {
       this.load.image(`xara-walk-${i}`, `assets/sprites/xara_frames/xara_walk_${i}.png`);
     }
     this.load.image('xara-swing-0', 'assets/sprites/xara_frames/xara_swing_0.png');
-    // Fond de l'écran-titre (image fournie par l'utilisateur, 2026-11-07) ; sans
-    // elle, TitleScene garde le décor de nuit dessiné par le code.
-    this.load.image('titre-fond', 'assets/ui/fond_titre.jpg');
     for (let i = 1; i <= 3; i++) {
       this.load.image(`xara-switch-${i}`, `assets/sprites/xara_frames/xara_switch_${i}.png`);
     }
@@ -292,9 +301,29 @@ class BootScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const ui = typeof STORY_UI !== 'undefined' ? STORY_UI : { serif: 'Georgia, serif', pink: 0xff9fc9, vineLight: 0x8fe3b8, vine: 0x3f7a52 };
     const objs = [];
+    // Fond peint et logo déjà chargés par le `pack` de la scène (cf.
+    // constructeur) : écran de chargement assorti à l'écran-titre.
+    const painted = this.textures.exists('titre-fond');
+    const logoReady = this.textures.exists('item-titre_logo');
     const bg = this.add.graphics();
     bg.fillGradientStyle(0x1a1430, 0x1a1430, 0x0d0b1a, 0x0d0b1a, 1, 1, 1, 1);
     bg.fillRect(0, 0, width, height);
+    if (painted) {
+      const img = this.add.image(width / 2, height / 2, 'titre-fond');
+      img.setScale(Math.max(width / img.width, height / img.height));
+      // Voile léger en bas : la barre et la phrase restent lisibles.
+      const veil = this.add.graphics();
+      veil.fillGradientStyle(0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0, 0, 0.55, 0.55);
+      veil.fillRect(0, height * 0.4, width, height * 0.6);
+      objs.push(img, veil);
+    }
+    if (logoReady) {
+      // Logo en pixel art : pixels nets, pas de lissage.
+      this.textures.get('item-titre_logo').setFilter(Phaser.Textures.FilterMode.NEAREST);
+      const logo = this.add.image(width / 2, 186, 'item-titre_logo');
+      logo.setScale(Math.min(450 / logo.width, 290 / logo.height));
+      objs.push(logo);
+    }
     // Lune et halo.
     for (let r = 120; r > 0; r -= 15) {
       bg.fillStyle(0xc9b8f0, 0.025);
@@ -316,11 +345,14 @@ class BootScene extends Phaser.Scene {
     }).setOrigin(0.5);
     title.setShadow(0, 0, '#ff9fc9', 16, true, true);
     objs.push(title);
-    // Logo Codex `titre_logo` (agent UI) : mis en tête de file, il remplace
-    // la lune et le titre texte dès qu'il arrive ; même clé que le manifest
-    // (loadManifestAssets ne le recharge pas).
+    // Lune et titre texte : seulement sans le fond peint ni le logo.
+    if (painted || logoReady) { moon.setVisible(false); title.setVisible(false); }
+    if (painted) bg.setVisible(false);
+    // Logo Codex `titre_logo` (agent UI), si le `pack` ne l'a pas chargé : mis
+    // en tête de file, il remplace la lune et le titre texte dès qu'il arrive ;
+    // même clé que le manifest (loadManifestAssets ne le recharge pas).
     const logoPath = 'assets/ui/titre_logo.png';
-    if (typeof assetPresent === 'function' && assetPresent(logoPath)) {
+    if (!logoReady && typeof assetPresent === 'function' && assetPresent(logoPath)) {
       this.load.image('item-titre_logo', logoPath);
       this.load.once('filecomplete-image-item-titre_logo', () => {
         // Logo en pixel art (refait le 2026-10-23) : pixels nets, pas de lissage.
@@ -346,8 +378,10 @@ class BootScene extends Phaser.Scene {
     objs.push(frame);
     const fill = this.add.graphics();
     objs.push(fill);
+    // Contour sombre : lisibles aussi sur le fond peint (herbe claire).
     const pct = this.add.text(width / 2, barY + 36, '0 %', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: '#a99bd6',
+      fontFamily: 'sans-serif', fontSize: '13px', color: painted ? '#e8ddff' : '#a99bd6',
+      stroke: '#15101f', strokeThickness: painted ? 4 : 0,
     }).setOrigin(0.5);
     objs.push(pct);
     const lines = [
@@ -357,7 +391,8 @@ class BootScene extends Phaser.Scene {
       'Les lucioles s\'éveillent…',
     ];
     const flavor = this.add.text(width / 2, barY + 70, lines[0], {
-      fontFamily: ui.serif, fontSize: '16px', fontStyle: 'italic', color: '#c9b8f0', padding: { x: 6, y: 4 },
+      fontFamily: ui.serif, fontSize: '16px', fontStyle: 'italic', color: painted ? '#ffe9f5' : '#c9b8f0', padding: { x: 6, y: 4 },
+      stroke: '#15101f', strokeThickness: painted ? 4 : 0,
     }).setOrigin(0.5);
     objs.push(flavor);
 
