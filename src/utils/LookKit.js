@@ -124,7 +124,9 @@ const LOOK_PROFILES = {
     },
     // Liseré : UNE copie décalée vers le haut, vert lunaire, teintée par la
     // lumière la plus proche (chaud près du feu).
-    rim: { color: 0x8ff0c0, alpha: 0.15, offsets: [[0, -1]], px: 1.4, lightTint: 0.9 },
+    // Liseré coupé partout (retour utilisateur du 2026-11-07 : le contour clair au-dessus
+    // des personnages « rend mal »). La mécanique reste (lookSyncRim) : `rim: { … }` la réactive.
+    rim: false,
     // Ombre de contact sous les personnages (jamais sous les décors).
     shadow: { alpha: 0.78 },
   },
@@ -155,7 +157,9 @@ const LOOK_PROFILES = {
       self: { intensity: 0.08, radius: 140, color: 0xe6dcff },
       xara: { intensity: 0.22, radius: 70, glow: 0.04, color: 0xff9ad6 },
     },
-    rim: { color: 0x8ff0c0, alpha: 0.15, offsets: [[0, -1]], px: 1.4, lightTint: 0.9 },
+    // Liseré coupé partout (retour utilisateur du 2026-11-07 : le contour clair au-dessus
+    // des personnages « rend mal »). La mécanique reste (lookSyncRim) : `rim: { … }` la réactive.
+    rim: false,
     shadow: { alpha: 0.6 },
   },
   // Zones claires (forêt flottante de jour, clairière) : point de départ
@@ -183,7 +187,9 @@ const LOOK_PROFILES = {
       self: { intensity: 0, radius: 140, color: 0xe6dcff },
       xara: { intensity: 0.12, radius: 60, glow: 0.02, color: 0xff9ad6 },
     },
-    rim: { color: 0xfff4d8, alpha: 0.1, offsets: [[0, -1]], px: 1.2, lightTint: 0.6 },
+    // Liseré coupé partout (retour utilisateur du 2026-11-07 : le contour clair au-dessus
+    // des personnages « rend mal »). La mécanique reste (lookSyncRim) : `rim: { … }` la réactive.
+    rim: false,
     shadow: { alpha: 0.55 },
   },
 };
