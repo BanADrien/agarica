@@ -18,9 +18,17 @@ class PrologueScene extends Phaser.Scene {
     const { width, height } = this.scale;
     this.__transitioningAway = false;
     fadeInScene(this);
-    addMoonlitDecor(this, width, height, width, [], 'fond_bosquet');
-    addCaveCeiling(this, width);
-    this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.6).setOrigin(0);
+    if (this.textures.exists('titre-fond')) {
+      // Même fond peint que le titre et le chargement (image de l'utilisateur,
+      // 2026-11-07), recadré au centre ; voile sombre pour la lecture du texte.
+      const bg = this.add.image(width / 2, height / 2, 'titre-fond');
+      bg.setScale(Math.max(width / bg.width, height / bg.height));
+      this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.55).setOrigin(0);
+    } else {
+      addMoonlitDecor(this, width, height, width, [], 'fond_bosquet');
+      addCaveCeiling(this, width);
+      this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.6).setOrigin(0);
+    }
 
     this.add.text(width / 2, 64, 'Le bosquet d\'Émeraude', {
       fontFamily: STORY_UI.serif, fontSize: '32px', fontStyle: 'bold', color: '#ffe9f5',
@@ -30,11 +38,14 @@ class PrologueScene extends Phaser.Scene {
     this.lineTexts = PROLOGUE_LINES.map((line, i) => this.add.text(width / 2, 130 + i * 62, line, {
       fontFamily: STORY_UI.serif, fontSize: '19px', color: '#e8d9ff', align: 'center',
       wordWrap: { width: width - 220 }, lineSpacing: 6,
+      // Contour sombre : lisible sur les zones claires du fond peint.
+      stroke: '#15101f', strokeThickness: 4,
     }).setOrigin(0.5, 0).setAlpha(0));
     this.shownCount = 0;
 
     this.prompt = this.add.text(width / 2, height - 30, 'Appuie sur une touche', {
       fontFamily: 'sans-serif', fontSize: '14px', color: STORY_UI.textSoft,
+      backgroundColor: '#15101fb0', padding: { x: 10, y: 4 },
     }).setOrigin(0.5).setAlpha(0);
     this.tweens.add({ targets: this.prompt, alpha: 0.9, duration: 900, yoyo: true, repeat: -1, delay: 800 });
 
