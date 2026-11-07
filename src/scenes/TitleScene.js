@@ -33,18 +33,29 @@ class TitleScene extends Phaser.Scene {
     menuNoteSaveProgress();
     fadeInScene(this);
 
-    addMoonlitDecor(this, width, height, width);
-    addCaveCeiling(this, width);
-    const veil = this.add.graphics();
-    veil.fillGradientStyle(0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0.2, 0.2, 0.7, 0.7);
-    veil.fillRect(0, 0, width, height);
-    // Halo de lune derrière le logo.
-    const halo = this.add.graphics();
-    for (let r = 220; r > 0; r -= 22) {
-      halo.fillStyle(0xc9b8f0, 0.018);
-      halo.fillCircle(width / 2, 120, r);
+    if (this.textures.exists('titre-fond')) {
+      // Fond peint (image de l'utilisateur) : couvre tout l'écran sans
+      // déformation, recadré au centre. Voile léger en bas seulement, pour la
+      // lisibilité du menu, sans éteindre le paysage de jour.
+      const bg = this.add.image(width / 2, height / 2, 'titre-fond');
+      bg.setScale(Math.max(width / bg.width, height / bg.height));
+      const veil = this.add.graphics();
+      veil.fillGradientStyle(0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0, 0, 0.45, 0.45);
+      veil.fillRect(0, height * 0.35, width, height * 0.65);
+    } else {
+      addMoonlitDecor(this, width, height, width);
+      addCaveCeiling(this, width);
+      const veil = this.add.graphics();
+      veil.fillGradientStyle(0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0x0d0b1a, 0.2, 0.2, 0.7, 0.7);
+      veil.fillRect(0, 0, width, height);
+      // Halo de lune derrière le logo.
+      const halo = this.add.graphics();
+      for (let r = 220; r > 0; r -= 22) {
+        halo.fillStyle(0xc9b8f0, 0.018);
+        halo.fillCircle(width / 2, 120, r);
+      }
+      menuAddFireflies(this, 22);
     }
-    menuAddFireflies(this, 22);
 
     this.buildCharacters(width, height);
     this.buildLogo(width);
@@ -150,10 +161,12 @@ class TitleScene extends Phaser.Scene {
     const layer = this.layers.splash = this.add.container(0, 0).setDepth(30);
     const prompt = this.add.text(width / 2, height - 130, 'Appuie sur une touche', {
       fontFamily: STORY_UI.serif, fontSize: '20px', fontStyle: 'italic', color: '#ffe9f5',
-      stroke: '#15101f', strokeThickness: 4, padding: { x: 8, y: 4 },
+      stroke: '#15101f', strokeThickness: 4, padding: { x: 14, y: 6 },
+      // Bandeau sombre : lisible aussi sur le fond peint de jour (fond_titre).
+      backgroundColor: '#15101fb0',
     }).setOrigin(0.5).setAlpha(0);
     layer.add(prompt);
-    this.tweens.add({ targets: prompt, alpha: { from: 0.25, to: 1 }, duration: 1100, yoyo: true, repeat: -1, delay: 700, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: prompt, alpha: { from: 0.55, to: 1 }, duration: 1100, yoyo: true, repeat: -1, delay: 700, ease: 'Sine.easeInOut' });
     this.splashZone = this.add.zone(0, 0, width, height).setOrigin(0).setInteractive().setDepth(40);
     this.splashZone.once('pointerdown', () => this.leaveSplash());
   }

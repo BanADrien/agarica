@@ -95,6 +95,9 @@ class BootScene extends Phaser.Scene {
       this.load.image(`xara-walk-${i}`, `assets/sprites/xara_frames/xara_walk_${i}.png`);
     }
     this.load.image('xara-swing-0', 'assets/sprites/xara_frames/xara_swing_0.png');
+    // Fond de l'écran-titre (image fournie par l'utilisateur, 2026-11-07) ; sans
+    // elle, TitleScene garde le décor de nuit dessiné par le code.
+    this.load.image('titre-fond', 'assets/ui/fond_titre.jpg');
     for (let i = 1; i <= 3; i++) {
       this.load.image(`xara-switch-${i}`, `assets/sprites/xara_frames/xara_switch_${i}.png`);
     }
