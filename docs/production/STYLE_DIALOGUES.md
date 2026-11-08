@@ -7,8 +7,24 @@
 - « C'est ChatGPT, les textes, non ? Ça fait un peu dire des trucs pour faire genre, mais rien dire en même
   temps. Après, je capte le sens général. »
 
+- Et l'utilisateur, le même jour : « Trop de blabla inutile aussi, apparemment. Ça fait trop IA, chiant,
+  les dialogues en général. »
+
 Ce guide vaut pour tout texte affiché : dialogues, bulles de Xara, messages d'aide, prologue, noms
 de zones et écran de fin. Tout nouveau texte le suit, et les anciens sont réécrits selon lui.
+
+## D'abord couper, ensuite réécrire
+
+Le premier travail est de SUPPRIMER, avant même de reformuler :
+- **Objectif : au moins moitié moins de texte au total**, en nombre de répliques comme en mots.
+- **Échanges entiers** : on supprime ceux qui n'apportent rien à l'histoire ni au jeu (bavardage
+  d'ambiance, commentaires sur le décor, répétition de l'objectif).
+- **Bulles de Xara** : on ne garde que celles qui aident vraiment, un indice au bon moment, ou une
+  blague qui marche.
+- **PNJ du bosquet** : une réplique chacun suffit souvent.
+- **Ce qui tient en un geste ou une image** (personnage qui se retourne, objet qui brille) ne s'écrit pas.
+- **Test de chaque réplique** : « si je l'enlève, le joueur perd-il quelque chose ? » Si non, on
+  l'enlève.
 
 ## Les règles
 
