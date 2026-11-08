@@ -4,3 +4,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 src/data/_backup/
+
+# Version a mettre en ligne (python tools/build_netlify.py)
+dist/
+dist.zip
