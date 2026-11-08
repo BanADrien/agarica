@@ -68,11 +68,14 @@ Tu peux lire le screenshot avec l'outil Read pour vérifier visuellement.
   localStorage (`agarica-save-v1`). Les clés existantes (`hasWolfForm`, `equippedForms`,
   `unlockedSkills`, `hearts`…) sont aussi sauvegardées.
 - `saveGame(scene)`, `loadGame(game)` → bool, `hasSaveGame()`, `resetGame(game)`.
-  Sauvegarde : à chaque feu de camp + à chaque entrée de zone (`lastZone`, `lastEnterId`).
+  Sauvegarde : à chaque feu de camp (en s'asseyant, et à la fermeture de son menu) + à chaque
+  entrée de zone (`lastZone`, `lastEnterId`).
 - Inventaire (objets-clés de l'histoire) : `inventoryAdd(scene, id, {silent})` (popup
   « Objet obtenu » avec `addItemImage`), `inventoryHas(id)`, `inventoryRemove(id)`,
-  `inventoryList()`. Écran inventaire touche **I** (`InventoryScene`, overlay, monde gelé),
-  avec la carte de Geralt (touche **M** → `MapScene`) si `inventoryHas('carte_geralt')`.
+  `inventoryList()`. Écran inventaire touche **I** (`InventoryScene`, overlay, monde gelé :
+  objets de quête + consommables), avec la carte du monde (touche **M** → `MapScene`) si
+  `storyMapAvailable()` (aujourd'hui : `inventoryHas('carte_geralt')`). Consommables, carte et
+  feux de camp : voir « Feu de camp, carte du monde, vol de l'aigle » plus bas.
 - `unlockSkillFromStory(scene, skillId)` — ajoute à `unlockedSkills`, équipe dans le 1er
   slot libre, popup « Compétence débloquée ». (Implémentée par l'agent Formes dans
   Player.js / StoryKit ? → **Fondation** l'implémente dans StoryKit, en réutilisant la
@@ -245,8 +248,11 @@ Formes (Player.js) — état & API :
   (Contrôles, feu de camp, popups de forme) alignés sur cette règle.
 - **Totems de bonus verrouillés pour la démo** : `DEMO_TOTEMS_LOCKED = true` (Player.js).
   `recomputeTotemBonuses` calcule alors comme si aucun totem n'était porté, sans toucher à
-  `equippedTotem` ni au registre ; le menu du feu de camp lit la même constante
-  (`CAMPFIRE_TOTEMS_LOCKED`, chaînes en croix + cadenas, aucune interaction). `false` rouvre tout.
+  `equippedTotem` ni au registre. Depuis le 2026-11-08 (totems à équiper mis de côté tant qu'il y
+  a peu de formes), le menu du feu n'a plus de section totem (`CAMPFIRE_SHOW_TOTEMS = false`,
+  CampfireMenuScene ; plus de cadenas ni de chaînes) ; code et sauvegarde (`equippedTotem`,
+  `TOTEM_HEADS`/`TOTEM_BODIES`) intacts. Tout rouvrir : `DEMO_TOTEMS_LOCKED = false` ET
+  `CAMPFIRE_SHOW_TOTEMS = true`. Les totems du monde qui donnent une forme ne changent pas.
 - Lianes : seule Agarica **devenue singe** s'y accroche (`airJumpForm === 'monkey'`) : après le
   double saut qui la transforme, ou après un lâcher de liane (il compte comme ce double saut :
   on enchaîne les lianes). Un saut simple sous une liane passe au travers, même au sommet de
@@ -304,7 +310,7 @@ lui-même en bas de fichier. Combat : si `enemy.takeHit` existe, LevelKit appell
 attaque) sinon `enemy.defeat()`. Zone frappable par la mêlée (dague, croc) et le rebond :
 `enemy.getMeleeBounds()` s'il existe, sinon `enemy.getBounds()` — à fournir quand l'image est
 bien plus grande que l'ennemi (crapaud : son corps physique, étiré avec la langue, au lieu du
-canevas de 373 px). Ennemis corrompus : `enemy.corrupted = true` et
+canevas de 373 px ; crapauds corrompus : le corps seul, la langue a son propre test). Ennemis corrompus : `enemy.corrupted = true` et
 `enemy.heal()` (appelée par la compétence `papillon`). `enemy.harmless`, `enemy.noGravity`.
 
 Types d'ennemis enregistrés (agent **Ennemis**), entrée `enemies: [{type, x, y, …}]` :
@@ -318,7 +324,22 @@ Types d'ennemis enregistrés (agent **Ennemis**), entrée `enemies: [{type, x, y
 | `crapaud` | Crapaud | — | 1 ; fixe, langue vers la droite |
 | `mousse_creature` | MousseCreature | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit, ne les dépasse pas), `hp` (déf. 1) | corrompu ; rampe vers le joueur (<260 px), se tasse 0,4 s puis bondit. Art `mousse_creature` (idle/attack/death) |
 | `singe_corrompu` | SingeCorrompu | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit), `hp` (déf. 2) | corrompu ; garde ses distances (170-360 px), lève une pierre 0,5 s puis la lance en cloche (`player.hitByEnemy()`, brisée au sol). Art `singe_corrompu` (idle/run/throw) |
-| `crapaud_corrompu` | CrapaudCorrompu (hérite de Crapaud) | `hp` (déf. 2) | corrompu ; teinte toxique + aura + gouttes, ou art `crapaud_corrompu` (anim `attack` 5 frames, canvas 1434x237 comme crapaud_frames ; `idle` inutilisé) |
+| `crapaud_sauteur` | CrapaudSauteur (CrapaudCorrompu.js) | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit), `hp` (déf. 2), `facing` (`'left'` déf. / `'right'`), `reach` (portée de langue, déf. 220) | corrompu ; échelle 0,24. Se tourne vers Agarica (aggro 380 px, 240 au-dessus) ; petite machine à états : langue (télégraphe 0,42 s : gorge gonflée, lueur, 3 points de visée ; visée figée ; langue 0,45 s, de -75° à +25°, bloquée par les solides ; puis 0,65 s bouche ouverte) OU saut (accroupi 0,32 s puis bond ≤ 200 px : se rapproche, recule si < 70 px, saute sur elle entre 90 et 210 px). Alterne langue / saut. Reste dans ses bornes ET sur un sol continu au même niveau (± 24 px, sondé sous tout le trajet) : jamais dans un trou ni sur une marche |
+| `crapaud_piege` | CrapaudPiege (CrapaudPiege.js) | `hp` (déf. 2), `facing`, `reach` (déf. 220) | corrompu ; échelle 0,30, teinte pierre + coussin de mousse dessiné par code. Caché (enfoncé, rogné sous le sol) ; sort (0,22 s) quand la langue peut atteindre Agarica, vise (0,36 s), langue, exposé 0,9 s, se recache (0,32 s), réarmé 0,9 s après. `harmless` (ne blesse qu'avec la langue) ; frappable caché (dos + mousse) : frappé, il sort |
+| `crapaud_corrompu` | alias de `crapaud_sauteur` (depuis le 2026-11-08) | idem | l'ancien crapaud fixe à langue droite ; ses placements utilisent les bornes par défaut x±150 |
+
+Crapauds corrompus (CrapaudCorrompu.js, base commune) : corps et langue SÉPARÉS. Le corps est
+le cadre `corps` (300 px de gauche) découpé à l'exécution dans les planches 1434x237 existantes
+(`crapaud_corrompu-*`, repli `crapaud-*` teinté), origine au centre des pattes (flipX = demi-tour) ;
+la langue est une image à part (cadre `langue` = langue de l'apogée), ancrée à la bouche,
+tournée vers la cible, sortie par rognage glissant. Dégâts de la langue : segment bouche → bout
+(+ boule) contre le corps d'Agarica, testé par l'ennemi (`player.hitByEnemy()`) ; une mêlée qui
+croise la langue frappe le crapaud (`damageEnemy`, même jeton que `tryPlayerMeleeHit`) et la
+renvoie. `getMeleeBounds()` = le corps (piège caché : la partie hors du sol). `calm(ms)` (sortie de
+dialogue, cf. `storyUnfrozenTick`) : télégraphe annulé, langue rentrée, rien avant `ms`. Soin : crapaud sain
+orange (cadre `corps` de `crapaud-0`), reposé au sol s'il était en l'air. Art du prompt Codex
+n°12 (`crapaud_sauteur`, `crapaud_piege`, `crapaud_langue`, clé `mouth` du manifeste) utilisé
+dès qu'il existe.
 
 Ennemis corrompus : `takeHit(source)` → -1 PV, flash blanc, recul (0 → `defeat()`).
 `heal()` → purification : flash, particules lumineuses, apparence saine, petit saut puis
@@ -356,8 +377,8 @@ dans le rectangle d'eau (x, y = coin haut-gauche, comme `water`). Résultat dans
 - **Sauvegarde** : TOUTE valeur JSON du registre (clé ne commençant pas par `__`) est
   sauvegardée. `storySet` sauvegarde aussitôt. Entrée d'une zone de l'histoire : flags
   `visited_<zone>`, `lastZone` (id de zone), `lastEnterId`, puis sauvegarde silencieuse.
-  Feu de camp (zones de l'histoire seulement) : sauvegarde à l'ouverture et à la fermeture
-  du menu. Les zones de test ne sauvegardent jamais d'elles-mêmes. `hasSaveGame()` exige
+  Feu de camp (zones de l'histoire seulement) : sauvegarde quand Agarica s'assoit et à la
+  fermeture du menu. Les zones de test ne sauvegardent jamais d'elles-mêmes. `hasSaveGame()` exige
   `lastZone`. `storySet({a: 1, b: 2})` accepté.
 - **Conditions** : `requires` = toutes les clés vraies ; `forbids` = interdit dès qu'UNE clé
   est vraie. Clés spéciales `item` / `noItem` (id ou tableau). `true`/`false` testent la
@@ -1037,6 +1058,68 @@ le sol juste après (`LEVEL_DATA_HANDLERS.branches` / `.trunks` sont des entrée
   de sortie (`hitByEnemy({ fall: true })` et `storyFallRespawn` ne lisent que `hitInvulnerable`) :
   elle coûte toujours son cœur. `player.grantStoryInvulnerability(ms)` : API publique.
 
+### Feu de camp, carte du monde, vol de l'aigle (2026-11-08, points 3-5 de la liste, rétro-compatible)
+- **S'asseoir** (LevelKit `addCampfire` / `campfireSit`) : E à portée d'un feu (au sol, hors liane et
+  eau) → `player.startCampfireRest(fire)` : immobile, tournée vers le feu, art `agarica_repos`
+  (`sit` puis `sit_idle` en boucle ; repli sans art : idle debout). Effets : vie et énergie pleines
+  (`refillAtCampfire`), puis `storyCampfireRest(scene, fireId)` (zones de l'histoire seulement) :
+  feu ajouté à `campfiresVisited`, `lastCampfire`, `lastEnterId = 'feu:<id>'`, découvertes
+  reportées sur la carte (`storyMapCommit`), sauvegarde. Toast « Vie et énergie restaurées · carte
+  mise à jour ». Le monde n'est PAS gelé : marcher, sauter, frapper ou une compétence la relève
+  (l'action part dans la même image, `updateCampfireRest`), un coup reçu, une cinématique
+  (`storyStopActions`) ou une chute aussi (`endCampfireRest`). `player.campfireRest` = `{ fireId,
+  since, anim }` ou null.
+- **Identifiant d'un feu** : `<zone>#<indice dans data.campfires>` (`campfireIdFor(scene, i)`,
+  `campfireParseId(id)`) ; `scene.__campfires` = `[{ id, index, x, y, fire, … }]` (une visite).
+- **Point d'entrée `feu:<id>`** (`campfireEnterId(id)`, `campfireIndexFromEnterId(scene, enterId)`) :
+  `buildLevelFromData` place Agarica à côté du feu (`campfireSeatSpot`) et l'assoit
+  (`campfireArrive`, avec la descente de l'aigle si `sceneData.flight`). Sert au vol et à
+  « Continuer » (reprise assise au dernier feu ; respawn de la zone = ce point). Feu introuvable :
+  spawn par défaut.
+- **Menu du feu** (`CampfireMenuScene`, assise : E ou Entrée ; données `{ player, fire, parentKey,
+  mode }`) : écran `hub` (Formes et compétences, Carte, Vol si `hasEagleForm`, Inventaire, Objets
+  grisé « bientôt »), `forms` (l'ancien panneau, centré, sans totems), `flight`. Échap ferme le menu
+  (elle reste assise, sauvegarde silencieuse). Carte et inventaire s'ouvrent PAR-DESSUS le menu mis
+  en pause (`returnTo: 'CampfireMenuScene'`) et le reprennent en se fermant.
+- **Consommables** (StoryKit) : `CONSUMABLE_INFO` (`baie_soin` : +1 cœur, `seve_energie` : énergie
+  pleine), registre `consumables` = `{ id: nombre }`. `consumableCount(id)`, `consumableAdd(scene, id,
+  n = 1, { silent })` (popup « Objet obtenu »), `consumableUse(scene, id)` → `{ ok, text }` (rien de
+  consommé si sans effet). Aucune source en jeu pour l'instant. Utilisables depuis le sac (I, ou
+  entrée Inventaire du feu) : E / Entrée sur la case. Icônes dessinées (`STORY_DRAWN_ITEMS`).
+- **Découvertes** (StoryKit, `storyMapRecord` dans `storyUpdateHook`, monde non gelé, zones de
+  l'histoire) : blocs de `STORY_MAP_CHUNK` (128 px) dans ±`STORY_MAP_REVEAL_X/Y` (448 / 320 px)
+  autour d'Agarica → `mapPending`. Au feu : `storyMapCommit()` les verse dans `mapExplored`. Format
+  des deux clés : `{ zone: ['cx,cy', …] | '*' }` (`STORY_MAP_ALL = '*'` : zone entière).
+  `storyMapZoneChunks(zone, key)`, `storyMapPendingCount()`.
+- **Carte** (`MapScene`, refaite) : silhouette du vrai terrain (`zoneGroundCells`, branches
+  comprises) de chaque zone présente dans `mapExplored`, sur le parchemin `carte_parchemin` voilé ;
+  blocs non parcourus de la zone en brouillard hachuré ; feux (allumés si assise, sinon aperçus),
+  passages (sorties de bord vues), épingle « toi » si la zone d'Agarica est sur la carte. C'est
+  la version du dernier feu : le sous-titre compte les découvertes en attente. Positions :
+  `MAP_ZONE_LAYOUT` (MapScene.js, px de jeu, coin (0,0) de chaque zone, 15 zones de la démo) ;
+  zone absente → `mapAutoPlace` (collée à une zone placée qui la relie par une sortie de bord) ;
+  zones de test jamais. Données : `<ZONE>_DATA` par convention de nom (`mapZoneData`). Flèches /
+  ZQSD déplacent, + / − / molette / PageUp-PageDown zooment (`MAP_ZOOMS`), glisser à la souris,
+  Espace recentre sur Agarica, M / Échap / E ferment.
+- **Touche M partout** : `storyMapAvailable()` = `inventoryHas(STORY_MAP_ITEM)` (`'carte_geralt'`,
+  donnée par Geralt dans la forêt flottante 1 ; `null` = toujours). Sans elle : toast « Tu n'as pas
+  encore de carte. » (et entrée Carte grisée au feu) ; les découvertes s'enregistrent quand même.
+- **Vol de l'aigle** (entrée « Vol », `hasEagleForm`) : destinations = `campfiresVisited` sauf le
+  feu actuel (`campfireFlightDestinations(scene, fromId)` → `[{ id, zone, index, scene, label,
+  blocked }]`) ; envol (`campfireFlyTo(scene, dest)` : l'aigle remplace Agarica et quitte l'écran,
+  monde gelé, fondu) puis arrivée assise par `feu:<id>`. Règles (`CAMPFIRE_FLIGHT_RULES`, StoryKit) :
+  départ refusé hors zone de l'histoire ; zone fermée (`campfireZoneSealed` : la donnée a des
+  sorties mais son script les a toutes retirées — combat de Ghil't, trou sombre) ;
+  défaite imposée face à Ghil't en cours (`ghiltPhase >= 2` sans `ghiltHealed`) ; forêt corrompue
+  tant que `ghiltHealed` est faux (après le crash, la mousse se referme : ni départ ni arrivée).
+  Arrivée refusée à la cime du grand arbre (`grand_arbre_arene`) tant que `kainatiDefeated` est
+  faux. `campfireFlightDepartureBlock(scene, fromId)` → raison ou null.
+- **Anciennes sauvegardes** (`migrateSaveMap`, appelée par `migrateSaveValues`) : sans
+  `mapExplored`, chaque zone `visited_<zone>` est reportée en entier (`'*'`) ; une partie neuve pose
+  `mapExplored = {}` dès son entrée en zone (jamais prise pour une ancienne).
+- Nouvelles clés de sauvegarde : `campfiresVisited`, `lastCampfire`, `mapExplored`, `mapPending`,
+  `consumables` ; `lastEnterId` peut valoir `feu:<id>`.
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |
@@ -1147,7 +1230,7 @@ Détails compétences (agent Formes) :
 | Formes | `src/entities/Player.js`, `src/scenes/CampfireMenuScene.js`, `src/entities/Xara.js`, `src/entities/Liane.js`, `src/entities/Piste.js`, `src/entities/CourantAir.js`, `src/entities/Projectiles.js` (pierre) | 8812 |
 | Kainati | `src/entities/Kainati.js` (boss + pierres + esprit), `src/story/boss_kainati.js` (ZONE_SCRIPTS `kainati_arene`) | 8813 |
 | Ghil't | `src/entities/Ghilt.js`, `src/story/boss_ghilt.js` (ZONE_SCRIPTS `ghilt_arene`) | 8814 |
-| Ennemis | `src/entities/LoupSanguinaire.js`, `Araignee.js`, `Web.js`, `LoupAlpha.js`, `Corbeau.js`, `Crapaud.js`, nouveaux `MousseCreature.js`, `SingeCorrompu.js`, `CrapaudCorrompu.js`, `Animaux.js` (cochons, poissons, papillons décor) | 8815 |
+| Ennemis | `src/entities/LoupSanguinaire.js`, `Araignee.js`, `Web.js`, `LoupAlpha.js`, `Corbeau.js`, `Crapaud.js`, nouveaux `MousseCreature.js`, `SingeCorrompu.js`, `CrapaudCorrompu.js` (+ `CrapaudPiege.js`, 2026-11-08), `Animaux.js` (cochons, poissons, papillons décor) | 8815 |
 
 Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
 (`src/story/acte2.js`, zones 8-16), Éditeur (`src/scenes/EditorScene.js`, `index.html`

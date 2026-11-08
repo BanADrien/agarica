@@ -269,6 +269,44 @@ const STORY_DRAWN_ITEMS = {
       ctx.beginPath(); ctx.arc(w - 26, h - 24, 6, 0, Math.PI * 2); ctx.fill();
     },
   },
+  // Consommables (cf. CONSUMABLE_INFO) : pas d'art Codex pour l'instant.
+  baie_soin: {
+    w: 100, h: 100, scale: 0.4,
+    draw(ctx, w, h) {
+      ctx.strokeStyle = '#2a1a12';
+      ctx.lineWidth = 4;
+      // Tige et feuille.
+      ctx.fillStyle = '#5aa04a';
+      ctx.beginPath(); ctx.ellipse(62, 22, 18, 8, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(50, 36); ctx.lineTo(54, 16); ctx.stroke();
+      // Trois grains rouges (rose framboise, palette du jeu).
+      for (const [x, y, r] of [[36, 56, 20], [64, 58, 20], [50, 76, 19]]) {
+        ctx.fillStyle = '#d8345f';
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffb3c9';
+        ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, Math.PI * 2); ctx.fill();
+      }
+    },
+  },
+  seve_energie: {
+    w: 100, h: 110, scale: 0.4,
+    draw(ctx, w, h) {
+      ctx.strokeStyle = '#1a1028';
+      ctx.lineWidth = 4;
+      // Fiole : bouchon, col, panse ronde remplie de sève vert lunaire.
+      ctx.fillStyle = '#8a6438';
+      ctx.fillRect(40, 8, 20, 14); ctx.strokeRect(40, 8, 20, 14);
+      ctx.fillStyle = 'rgba(220,235,255,0.35)';
+      ctx.beginPath(); ctx.moveTo(42, 22); ctx.lineTo(58, 22); ctx.lineTo(58, 40);
+      ctx.arc(50, 70, 32, -Math.PI / 2 + 0.25, Math.PI * 1.5 - 0.25); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#8fe3b8';
+      ctx.beginPath(); ctx.arc(50, 70, 27, 0.15, Math.PI - 0.15); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e8fff2';
+      ctx.beginPath(); ctx.arc(40, 78, 4, 0, Math.PI * 2); ctx.arc(58, 84, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath(); ctx.arc(50, 70, 24, Math.PI * 1.15, Math.PI * 1.45); ctx.stroke();
+    },
+  },
 };
 
 function storyDrawnItemKey(scene, id) {
@@ -421,6 +459,7 @@ const SAVE_OBSOLETE_AIR_FORMS = ['butterfly'];
 
 function migrateSaveValues(values) {
   if (!values || typeof values !== 'object') return values;
+  migrateSaveMap(values);
   const forms = Array.isArray(values.equippedForms) ? values.equippedForms : null;
   const obsoleteAir = SAVE_OBSOLETE_AIR_FORMS.includes(values.airForm);
   const obsoleteSlot = !!forms && forms.some((f) => SAVE_OBSOLETE_AIR_FORMS.includes(f));
@@ -431,6 +470,17 @@ function migrateSaveValues(values) {
     values.equippedForms = forms.map((f) => (SAVE_OBSOLETE_AIR_FORMS.includes(f) ? (values.airForm || null) : f));
   }
   return values;
+}
+
+// Sauvegardes d'avant la carte du monde (2026-11-08) : aucune clé `mapExplored`.
+// Une zone déjà visitée a été traversée : elle est reportée en entier sur la
+// carte (STORY_MAP_ALL) plutôt que de repartir d'une carte vide. Les nouvelles
+// sauvegardes ont toujours `mapExplored` (posée dès la 1re image en zone).
+function migrateSaveMap(values) {
+  if (values.mapExplored !== undefined) return;
+  const explored = {};
+  for (const z of DEMO_ZONES) if (values[`visited_${z.zone}`]) explored[z.zone] = STORY_MAP_ALL;
+  values.mapExplored = explored;
 }
 
 function storyRegistry(scene) {
@@ -535,6 +585,10 @@ function storyOnZoneEnter(scene, data, sceneData) {
   reg.set(`visited_${entry.zone}`, true);
   reg.set('lastZone', entry.zone);
   reg.set('lastEnterId', (sceneData && sceneData.enterId) || null);
+  // Marque une sauvegarde « avec carte du monde » (cf. migrateSaveMap) : sans
+  // elle, une partie neuve quittée avant son 1er pas serait prise pour une
+  // ancienne sauvegarde et sa zone reportée en entier sur la carte.
+  if (reg.get('mapExplored') === undefined) reg.set('mapExplored', {});
   saveGame(scene, { silent: true });
 }
 
@@ -555,7 +609,7 @@ const ITEM_INFO = {
 };
 
 function itemInfo(id) {
-  return ITEM_INFO[id] || { name: id, desc: '' };
+  return ITEM_INFO[id] || CONSUMABLE_INFO[id] || { name: id, desc: '' };
 }
 
 function inventoryList() {
@@ -586,6 +640,303 @@ function inventoryRemove(id) {
   list.splice(i, 1);
   storySet('inventory', list);
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Consommables (2026-11-08) : objets à usage unique, comptés (registre
+// `consumables` = { id: nombre }), à part des objets-clés. Aucune source en jeu
+// pour l'instant : la structure et l'usage (sac, touche I ou menu du feu) sont
+// prêts ; une source future appelle `consumableAdd(scene, 'baie_soin')`.
+// `effect` : 'heart' (+1 cœur, plafonné) ou 'energy' (énergie pleine).
+// ---------------------------------------------------------------------------
+const CONSUMABLE_INFO = {
+  baie_soin: { name: 'Baie de soin', desc: 'Une baie rouge, sucrée et tiède. La croquer rend un cœur.', effect: 'heart' },
+  seve_energie: { name: "Sève d'énergie", desc: "Quelques gouttes de sève qui brillent dans le noir. Remplit toute l'énergie.", effect: 'energy' },
+};
+const CONSUMABLE_IDS = Object.keys(CONSUMABLE_INFO);
+
+function consumableCounts() {
+  const v = storyGet('consumables');
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+
+function consumableCount(id) {
+  const n = consumableCounts()[id];
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+// Ajoute `n` exemplaires (popup « Objet obtenu » sauf `silent`). Renvoie le nouveau total.
+function consumableAdd(scene, id, n = 1, { silent = false } = {}) {
+  if (!CONSUMABLE_INFO[id] || !(n > 0)) return consumableCount(id);
+  const counts = { ...consumableCounts(), [id]: consumableCount(id) + n };
+  storySet('consumables', counts);
+  if (!silent && scene && scene.add) {
+    const info = CONSUMABLE_INFO[id];
+    showStoryBanner(scene, { kicker: n > 1 ? `Objet obtenu (×${n})` : 'Objet obtenu', title: info.name, desc: info.desc, itemId: id });
+  }
+  return counts[id];
+}
+
+// Utilise un consommable sur Agarica (`scene` : la zone, avec `scene.player`).
+// Renvoie { ok, text } : `text` dit ce qui s'est passé (ou pourquoi rien).
+// Un consommable sans effet utile (cœurs déjà pleins…) n'est pas consommé.
+function consumableUse(scene, id) {
+  const info = CONSUMABLE_INFO[id];
+  const p = scene && scene.player;
+  if (!info) return { ok: false, text: '' };
+  if (consumableCount(id) <= 0) return { ok: false, text: 'Tu n\'en as plus.' };
+  if (!p || !p.active) return { ok: false, text: 'Impossible ici.' };
+  if (info.effect === 'heart') {
+    if (p.hearts >= p.maxHearts) return { ok: false, text: 'Tes cœurs sont déjà pleins.' };
+    p.hearts = Math.min(p.maxHearts, p.hearts + 1);
+    scene.registry.set('hearts', p.hearts);
+  } else if (info.effect === 'energy') {
+    if (p.energy >= p.maxEnergy) return { ok: false, text: 'Ton énergie est déjà pleine.' };
+    p.energy = p.maxEnergy;
+    scene.registry.set('energy', p.energy);
+  }
+  storySet('consumables', { ...consumableCounts(), [id]: consumableCount(id) - 1 });
+  if (typeof spawnFx === 'function') spawnFx(scene, 'heal', p.x, p.y - 40, { count: 10 });
+  return { ok: true, text: info.effect === 'heart' ? 'Un cœur retrouvé.' : 'Énergie pleine.' };
+}
+
+// ---------------------------------------------------------------------------
+// Carte du monde : découvertes (2026-11-08, points 3 et 4 de la liste)
+// ---------------------------------------------------------------------------
+// Pendant le jeu, chaque bloc de STORY_MAP_CHUNK px autour d'Agarica (un
+// rectangle de ±STORY_MAP_REVEAL_X/Y, à peu près l'écran) est noté « en
+// attente » (`mapPending`). S'asseoir à un feu de camp les reporte sur la carte
+// sauvegardée (`mapExplored`, storyMapCommit) : la touche M montre cette
+// version-là. Format des deux clés : { zone: ['cx,cy', …] | STORY_MAP_ALL }.
+// Zones de test : jamais notées (hors carte).
+// La carte reste liée à l'objet de l'histoire STORY_MAP_ITEM (la carte de
+// Geralt) : sans lui, M ne l'ouvre pas, mais les découvertes s'enregistrent
+// quand même. `null` : carte toujours disponible.
+const STORY_MAP_ITEM = 'carte_geralt';
+const STORY_MAP_CHUNK = 128;
+const STORY_MAP_REVEAL_X = 448;
+const STORY_MAP_REVEAL_Y = 320;
+// Zone reportée en entier (ancienne sauvegarde, cf. migrateSaveMap).
+const STORY_MAP_ALL = '*';
+
+function storyMapAvailable() {
+  return !STORY_MAP_ITEM || inventoryHas(STORY_MAP_ITEM);
+}
+
+function storyMapStore(key) {
+  const v = storyGet(key);
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+
+// Blocs connus d'une zone dans `mapExplored` (ou `mapPending`) : Set de
+// 'cx,cy', STORY_MAP_ALL, ou null si la zone n'y est pas.
+function storyMapZoneChunks(zone, key = 'mapExplored') {
+  const v = storyMapStore(key)[zone];
+  if (v === STORY_MAP_ALL) return STORY_MAP_ALL;
+  return Array.isArray(v) && v.length ? new Set(v) : null;
+}
+
+// Nombre de blocs découverts depuis le dernier feu de camp.
+function storyMapPendingCount() {
+  let n = 0;
+  for (const v of Object.values(storyMapStore('mapPending'))) n += v === STORY_MAP_ALL ? 1 : (Array.isArray(v) ? v.length : 0);
+  return n;
+}
+
+// Chaque image (monde non gelé, cf. storyUpdateHook) : rien à faire tant
+// qu'Agarica reste dans le même bloc ; sinon les blocs neufs autour d'elle
+// passent en attente.
+function storyMapRecord(scene) {
+  const entry = storyZoneEntry(scene);
+  const p = scene.player;
+  if (!entry || !p || !p.body || p.fallingOut) return;
+  const reg = storyRegistry(scene);
+  let st = scene.__mapRec;
+  if (!st || st.visit !== scene.__storyVisit) {
+    if (reg.get('mapExplored') === undefined) reg.set('mapExplored', {});
+    const saved = storyMapZoneChunks(entry.zone);
+    const pending = storyMapZoneChunks(entry.zone, 'mapPending');
+    st = scene.__mapRec = {
+      visit: scene.__storyVisit, zone: entry.zone, last: null,
+      all: saved === STORY_MAP_ALL || pending === STORY_MAP_ALL,
+      known: new Set([...(saved instanceof Set ? saved : []), ...(pending instanceof Set ? pending : [])]),
+    };
+  }
+  if (st.all) return;
+  const C = STORY_MAP_CHUNK;
+  // Centre du corps (les pieds sont au bas d'un bloc la moitié du temps).
+  const py = p.y - 40;
+  const here = `${Math.floor(p.x / C)},${Math.floor(py / C)}`;
+  if (st.last === here) return;
+  st.last = here;
+  const maxCx = Math.max(0, Math.ceil((scene.levelWidth || 960) / C) - 1);
+  const fresh = [];
+  const x0 = Math.max(0, Math.floor((p.x - STORY_MAP_REVEAL_X) / C));
+  const x1 = Math.min(maxCx, Math.floor((p.x + STORY_MAP_REVEAL_X) / C));
+  for (let cx = x0; cx <= x1; cx++) {
+    for (let cy = Math.floor((py - STORY_MAP_REVEAL_Y) / C); cy <= Math.floor((py + STORY_MAP_REVEAL_Y) / C); cy++) {
+      const k = `${cx},${cy}`;
+      if (st.known.has(k)) continue;
+      st.known.add(k);
+      fresh.push(k);
+    }
+  }
+  if (!fresh.length) return;
+  const pending = { ...storyMapStore('mapPending') };
+  const prev = Array.isArray(pending[entry.zone]) ? pending[entry.zone] : [];
+  pending[entry.zone] = prev.concat(fresh);
+  reg.set('mapPending', pending);
+}
+
+// Feu de camp : les découvertes en attente rejoignent la carte sauvegardée.
+// Renvoie le nombre de blocs ajoutés.
+function storyMapCommit() {
+  const reg = storyRegistry();
+  if (!reg) return 0;
+  const pending = storyMapStore('mapPending');
+  const saved = { ...storyMapStore('mapExplored') };
+  let added = 0;
+  for (const [zone, list] of Object.entries(pending)) {
+    if (saved[zone] === STORY_MAP_ALL) continue;
+    if (list === STORY_MAP_ALL) {
+      saved[zone] = STORY_MAP_ALL;
+      added += 1;
+      continue;
+    }
+    const set = new Set(Array.isArray(saved[zone]) ? saved[zone] : []);
+    const before = set.size;
+    for (const k of Array.isArray(list) ? list : []) set.add(k);
+    added += set.size - before;
+    saved[zone] = [...set];
+  }
+  reg.set('mapExplored', saved);
+  reg.set('mapPending', {});
+  return added;
+}
+
+// ---------------------------------------------------------------------------
+// Feux de camp : identifiants, repos, vol de l'aigle (2026-11-08)
+// ---------------------------------------------------------------------------
+// Identifiant d'un feu = zone + indice dans le tableau `campfires` de sa
+// donnée : 'foret_sombre_1#0'. Registre : `campfiresVisited` (feux où Agarica
+// s'est assise, destinations du vol), `lastCampfire`. S'asseoir pose aussi
+// `lastEnterId = 'feu:<id>'` : « Continuer » reprend assise à ce feu
+// (buildLevelFromData lit ce point d'entrée, cf. campfireIndexFromEnterId).
+const CAMPFIRE_ENTER_PREFIX = 'feu:';
+
+function campfireIdFor(scene, index) {
+  return `${storyZoneId(scene)}#${index}`;
+}
+
+function campfireParseId(id) {
+  const s = String(id || '');
+  const i = s.lastIndexOf('#');
+  if (i <= 0) return null;
+  const index = Number(s.slice(i + 1));
+  return Number.isInteger(index) && index >= 0 ? { zone: s.slice(0, i), index } : null;
+}
+
+function campfireEnterId(id) {
+  return CAMPFIRE_ENTER_PREFIX + id;
+}
+
+// Indice du feu visé par un point d'entrée 'feu:<zone>#<i>' dans CETTE zone, sinon null.
+function campfireIndexFromEnterId(scene, enterId) {
+  if (typeof enterId !== 'string' || !enterId.startsWith(CAMPFIRE_ENTER_PREFIX)) return null;
+  const f = campfireParseId(enterId.slice(CAMPFIRE_ENTER_PREFIX.length));
+  return f && f.zone === storyZoneId(scene) ? f.index : null;
+}
+
+function campfiresVisited() {
+  const v = storyGet('campfiresVisited', []);
+  return Array.isArray(v) ? v : [];
+}
+
+// Agarica vient de s'asseoir au feu `fireId` (cf. campfireSit, LevelKit) :
+// mémorisé, découvertes reportées sur la carte, partie sauvegardée. Zones de
+// test : rien de tout ça (ni carte ni sauvegarde). Renvoie { saved, mapAdded }.
+function storyCampfireRest(scene, fireId) {
+  if (!isStoryScene(scene)) return { saved: false, mapAdded: 0 };
+  const reg = storyRegistry(scene);
+  const list = campfiresVisited();
+  if (!list.includes(fireId)) reg.set('campfiresVisited', [...list, fireId]);
+  reg.set('lastCampfire', fireId);
+  reg.set('lastEnterId', campfireEnterId(fireId));
+  const mapAdded = storyMapCommit();
+  const saved = saveGame(scene);
+  return { saved, mapAdded };
+}
+
+// Règles d'histoire du vol (décidées d'après les scripts de src/story/) : chaque
+// règle renvoie la raison du refus, montrée telle quelle, ou null.
+// `ctx` : { scene, from: {zone, index, region}, to: {zone, index, region} | null }.
+// Règles de départ : `to` vaut null ; règles d'arrivée : testées par destination.
+const CAMPFIRE_FLIGHT_RULES = [
+  // Départ : seulement d'une zone de l'histoire.
+  { at: 'from', why: (c) => (!c.from.region ? 'Pas de vol depuis une zone de test.' : null) },
+  // Zone fermée par un combat ou une épreuve (toutes ses sorties retirées par
+  // son script : arène de Ghil't pendant le combat, trou sombre…).
+  { at: 'from', why: (c) => (campfireZoneSealed(c.scene) ? 'Le passage est fermé : impossible de t\'envoler maintenant.' : null) },
+  // Défaite imposée face à Ghil't puis trou sombre : la suite se joue à pied.
+  { at: 'from', why: () => (storyGet('ghiltPhase', 1) >= 2 && !storyGet('ghiltHealed') ? 'Ghil\'t t\'attend. Pas question de fuir maintenant.' : null) },
+  // Forêt corrompue (après le crash, la mousse se referme derrière elle) : les
+  // vents de la corruption ont déjà jeté l'aigle au sol ; plus de vol, ni pour
+  // en partir ni pour y revenir, tant que Ghil't n'est pas soigné.
+  { at: 'from', why: (c) => (c.from.region === 'foret_corrompue' && !storyGet('ghiltHealed') ? 'Les vents de la corruption plaquent tes ailes au sol.' : null) },
+  { at: 'to', why: (c) => (c.to.region === 'foret_corrompue' && !storyGet('ghiltHealed') ? 'Les vents de la corruption t\'en empêchent.' : null) },
+  // Cime du grand arbre : Kainati la garde tant qu'il n'est pas apaisé.
+  { at: 'to', why: (c) => (c.to.zone === 'grand_arbre_arene' && !storyGet('kainatiDefeated') ? 'Kainati garde encore la cime du grand arbre.' : null) },
+];
+
+// La donnée de la zone a des sorties (`scene.__dataExitCount`, cf.
+// buildLevelFromData) mais le script les a toutes retirées pour l'instant.
+function campfireZoneSealed(scene) {
+  if (!scene || !(scene.__dataExitCount > 0)) return false;
+  return !(scene.__exits || []).some((e) => e && e.targetScene);
+}
+
+function campfireFlightPlace(scene, id) {
+  const f = campfireParseId(id);
+  if (!f) return null;
+  const entry = storyZoneEntry(f.zone);
+  return { ...f, id, region: entry ? entry.region : null, entry };
+}
+
+// Raison qui interdit tout vol depuis ce feu (null : on peut s'envoler).
+function campfireFlightDepartureBlock(scene, fromId) {
+  const from = campfireFlightPlace(scene, fromId) || { zone: null, index: null, region: null };
+  if (!from.region || !isStoryScene(scene)) from.region = null;
+  for (const r of CAMPFIRE_FLIGHT_RULES) {
+    if (r.at !== 'from') continue;
+    const why = r.why({ scene, from, to: null });
+    if (why) return why;
+  }
+  return null;
+}
+
+// Destinations du vol depuis `fromId` : les feux où Agarica s'est assise (sauf
+// celui-ci), dans l'ordre de l'histoire, chacun avec `blocked` (raison) ou null.
+function campfireFlightDestinations(scene, fromId) {
+  const from = campfireFlightPlace(scene, fromId) || { zone: null, index: null, region: null };
+  const order = (z) => {
+    const i = DEMO_ZONES.findIndex((e) => e.zone === z);
+    return i === -1 ? DEMO_ZONES.length : i;
+  };
+  const places = campfiresVisited().filter((id) => id !== fromId).map((id) => campfireFlightPlace(scene, id))
+    .filter((t) => t && t.entry)
+    .sort((a, b) => order(a.zone) - order(b.zone) || a.index - b.index);
+  const perZone = {};
+  for (const t of places) perZone[t.zone] = (perZone[t.zone] || 0) + 1;
+  return places.map((to) => {
+    let blocked = null;
+    for (const r of CAMPFIRE_FLIGHT_RULES) {
+      if (r.at !== 'to') continue;
+      blocked = r.why({ scene, from, to });
+      if (blocked) break;
+    }
+    const label = perZone[to.zone] > 1 || to.index > 0 ? `${to.entry.name} — feu ${to.index + 1}` : to.entry.name;
+    return { id: to.id, zone: to.zone, index: to.index, scene: to.entry.scene, label, blocked };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -4087,7 +4438,12 @@ function updateStoryKeys(scene) {
   }
   // Ctrl+I reste la bascule de debug physique (cf. setupDebugToggle).
   if (Phaser.Input.Keyboard.JustDown(st.keys.inventory) && !st.keys.inventory.ctrlKey) openInventory(scene);
-  else if (Phaser.Input.Keyboard.JustDown(st.keys.map) && inventoryHas('carte_geralt')) openMap(scene);
+  else if (Phaser.Input.Keyboard.JustDown(st.keys.map)) {
+    // Carte liée à l'objet de l'histoire (STORY_MAP_ITEM) : sans lui, un mot
+    // plutôt que rien (les découvertes, elles, s'enregistrent déjà).
+    if (storyMapAvailable()) openMap(scene);
+    else showToast(scene, 'Tu n\'as pas encore de carte.', 1800);
+  }
 }
 
 function openStoryOverlay(scene, key) {
@@ -4118,6 +4474,8 @@ function storyUpdateHook(scene, time, delta) {
   updateStoryFall(scene);
   updateStoryXaraInZone(scene);
   updateStoryXaraRescue(scene);
+  // Carte du monde : blocs parcourus, en attente du prochain feu de camp.
+  storyMapRecord(scene);
   updateStoryCheckpoints(scene);
   updateStoryLights(scene);
   updateStoryMossBlocks(scene);

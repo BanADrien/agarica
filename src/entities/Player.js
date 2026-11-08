@@ -1350,10 +1350,12 @@ const TOTEM_BODIES = {
 // "lock la partie totem pour la démo, cadenas chaîne"). Tant que c'est vrai,
 // recomputeTotemBonuses calcule comme si aucun totem n'était porté, SANS
 // toucher à `equippedTotem` ni au registre (un totem équipé avant le verrou
-// -- ancienne partie, tests -- reste sauvegardé) ; le menu du feu de camp
-// lit la même constante pour afficher le cadenas (CampfireMenuScene).
-// Passer à `false` suffit à tout rouvrir. Règle tenue ici, dans le joueur,
-// plutôt qu'en remplaçant la méthode depuis le menu (patch invisible).
+// -- ancienne partie, tests -- reste sauvegardé). Depuis le 2026-11-08 (totems
+// mis de côté tant qu'il y a peu de formes), le menu du feu de camp n'a plus
+// de section totem du tout (cf. CAMPFIRE_SHOW_TOTEMS, CampfireMenuScene) :
+// pour tout rouvrir, passer cette constante à `false` ET CAMPFIRE_SHOW_TOTEMS
+// à `true`. Règle tenue ici, dans le joueur, plutôt qu'en remplaçant la
+// méthode depuis le menu (patch invisible).
 const DEMO_TOTEMS_LOCKED = true;
 
 class Player extends Phaser.Physics.Arcade.Sprite {
@@ -1676,6 +1678,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     ensureManifestAnims(scene, 'singe');
     ensureManifestAnims(scene, 'transfo_singe');
     ensureManifestAnims(scene, 'agarica_extra');
+    // Repos au feu de camp (`sit` puis `sit_idle`, cf. startCampfireRest).
+    ensureManifestAnims(scene, 'agarica_repos');
+    this.campfireRest = null;
     // Lot Codex n°8 : grimpe/lancer du singe (`singe_extra` : climb, throw) et
     // incantation du papillon (`forme_papillon_extra` : cast), séparés des
     // feuilles d'origine ; repli sur les anims de `singe` / `forme_papillon`.
@@ -1794,6 +1799,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // ce garde-fou couvre un dégel imprévu -- ni touche ni changement de
     // forme ne doit la rattraper avant la reprise.
     if (this.fallingOut) return;
+    // Assise au feu de camp : immobile tant qu'aucune action ne la relève.
+    if (this.campfireRest && this.updateCampfireRest()) return;
     this.syncFormSlots();
     const left = this.cursors.left.isDown || this.keys.left.isDown;
     const right = this.cursors.right.isDown || this.keys.right.isDown;
@@ -3850,6 +3857,84 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.registry.set('energy', this.energy);
   }
 
+  // --- Assise au feu de camp (2026-11-08, point 3 de la liste) ---------------
+  // E près d'un feu (cf. campfireSit, LevelKit) : Agarica s'assoit, tournée
+  // vers le feu (art `agarica_repos` : `sit` puis `sit_idle` en boucle ;
+  // repli sans art : pose de repos debout). Le monde continue de tourner.
+  // Marcher, sauter, frapper ou lancer une compétence la relève (l'action part
+  // dans la même image) ; un coup reçu, une cinématique ou une chute aussi.
+  // E / Entrée (menu du feu) sont lus par le feu, jamais ici.
+  startCampfireRest(fire) {
+    const now = this.scene.time.now;
+    if (this.vine) this.releaseVine(false, now);
+    this.endSkillFormPose(true);
+    this.storyStopActions();
+    this.storyForceHuman();
+    this.setAcceleration(0, 0);
+    this.setVelocityX(0);
+    if (fire && Number.isFinite(fire.x) && Math.abs(fire.x - this.x) > 4) this.facingDir = fire.x > this.x ? 1 : -1;
+    this.campfireRest = { fireId: fire ? fire.id : null, since: now, anim: null };
+    // Ni « gros atterrissage » ni éclat de forme en se relevant (cf. updateJuice).
+    this.wasOnGround = true;
+    this.juicePrevVy = 0;
+    this.applyCampfireRestPose('sit');
+  }
+
+  applyCampfireRestPose(anim) {
+    const rest = this.campfireRest;
+    if (!rest) return;
+    rest.anim = anim;
+    if (hasManifestArt(this.scene, 'agarica_repos', anim)) {
+      const cfg = agaricaSheetPoseConfig(this.scene, 'agarica_repos', anim);
+      playManifestOn(this, 'agarica_repos', anim);
+      this.applyBodyForScale(cfg.scale, cfg.body);
+      // Art `agarica_repos` dessiné face à DROITE, comme `agarica_extra`.
+      this.setFlipX(AGARICA_EXTRA_FACES_RIGHT ? this.facingDir < 0 : this.facingDir > 0);
+    } else {
+      if (this.scene.anims.exists(ANIM_IDLE_KEY)) this.anims.play(ANIM_IDLE_KEY, true);
+      this.applyBodyForScale(FORMS.agarica.scale, FORMS.agarica.body);
+      this.setFlipX(this.facingDir > 0);
+    }
+  }
+
+  // Vrai tant qu'elle reste assise (update() s'arrête là pour cette image).
+  // Touches lues SANS les consommer (isDown) : celle qui la relève agit aussitôt
+  // dans la suite d'update() (premier pas, saut, coup).
+  updateCampfireRest() {
+    const rest = this.campfireRest;
+    const k = this.keys;
+    const sk = this.skillKeys;
+    const wantsToAct = this.cursors.left.isDown || k.left.isDown || this.cursors.right.isDown || k.right.isDown
+      || k.jump.isDown || this.attackKey.isDown || this.attackPointerJustDown
+      || sk.slot1.isDown || sk.slot2.isDown || sk.slot3.isDown;
+    if (wantsToAct) {
+      this.endCampfireRest();
+      return false;
+    }
+    this.setAccelerationX(0);
+    this.setVelocityX(0);
+    this.onGround = (this.body.blocked.down || this.body.touching.down) && this.body.velocity.y >= 0;
+    this.wasOnGround = this.onGround;
+    // `sit` (non bouclée) finie : `sit_idle` en boucle.
+    if (rest.anim === 'sit') {
+      const cur = this.anims.currentAnim;
+      if (!this.anims.isPlaying || !cur || cur.key !== 'agarica_repos-sit') this.applyCampfireRestPose('sit_idle');
+    }
+    this.inWeb = false;
+    this.inWater = false;
+    return true;
+  }
+
+  // Se relever : pose de repos humaine ; update() reprend la main normalement.
+  endCampfireRest() {
+    if (!this.campfireRest) return;
+    this.campfireRest = null;
+    if (this.form === 'agarica' && this.scene && this.scene.anims.exists(ANIM_IDLE_KEY)) this.anims.play(ANIM_IDLE_KEY, true);
+    if (this.body) this.applyBodyForScale(FORMS.agarica.scale, FORMS.agarica.body);
+    this.wasOnGround = true;
+    this.juicePrevVy = 0;
+  }
+
   // --- Chute dans le vide (retour utilisateur : « quand on tombe dans le
   // vide on doit passer dans le sol pour mourir, pas s'allonger en bas de
   // l'écran ») ------------------------------------------------------------
@@ -3861,6 +3946,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   startFallOut() {
     if (this.fallingOut) return;
     const now = this.scene.time.now;
+    this.endCampfireRest();
     if (this.vine) this.releaseVine(false, now);
     this.endSkillFormPose(true);
     this.fallingOut = true;
@@ -3958,6 +4044,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // Une pose narrative (`storyPose`, posée par la cinématique) et la liane
   // gardent toujours la main.
   storyStopActions() {
+    // Une cinématique relève Agarica assise au feu (sa pose narrative prime).
+    this.endCampfireRest();
     this.isAttacking = false;
     this.slashDir = null;
     this.biteAnimPending = false;
@@ -4115,6 +4203,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // (règle d'avant) ; celle de la sortie d'un dialogue ne protège que des
     // ennemis -- une chute juste après un dialogue coûte toujours son cœur.
     if ((opts.fall ? this.hitInvulnerable : this.isInvulnerable) || this.fallingOut) return;
+    // Touchée assise au feu : elle se relève sous le coup.
+    this.endCampfireRest();
     this.isInvulnerable = true;
     if (this.vine) this.releaseVine(false, this.scene.time.now);
     this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;

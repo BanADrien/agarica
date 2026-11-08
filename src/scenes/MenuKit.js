@@ -50,7 +50,7 @@ const CONTROLS_GROUPS = [
     title: 'Menus',
     rows: [
       { keys: ['I'], text: 'Sac (inventaire)' },
-      { keys: ['M'], text: 'Carte de Geralt (une fois trouvée)' },
+      { keys: ['M'], text: 'Carte du monde (une fois celle de Geralt trouvée)' },
       { keys: ['Échap'], alt: ['P'], text: 'Pause' },
     ],
   },
@@ -59,7 +59,7 @@ const CONTROLS_GROUPS = [
 // rebord, le 1er appui est un saut, le 2e la transformation (singe et aigle).
 const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e saut = Singe ou Aigle '
   + '(en tombant d\'un rebord aussi : 1er appui = saut, 2e = la forme ; sans forme aérienne, un seul saut), '
-  + 'eau = Pieuvre. Au feu de camp : soin, sauvegarde, formes et compétences.';
+  + 'eau = Pieuvre. Au feu de camp : E pour t\'asseoir (soin, sauvegarde, carte), puis E pour son menu.';
 // Rappel discret affiché en jeu si l'option est activée.
 const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Shift courir · E agir · A F R compétences · I sac · Échap pause';
 

@@ -2571,13 +2571,18 @@ function ensureCampfireAnimation(scene) {
 const CAMPFIRE_INTERACT_RANGE = 70;
 
 // `y` est le sol sous le feu (même convention que addAbilityShrine :
-// origine ancrée en bas). Interaction (E) : restaure vie/énergie au max
-// (cf. Player.refillAtCampfire) ET lance CampfireMenuScene (cf. ce
-// fichier) EN PARALLÈLE -- vrai menu à glisser-déposer (formes/
-// compétences/totems), plus le bricolage Graphics/Text+touches d'avant
-// (retour utilisateur : "fais un vrai menu propre... glisser déposer").
-function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
+// origine ancrée en bas). Feu refait le 2026-11-08 (point 3 de la liste) :
+//   E près du feu : Agarica s'ASSOIT (campfireSit : vie et énergie pleines,
+//   découvertes reportées sur la carte, sauvegarde) ;
+//   assise, E ou Entrée : menu du feu (CampfireMenuScene : formes et
+//   compétences, carte, vol, inventaire, objets) ; marcher ou sauter la relève.
+// `index` : rang du feu dans `data.campfires` (identifiant `<zone>#<index>`,
+// cf. campfireIdFor dans StoryKit). Renvoie la description du feu.
+function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE, { index = 0 } = {}) {
   ensureCampfireAnimation(scene);
+  const fireInfo = { id: campfireIdFor(scene, index), index, x, y };
+  scene.__campfires = scene.__campfires || [];
+  scene.__campfires.push(fireInfo);
   // Bûches posées sur la surface de marche (haut de la hitbox, comme les
   // props et les pieds d'Agarica) ; l'ancien enfoncement fixe de 14 px sous
   // le haut de l'image de tuile laissait le feu 3 px au-dessus d'elle.
@@ -2620,8 +2625,14 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
   let nextEmberAt = 0;
   let nextCrackleAt = 0;
 
-  const prompt = addLevelPrompt(scene, x, y - 90, 'E : te reposer');
+  const prompt = addLevelPrompt(scene, x, y - 90, CAMPFIRE_PROMPT_SIT);
   keepWorldUiInView(prompt, { prompt: true });
+  fireInfo.fire = fire;
+  fireInfo.flameY = flameY;
+  fireInfo.halo = halo;
+  fireInfo.scale = scale;
+  // Entrée lue en plus de E pour ouvrir le menu, une fois assise.
+  const enterKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER, false);
 
   levelSceneOn(scene, 'update', () => {
     // Écouteur retiré à l'arrêt de la scène (levelSceneOn) ; garde-fou
@@ -2645,40 +2656,184 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE) {
         halo.setAlpha(Math.min(0.55, halo.alpha + 0.12));
       }
     }
-    // Menu ouvert (scène séparée, cf. CampfireMenuScene.update() pour sa
-    // propre fermeture E/Échap) : le prompt "Appuie sur E" (texte MONDE,
-    // pas écran) resterait sinon affiché par-dessus, inchangé depuis juste
-    // avant l'ouverture.
-    if (isWorldFrozen(scene)) {
+    // Menu ouvert (scène séparée) ou cinématique : l'invite (texte MONDE, pas
+    // écran) resterait sinon affichée par-dessus.
+    if (isWorldFrozen(scene) || scene.__campfireFlight) {
       prompt.setVisible(false);
       return;
     }
-    const inRange = Phaser.Math.Distance.Between(scene.player.x, scene.player.y, x, y) <= CAMPFIRE_INTERACT_RANGE;
-    prompt.setVisible(inRange);
-    if (!inRange || !Phaser.Input.Keyboard.JustDown(scene.player.interactKey)) return;
-    // Juice : le feu s'embrase (flamme qui grandit, gerbe d'étincelles, halo).
-    scene.tweens.add({ targets: fire, scaleX: scale * 1.15, scaleY: scale * 1.28, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
-    spawnFx(scene, 'crackle', x, flameY, { count: 16 });
-    juiceBurstImage(scene, 'glow', x, flameY, { size: fire.displayWidth * 5, from: 0.4, to: 1.1, ms: 600, color: 0xffb070, alpha: 0.6 });
-    spawnFx(scene, 'motes', scene.player.x, scene.player.y - 40, { count: 10, spread: 18, color: [0xffd8a0, 0xff9fc9, 0xe8fff2] });
-    playSfx('campfire_rest');
-    scene.player.refillAtCampfire();
-    // Coupe l'élan en cours avant de geler les updates (cf.
-    // updateLevelFromData, qui n'appelle plus player.update() tant que
-    // CampfireMenuScene est active) -- sans ça la vitesse au moment de
-    // l'ouverture continuerait d'être appliquée par le moteur physique
-    // pendant que les touches de direction, elles, ne font plus rien.
-    scene.player.setVelocity(0, 0);
-    scene.scene.launch('CampfireMenuScene', { player: scene.player });
-    // Les zones de l'histoire sont déclarées APRÈS le menu dans main.js : sans
-    // ça le menu serait dessiné sous la zone.
-    scene.scene.bringToTop('CampfireMenuScene');
-    // Sauvegarde à chaque feu de camp (zones de l'histoire seulement : les
-    // zones de test ne doivent pas écraser la progression).
-    if (isStoryScene(scene)) {
-      saveGame(scene);
-      scene.scene.get('CampfireMenuScene').events.once('shutdown', () => saveGame(scene, { silent: true }));
+    const p = scene.player;
+    // Assise à CE feu : E ou Entrée ouvre le menu.
+    if (p.campfireRest && p.campfireRest.fireId === fireInfo.id) {
+      if (prompt.text !== CAMPFIRE_PROMPT_MENU) prompt.setText(CAMPFIRE_PROMPT_MENU);
+      prompt.setVisible(true);
+      if (Phaser.Input.Keyboard.JustDown(p.interactKey) || Phaser.Input.Keyboard.JustDown(enterKey)) campfireOpenMenu(scene, fireInfo);
+      return;
     }
+    if (prompt.text !== CAMPFIRE_PROMPT_SIT) prompt.setText(CAMPFIRE_PROMPT_SIT);
+    // Assise à un autre feu (deux feux proches) : pas d'invite ici.
+    const inRange = !p.campfireRest && Phaser.Math.Distance.Between(p.x, p.y, x, y) <= CAMPFIRE_INTERACT_RANGE;
+    prompt.setVisible(inRange);
+    if (!inRange || !Phaser.Input.Keyboard.JustDown(p.interactKey)) return;
+    // Pas en l'air, sur une liane ni dans l'eau : on s'assoit par terre.
+    if (!p.body.blocked.down || p.vine || p.form === 'octopus') return;
+    campfireSit(scene, fireInfo);
+  });
+  return fireInfo;
+}
+
+const CAMPFIRE_PROMPT_SIT = 'E : t\'asseoir';
+const CAMPFIRE_PROMPT_MENU = 'E : menu du feu  ·  ←/→ : te lever';
+
+// Agarica s'assoit au feu (E, arrivée d'un vol, reprise de sauvegarde) :
+// vie et énergie pleines, feu mémorisé, découvertes reportées sur la carte et
+// sauvegarde (StoryKit, storyCampfireRest). `quiet` : sans l'embrasement du
+// feu (l'arrivée en vol a sa propre mise en scène).
+function campfireSit(scene, fireInfo, { quiet = false } = {}) {
+  const p = scene.player;
+  if (!p || !p.active) return null;
+  if (!quiet) {
+    // Juice : le feu s'embrase (flamme qui grandit, gerbe d'étincelles, halo).
+    const { fire, x, flameY, scale } = fireInfo;
+    if (fire && fire.scene) {
+      scene.tweens.add({ targets: fire, scaleX: scale * 1.15, scaleY: scale * 1.28, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
+      spawnFx(scene, 'crackle', x, flameY, { count: 16 });
+      juiceBurstImage(scene, 'glow', x, flameY, { size: fire.displayWidth * 5, from: 0.4, to: 1.1, ms: 600, color: 0xffb070, alpha: 0.6 });
+    }
+    spawnFx(scene, 'motes', p.x, p.y - 40, { count: 10, spread: 18, color: [0xffd8a0, 0xff9fc9, 0xe8fff2] });
+  }
+  playSfx('campfire_rest');
+  p.startCampfireRest(fireInfo);
+  p.refillAtCampfire();
+  const res = storyCampfireRest(scene, fireInfo.id);
+  // Petit mot de ce qui vient de se passer (la sauvegarde a déjà son indicateur).
+  const bits = ['Vie et énergie restaurées'];
+  if (res.mapAdded > 0) bits.push('carte mise à jour');
+  showToast(scene, bits.join(' · '), 2200);
+  return res;
+}
+
+// Assise : ouvre le menu du feu (monde gelé tant qu'il est ouvert). La
+// sauvegarde de fin (formes, compétences changées) est faite par le menu.
+function campfireOpenMenu(scene, fireInfo) {
+  const p = scene.player;
+  p.setVelocity(0, 0);
+  // Rebond d'ouverture une seule fois par ouverture (pas à chaque écran du menu).
+  scene.__campfireMenuOpenFx = false;
+  scene.scene.launch('CampfireMenuScene', { player: p, fire: fireInfo, parentKey: scene.scene.key });
+  // Les zones de l'histoire sont déclarées APRÈS le menu dans main.js : sans
+  // ça le menu serait dessiné sous la zone.
+  scene.scene.bringToTop('CampfireMenuScene');
+}
+
+// Place assise près d'un feu (arrivée en vol, reprise) : à côté des bûches,
+// côté gauche s'il y a du sol, sinon côté droit, tournée vers le feu.
+const CAMPFIRE_SEAT_OFFSET = 46;
+function campfireSeatSpot(scene, c) {
+  const fy = groundSurfaceYAt(scene, c.x, c.y) ?? c.y;
+  for (const dx of [-CAMPFIRE_SEAT_OFFSET, CAMPFIRE_SEAT_OFFSET]) {
+    const sx = c.x + dx;
+    const stand = groundStandYAt(scene, sx, fy);
+    if (stand != null && Math.abs(stand - fy) < 24) return { x: sx, y: stand - 2 };
+  }
+  return { x: c.x - CAMPFIRE_SEAT_OFFSET, y: fy - 8 };
+}
+
+// --- Vol de l'aigle (point 5 de la liste) ------------------------------------
+// Depuis le menu du feu (entrée « Vol », forme de l'aigle acquise) : Agarica
+// se relève, devient l'aigle et s'envole hors de l'écran, puis fondu vers la
+// zone du feu choisi, où elle se pose assise (point d'entrée 'feu:<id>', cf.
+// buildLevelFromData). Les règles d'histoire (destinations permises) sont
+// dans StoryKit (CAMPFIRE_FLIGHT_RULES) ; le menu ne propose que celles-là.
+const CAMPFIRE_FLIGHT_TAKEOFF_MS = 1100;
+function campfireFlyTo(scene, dest) {
+  const p = scene.player;
+  if (!p || !p.active || scene.__campfireFlight || !dest) return false;
+  scene.__campfireFlight = true;
+  p.endCampfireRest();
+  // Joueur piloté, monde gelé : ni ennemi, ni sortie, ni mise au repos.
+  scene.__playerScripted = true;
+  scene.__cutsceneLock = (scene.__cutsceneLock || 0) + 1;
+  p.setVelocity(0, 0);
+  p.setAcceleration(0, 0);
+  if (p.body) p.body.moves = false;
+  const dir = p.facingDir >= 0 ? 1 : -1;
+  const x0 = p.x;
+  const y0 = p.y;
+  // L'aigle prend la place d'Agarica (sprite à part : son corps physique reste
+  // posé), Xara grimpe sur son dos (elle disparaît dans le même nuage).
+  spawnFx(scene, 'transform', x0, y0 - 40, { color: 0xc77dff, size: 1 });
+  spawnFx(scene, 'feathers', x0, y0 - 40, { count: 8 });
+  juiceBurstImage(scene, 'glow', x0, y0 - 40, { size: 160, from: 0.3, to: 1.2, ms: 520, color: 0xe8fff2, alpha: 0.8 });
+  p.setVisible(false);
+  if (scene.xara && scene.xara.active) scene.xara.setVisible(false);
+  const eagle = campfireEagleSprite(scene, x0, y0 - 20, dir);
+  playSfx('flight_takeoff');
+  showToast(scene, `Envol vers : ${dest.label}`, 1800);
+  if (eagle) {
+    scene.tweens.add({ targets: eagle, x: x0 + dir * 220, y: y0 - 620, duration: CAMPFIRE_FLIGHT_TAKEOFF_MS, ease: 'Quad.easeIn' });
+    scene.time.addEvent({ delay: 160, repeat: 5, callback: () => { if (eagle.active) spawnFx(scene, 'feathers', eagle.x, eagle.y, { count: 1 }); } });
+  }
+  scene.cameras.main.stopFollow();
+  scene.time.delayedCall(Math.round(CAMPFIRE_FLIGHT_TAKEOFF_MS * 0.55), () => {
+    goToScene(scene, dest.scene, { enterId: campfireEnterId(dest.id), flight: true });
+  });
+  return true;
+}
+
+// Aigle de la mise en scène du vol (art de la forme aigle, sinon rien : les
+// plumes et le fondu suffisent).
+function campfireEagleSprite(scene, x, y, dir) {
+  if (!scene.textures.exists('piaf-fly-0')) return null;
+  const eagle = scene.add.sprite(x, y, 'piaf-fly-0').setDepth(CHARACTER_DEPTH + 2);
+  if (scene.anims.exists(ANIM_PIAF_FLY_KEY)) eagle.play(ANIM_PIAF_FLY_KEY);
+  eagle.setScale(FORMS.eagle && FORMS.eagle.scale ? FORMS.eagle.scale : 0.25);
+  // Feuille de l'aigle face à GAUCHE (cf. Player, forme aigle).
+  eagle.setFlipX(dir > 0);
+  return eagle;
+}
+
+// Arrivée en vol : l'aigle descend se poser près du feu, puis Agarica
+// apparaît assise (pose `sit` jouée depuis le début) ; sinon (reprise d'une
+// sauvegarde), assise tout de suite.
+function campfireArrive(scene, fireInfo, { flight = false } = {}) {
+  const p = scene.player;
+  if (!flight) {
+    campfireSit(scene, fireInfo, { quiet: true });
+    return;
+  }
+  const dir = fireInfo.x >= p.x ? 1 : -1;
+  const eagle = campfireEagleSprite(scene, p.x - dir * 260, p.y - 420, dir);
+  if (!eagle) {
+    campfireSit(scene, fireInfo, { quiet: true });
+    spawnFx(scene, 'feathers', p.x, p.y - 40, { count: 10 });
+    return;
+  }
+  // Pendant la descente : Agarica cachée, assise d'office, monde gelé et
+  // joueur « piloté » (la mise au repos des cinématiques ne la relève pas).
+  campfireSit(scene, fireInfo, { quiet: true });
+  p.setVisible(false);
+  if (scene.xara && scene.xara.active) scene.xara.setAlpha(0);
+  scene.__campfireFlight = true;
+  scene.__playerScripted = true;
+  scene.__cutsceneLock = (scene.__cutsceneLock || 0) + 1;
+  const visit = scene.__storyVisit;
+  scene.tweens.add({
+    targets: eagle, x: p.x, y: p.y - 30, duration: 900, ease: 'Quad.easeOut',
+    onComplete: () => {
+      if (visit !== scene.__storyVisit) return;
+      scene.__campfireFlight = false;
+      scene.__playerScripted = false;
+      scene.__cutsceneLock = Math.max(0, (scene.__cutsceneLock || 0) - 1);
+      spawnFx(scene, 'transform', p.x, p.y - 40, { color: 0xc77dff, size: 0.9 });
+      spawnFx(scene, 'feathers', p.x, p.y - 40, { count: 10 });
+      eagle.destroy();
+      if (!p.active) return;
+      p.setVisible(true);
+      // La pose `sit` repart du début : elle se pose, puis s'assoit.
+      if (p.campfireRest) p.applyCampfireRestPose('sit');
+      if (scene.xara && scene.xara.active) scene.tweens.add({ targets: scene.xara, alpha: 1, duration: 300 });
+    },
   });
 }
 
@@ -4558,6 +4713,12 @@ function buildLevelFromData(scene, data, sceneData) {
   const enterId = sceneData && sceneData.enterId;
   const enteredAt = enterId && (data.entries || []).find((e) => e.id === enterId);
   let spawn = enteredAt || data.playerSpawn || { x: 80, y: 100 };
+  // Point d'entrée 'feu:<zone>#<i>' (vol de l'aigle, « Continuer » après un
+  // repos, cf. storyCampfireRest) : assise près de ce feu (cf. campfireArrive
+  // plus bas). Feu introuvable (donnée changée) : spawn par défaut.
+  const arrivalFireIndex = campfireIndexFromEnterId(scene, enterId);
+  const arrivalFire = arrivalFireIndex != null ? (data.campfires || [])[arrivalFireIndex] : null;
+  if (arrivalFire) spawn = campfireSeatSpot(scene, arrivalFire);
   // Retour utilisateur : "quand je prend une gate d'un sens ou l'autre je
   // doit arriver au meme equivalent altitude de l'autre coté" -- `enterRatio`
   // (posé par updateLevelFromData au moment de franchir la sortie source,
@@ -4748,10 +4909,14 @@ function buildLevelFromData(scene, data, sceneData) {
   // de niveau comme totems/props, posable dans n'importe quelle zone
   // depuis l'éditeur. Même recalage sur le sol RÉEL que pour eux (pas la
   // position brute stockée) : cf. leur commentaire respectif.
-  for (const c of data.campfires || []) {
+  // Feux décrits dans `scene.__campfires` (identifiant, position), lus par le
+  // menu du feu et le vol ; repartis d'une liste vide à chaque visite.
+  scene.__campfires = [];
+  scene.__campfireFlight = false;
+  (data.campfires || []).forEach((c, index) => {
     const y = groundSurfaceYAt(scene, c.x, c.y) ?? c.y;
-    addCampfire(scene, c.x, y, c.scale || CAMPFIRE_SCALE);
-  }
+    addCampfire(scene, c.x, y, c.scale || CAMPFIRE_SCALE, { index });
+  });
 
   // Retour utilisateur : "une zone doit avoir plusieurs sorties" -- `exits`
   // (tableau) est le format actuel (cf. EditorScene.js, outil "Sortie
@@ -4762,6 +4927,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // sous_grotte/zone_aquatique) -- pas besoin de les migrer à la main,
   // juste normalisé en tableau d'un seul élément ici.
   scene.__exits = data.exits || (data.exit ? [data.exit] : []);
+  // Sorties prévues par la donnée : un script qui les retire toutes ferme la
+  // zone (combat, épreuve) -- le vol de l'aigle s'y refuse (campfireZoneSealed).
+  scene.__dataExitCount = scene.__exits.filter((e) => e && e.targetScene).length;
   // Lisibilité des bords (cf. addEdgeHints) : brume sombre des trous mortels ici,
   // indices des sorties à la première image (les scripts de zone trient encore
   // `__exits` pendant leur create).
@@ -4773,6 +4941,9 @@ function buildLevelFromData(scene, data, sceneData) {
   // zone...) : cf. LEVEL_DATA_HANDLERS dans StoryKit.js / PLAN_DEV.md.
   runLevelDataHandlers(scene, data);
   storyOnZoneEnter(scene, data, sceneData);
+  // Arrivée à un feu (vol, reprise) : assise, une fois la zone entière en place.
+  const arrivalInfo = arrivalFire && scene.__campfires.find((f) => f.index === arrivalFireIndex);
+  if (arrivalInfo) campfireArrive(scene, arrivalInfo, { flight: !!(sceneData && sceneData.flight) });
   // Juice : temps (hit-stop), regard caméra, lucioles/papillons d'ambiance.
   juiceSetupLevel(scene, data);
   // Rendu de cohésion (clé `look`, cf. LookKit.js) : posé en dernier, quand

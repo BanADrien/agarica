@@ -6,16 +6,27 @@
 // simplifie tout le placement écran + le glisser-déposer, qui a besoin de
 // coordonnées écran stables.
 //
-// 3 catégories, chacune avec DEUX façons d'équiper (demande explicite :
-// "je veux pouvoir glisser deposer et cliquer sur un choix puis sur
-// l'emplacement") :
+// Feu refait le 2026-11-08 (point 3 de la liste) : Agarica s'assoit au feu
+// (campfireSit, LevelKit) ; assise, E ou Entrée ouvre CE menu, qui a trois
+// écrans (`mode`, un `scene.restart` par changement d'écran : chacun est
+// reconstruit de zéro, rien à défaire) :
+// - 'hub'    : la liste des entrées (CAMPFIRE_HUB_ENTRIES) ;
+// - 'forms'  : formes et compétences (le panneau à glisser-déposer d'avant) ;
+// - 'flight' : vol de l'aigle vers un autre feu (règles dans StoryKit).
+// Carte et inventaire sont leurs propres scènes (MapScene, InventoryScene),
+// ouvertes PAR-DESSUS ce menu mis en pause (`returnTo`) : les fermer le
+// reprend là où il était. Échap dans le hub ferme le menu, Agarica reste
+// assise ; la partie est sauvegardée à la fermeture (formes changées…).
+//
+// Écran 'forms', 2 catégories, chacune avec DEUX façons d'équiper (demande
+// explicite : "je veux pouvoir glisser deposer et cliquer sur un choix puis
+// sur l'emplacement") :
 // - Formes de déplacement : 3 emplacements typés (sol/aérien/eau, cf.
 //   FORM_INFO) ; doivent être ÉQUIPÉES pour fonctionner en jeu.
 // - Compétences (cf. SKILL_DEFS dans Player.js / Crapaud.js / Projectiles.js).
-// - Totem : UN SEUL {head, body} (pas plusieurs emplacements -- revenu sur
-//   l'idée de cumul entre plusieurs totems, demande explicite : "un seul
-//   totem au total"), cf. Player.equippedTotem. VERROUILLÉ pour la démo,
-//   cf. DEMO_TOTEMS_LOCKED (Player.js) et CAMPFIRE_TOTEMS_LOCKED plus bas.
+// Totems à équiper (une tête + un corps, cf. Player.equippedTotem) : mis de
+// côté tant qu'il y a peu de formes (décision du 2026-11-08) -- leur colonne
+// n'est plus affichée (CAMPFIRE_SHOW_TOTEMS) ; code et sauvegarde gardés.
 //
 // Cartes sans art dédié : rectangle coloré par catégorie + icône du
 // manifest si elle existe. `rebuildUI()` détruit et recrée TOUTES les
@@ -29,10 +40,13 @@
 // Le papillon n'est PAS une forme (décision utilisateur : « le papillon ne
 // doit être qu'une compétence ») : il n'apparaît que parmi les compétences.
 
-// Démo : totems verrouillés (cadenas, aucune interaction). La règle vit dans
-// Player.js (DEMO_TOTEMS_LOCKED : bonus ignorés par recomputeTotemBonuses,
-// sauvegarde intacte) ; le menu ne fait que la lire pour son affichage.
+// Totems verrouillés (bonus ignorés, cf. DEMO_TOTEMS_LOCKED dans Player.js) ;
+// le menu ne fait que lire la constante.
 const CAMPFIRE_TOTEMS_LOCKED = typeof DEMO_TOTEMS_LOCKED !== 'undefined' ? DEMO_TOTEMS_LOCKED : true;
+// Colonne des totems (tête + corps) dans l'écran des formes. `false` depuis
+// le 2026-11-08 (plus de section totem, ni cadenas ni chaînes) ; `true` la
+// rend telle qu'avant, en cartes inertes tant que les totems sont verrouillés.
+const CAMPFIRE_SHOW_TOTEMS = false;
 
 const FORM_INFO = {
   wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), coup de croc (K), perçoit les pistes cachées.' },
@@ -91,8 +105,9 @@ const CAMPFIRE_SAFE = {
   foot: { x0: 232, x1: 728, y0: 106, y1: 433 },
 };
 // Grille commune. Colonne gauche (formes, compétences) : 3 colonnes de
-// 108 px + gouttières de 12 px (212..560). Colonne droite (totem) :
-// 576..748, 2 emplacements de 80 px ou 3 colonnes de 52 px (pas de 58).
+// 108 px + gouttières de 12 px (348 px) ; centrée sur le panneau (306..654)
+// sans colonne des totems, sinon à gauche (212..560) et colonne droite
+// (totem) 576..748, 2 emplacements de 80 px ou 3 colonnes de 52 px (pas de 58).
 // Rangées en y = HAUT des textes, CENTRE des emplacements, des cartes et du
 // bloc de description (1 ou 2 lignes, centré dans sa hauteur) ; les deux
 // colonnes partagent les rangées en-tête / emplacements / rangées du bas.
@@ -104,7 +119,7 @@ const CAMPFIRE_SAFE = {
 // de 24 px : à 18 px les médaillons des formes devenaient identiques) dans
 // des emplacements et des rangées de 34 px.
 const CAMPFIRE_LAYOUT = {
-  left: { x0: 212, colW: 108, gap: 12 },
+  left: { x0: CAMPFIRE_SHOW_TOTEMS ? 212 : 306, colW: 108, gap: 12 },
   right: { x0: 576, x1: 748, slotW: 80, cellW: 52, cellStep: 58 },
   rows: {
     title: 106,
@@ -116,6 +131,26 @@ const CAMPFIRE_LAYOUT = {
   slotH: 34, poolH: 34, cardH: 28, iconSize: 24, totemCardH: 26,
 };
 
+// Entrées du hub (écran d'accueil du menu). `icon` : textures essayées dans
+// l'ordre (manifest, icônes de forme), sinon pastille avec l'initiale.
+const CAMPFIRE_HUB_ENTRIES = [
+  { id: 'forms', label: 'Formes et compétences', icon: ['form-icon-wolf'], color: 0x3a5a8c,
+    desc: 'Équipe tes formes (sol, aérien, eau) et tes compétences (A, F, R).' },
+  { id: 'map', label: 'Carte', icon: ['item-carte_geralt'], color: 0x9a7444,
+    desc: 'La carte du monde, avec ce que tu as découvert jusqu\'à ce feu.' },
+  { id: 'flight', label: 'Vol', icon: ['form-icon-eagle'], color: 0x6a4a8c,
+    desc: 'Rejoins d\'un coup d\'aile un feu où tu t\'es déjà assise.' },
+  { id: 'inventory', label: 'Inventaire', icon: ['item-talisman_ours'], color: 0x3f7a52,
+    desc: 'Tes objets de quête et tes consommables.' },
+  { id: 'items', label: 'Objets', icon: [], color: 0x4a4258, soon: true,
+    desc: 'Bientôt.' },
+];
+// Liste du hub : centrée, une entrée tous les 38 px sous le titre et sa
+// ligne d'état (jusqu'à y 340, au-dessus de la description).
+const CAMPFIRE_HUB_LIST = { x0: 330, x1: 630, y0: 174, step: 38, rowH: 30 };
+// Liste des destinations du vol (défile au-delà de `rows`).
+const CAMPFIRE_FLIGHT_LIST = { x0: 300, x1: 660, y0: 178, step: 32, rowH: 28, rows: 6 };
+
 class CampfireMenuScene extends Phaser.Scene {
   constructor() {
     super('CampfireMenuScene');
@@ -123,41 +158,43 @@ class CampfireMenuScene extends Phaser.Scene {
 
   init(data) {
     this.player = data && data.player;
+    this.fire = (data && data.fire) || null;
+    this.parentKey = (data && data.parentKey) || (this.player && this.player.scene ? this.player.scene.scene.key : null);
+    this.mode = (data && data.mode) || 'hub';
+    this.hubIndex = (data && data.hubIndex) || 0;
+    this.closing = false;
   }
 
   create() {
     // Toujours ouvert depuis une zone avec le joueur (LevelKit) ; lancé seul
     // (harnais de test, démarrage direct), il se referme au lieu de planter.
-    if (!this.player) {
+    if (!this.player || !this.player.scene) {
       this.scene.stop();
       return;
     }
     this.totemsLocked = CAMPFIRE_TOTEMS_LOCKED;
+    this.showTotems = CAMPFIRE_SHOW_TOTEMS;
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
     // Voile sombre : fond du menu ET repli si le panneau peint manque.
     this.add.rectangle(480, 270, 960, 540, 0x0d0b1a, 0.82).setName('fond');
     this.buildPanel();
-    this.buildHeader();
-
-    // Cf. historique : un simple TABLEAU de cartes de premier niveau (un
-    // Container imbriqué cassait la zone de clic de ses enfants).
-    this.dynamicCards = [];
-    // Légendes des rangées vides (« repose ici pour retirer »), recréées
-    // avec les cartes.
-    this.dynamicDecor = [];
-    this.dropZones = [];
-    this.selectedCard = null;
-    // Seuil de glisser : un clic immobile ne doit pas devenir un 'dragstart'.
-    this.input.dragDistanceThreshold = 6;
-
-    this.buildStaticSlots();
-    if (this.totemsLocked) this.buildTotemLock();
-    this.wireInputEvents();
-    this.rebuildUI();
-    // Juice : le menu du feu s'ouvre avec un léger rebond.
-    juiceOverlayIn(this);
-
-    this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.openedAt = this.time.now;
+    this.input.keyboard.on('keydown', this.onKey, this);
+    this.events.once('shutdown', () => this.input.keyboard.off('keydown', this.onKey, this));
+    // Carte / inventaire refermés : ce menu reprend la main (touche de
+    // fermeture de l'écran du dessus ignorée, cf. openedAt). Les événements de
+    // la scène survivent à `restart` : un seul écouteur.
+    this.events.off('resume', this.onResume, this);
+    this.events.on('resume', this.onResume, this);
+    if (this.mode === 'forms') this.buildFormsScreen();
+    else if (this.mode === 'flight') this.buildFlightScreen();
+    else this.buildHubScreen();
+    // Juice : le menu s'ouvre avec un léger rebond (seulement à l'ouverture,
+    // pas à chaque changement d'écran).
+    if (!this.player.scene.__campfireMenuOpenFx) {
+      this.player.scene.__campfireMenuOpenFx = true;
+      juiceOverlayIn(this);
+    }
   }
 
   // Panneau peint (ITEM_MANIFEST `ui_feu_camp`) à échelle UNIFORME : l'ancien
@@ -188,24 +225,317 @@ class CampfireMenuScene extends Phaser.Scene {
     }).setOrigin(originX, originY);
   }
 
+  // Ligne du bas : morceaux posés bout à bout, centrés (consignes, touches).
+  addFootLine(parts) {
+    const R = CAMPFIRE_LAYOUT.rows;
+    const texts = parts.map(([text, color, bold]) => this.addPanelText(0, R.foot, text, { size: 10, color, bold: !!bold, originX: 0 }));
+    const total = texts.reduce((w, t) => w + t.width, 0);
+    let x = 480 - total / 2;
+    for (const t of texts) {
+      t.x = Math.round(x);
+      x += t.width;
+    }
+    return texts;
+  }
+
+  // Description centrée (2 lignes au plus) au-dessus de la ligne du bas.
+  addDescText() {
+    const R = CAMPFIRE_LAYOUT.rows;
+    const t = this.addPanelText(480, R.desc, '', { size: 11, color: '#ffe9f5', originY: 0.5 });
+    t.setAlign('center').setWordWrapWidth(CAMPFIRE_SAFE.foot.x1 - CAMPFIRE_SAFE.foot.x0 - 8);
+    return t;
+  }
+
+  // Changer d'écran : la scène est reconstruite (cf. en-tête).
+  switchMode(mode) {
+    if (this.closing) return;
+    this.closing = true;
+    this.scene.restart({ player: this.player, fire: this.fire, parentKey: this.parentKey, mode, hubIndex: this.hubIndex });
+  }
+
+  // Ferme le menu (Agarica reste assise) : sauvegarde des formes/compétences
+  // changées (zones de l'histoire seulement), touches de la zone relâchées.
+  // `after` : appelé une fois le menu arrêté (vol).
+  closeMenu(after = null) {
+    if (this.closing) return;
+    this.closing = true;
+    const parent = this.parentKey ? this.scene.get(this.parentKey) : null;
+    if (parent) {
+      parent.__campfireMenuOpenFx = false;
+      if (isStoryScene(parent)) saveGame(parent, { silent: true });
+      releaseStoryInput(parent);
+    }
+    this.scene.stop();
+    if (after && parent) after(parent);
+  }
+
+  // Carte ou inventaire PAR-DESSUS ce menu, mis en pause (cf. en-tête).
+  openOverlay(key, data = {}) {
+    if (!this.parentKey) return;
+    this.scene.launch(key, { parentKey: this.parentKey, returnTo: this.scene.key, ...data });
+    this.scene.bringToTop(key);
+    this.scene.pause();
+  }
+
+  onResume() {
+    this.openedAt = this.time.now;
+  }
+
+  onKey(event) {
+    if (event.repeat || this.closing || this.time.now - this.openedAt < 150) return;
+    const action = menuKeyAction(event);
+    const k = (event.key || '').toLowerCase();
+    if (this.mode === 'forms') {
+      // E ou Échap : retour au hub (comme l'ancienne fermeture du panneau).
+      if (k === 'e' || k === 'escape' || k === 'backspace') this.switchMode('hub');
+      return;
+    }
+    if (this.mode === 'flight') {
+      if (action === 'back') this.switchMode('hub');
+      else if (action === 'up') this.selectFlight(this.flightIndex - 1);
+      else if (action === 'down') this.selectFlight(this.flightIndex + 1);
+      else if (action === 'ok' || k === 'enter') this.activateFlight();
+      return;
+    }
+    if (action === 'back') this.closeMenu();
+    else if (action === 'up') this.selectHub(this.hubIndex - 1, -1);
+    else if (action === 'down') this.selectHub(this.hubIndex + 1, 1);
+    else if (action === 'ok' || k === 'enter') this.activateHub();
+  }
+
+  // --- Hub ------------------------------------------------------------------
+
+  // Entrées visibles (le vol n'apparaît qu'avec la forme de l'aigle) et leur
+  // état : `disabled` (raison) ou null.
+  hubEntries() {
+    const p = this.player;
+    const out = [];
+    for (const e of CAMPFIRE_HUB_ENTRIES) {
+      if (e.id === 'flight' && !(p.hasEagleForm || storyGet('hasEagleForm'))) continue;
+      let disabled = null;
+      if (e.soon) disabled = 'Bientôt.';
+      else if (e.id === 'map' && !storyMapAvailable()) disabled = 'Tu n\'as pas encore de carte.';
+      else if (e.id === 'flight' && this.fire && this.player.scene) disabled = campfireFlightDepartureBlock(this.player.scene, this.fire.id);
+      out.push({ ...e, disabled });
+    }
+    return out;
+  }
+
+  buildHubScreen() {
+    const R = CAMPFIRE_LAYOUT.rows;
+    const L = CAMPFIRE_HUB_LIST;
+    this.addPanelText(480, R.title, 'Feu de camp', { size: 20, color: STORY_UI.title, bold: true, serif: true, stroke: 4 });
+    // État : ce que le repos vient de faire (cf. campfireSit).
+    const story = this.player.scene && isStoryScene(this.player.scene);
+    this.addPanelText(480, R.title + 28, story ? 'Vie et énergie restaurées  •  partie sauvegardée' : 'Vie et énergie restaurées',
+      { size: 11, color: '#8fe3b8', bold: true });
+    this.hubItems = this.hubEntries();
+    this.hubHighlight = this.add.graphics();
+    this.hubItems.forEach((it, i) => {
+      const y = L.y0 + i * L.step;
+      it.y = y;
+      const dim = !!it.disabled;
+      // Icône : texture du manifest ou pastille colorée avec l'initiale.
+      const ix = L.x0 + 26;
+      const key = (it.icon || []).find((t) => this.textures.exists(t));
+      if (key) {
+        const img = this.add.image(ix, y, key);
+        img.setScale(24 / Math.max(img.width, img.height)).setAlpha(dim ? 0.45 : 1);
+      } else {
+        this.add.circle(ix, y, 12, it.color, dim ? 0.5 : 1).setStrokeStyle(1, 0xffe9f5, 0.6);
+        this.add.text(ix, y, it.label.charAt(0), { fontFamily: 'sans-serif', fontSize: '12px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(dim ? 0.6 : 1);
+      }
+      it.text = this.addPanelText(ix + 22, y, it.label, { size: 16, bold: true, serif: true, originX: 0, originY: 0.5, color: dim ? '#8f86a8' : '#ffe9f5' });
+      if (it.soon) {
+        this.addPanelText(L.x1 - 14, y, 'bientôt', { size: 10, color: '#a99bd6', originX: 1, originY: 0.5 }).setFontStyle('italic');
+      }
+      const zone = this.add.zone((L.x0 + L.x1) / 2, y, L.x1 - L.x0, L.rowH).setInteractive({ useHandCursor: true });
+      zone.on('pointerover', () => this.selectHub(i));
+      zone.on('pointerdown', () => { this.selectHub(i); this.activateHub(); });
+    });
+    this.hubDesc = this.addDescText();
+    this.addFootLine([
+      ['↑↓ : choisir', '#d8ccf5'], ['   ·   ', '#a99bd6'], ['E / Entrée : ouvrir', '#d8ccf5'],
+      ['   ·   ', '#a99bd6'], ['Échap : fermer (tu restes assise)', '#ffe066', true],
+    ]);
+    this.selectHub(Phaser.Math.Clamp(this.hubIndex, 0, this.hubItems.length - 1));
+  }
+
+  // `dir` : sens de la flèche (saute les entrées « bientôt », jamais choisies au clavier).
+  selectHub(i, dir = 0) {
+    const n = this.hubItems.length;
+    if (!n) return;
+    let idx = ((i % n) + n) % n;
+    if (dir) {
+      for (let s = 0; s < n && this.hubItems[idx].soon; s++) idx = (((idx + dir) % n) + n) % n;
+    }
+    this.hubIndex = idx;
+    const it = this.hubItems[idx];
+    const L = CAMPFIRE_HUB_LIST;
+    const g = this.hubHighlight;
+    g.clear();
+    g.fillStyle(0xff9fc9, 0.12);
+    g.fillRoundedRect(L.x0, it.y - L.rowH / 2, L.x1 - L.x0, L.rowH, 9);
+    g.lineStyle(1.5, it.disabled ? 0xa99bd6 : SELECT_HIGHLIGHT_COLOR, 0.8);
+    g.strokeRoundedRect(L.x0, it.y - L.rowH / 2, L.x1 - L.x0, L.rowH, 9);
+    this.hubItems.forEach((o) => {
+      if (!o.disabled) o.text.setColor(o === it ? '#ffe066' : '#ffe9f5');
+    });
+    const desc = it.disabled && !it.soon ? `${it.desc}\n${it.disabled}` : it.desc;
+    this.hubDesc.setFontSize(11).setText(desc);
+    if (this.hubDesc.height > 32) this.hubDesc.setFontSize(10);
+  }
+
+  activateHub() {
+    const it = this.hubItems && this.hubItems[this.hubIndex];
+    if (!it) return;
+    if (it.disabled) {
+      // Refus lisible : la ligne tremble, la raison est déjà affichée dessous.
+      this.tweens.killTweensOf(it.text);
+      const x0 = it.text.x;
+      this.tweens.add({ targets: it.text, x: { from: x0 - 4, to: x0 + 4 }, duration: 50, yoyo: true, repeat: 2, onComplete: () => it.text.setX(x0) });
+      if (typeof playSfx === 'function') playSfx('skill_denied', { key: this.scene.key });
+      return;
+    }
+    if (typeof playSfx === 'function') playSfx('menu_ok');
+    if (it.id === 'forms') this.switchMode('forms');
+    else if (it.id === 'flight') this.switchMode('flight');
+    else if (it.id === 'map') this.openOverlay('MapScene');
+    else if (it.id === 'inventory') this.openOverlay('InventoryScene', { campfire: true });
+  }
+
+  // --- Vol de l'aigle ---------------------------------------------------------
+
+  buildFlightScreen() {
+    const R = CAMPFIRE_LAYOUT.rows;
+    const L = CAMPFIRE_FLIGHT_LIST;
+    this.addPanelText(480, R.title, 'Vol de l\'aigle', { size: 20, color: STORY_UI.title, bold: true, serif: true, stroke: 4 });
+    this.addPanelText(480, R.title + 28, 'Rejoins un feu où tu t\'es déjà assise. Tu t\'y poseras assise.', { size: 11, color: '#d8ccf5' });
+    const scene = this.player.scene;
+    const fromId = this.fire ? this.fire.id : null;
+    this.flightBlock = campfireFlightDepartureBlock(scene, fromId);
+    this.flightItems = this.flightBlock ? [] : campfireFlightDestinations(scene, fromId);
+    this.flightDesc = this.addDescText();
+    this.flightHighlight = this.add.graphics();
+    this.flightRows = [];
+    for (let r = 0; r < L.rows; r++) {
+      const y = L.y0 + r * L.step;
+      const flame = this.add.graphics();
+      const text = this.addPanelText(L.x0 + 34, y, '', { size: 15, bold: true, serif: true, originX: 0, originY: 0.5 });
+      const note = this.addPanelText(L.x1 - 12, y, '', { size: 10, color: '#a99bd6', originX: 1, originY: 0.5 });
+      const zone = this.add.zone((L.x0 + L.x1) / 2, y, L.x1 - L.x0, L.rowH).setInteractive({ useHandCursor: true });
+      zone.on('pointerover', () => { if (this.flightTop + r < this.flightItems.length) this.selectFlight(this.flightTop + r); });
+      zone.on('pointerdown', () => {
+        if (this.flightTop + r >= this.flightItems.length) return;
+        this.selectFlight(this.flightTop + r);
+        this.activateFlight();
+      });
+      this.flightRows.push({ y, flame, text, note });
+    }
+    this.flightMore = this.addPanelText(480, L.y0 + L.rows * L.step - 8, '', { size: 10, color: '#a99bd6' });
+    this.flightTop = 0;
+    this.flightIndex = 0;
+    if (this.flightBlock || !this.flightItems.length) {
+      this.addPanelText(480, L.y0 + 50, this.flightBlock || 'Aucun autre feu où tu te sois assise pour l\'instant.', { size: 13, color: '#ffe9f5', serif: true })
+        .setAlign('center').setWordWrapWidth(L.x1 - L.x0);
+    }
+    this.addFootLine([
+      ['↑↓ : choisir', '#d8ccf5'], ['   ·   ', '#a99bd6'], ['E / Entrée : t\'envoler', '#d8ccf5'],
+      ['   ·   ', '#a99bd6'], ['Échap : retour', '#ffe066', true],
+    ]);
+    this.selectFlight(0);
+  }
+
+  // Petite flamme dessinée devant chaque destination (éteinte si interdite).
+  drawFlightFlame(g, x, y, lit) {
+    g.clear();
+    g.fillStyle(0x5a3a22, 1);
+    g.fillRect(x - 7, y + 5, 14, 3);
+    g.fillStyle(lit ? 0xff9a3c : 0x6f6391, 1);
+    g.fillTriangle(x - 6, y + 5, x + 6, y + 5, x, y - 9);
+    g.fillStyle(lit ? 0xffe066 : 0x8f86a8, 1);
+    g.fillTriangle(x - 3, y + 5, x + 3, y + 5, x, y - 3);
+  }
+
+  selectFlight(i) {
+    const items = this.flightItems || [];
+    const L = CAMPFIRE_FLIGHT_LIST;
+    if (!items.length) {
+      this.flightHighlight.clear();
+      this.flightRows.forEach((row) => { row.text.setText(''); row.note.setText(''); row.flame.clear(); });
+      this.flightDesc.setText('');
+      return;
+    }
+    this.flightIndex = Phaser.Math.Clamp(i, 0, items.length - 1);
+    // Défilement : la sélection reste dans les `rows` lignes visibles.
+    if (this.flightIndex < this.flightTop) this.flightTop = this.flightIndex;
+    if (this.flightIndex >= this.flightTop + L.rows) this.flightTop = this.flightIndex - L.rows + 1;
+    this.flightRows.forEach((row, r) => {
+      const it = items[this.flightTop + r];
+      if (!it) { row.text.setText(''); row.note.setText(''); row.flame.clear(); return; }
+      const on = this.flightTop + r === this.flightIndex;
+      row.text.setText(it.label).setColor(it.blocked ? '#8f86a8' : (on ? '#ffe066' : '#ffe9f5'));
+      row.note.setText(it.blocked ? 'impossible' : '');
+      this.drawFlightFlame(row.flame, L.x0 + 18, row.y, !it.blocked);
+    });
+    const more = items.length - (this.flightTop + L.rows);
+    this.flightMore.setText(more > 0 ? `… ${more} autre${more > 1 ? 's' : ''} plus bas` : '');
+    const sel = items[this.flightIndex];
+    const y = L.y0 + (this.flightIndex - this.flightTop) * L.step;
+    const g = this.flightHighlight;
+    g.clear();
+    g.fillStyle(0xff9fc9, 0.12);
+    g.fillRoundedRect(L.x0, y - L.rowH / 2, L.x1 - L.x0, L.rowH, 8);
+    g.lineStyle(1.5, sel.blocked ? 0xa99bd6 : SELECT_HIGHLIGHT_COLOR, 0.8);
+    g.strokeRoundedRect(L.x0, y - L.rowH / 2, L.x1 - L.x0, L.rowH, 8);
+    this.flightDesc.setFontSize(11).setText(sel.blocked || `Envol vers : ${sel.label}.`);
+  }
+
+  activateFlight() {
+    const items = this.flightItems || [];
+    const it = items[this.flightIndex];
+    if (!it) return;
+    if (it.blocked) {
+      const row = this.flightRows[this.flightIndex - this.flightTop];
+      const x0 = row.text.x;
+      this.tweens.add({ targets: row.text, x: { from: x0 - 4, to: x0 + 4 }, duration: 50, yoyo: true, repeat: 2, onComplete: () => row.text.setX(x0) });
+      if (typeof playSfx === 'function') playSfx('skill_denied', { key: this.scene.key });
+      return;
+    }
+    if (typeof playSfx === 'function') playSfx('menu_ok');
+    this.closeMenu((parent) => campfireFlyTo(parent, it));
+  }
+
+  // --- Formes et compétences -------------------------------------------------
+
+  buildFormsScreen() {
+    this.buildHeader();
+    // Cf. historique : un simple TABLEAU de cartes de premier niveau (un
+    // Container imbriqué cassait la zone de clic de ses enfants).
+    this.dynamicCards = [];
+    // Légendes des rangées vides (« repose ici pour retirer »), recréées
+    // avec les cartes.
+    this.dynamicDecor = [];
+    this.dropZones = [];
+    this.selectedCard = null;
+    // Seuil de glisser : un clic immobile ne doit pas devenir un 'dragstart'.
+    this.input.dragDistanceThreshold = 6;
+
+    this.buildStaticSlots();
+    this.wireInputEvents();
+    this.rebuildUI();
+  }
+
   buildHeader() {
     const R = CAMPFIRE_LAYOUT.rows;
     // Titre sous la pointe de l'ornement central du haut (y 93 + marge).
-    // « Vie et énergie restaurées » n'a plus sa ligne sous le titre : ces
-    // 20 px servent à agrandir les cartes ; il ouvre la ligne des bonus.
-    this.addPanelText(480, R.title, 'Feu de camp', { size: 20, color: STORY_UI.title, bold: true, serif: true, stroke: 4 });
+    this.addPanelText(480, R.title, 'Formes et compétences', { size: 20, color: STORY_UI.title, bold: true, serif: true, stroke: 4 });
 
-    // Consigne raccourcie, en bas, sur la même ligne que la touche de
-    // fermeture (avant : une longue phrase sur les lianes du haut).
-    const hint = this.addPanelText(0, R.foot, 'Glisse ou clique une carte, puis sa place · en bas pour la retirer', { size: 10, color: '#d8ccf5', originX: 0 });
-    const sep = this.addPanelText(0, R.foot, '   ·   ', { size: 10, color: '#a99bd6', originX: 0 });
-    const close = this.addPanelText(0, R.foot, 'E ou Échap pour fermer', { size: 10, color: '#ffe066', bold: true, originX: 0 });
-    const total = hint.width + sep.width + close.width;
-    let x = 480 - total / 2;
-    for (const t of [hint, sep, close]) {
-      t.x = x;
-      x += t.width;
-    }
+    // Consigne raccourcie, en bas, sur la même ligne que la touche de retour.
+    this.addFootLine([
+      ['Glisse ou clique une carte, puis sa place · en bas pour la retirer', '#d8ccf5'],
+      ['   ·   ', '#a99bd6'], ['E ou Échap : retour', '#ffe066', true],
+    ]);
   }
 
   // En-tête de section : libellé + filet rose jusqu'au bout de la colonne.
@@ -284,150 +614,50 @@ class CampfireMenuScene extends Phaser.Scene {
     });
     this.skillPoolZone = drawPoolInset(left0, leftX1, R.skillPool, L.poolH, 'skill');
 
-    // -- Totem : une tête + un corps (colonne droite).
-    const rx0 = L.right.x0;
-    const rx1 = L.right.x1;
-    const totemSlotX = [rx0 + L.right.slotW / 2, rx1 - L.right.slotW / 2];
-    this.totemColumn = { x0: rx0, x1: rx1, cx: (rx0 + rx1) / 2 };
-    this.totemHeader = this.addSectionHeader(rx0, rx1, R.head, 'Totem');
-    this.addPanelText(totemSlotX[0], R.slotSub, 'Tête', { size: 10, color: '#c9b8f0' });
-    this.addPanelText(totemSlotX[1], R.slotSub, 'Corps', { size: 10, color: '#c9b8f0' });
-    // Rangée des têtes : du haut de la rangée de formes au bas des
-    // emplacements de compétences (mêmes lignes que la colonne gauche).
-    const headsTop = R.pool - L.poolH / 2;
-    const headsBottom = R.skillSlot + L.slotH / 2;
-    if (this.totemsLocked) {
-      // Verrouillé : mêmes emplacements, mais simples dessins (ni zone de
-      // dépôt, ni cible de clic : rien ne doit réagir).
-      const dim = (x, y, w, h) => this.add.rectangle(x, y, w, h, 0x1c1628, 0.7).setStrokeStyle(2, 0x6f6391, 0.45);
-      this.totemHeadSlot = dim(totemSlotX[0], R.slot, L.right.slotW, L.slotH);
-      this.totemBodySlot = dim(totemSlotX[1], R.slot, L.right.slotW, L.slotH);
-      this.add.rectangle((rx0 + rx1) / 2, (headsTop + headsBottom) / 2, rx1 - rx0, headsBottom - headsTop, 0x0d0816, 0.25)
-        .setStrokeStyle(1, 0x6f6391, 0.25);
-      this.add.rectangle((rx0 + rx1) / 2, R.skillPool, rx1 - rx0, L.poolH, 0x0d0816, 0.25)
-        .setStrokeStyle(1, 0x6f6391, 0.25);
-    } else {
-      this.totemHeadSlot = drawSlotBox(totemSlotX[0], R.slot, L.right.slotW, L.slotH, 'totemHead', 'equipped');
-      this.totemBodySlot = drawSlotBox(totemSlotX[1], R.slot, L.right.slotW, L.slotH, 'totemBody', 'equipped');
-      this.totemHeadPoolZone = drawPoolInset(rx0, rx1, (headsTop + headsBottom) / 2, headsBottom - headsTop, 'totemHead');
-      this.totemBodyPoolZone = drawPoolInset(rx0, rx1, R.skillPool, L.poolH, 'totemBody');
+    // -- Totem : une tête + un corps (colonne droite), seulement si la
+    // section est affichée (CAMPFIRE_SHOW_TOTEMS) ; verrouillé, simples
+    // dessins (ni zone de dépôt, ni cible de clic).
+    if (this.showTotems) {
+      const rx0 = L.right.x0;
+      const rx1 = L.right.x1;
+      const totemSlotX = [rx0 + L.right.slotW / 2, rx1 - L.right.slotW / 2];
+      this.totemColumn = { x0: rx0, x1: rx1, cx: (rx0 + rx1) / 2 };
+      this.totemHeader = this.addSectionHeader(rx0, rx1, R.head, 'Totem');
+      this.addPanelText(totemSlotX[0], R.slotSub, 'Tête', { size: 10, color: '#c9b8f0' });
+      this.addPanelText(totemSlotX[1], R.slotSub, 'Corps', { size: 10, color: '#c9b8f0' });
+      // Rangée des têtes : du haut de la rangée de formes au bas des
+      // emplacements de compétences (mêmes lignes que la colonne gauche).
+      const headsTop = R.pool - L.poolH / 2;
+      const headsBottom = R.skillSlot + L.slotH / 2;
+      if (this.totemsLocked) {
+        const dim = (x, y, w, h) => this.add.rectangle(x, y, w, h, 0x1c1628, 0.7).setStrokeStyle(2, 0x6f6391, 0.45);
+        this.totemHeadSlot = dim(totemSlotX[0], R.slot, L.right.slotW, L.slotH);
+        this.totemBodySlot = dim(totemSlotX[1], R.slot, L.right.slotW, L.slotH);
+        this.add.rectangle((rx0 + rx1) / 2, (headsTop + headsBottom) / 2, rx1 - rx0, headsBottom - headsTop, 0x0d0816, 0.25)
+          .setStrokeStyle(1, 0x6f6391, 0.25);
+        this.add.rectangle((rx0 + rx1) / 2, R.skillPool, rx1 - rx0, L.poolH, 0x0d0816, 0.25)
+          .setStrokeStyle(1, 0x6f6391, 0.25);
+      } else {
+        this.totemHeadSlot = drawSlotBox(totemSlotX[0], R.slot, L.right.slotW, L.slotH, 'totemHead', 'equipped');
+        this.totemBodySlot = drawSlotBox(totemSlotX[1], R.slot, L.right.slotW, L.slotH, 'totemBody', 'equipped');
+        this.totemHeadPoolZone = drawPoolInset(rx0, rx1, (headsTop + headsBottom) / 2, headsBottom - headsTop, 'totemHead');
+        this.totemBodyPoolZone = drawPoolInset(rx0, rx1, R.skillPool, L.poolH, 'totemBody');
+      }
     }
 
     // Description de la carte survolée/sélectionnée (aide contextuelle) :
     // largeur de la bande `foot` (plus étroite) car, sur 2 lignes, elle
     // descend sous y 390, là où les feuilles des coins resserrent le bois.
-    this.descText = this.addPanelText(480, R.desc, '', { size: 11, color: '#ffe9f5', originY: 0.5 });
-    this.descText.setAlign('center').setWordWrapWidth(CAMPFIRE_SAFE.foot.x1 - CAMPFIRE_SAFE.foot.x0 - 8);
-    // Ligne d'état : « Vie et énergie restaurées » (ancien sous-titre, en
-    // vert lunaire) puis les bonus actuels (lilas), centrés ensemble par
-    // layoutBonusLine() à chaque mise à jour.
-    this.restoredText = this.addPanelText(0, R.bonus, 'Vie et énergie restaurées', { size: 11, color: '#8fe3b8', bold: true, originX: 0 });
-    this.bonusSep = this.addPanelText(0, R.bonus, '  •  ', { size: 11, color: '#a99bd6', originX: 0 });
+    this.descText = this.addDescText();
+    // Ligne d'état : les bonus actuels (lilas), centrés par layoutBonusLine().
     this.bonusText = this.addPanelText(0, R.bonus, '', { size: 11, color: '#d8ccf5', originX: 0 });
   }
 
   layoutBonusLine() {
-    const parts = [this.restoredText, this.bonusSep, this.bonusText];
-    const total = () => parts.reduce((w, t) => w + t.width, 0);
-    // Totem déverrouillé, la ligne s'allonge (« x1.15 taille de
-    // compétence ») : un cran plus petit pour rester dans la bande du bas.
-    parts.forEach((t) => t.setFontSize(11));
-    if (total() > CAMPFIRE_SAFE.foot.x1 - CAMPFIRE_SAFE.foot.x0 - 8) parts.forEach((t) => t.setFontSize(10));
-    let x = 480 - total() / 2;
-    for (const t of parts) {
-      t.x = Math.round(x);
-      x += t.width;
-    }
-  }
-
-  // --- Verrou du totem (démo) -----------------------------------------------
-
-  // Section totem assombrie, barrée de deux chaînes en croix tenues par un
-  // cadenas. Tout est purement visuel : une seule zone de clic, qui fait
-  // trembler le cadenas sans rien débloquer.
-  buildTotemLock() {
-    const L = CAMPFIRE_LAYOUT;
-    const R = L.rows;
-    const col = this.totemColumn;
-    const top = R.head - 4;
-    const bottom = R.skillPool + L.poolH / 2 + 2;
-    const cy = (top + bottom) / 2;
-    // Voile violet nuit par-dessus les cartes (profondeur 4 > cartes 0) :
-    // assombrit et éteint les couleurs de toute la section.
-    this.add.rectangle(col.cx, cy, col.x1 - col.x0, bottom - top, 0x120c1e, 0.5).setDepth(4);
-    this.totemHeader.setDepth(9).setColor('#c9b8f0');
-
-    campfireEnsureLockTextures(this);
-    // Bouts à 18 px des bords : maillons tournés compris, la chaîne reste
-    // dans la zone utile (pas sur les lianes).
-    const pad = 18;
-    // Départ sous l'en-tête « Totem », qui reste lisible au-dessus du voile.
-    const a = { x: col.x0 + pad, y: R.slotSub + 15 };
-    const b = { x: col.x1 - pad, y: bottom - 12 };
-    this.addChain(a.x, a.y, b.x, b.y, 5);
-    this.addChain(b.x, a.y, a.x, b.y, 6);
-
-    // Cadenas au croisement, accroché par l'anse (origine haute : il
-    // pivote comme un objet suspendu quand il tremble).
-    const cross = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-    const lockKey = this.textures.exists('item-ui_cadenas') ? 'item-ui_cadenas' : 'campfire-padlock';
-    const lock = this.add.image(cross.x, cross.y - 14, lockKey).setOrigin(0.5, 0.12).setDepth(7);
-    if (lockKey !== 'campfire-padlock') lock.setScale(52 / lock.height);
-    this.lockPadlock = lock;
-
-    // « Verrouillé — bientôt » sur une petite plaque sombre sous le cadenas.
-    const label = this.add.text(cross.x, lock.y + lock.displayHeight * 0.88 + 12, 'Verrouillé — bientôt', {
-      fontFamily: 'sans-serif', fontSize: '10px', color: '#ffd6ea', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(9);
-    this.add.rectangle(label.x, label.y, label.width + 14, 16, 0x15101f, 0.9)
-      .setStrokeStyle(1, 0xff9fc9, 0.55).setDepth(8);
-
-    // Seule interaction : un clic fait trembler le cadenas. Pas de survol,
-    // pas de dropZone (une carte glissée ici est simplement rendue).
-    const zone = this.add.zone(col.cx, cy, col.x1 - col.x0, bottom - top).setDepth(9);
-    zone.setInteractive();
-    zone.on('pointerdown', () => this.shakeLock());
-    this.totemLockZone = zone;
-  }
-
-  // Chaîne de maillons ovales alternés (de face / de profil) le long d'un
-  // segment, clouée aux deux bouts. Les maillons de profil passent par-
-  // dessus ceux de face : l'œil lit des maillons enchaînés.
-  addChain(x1, y1, x2, y2, depth) {
-    const custom = this.textures.exists('item-ui_chaine');
-    const faceKey = custom ? 'item-ui_chaine' : 'campfire-chain-face';
-    const sideKey = custom ? 'item-ui_chaine' : 'campfire-chain-side';
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const len = Math.hypot(dx, dy);
-    const angle = Math.atan2(dy, dx);
-    const step = 15;
-    const n = Math.max(2, Math.floor(len / step));
-    const links = [];
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      const face = i % 2 === 0;
-      const img = this.add.image(x1 + dx * t, y1 + dy * t, face ? faceKey : sideKey)
-        .setRotation(angle).setScale(0.82).setDepth(depth + (face ? 0 : 0.5));
-      if (custom) img.setScale(17 / img.height);
-      links.push(img);
-    }
-    for (const [x, y] of [[x1, y1], [x2, y2]]) {
-      this.add.image(x, y, 'campfire-chain-bolt').setDepth(depth + 0.6);
-    }
-    return links;
-  }
-
-  shakeLock() {
-    const lock = this.lockPadlock;
-    if (!lock) return;
-    this.tweens.killTweensOf(lock);
-    lock.setAngle(0);
-    this.tweens.add({
-      targets: lock, angle: { from: -10, to: 10 }, duration: 60, yoyo: true, repeat: 2,
-      ease: 'Sine.easeInOut', onComplete: () => lock.setAngle(0),
-    });
-    if (typeof playSfx === 'function') playSfx('skill_denied', { key: this.scene.key });
+    const t = this.bonusText;
+    t.setFontSize(11);
+    if (t.width > CAMPFIRE_SAFE.foot.x1 - CAMPFIRE_SAFE.foot.x0 - 8) t.setFontSize(10);
+    t.x = Math.round(480 - t.width / 2);
   }
 
   // --- Cartes -------------------------------------------------------------
@@ -602,40 +832,42 @@ class CampfireMenuScene extends Phaser.Scene {
       this.addPoolCaption(this.skillPoolZone, anySkill ? 'Repose une compétence ici pour la retirer' : 'Aucune compétence débloquée');
     }
 
-    // Totem : un seul {head, body}. Verrouillé : mêmes cartes, inertes
-    // (le totem sauvegardé reste affiché dans ses emplacements).
+    // Totem : un seul {head, body}, seulement si sa colonne est affichée
+    // (CAMPFIRE_SHOW_TOTEMS). Verrouillé : mêmes cartes, inertes (le totem
+    // sauvegardé reste affiché dans ses emplacements).
     const inert = this.totemsLocked;
-    const headLabel = (id) => CAMPFIRE_HEAD_LABELS[id] || (id.charAt(0).toUpperCase() + id.slice(1));
-    const t = player.equippedTotem;
-    const totemCards = [];
-    if (t.head) {
-      const box = this.totemHeadSlot;
-      totemCards.push(this.makeCard(box.x, box.y, box.width - 8, L.cardH, headLabel(t.head), 'totemHead', t.head, 'equipped', { inert }));
+    if (this.showTotems) {
+      const headLabel = (id) => CAMPFIRE_HEAD_LABELS[id] || (id.charAt(0).toUpperCase() + id.slice(1));
+      const t = player.equippedTotem;
+      const totemCards = [];
+      if (t.head) {
+        const box = this.totemHeadSlot;
+        totemCards.push(this.makeCard(box.x, box.y, box.width - 8, L.cardH, headLabel(t.head), 'totemHead', t.head, 'equipped', { inert }));
+      }
+      if (t.body && TOTEM_BODIES[t.body]) {
+        const box = this.totemBodySlot;
+        totemCards.push(this.makeCard(box.x, box.y, box.width - 8, L.cardH, TOTEM_BODIES[t.body].label, 'totemBody', t.body, 'equipped', { inert }));
+      }
+      // Têtes/corps toujours disponibles en pool (pas de stock limité) :
+      // grille de 3 colonnes de 52 px, alignées sur les corps en dessous.
+      const cellXs = this.rowXs(3, this.totemColumn.cx, L.right.cellStep);
+      TOTEM_HEADS.forEach((id, i) => {
+        const y = R.heads[Math.floor(i / 3) % R.heads.length];
+        totemCards.push(this.makeCard(cellXs[i % 3], y, L.right.cellW, L.totemCardH, headLabel(id), 'totemHead', id, null, { inert }));
+      });
+      const bodyEntries = Object.entries(TOTEM_BODIES);
+      this.rowXs(bodyEntries.length, this.totemColumn.cx, L.right.cellStep).forEach((x, i) => {
+        const [id, def] = bodyEntries[i];
+        totemCards.push(this.makeCard(x, R.skillPool, L.right.cellW, L.totemCardH, def.label, 'totemBody', id, null, { inert }));
+      });
+      campfireUniformLabels(totemCards);
     }
-    if (t.body && TOTEM_BODIES[t.body]) {
-      const box = this.totemBodySlot;
-      totemCards.push(this.makeCard(box.x, box.y, box.width - 8, L.cardH, TOTEM_BODIES[t.body].label, 'totemBody', t.body, 'equipped', { inert }));
-    }
-    // Têtes/corps toujours disponibles en pool (pas de stock limité) :
-    // grille de 3 colonnes de 52 px, alignées sur les corps en dessous.
-    const cellXs = this.rowXs(3, this.totemColumn.cx, L.right.cellStep);
-    TOTEM_HEADS.forEach((id, i) => {
-      const y = R.heads[Math.floor(i / 3) % R.heads.length];
-      totemCards.push(this.makeCard(cellXs[i % 3], y, L.right.cellW, L.totemCardH, headLabel(id), 'totemHead', id, null, { inert }));
-    });
-    const bodyEntries = Object.entries(TOTEM_BODIES);
-    this.rowXs(bodyEntries.length, this.totemColumn.cx, L.right.cellStep).forEach((x, i) => {
-      const [id, def] = bodyEntries[i];
-      totemCards.push(this.makeCard(x, R.skillPool, L.right.cellW, L.totemCardH, def.label, 'totemBody', id, null, { inert }));
-    });
-    campfireUniformLabels(totemCards);
 
-    // Bonus actuels : pendant la démo, aucun bonus de totem (cf. verrou en
-    // tête de fichier) -- la ligne le dit plutôt que d'afficher x1.00.
+    // Bonus actuels (cœurs gagnés dans l'histoire, totems s'ils comptent).
     const hearts = player.maxHearts - HEART_MAX;
     const energy = player.maxEnergy - ENERGY_MAX;
     this.bonusText.setText(inert
-      ? `Bonus : +${hearts} cœur(s)  •  +${energy} énergie  •  totem verrouillé`
+      ? `Bonus : +${hearts} cœur(s)  •  +${energy} énergie`
       : `Bonus : +${hearts} cœur(s)  •  +${energy} énergie  •  x${player.skillSizeMultiplier.toFixed(2)} taille de compétence`);
     this.layoutBonusLine();
     // Rappel (règle de saut) : seule une forme aérienne équipée donne le double saut.
@@ -741,20 +973,14 @@ class CampfireMenuScene extends Phaser.Scene {
       if (zoneSlot !== 'pool') player.skillSlots[zoneSlot] = id; // l'ancien occupant retourne au pool
       this.registry.set('skillSlots', player.skillSlots);
     } else if (kind === 'totemHead' || kind === 'totemBody') {
-      // Garde-fou : rien ne doit pouvoir modifier le totem pendant la démo.
-      if (this.totemsLocked) return;
+      // Garde-fou : rien ne doit pouvoir modifier le totem pendant la démo
+      // (ni quand sa colonne est cachée).
+      if (this.totemsLocked || !this.showTotems) return;
       const field = kind === 'totemHead' ? 'head' : 'body';
       if (sourceSlot === 'equipped') player.equippedTotem[field] = null;
       if (zoneSlot !== 'pool') player.equippedTotem[field] = id;
       this.registry.set('equippedTotem', player.equippedTotem);
       player.recomputeTotemBonuses();
-    }
-  }
-
-  update() {
-    if (!this.player) return;
-    if (Phaser.Input.Keyboard.JustDown(this.player.interactKey) || Phaser.Input.Keyboard.JustDown(this.escKey)) {
-      this.scene.stop();
     }
   }
 }
@@ -784,204 +1010,5 @@ function campfireUniformLabels(cards) {
   const size = Math.min(...labels.map((t) => parseFloat(t.style.fontSize)));
   for (const t of labels) {
     if (parseFloat(t.style.fontSize) !== size) t.setFontSize(size);
-  }
-}
-
-// Chaîne et cadenas dessinés une fois par partie (textures partagées entre
-// scènes) en « fer froid » violet sombre, cohérent avec la palette nuit :
-// dégradés métalliques, contour sombre, reflet clair, ombre portée. Canvas
-// 2D plutôt que Graphics : dégradés et ellipses propres.
-function campfireEnsureLockTextures(scene) {
-  const T = scene.textures;
-  const metal = (c, x0, y0, x1, y1) => {
-    const g = c.createLinearGradient(x0, y0, x1, y1);
-    g.addColorStop(0, '#ddd6f5');
-    g.addColorStop(0.32, '#9289b4');
-    g.addColorStop(0.68, '#564c78');
-    g.addColorStop(1, '#2c2542');
-    return g;
-  };
-  const roundRect = (c, x, y, w, h, r) => {
-    c.beginPath();
-    c.moveTo(x + r, y);
-    c.arcTo(x + w, y, x + w, y + h, r);
-    c.arcTo(x + w, y + h, x, y + h, r);
-    c.arcTo(x, y + h, x, y, r);
-    c.arcTo(x, y, x + w, y, r);
-    c.closePath();
-  };
-
-  // Maillon vu de face : anneau ovale (axe de la chaîne = x).
-  if (!T.exists('campfire-chain-face')) {
-    const tex = T.createCanvas('campfire-chain-face', 34, 24);
-    const c = tex.getContext();
-    const cx = 16.5;
-    const cy = 11;
-    const rx = 12.5;
-    const ry = 7.2;
-    const ring = (dx, dy, w, style) => {
-      c.lineWidth = w;
-      c.strokeStyle = style;
-      c.beginPath();
-      c.ellipse(cx + dx, cy + dy, rx, ry, 0, 0, Math.PI * 2);
-      c.stroke();
-    };
-    ring(1.3, 2, 5, 'rgba(6,3,14,0.55)'); // ombre portée
-    ring(0, 0, 6.5, '#140f22'); // contour sombre (bords int. et ext.)
-    ring(0, 0, 4.2, metal(c, cx - rx, cy - ry, cx + rx, cy + ry));
-    c.lineWidth = 1.3;
-    c.strokeStyle = 'rgba(255,255,255,0.85)'; // reflet spéculaire en haut à gauche
-    c.beginPath();
-    c.ellipse(cx, cy, rx - 0.6, ry - 0.6, 0, Math.PI * 1.08, Math.PI * 1.5);
-    c.stroke();
-    c.strokeStyle = 'rgba(255,159,201,0.35)'; // pointe de rose dans le reflet bas
-    c.beginPath();
-    c.ellipse(cx, cy, rx + 0.4, ry + 0.4, 0, Math.PI * 0.15, Math.PI * 0.45);
-    c.stroke();
-    tex.refresh();
-  }
-
-  // Maillon vu de profil : barre arrondie (on voit la tranche de l'anneau).
-  if (!T.exists('campfire-chain-side')) {
-    const tex = T.createCanvas('campfire-chain-side', 34, 24);
-    const c = tex.getContext();
-    c.fillStyle = 'rgba(6,3,14,0.5)';
-    roundRect(c, 5, 10.5, 26, 7, 3.5);
-    c.fill();
-    c.fillStyle = '#140f22';
-    roundRect(c, 3.2, 7.2, 27.6, 9.6, 4.8);
-    c.fill();
-    c.fillStyle = metal(c, 0, 8, 0, 16);
-    roundRect(c, 4.4, 8.4, 25.2, 7.2, 3.6);
-    c.fill();
-    c.strokeStyle = 'rgba(20,15,34,0.75)'; // jour entre les deux brins de l'anneau
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(9, 12.2);
-    c.lineTo(25, 12.2);
-    c.stroke();
-    c.strokeStyle = 'rgba(255,255,255,0.8)';
-    c.beginPath();
-    c.moveTo(7.5, 9.6);
-    c.lineTo(21, 9.6);
-    c.stroke();
-    tex.refresh();
-  }
-
-  // Piton qui cloue chaque bout de chaîne dans les planches.
-  if (!T.exists('campfire-chain-bolt')) {
-    const tex = T.createCanvas('campfire-chain-bolt', 14, 14);
-    const c = tex.getContext();
-    c.fillStyle = 'rgba(6,3,14,0.55)';
-    c.beginPath();
-    c.arc(7.8, 8.2, 5, 0, Math.PI * 2);
-    c.fill();
-    const g = c.createRadialGradient(5.5, 5.2, 0.5, 7, 7, 5.5);
-    g.addColorStop(0, '#f0ebff');
-    g.addColorStop(0.45, '#8a80ad');
-    g.addColorStop(1, '#2a2340');
-    c.fillStyle = g;
-    c.strokeStyle = '#140f22';
-    c.lineWidth = 1.2;
-    c.beginPath();
-    c.arc(7, 7, 4.6, 0, Math.PI * 2);
-    c.fill();
-    c.stroke();
-    tex.refresh();
-  }
-
-  // Cadenas : anse en U, corps en fer violet sombre, rivets, entrée de
-  // serrure cerclée de rose (le clin d'œil au tatouage d'Agarica).
-  if (!T.exists('campfire-padlock')) {
-    const W = 50;
-    const H = 58;
-    const tex = T.createCanvas('campfire-padlock', W, H);
-    const c = tex.getContext();
-    const cx = W / 2;
-    // Anse : contour sombre, métal, reflet.
-    const shackle = (w, style) => {
-      c.lineWidth = w;
-      c.strokeStyle = style;
-      c.lineCap = 'round';
-      c.beginPath();
-      c.moveTo(cx - 11, 31);
-      c.lineTo(cx - 11, 20);
-      c.arc(cx, 20, 11, Math.PI, 0);
-      c.lineTo(cx + 11, 31);
-      c.stroke();
-    };
-    shackle(9, '#140f22');
-    shackle(5.5, metal(c, cx - 14, 6, cx + 14, 30));
-    c.lineWidth = 1.3;
-    c.strokeStyle = 'rgba(255,255,255,0.8)';
-    c.beginPath();
-    c.arc(cx, 20, 11.6, Math.PI * 1.08, Math.PI * 1.45);
-    c.stroke();
-    // Corps : ombre, contour, dégradé violet nuit, biseau clair en haut.
-    const bx = 7;
-    const by = 28;
-    const bw = W - 14;
-    const bh = 26;
-    c.fillStyle = 'rgba(6,3,14,0.55)';
-    roundRect(c, bx + 2, by + 3, bw, bh, 6);
-    c.fill();
-    c.fillStyle = '#140f22';
-    roundRect(c, bx - 1.5, by - 1.5, bw + 3, bh + 3, 7);
-    c.fill();
-    const body = c.createLinearGradient(0, by, 0, by + bh);
-    body.addColorStop(0, '#8a7ab3');
-    body.addColorStop(0.25, '#5d4e86');
-    body.addColorStop(1, '#2a2140');
-    c.fillStyle = body;
-    roundRect(c, bx, by, bw, bh, 6);
-    c.fill();
-    c.strokeStyle = 'rgba(214,204,245,0.75)';
-    c.lineWidth = 1.2;
-    c.beginPath();
-    c.moveTo(bx + 5, by + 2.2);
-    c.lineTo(bx + bw - 5, by + 2.2);
-    c.stroke();
-    // Rivets aux quatre coins.
-    for (const [rx, ry] of [[bx + 5, by + 6], [bx + bw - 5, by + 6], [bx + 5, by + bh - 5], [bx + bw - 5, by + bh - 5]]) {
-      c.fillStyle = '#140f22';
-      c.beginPath();
-      c.arc(rx, ry, 2.2, 0, Math.PI * 2);
-      c.fill();
-      c.fillStyle = '#d6cdf2';
-      c.beginPath();
-      c.arc(rx - 0.4, ry - 0.4, 1.3, 0, Math.PI * 2);
-      c.fill();
-    }
-    // Entrée de serrure : rosace rose, trou de serrure noir.
-    const ky = by + 12;
-    c.fillStyle = '#ff9fc9';
-    c.beginPath();
-    c.arc(cx, ky, 6.2, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#3a2340';
-    c.beginPath();
-    c.arc(cx, ky, 4.8, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#07040c';
-    c.beginPath();
-    c.arc(cx, ky - 1, 2.4, 0, Math.PI * 2);
-    c.fill();
-    c.beginPath();
-    c.moveTo(cx - 1.4, ky);
-    c.lineTo(cx + 1.4, ky);
-    c.lineTo(cx + 2.4, ky + 7.5);
-    c.lineTo(cx - 2.4, ky + 7.5);
-    c.closePath();
-    c.fill();
-    // Éclat de lumière sur le coin haut gauche du corps.
-    c.fillStyle = 'rgba(255,255,255,0.85)';
-    c.beginPath();
-    c.moveTo(bx + 9, by + 4);
-    c.lineTo(bx + 11, by + 6);
-    c.lineTo(bx + 9, by + 8);
-    c.lineTo(bx + 7, by + 6);
-    c.closePath();
-    c.fill();
-    tex.refresh();
   }
 }

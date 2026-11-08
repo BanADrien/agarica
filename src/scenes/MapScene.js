@@ -1,31 +1,174 @@
-// MapScene — carte de Geralt (touche M en jeu si `carte_geralt` est dans le
-// sac). Parchemin (art `item-carte_parchemin` si présent, sinon dessiné) avec
-// les 5 grandes régions de la démo : une région n'est révélée qu'une fois
-// une de ses zones visitée (flags `visited_<zone>`, cf. storyOnZoneEnter),
-// avec la note (pas toujours utile) de Geralt. M / Échap / E ferme.
-const MAP_REGION_LAYOUT = {
-  bosquet: { x: 190, y: 400, note: 'Des druides. Accueillants,\nsauf avec les bannies.' },
-  foret_sombre: { x: 330, y: 270, note: 'Sombre. (Vérifier si c\'est\npour ça le nom.)' },
-  grand_arbre: { x: 490, y: 360, note: 'Un singe m\'y a lancé une pierre.\nPuis deux. Puis Clak.' },
-  foret_flottante: { x: 630, y: 190, note: 'Trop haut pour moi.\nPas pour mes ambitions.' },
-  foret_corrompue: { x: 780, y: 330, note: 'Mousse partout. NE PAS LÉCHER.\n(Clak, je te vois.)' },
+// MapScene — carte du monde (refaite le 2026-11-08, point 4 de la liste ;
+// avant : la carte peinte de Geralt, 5 régions révélées par visite).
+// Touche M partout (cf. updateStoryKeys, StoryKit) et entrée « Carte » du menu
+// du feu de camp. Chaque zone de l'histoire est dessinée en petit avec la
+// silhouette de SON VRAI TERRAIN (zoneGroundCells : sol + branches du grand
+// arbre), à sa place dans le monde (MAP_ZONE_LAYOUT, sinon placement déduit
+// des sorties de bord), sur fond de parchemin. Seuls les blocs parcourus sont
+// dessinés, le reste de la zone est dans le brouillard ; la carte montrée est
+// celle du DERNIER FEU DE CAMP (`mapExplored`, cf. storyMapCommit) : ce qui a
+// été découvert depuis attend le prochain feu. Feux de camp et passages (sorties
+// de bord) y sont marqués ; Agarica aussi, si sa zone est déjà sur la carte.
+// Flèches / ZQSD : déplacer ; + / − ou molette : zoom ; Espace : se retrouver ;
+// M / Échap / E : fermer. `returnTo` (menu du feu) : cette scène-là reprend
+// la main à la fermeture.
+
+// Position de chaque zone dans le monde, en px de jeu : coin (0, 0) de la
+// zone (x vers la droite, y vers le bas, comme en jeu). Écrite à la main,
+// d'après les sorties de bord : chaque sortie tombe au bord de sa voisine, à
+// la même hauteur de sol quand c'est possible. Le monde n'est pas tout à fait
+// euclidien (la sortie basse de la forêt sombre 2 mène à la hutte de Morgat,
+// placée en hauteur près de la clairière ; l'épreuve du singe repart du bord
+// gauche des racines) : ces deux-là sont posées au plus lisible. Une zone
+// absente de la table est placée automatiquement (mapAutoPlace). Les zones de
+// test ne sont jamais sur la carte.
+const MAP_ZONE_LAYOUT = {
+  bosquet: { x: 0, y: 0 },
+  foret_sombre_1: { x: 3840, y: 0 },
+  foret_sombre_2: { x: 7680, y: 0 },
+  grand_arbre_racines: { x: 13568, y: 0 },
+  // Sol de l'arène (448) au niveau de la sortie haute des racines (-192).
+  grand_arbre_arene: { x: 17408, y: -640 },
+  // Longue course au-dessus de la forêt sombre, qui revient aux racines.
+  epreuve_singe: { x: 1280, y: -720 },
+  // Hors du chemin (fichiers gardés) : au-dessus du grand arbre.
+  monde_spirituel: { x: 14000, y: -2300 },
+  foret_flottante_1: { x: 19328, y: -640 },
+  foret_flottante_2: { x: 22912, y: -1856 },
+  clairiere_plante: { x: 27008, y: -1834 },
+  hutte_morgat: { x: 29248, y: -1834 },
+  // Le crash : en contrebas, au-delà de la hutte.
+  foret_corrompue_1: { x: 32600, y: -500 },
+  arene_ghilt: { x: 36760, y: -500 },
+  trou_sombre: { x: 36760, y: 160 },
+  bosquet_retour: { x: 38104, y: -500 },
 };
+// Échelles (px d'écran par px de jeu), de la vue d'ensemble (le monde de la
+// démo, ~40 000 px, tient dans le cadre) au détail.
+const MAP_ZOOMS = [1 / 56, 1 / 32, 1 / 20, 1 / 12, 1 / 7];
+const MAP_ZOOM_DEFAULT = 3;
+const MAP_CELL = 64;
+// Encre et papier.
 const MAP_INK = 0x4a2e16;
 const MAP_INK_HEX = '#4a2e16';
-// Avec le parchemin Codex `carte_parchemin` (1485x993, régions déjà peintes) :
-// position de chaque région peinte (fx, fy = fraction de l'image), rayon du
-// brouillard qui la cache tant qu'elle n'est pas visitée, et emplacement de
-// son étiquette (nom + note de Geralt).
-const MAP_ART_REGIONS = {
-  bosquet: { fx: 0.2, fy: 0.29, r: 0.12, lx: 0.17, ly: 0.5 },
-  foret_sombre: { fx: 0.49, fy: 0.4, r: 0.17, lx: 0.45, ly: 0.64 },
-  grand_arbre: { fx: 0.818, fy: 0.42, r: 0.07, lx: 0.67, ly: 0.46 },
-  foret_flottante: { fx: 0.835, fy: 0.19, r: 0.12, lx: 0.63, ly: 0.2 },
-  foret_corrompue: { fx: 0.785, fy: 0.69, r: 0.15, lx: 0.66, ly: 0.88 },
-};
-// Le grand X rouge peint au pied des montagnes : la blague du raccourci.
-const MAP_ART_SHORTCUT = { fx: 0.485, fy: 0.785 };
-const MAP_ART_FOG = 0xd8bd88;
+const MAP_PAPER = 0xecd9ab;
+const MAP_FOG = 0xa88c5c;
+const MAP_GRASS = 0x5f8a3e;
+const MAP_PASSAGE = 0x9a2a1a;
+// Cadre de la carte à l'écran (le parchemin déborde autour).
+const MAP_VIEW = { x: 78, y: 96, w: 804, h: 318 };
+
+// Donnée de zone par convention de nom (`foret_sombre_1` -> FORET_SOMBRE_1_DATA),
+// lue telle qu'écrite dans src/data/ (les globales `const` ne sont pas sur window).
+const MAP_ZONE_DATA_CACHE = {};
+function mapZoneData(zone) {
+  if (zone in MAP_ZONE_DATA_CACHE) return MAP_ZONE_DATA_CACHE[zone];
+  const name = `${zone.toUpperCase()}_DATA`;
+  let data = null;
+  if (/^[A-Z0-9_]+$/.test(name)) {
+    try {
+      data = (new Function(`return typeof ${name} !== 'undefined' ? ${name} : null;`))();
+    } catch (e) {
+      data = null;
+    }
+  }
+  MAP_ZONE_DATA_CACHE[zone] = data;
+  return data;
+}
+
+// Boîte d'une zone (px de jeu, repère de la zone) : largeur du niveau, du
+// haut (levelTop ou plus haute case) au bas (levelHeight ou plus basse case).
+function mapZoneBox(data, cells) {
+  let top = Math.min(0, data.levelTop || 0);
+  let bottom = data.levelHeight || 540;
+  for (const [, gy] of cells) {
+    top = Math.min(top, gy * MAP_CELL);
+    bottom = Math.max(bottom, (gy + 1) * MAP_CELL);
+  }
+  return { w: data.levelWidth || 960, top, bottom };
+}
+
+// Repli pour une future zone sans position : posée contre une zone déjà
+// placée qui la relie par une sortie de bord (gauche, droite, haut, bas), dans
+// un sens ou dans l'autre. Plusieurs passes (une zone peut se rattacher à une
+// zone placée automatiquement à la passe d'avant).
+function mapAutoPlace(zones, placed) {
+  const sceneZone = (key) => {
+    const e = storyZoneEntry(key);
+    return e ? e.zone : null;
+  };
+  const opposite = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+  for (let pass = 0; pass < zones.length; pass++) {
+    let progress = false;
+    for (const z of zones) {
+      if (placed[z.zone]) continue;
+      for (const k of zones) {
+        const kp = placed[k.zone];
+        if (!kp || k === z) continue;
+        // Sortie de K vers Z (bord de K), ou de Z vers K (bord opposé de K).
+        let edge = null;
+        let exit = null;
+        exit = (k.data.exits || []).find((e) => e && e.edge && sceneZone(e.targetScene) === z.zone);
+        if (exit) edge = exit.edge;
+        if (!edge) {
+          exit = (z.data.exits || []).find((e) => e && e.edge && sceneZone(e.targetScene) === k.zone);
+          if (exit) edge = opposite[exit.edge];
+          exit = null;
+        }
+        if (!edge) continue;
+        const mid = exit && exit.from != null && exit.to != null ? (exit.from + exit.to) / 2 : k.box.w / 2;
+        if (edge === 'right') placed[z.zone] = { x: kp.x + k.box.w, y: kp.y };
+        else if (edge === 'left') placed[z.zone] = { x: kp.x - z.box.w, y: kp.y };
+        else if (edge === 'top') placed[z.zone] = { x: kp.x + mid - z.box.w / 2, y: kp.y + k.box.top - z.box.bottom };
+        else placed[z.zone] = { x: kp.x + mid - z.box.w / 2, y: kp.y + k.box.bottom - z.box.top };
+        progress = true;
+        break;
+      }
+    }
+    if (!progress) break;
+  }
+}
+
+// Le monde tel que la carte sauvegardée le connaît : zones avec au moins un
+// bloc reporté, leur terrain, leurs feux et leurs passages.
+function mapBuildWorld() {
+  const all = [];
+  for (const entry of DEMO_ZONES) {
+    const data = mapZoneData(entry.zone);
+    if (!data) continue;
+    const cells = typeof zoneGroundCells === 'function' ? zoneGroundCells(data) : (data.groundCells || []);
+    all.push({ zone: entry.zone, name: entry.name, scene: entry.scene, data, cells, box: mapZoneBox(data, cells) });
+  }
+  const placed = {};
+  for (const z of all) if (MAP_ZONE_LAYOUT[z.zone]) placed[z.zone] = MAP_ZONE_LAYOUT[z.zone];
+  mapAutoPlace(all, placed);
+  const visited = campfiresVisited();
+  const zones = [];
+  for (const z of all) {
+    const chunks = storyMapZoneChunks(z.zone);
+    const pos = placed[z.zone];
+    if (!chunks || !pos) continue;
+    z.x = pos.x;
+    z.y = pos.y;
+    z.all = chunks === STORY_MAP_ALL;
+    z.chunks = z.all ? null : chunks;
+    z.fires = (z.data.campfires || []).map((c, i) => ({ x: c.x, y: c.y, visited: visited.includes(`${z.zone}#${i}`) }));
+    zones.push(z);
+  }
+  let bounds = null;
+  for (const z of zones) {
+    const b = { x0: z.x, x1: z.x + z.box.w, y0: z.y + z.box.top, y1: z.y + z.box.bottom };
+    bounds = bounds ? { x0: Math.min(bounds.x0, b.x0), x1: Math.max(bounds.x1, b.x1), y0: Math.min(bounds.y0, b.y0), y1: Math.max(bounds.y1, b.y1) } : b;
+  }
+  return { zones, bounds };
+}
+
+// Bloc (128 px) parcouru ? (`z.all` : zone reportée en entier.)
+function mapChunkKnown(z, x, y) {
+  if (z.all) return true;
+  const C = STORY_MAP_CHUNK;
+  return z.chunks.has(`${Math.floor(x / C)},${Math.floor(y / C)}`);
+}
 
 class MapScene extends Phaser.Scene {
   constructor() {
@@ -34,6 +177,7 @@ class MapScene extends Phaser.Scene {
 
   init(data) {
     this.parentKey = data.parentKey;
+    this.returnTo = data.returnTo || null;
   }
 
   create() {
@@ -42,178 +186,95 @@ class MapScene extends Phaser.Scene {
     // Juice : la carte s'ouvre avec un léger rebond.
     juiceOverlayIn(this);
     this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.75).setOrigin(0);
-    this.input.keyboard.on('keydown', this.onKey, this);
+    this.drawParchmentBackground();
 
+    this.world = mapBuildWorld();
     const parent = this.scene.get(this.parentKey);
-    const here = parent ? storyZoneEntry(parent) : null;
-    const revealed = {};
-    for (const r of STORY_REGIONS) {
-      revealed[r.id] = DEMO_ZONES.some((z) => z.region === r.id && storyGet(`visited_${z.zone}`));
-    }
-    if (here) revealed[here.region] = true;
+    const entry = parent ? storyZoneEntry(parent) : null;
+    const hereZone = entry && this.world.zones.find((z) => z.zone === entry.zone);
+    this.here = hereZone && parent.player ? { zone: hereZone, x: hereZone.x + parent.player.x, y: hereZone.y + parent.player.y } : null;
 
-    if (this.textures.exists('item-carte_parchemin')) {
-      this.buildArtMap(revealed, here);
-      return;
-    }
-    this.drawParchment(width, height);
-    this.addMapTitle(width / 2, 62);
-    this.drawPath(revealed);
-    for (const r of STORY_REGIONS) this.drawRegion(r, revealed[r.id], here && here.region === r.id);
-    this.drawCompass(width - 150, height - 140);
-
-    // Raccourci barré : la cartographie selon Geralt.
-    this.add.text(410, 440, 'raccourci ?', {
-      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#7a5a3a',
-    }).setOrigin(0.5).setAngle(-6);
-    const g = this.add.graphics();
-    g.lineStyle(2, 0x8a2a1a, 0.8);
-    g.lineBetween(375, 446, 446, 434);
-    this.add.text(456, 446, 'NON.', {
-      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'bold', color: '#8a2a1a',
-    }).setAngle(-4);
-
-    this.addCloseHint(height - 30);
-  }
-
-  addMapTitle(x, y, { ribbon = false } = {}) {
-    if (ribbon) {
-      // Bandeau de parchemin clair sous le titre : la carte peinte est chargée.
-      const g = this.add.graphics();
-      g.fillStyle(0x000000, 0.25);
-      g.fillRoundedRect(x - 262, y - 22, 528, 58, 12);
-      g.fillStyle(0xecd8a6, 0.94);
-      g.fillRoundedRect(x - 265, y - 25, 530, 58, 12);
-      g.lineStyle(1.5, 0x9a7444, 0.8);
-      g.strokeRoundedRect(x - 259, y - 19, 518, 46, 9);
-    }
-    this.add.text(x, y, 'Carte de la forêt', {
-      fontFamily: STORY_UI.serif, fontSize: '26px', fontStyle: 'bold italic', color: MAP_INK_HEX, padding: { x: 4, y: 2 },
-    }).setOrigin(0.5);
-    this.add.text(x, y + 26, 'par Geralt, ranger (et Clak) — incomplète, mais pleine de bonne volonté', {
-      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#6b4a2a',
-    }).setOrigin(0.5);
-  }
-
-  addCloseHint(y) {
-    this.add.text(this.scale.width / 2, y, 'M / Échap : fermer', {
-      fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.textSoft,
-    }).setOrigin(0.5);
-  }
-
-  // Carte peinte (Codex) : l'image entière, proportions gardées. Les régions y
-  // sont déjà dessinées (chemins, boussole, crabe…) : on n'ajoute que le
-  // brouillard des régions inconnues, leur nom + la note de Geralt, et
-  // l'épingle « tu es ici ».
-  buildArtMap(revealed, here) {
-    const { width, height } = this.scale;
-    const img = this.add.image(width / 2, 0, 'item-carte_parchemin').setOrigin(0.5, 0);
-    const scale = Math.min((width - 40) / img.width, (height - 48) / img.height);
-    img.setScale(scale).setY(8);
-    const M = { x: img.x - img.displayWidth / 2, y: img.y, w: img.displayWidth, h: img.displayHeight };
-    const at = (fx, fy) => ({ x: M.x + fx * M.w, y: M.y + fy * M.h });
-
-    for (const r of STORY_REGIONS) {
-      const L = MAP_ART_REGIONS[r.id];
-      if (!L) continue;
-      if (revealed[r.id]) this.addArtRegionLabel(r, L, at);
-      else this.addArtFog(L, at, M.w);
-    }
-    // Épingle après les étiquettes : toujours au-dessus.
-    if (here && MAP_ART_REGIONS[here.region]) {
-      const L = MAP_ART_REGIONS[here.region];
-      this.addHerePin(at(L.fx, L.fy));
-    }
-
-    // Sous le grand X : « raccourci ? » barré, puis « NON. ».
-    const s = at(MAP_ART_SHORTCUT.fx, MAP_ART_SHORTCUT.fy);
-    const sy = s.y + 30;
-    const short = this.add.text(s.x - 44, sy, 'raccourci ?', {
-      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'italic', color: '#7a5a3a',
-    }).setOrigin(0, 0.5).setAngle(-6);
-    const g = this.add.graphics();
-    g.lineStyle(2, 0x8a2a1a, 0.8);
-    g.lineBetween(s.x - 48, sy + 6, s.x - 40 + short.width, sy - 6);
-    this.add.text(s.x - 34 + short.width, sy - 6, 'NON.', {
-      fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'bold', color: '#8a2a1a',
-    }).setOrigin(0, 0.5).setAngle(-4);
-
-    this.addMapTitle(width / 2, M.y + 34, { ribbon: true });
-    this.addCloseHint(height - 18);
-  }
-
-  // Nom de la région + note de Geralt, à l'encre sur un cartouche clair.
-  addArtRegionLabel(region, L, at) {
-    const p = at(L.lx, L.ly);
-    const name = this.add.text(p.x, p.y, region.name, {
-      fontFamily: STORY_UI.serif, fontSize: '15px', fontStyle: 'bold', color: MAP_INK_HEX,
-    }).setOrigin(0.5, 0);
-    const layout = MAP_REGION_LAYOUT[region.id];
-    const note = this.add.text(p.x, p.y + 19, layout ? layout.note : '', {
-      fontFamily: STORY_UI.serif, fontSize: '11px', fontStyle: 'italic', color: '#6b4a2a', align: 'center',
-    }).setOrigin(0.5, 0);
-    const w = Math.max(name.width, note.width) + 18;
-    const h = 19 + note.height + 8;
-    const g = this.add.graphics();
-    g.fillStyle(0xf0dfb4, 0.88);
-    g.fillRoundedRect(p.x - w / 2, p.y - 4, w, h, 7);
-    g.lineStyle(1, 0x9a7444, 0.6);
-    g.strokeRoundedRect(p.x - w / 2, p.y - 4, w, h, 7);
-    // Cartouche créé après les textes (pour les mesurer) : textes devant.
-    g.setDepth(1);
-    name.setDepth(2);
-    note.setDepth(2);
-  }
-
-  // Région encore inconnue : brume de parchemin aux bords doux (couches de
-  // plus en plus opaques vers le centre) qui cache la peinture, et « ??? ».
-  addArtFog(L, at, mapW) {
-    const c = at(L.fx, L.fy);
-    const r = L.r * mapW;
-    const g = this.add.graphics();
-    const rnd = new Phaser.Math.RandomDataGenerator([`fog${L.fx}`]);
-    const puffs = [];
-    for (let i = 0; i < 11; i++) {
-      const a = (i / 10) * Math.PI * 2 + rnd.realInRange(-0.3, 0.3);
-      const d = i === 0 ? 0 : r * rnd.realInRange(0.3, 0.62);
-      puffs.push({ x: c.x + Math.cos(a) * d, y: c.y + Math.sin(a) * d * 0.7, r: r * rnd.realInRange(0.36, 0.5) });
-    }
-    for (const [k, alpha] of [[1.35, 0.18], [1.15, 0.3], [0.95, 0.5], [0.75, 0.75]]) {
-      g.fillStyle(MAP_ART_FOG, alpha);
-      for (const p of puffs) g.fillCircle(p.x, p.y, p.r * k);
-    }
-    // Hachures de crayon : « zone pas encore cartographiée ».
-    g.lineStyle(1, 0x9a7a4a, 0.35);
-    for (let i = -4; i <= 4; i++) g.lineBetween(c.x + i * 12 - 26, c.y + 26, c.x + i * 12 + 26, c.y - 26);
-    this.add.text(c.x, c.y, '???', {
-      fontFamily: STORY_UI.serif, fontSize: '22px', fontStyle: 'bold', color: '#7a6a4a',
-      stroke: '#e3cb98', strokeThickness: 4,
-    }).setOrigin(0.5);
-  }
-
-  addHerePin(p) {
-    const pin = this.add.graphics();
-    pin.fillStyle(0x000000, 0.3);
-    pin.fillEllipse(p.x, p.y + 2, 16, 6);
-    pin.fillStyle(STORY_UI.pink, 1);
-    pin.fillCircle(p.x, p.y - 18, 8);
-    pin.fillTriangle(p.x - 7, p.y - 14, p.x + 7, p.y - 14, p.x, p.y);
-    pin.fillStyle(0xffffff, 1);
-    pin.fillCircle(p.x, p.y - 18, 3);
-    const label = this.add.text(p.x + 12, p.y - 30, 'tu es ici', {
+    // Calques de la carte, coupés au cadre (masque) : brouillard, terrain,
+    // marques ; textes des zones par-dessus.
+    const V = MAP_VIEW;
+    const maskShape = this.make.graphics({ add: false });
+    maskShape.fillStyle(0xffffff, 1);
+    maskShape.fillRect(V.x, V.y, V.w, V.h);
+    this.viewMask = maskShape.createGeometryMask();
+    this.g = this.add.graphics().setMask(this.viewMask);
+    this.labels = this.world.zones.map((z) => this.add.text(0, 0, z.name, {
+      fontFamily: STORY_UI.serif, fontSize: '12px', fontStyle: 'bold italic', color: MAP_INK_HEX,
+      stroke: '#f3e3bd', strokeThickness: 3,
+    }).setOrigin(0.5, 1).setMask(this.viewMask));
+    this.pin = this.add.graphics().setMask(this.viewMask);
+    this.pinLabel = this.add.text(0, 0, 'toi', {
       fontFamily: STORY_UI.serif, fontSize: '13px', fontStyle: 'bold italic', color: '#b0306a',
       stroke: '#f3e3bd', strokeThickness: 3,
+    }).setMask(this.viewMask).setVisible(false);
+    this.pinBob = { dy: 0 };
+    this.tweens.add({ targets: this.pinBob, dy: -4, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', onUpdate: () => this.drawPin() });
+
+    this.addTitle();
+    this.addLegend();
+    this.addHints();
+
+    // Vue de départ : Agarica si sa zone est sur la carte, sinon la dernière
+    // zone reportée, sinon le centre.
+    this.zoomIndex = MAP_ZOOM_DEFAULT;
+    const focus = this.here || this.lastZoneFocus();
+    this.camX = focus ? focus.x : 0;
+    this.camY = focus ? focus.y : 0;
+    this.clampCamera();
+    this.redraw();
+
+    this.input.keyboard.on('keydown', this.onKey, this);
+    this.input.on('wheel', (pointer, objs, dx, dy) => this.zoomBy(dy > 0 ? -1 : 1));
+    this.input.on('pointermove', (pointer) => {
+      if (!pointer.isDown) return;
+      const z = MAP_ZOOMS[this.zoomIndex];
+      this.camX -= (pointer.x - pointer.prevPosition.x) / z;
+      this.camY -= (pointer.y - pointer.prevPosition.y) / z;
+      this.clampCamera();
+      this.redraw();
     });
-    pin.setDepth(3);
-    label.setDepth(3);
-    this.tweens.add({ targets: [pin, label], y: '-=4', duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  lastZoneFocus() {
+    const zones = this.world.zones;
+    if (!zones.length) return null;
+    const last = zones.find((z) => z.zone === storyGet('lastZone')) || zones[zones.length - 1];
+    return { x: last.x + last.box.w / 2, y: last.y + (last.box.top + last.box.bottom) / 2 };
+  }
+
+  // Parchemin : l'art `carte_parchemin` (ses dessins voilés de papier, on ne
+  // garde que le grain et les bords déchirés), sinon un parchemin dessiné.
+  drawParchmentBackground() {
+    const { width, height } = this.scale;
+    if (this.textures.exists('item-carte_parchemin')) {
+      this.add.image(width / 2, height / 2, 'item-carte_parchemin').setDisplaySize(width - 24, height - 16);
+      // Voile de papier aux bords fondus : couches de plus en plus opaques
+      // vers le centre (les dessins de Geralt ne restent qu'en filigrane).
+      const g = this.add.graphics();
+      for (let i = 0; i < 7; i++) {
+        const inset = 30 + i * 6;
+        g.fillStyle(MAP_PAPER, i === 6 ? 0.85 : 0.12);
+        g.fillRoundedRect(inset, inset - 10, width - 2 * inset, height - 2 * inset + 6, 40 - i * 2);
+      }
+    } else {
+      this.drawParchment(width, height);
+    }
+    // Cadre de la carte : filet d'encre.
+    const V = MAP_VIEW;
+    const f = this.add.graphics();
+    f.lineStyle(1.5, 0x9a7444, 0.7);
+    f.strokeRoundedRect(V.x - 4, V.y - 4, V.w + 8, V.h + 8, 8);
   }
 
   drawParchment(width, height) {
-    const x = 70;
-    const y = 36;
-    const w = width - 140;
-    const h = height - 86;
+    const x = 30;
+    const y = 18;
+    const w = width - 60;
+    const h = height - 36;
     const g = this.add.graphics();
     // Bords déchirés : polygone légèrement irrégulier.
     const rnd = new Phaser.Math.RandomDataGenerator(['geralt']);
@@ -234,124 +295,342 @@ class MapScene extends Phaser.Scene {
       g.fillStyle(0xc9ac72, rnd.realInRange(0.25, 0.5));
       g.fillCircle(rnd.between(x + 40, x + w - 40), rnd.between(y + 40, y + h - 40), rnd.between(8, 28));
     }
-    g.lineStyle(2, 0x9a7444, 0.6);
-    g.strokeRoundedRect(x + 18, y + 18, w - 36, h - 36, 14);
   }
 
-  drawPath(revealed) {
-    const g = this.add.graphics();
-    const ids = STORY_REGIONS.map((r) => r.id);
-    for (let i = 0; i < ids.length - 1; i++) {
-      const a = MAP_REGION_LAYOUT[ids[i]];
-      const b = MAP_REGION_LAYOUT[ids[i + 1]];
-      if (!revealed[ids[i]]) continue;
-      // Trait pointillé à la main ; s'arrête à mi-chemin vers l'inconnu.
-      const end = revealed[ids[i + 1]] ? 1 : 0.5;
-      const n = 14;
-      g.lineStyle(3, MAP_INK, 0.75);
-      for (let k = 0; k < n; k += 2) {
-        const t0 = (k / n) * end;
-        const t1 = ((k + 1) / n) * end;
-        const bend = (t) => Math.sin(t * Math.PI) * 26;
-        g.lineBetween(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0 - bend(t0),
-          a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1 - bend(t1));
-      }
-    }
-  }
-
-  drawRegion(region, revealed, isHere) {
-    const L = MAP_REGION_LAYOUT[region.id];
-    const g = this.add.graphics();
-    if (!revealed) {
-      g.fillStyle(0x9a8a6a, 0.35);
-      for (let i = 0; i < 5; i++) g.fillCircle(L.x - 30 + i * 15, L.y + Math.sin(i) * 6, 22);
-      this.add.text(L.x, L.y, '???', {
-        fontFamily: STORY_UI.serif, fontSize: '22px', fontStyle: 'bold', color: '#7a6a4a',
+  addTitle() {
+    const { width } = this.scale;
+    this.add.text(width / 2, 48, 'Carte du monde', {
+      fontFamily: STORY_UI.serif, fontSize: '24px', fontStyle: 'bold italic', color: MAP_INK_HEX, padding: { x: 4, y: 2 },
+    }).setOrigin(0.5);
+    // La version montrée (dernier feu) et ce qui attend le prochain feu.
+    const pending = storyMapPendingCount();
+    let sub = 'telle qu\'au dernier feu de camp';
+    if (pending > 0) sub += ` — ${pending} coin${pending > 1 ? 's' : ''} découvert${pending > 1 ? 's' : ''} depuis, à reporter au prochain feu`;
+    this.add.text(width / 2, 74, sub, {
+      fontFamily: STORY_UI.serif, fontSize: '12px', fontStyle: 'italic', color: '#6b4a2a',
+    }).setOrigin(0.5);
+    const V = MAP_VIEW;
+    if (!this.world.zones.length) {
+      this.add.text(V.x + V.w / 2, V.y + V.h / 2, 'Rien n\'est encore cartographié.\nAssieds-toi à un feu de camp pour y reporter tes découvertes.', {
+        fontFamily: STORY_UI.serif, fontSize: '15px', fontStyle: 'italic', color: MAP_INK_HEX, align: 'center',
       }).setOrigin(0.5);
-      return;
-    }
-    this.drawRegionSymbol(g, region.id, L.x, L.y);
-    this.add.text(L.x, L.y + 34, region.name, {
-      fontFamily: STORY_UI.serif, fontSize: '16px', fontStyle: 'bold', color: MAP_INK_HEX,
-    }).setOrigin(0.5, 0);
-    this.add.text(L.x, L.y + 54, L.note, {
-      fontFamily: STORY_UI.serif, fontSize: '12px', fontStyle: 'italic', color: '#6b4a2a', align: 'center',
-    }).setOrigin(0.5, 0);
-    if (isHere) {
-      const pin = this.add.graphics();
-      pin.fillStyle(STORY_UI.pink, 1);
-      pin.fillCircle(L.x + 34, L.y - 34, 8);
-      pin.fillTriangle(L.x + 27, L.y - 30, L.x + 41, L.y - 30, L.x + 34, L.y - 16);
-      pin.fillStyle(0xffffff, 1);
-      pin.fillCircle(L.x + 34, L.y - 34, 3);
-      this.add.text(L.x + 48, L.y - 42, 'tu es ici', {
-        fontFamily: STORY_UI.serif, fontSize: '12px', fontStyle: 'italic', color: '#b0306a',
-      });
-      this.tweens.add({ targets: pin, y: -4, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    } else if (!this.here) {
+      this.add.text(V.x + V.w - 8, V.y + 8, 'Ta zone n\'est pas encore sur la carte.', {
+        fontFamily: STORY_UI.serif, fontSize: '11px', fontStyle: 'italic', color: '#8a2a1a',
+        backgroundColor: '#f0dfb4', padding: { x: 5, y: 2 },
+      }).setOrigin(1, 0);
     }
   }
 
-  // Petits pictogrammes à l'encre, un par région.
-  drawRegionSymbol(g, id, x, y) {
-    g.lineStyle(2, MAP_INK, 1);
-    g.fillStyle(0x6b8a4a, 0.5);
-    if (id === 'bosquet') {
-      for (const dx of [-22, 0, 22]) {
-        g.fillTriangle(x + dx - 12, y + 10, x + dx + 12, y + 10, x + dx, y - 12);
-        g.strokeTriangle(x + dx - 12, y + 10, x + dx + 12, y + 10, x + dx, y - 12);
-      }
-    } else if (id === 'foret_sombre') {
-      g.fillStyle(0x3a4a3a, 0.6);
-      for (const [dx, s] of [[-24, 1], [-6, 1.3], [14, 1], [30, 0.8]]) {
-        g.fillTriangle(x + dx - 10 * s, y + 14, x + dx + 10 * s, y + 14, x + dx, y - 20 * s);
-        g.strokeTriangle(x + dx - 10 * s, y + 14, x + dx + 10 * s, y + 14, x + dx, y - 20 * s);
-      }
-    } else if (id === 'grand_arbre') {
-      g.fillStyle(0x7a5a3a, 0.7);
-      g.fillRect(x - 6, y - 10, 12, 26);
-      g.strokeRect(x - 6, y - 10, 12, 26);
-      g.fillStyle(0x5a7a3a, 0.6);
-      g.fillCircle(x, y - 22, 22);
-      g.strokeCircle(x, y - 22, 22);
-    } else if (id === 'foret_flottante') {
-      g.fillStyle(0x7a9a6a, 0.6);
-      for (const [dx, dy] of [[-26, 6], [4, -10], [30, 8]]) {
-        g.fillEllipse(x + dx, y + dy, 30, 10);
-        g.strokeEllipse(x + dx, y + dy, 30, 10);
-      }
-    } else if (id === 'foret_corrompue') {
-      g.fillStyle(0x5aa02a, 0.6);
-      for (const [dx, r] of [[-18, 12], [2, 16], [22, 10]]) {
-        g.fillCircle(x + dx, y, r);
-        g.strokeCircle(x + dx, y, r);
-      }
-      g.lineStyle(2, 0x8a2a1a, 1);
-      g.strokeCircle(x, y, 32);
-    }
-  }
-
-  drawCompass(x, y) {
+  // Légende courte, sous la carte à gauche.
+  addLegend() {
+    const y = MAP_VIEW.y + MAP_VIEW.h + 14;
+    let x = MAP_VIEW.x + 4;
     const g = this.add.graphics();
-    g.lineStyle(1.5, MAP_INK, 0.9);
-    g.strokeCircle(x, y, 26);
-    g.fillStyle(MAP_INK, 0.85);
-    g.fillTriangle(x, y - 34, x - 6, y, x + 6, y);
-    g.fillStyle(0xb8955a, 1);
-    g.fillTriangle(x, y + 34, x - 6, y, x + 6, y);
-    this.add.text(x, y - 48, 'N', { fontFamily: STORY_UI.serif, fontSize: '14px', fontStyle: 'bold', color: MAP_INK_HEX }).setOrigin(0.5);
-    this.add.text(x, y + 44, '(à peu près)', { fontFamily: STORY_UI.serif, fontSize: '10px', fontStyle: 'italic', color: '#6b4a2a' }).setOrigin(0.5);
+    const label = (text) => {
+      const t = this.add.text(x, y, text, { fontFamily: STORY_UI.serif, fontSize: '11px', fontStyle: 'italic', color: MAP_INK_HEX }).setOrigin(0, 0.5);
+      x += t.width + 16;
+    };
+    this.drawFlame(g, x + 6, y + 4, true, 1);
+    x += 16;
+    label('feu où tu t\'es assise');
+    this.drawFlame(g, x + 6, y + 4, false, 1);
+    x += 16;
+    label('feu aperçu');
+    this.drawChevron(g, x + 6, y, 'right', 6);
+    x += 16;
+    label('passage');
+    this.drawHatch(g, x, y - 6, 18, 12, 1);
+    g.lineStyle(1, MAP_INK, 0.35);
+    g.strokeRect(x, y - 6, 18, 12);
+    x += 24;
+    label('brouillard');
+    g.fillStyle(STORY_UI.pink, 1);
+    g.fillCircle(x + 5, y - 3, 4.5);
+    g.fillTriangle(x + 1, y - 1, x + 9, y - 1, x + 5, y + 6);
+    x += 14;
+    label('toi');
+  }
+
+  addHints() {
+    const { width } = this.scale;
+    const closeHint = this.returnTo ? 'M / Échap : retour au feu' : 'M / Échap : fermer';
+    this.add.text(width / 2, MAP_VIEW.y + MAP_VIEW.h + 38, `←↑↓→ / ZQSD : déplacer   ·   + / − ou molette : zoom   ·   Espace : te retrouver   ·   ${closeHint}`, {
+      fontFamily: 'sans-serif', fontSize: '12px', color: '#5a3d22',
+    }).setOrigin(0.5);
+  }
+
+  // --- Vue --------------------------------------------------------------------
+
+  toScreen(wx, wy) {
+    const z = MAP_ZOOMS[this.zoomIndex];
+    return { x: MAP_VIEW.x + MAP_VIEW.w / 2 + (wx - this.camX) * z, y: MAP_VIEW.y + MAP_VIEW.h / 2 + (wy - this.camY) * z };
+  }
+
+  // La vue reste sur ce qui est cartographié (marge d'un demi-cadre).
+  clampCamera() {
+    const b = this.world.bounds;
+    if (!b) return;
+    const z = MAP_ZOOMS[this.zoomIndex];
+    const halfW = MAP_VIEW.w / 2 / z;
+    const halfH = MAP_VIEW.h / 2 / z;
+    const fitX = (b.x1 - b.x0) <= 2 * halfW;
+    const fitY = (b.y1 - b.y0) <= 2 * halfH;
+    this.camX = fitX ? (b.x0 + b.x1) / 2 : Phaser.Math.Clamp(this.camX, b.x0 + halfW * 0.5, b.x1 - halfW * 0.5);
+    this.camY = fitY ? (b.y0 + b.y1) / 2 : Phaser.Math.Clamp(this.camY, b.y0 + halfH * 0.5, b.y1 - halfH * 0.5);
+  }
+
+  zoomBy(d) {
+    const i = Phaser.Math.Clamp(this.zoomIndex + d, 0, MAP_ZOOMS.length - 1);
+    if (i === this.zoomIndex) return;
+    this.zoomIndex = i;
+    this.clampCamera();
+    this.redraw();
+  }
+
+  pan(dx, dy) {
+    const z = MAP_ZOOMS[this.zoomIndex];
+    this.camX += (dx * MAP_VIEW.w * 0.18) / z;
+    this.camY += (dy * MAP_VIEW.h * 0.22) / z;
+    this.clampCamera();
+    this.redraw();
+  }
+
+  redraw() {
+    const g = this.g;
+    g.clear();
+    const z = MAP_ZOOMS[this.zoomIndex];
+    const V = MAP_VIEW;
+    const shown = [];
+    this.world.zones.forEach((zone, i) => {
+      const o = this.toScreen(zone.x, zone.y);
+      const box = { x: o.x, y: o.y + zone.box.top * z, w: zone.box.w * z, h: (zone.box.bottom - zone.box.top) * z };
+      const label = this.labels[i];
+      label.setVisible(false);
+      const onScreen = box.x < V.x + V.w && box.x + box.w > V.x && box.y < V.y + V.h && box.y + box.h > V.y;
+      if (!onScreen) return;
+      this.drawZone(g, zone, o, box, z);
+      label.setPosition(Phaser.Math.Clamp(box.x + box.w / 2, V.x + label.width / 2 + 4, V.x + V.w - label.width / 2 - 4), Math.max(V.y + 16, box.y - 3));
+      shown.push({ zone, label, box });
+    });
+    this.placeLabels(shown);
+    this.drawPin();
+  }
+
+  // Noms des zones : seulement s'ils tiennent au-dessus de leur zone, sans en
+  // chevaucher un autre (zone d'Agarica d'abord, puis les plus larges).
+  placeLabels(shown) {
+    const here = this.here && this.here.zone;
+    shown.sort((a, b) => (b.zone === here) - (a.zone === here) || b.box.w - a.box.w);
+    const taken = [];
+    // L'épingle « toi » et son mot passent avant les noms.
+    if (this.here) {
+      const p = this.toScreen(this.here.x, this.here.y);
+      taken.push(new Phaser.Geom.Rectangle(p.x - 10, p.y - 44, 46, 46));
+    }
+    const V = MAP_VIEW;
+    const rectOf = (l) => new Phaser.Geom.Rectangle(l.x - l.width / 2 - 4, l.y - l.height, l.width + 8, l.height);
+    const free = (r) => !taken.some((t) => Phaser.Geom.Intersects.RectangleToRectangle(t, r));
+    for (const s of shown) {
+      const l = s.label;
+      if (s.box.w < l.width * 0.7 && s.zone !== here) continue;
+      let r = rectOf(l);
+      // Nom de la zone d'Agarica sous l'épingle : glissé à côté d'elle.
+      if (!free(r) && s.zone === here) {
+        const p = this.toScreen(this.here.x, this.here.y);
+        for (const x of [p.x - l.width / 2 - 16, p.x + l.width / 2 + 40]) {
+          l.setX(Phaser.Math.Clamp(x, V.x + l.width / 2 + 4, V.x + V.w - l.width / 2 - 4));
+          r = rectOf(l);
+          if (free(r)) break;
+        }
+      }
+      if (!free(r)) continue;
+      taken.push(r);
+      l.setVisible(true);
+    }
+  }
+
+  drawZone(g, zone, o, box, z) {
+    const C = STORY_MAP_CHUNK;
+    // Brouillard : toute la zone, hachurée.
+    g.fillStyle(MAP_FOG, 0.22);
+    g.fillRect(box.x, box.y, box.w, box.h);
+    this.drawHatch(g, box.x, box.y, box.w, box.h, z * 14 > 6 ? 1 : 0.6);
+    // Parties parcourues : papier clair, par bandes de blocs contigus.
+    g.fillStyle(MAP_PAPER, 0.92);
+    if (zone.all) {
+      g.fillRect(box.x, box.y, box.w, box.h);
+    } else {
+      const rows = new Map();
+      for (const k of zone.chunks) {
+        const [cx, cy] = k.split(',').map(Number);
+        if (!rows.has(cy)) rows.set(cy, []);
+        rows.get(cy).push(cx);
+      }
+      for (const [cy, xs] of rows) {
+        xs.sort((a, b) => a - b);
+        let start = xs[0];
+        let prev = xs[0];
+        for (let i = 1; i <= xs.length; i++) {
+          if (i < xs.length && xs[i] === prev + 1) { prev = xs[i]; continue; }
+          g.fillRect(o.x + start * C * z, o.y + cy * C * z, (prev - start + 1) * C * z, C * z);
+          start = xs[i];
+          prev = xs[i];
+        }
+      }
+    }
+    g.lineStyle(1, MAP_INK, 0.3);
+    g.strokeRect(box.x, box.y, box.w, box.h);
+    // Terrain : cases connues, en bandes ; liseré d'herbe sur le dessus.
+    const known = (gx, gy) => mapChunkKnown(zone, gx * MAP_CELL + 1, gy * MAP_CELL + 1);
+    const solid = new Set(zone.cells.map(([gx, gy]) => `${gx},${gy}`));
+    const byRow = new Map();
+    for (const [gx, gy] of zone.cells) {
+      if (!known(gx, gy)) continue;
+      if (!byRow.has(gy)) byRow.set(gy, []);
+      byRow.get(gy).push(gx);
+    }
+    const s = MAP_CELL * z;
+    for (const [gy, xs] of byRow) {
+      xs.sort((a, b) => a - b);
+      let start = xs[0];
+      let prev = xs[0];
+      for (let i = 1; i <= xs.length; i++) {
+        if (i < xs.length && xs[i] === prev + 1) { prev = xs[i]; continue; }
+        g.fillStyle(MAP_INK, 0.88);
+        g.fillRect(o.x + start * s, o.y + gy * s, (prev - start + 1) * s + 0.5, s + 0.5);
+        start = xs[i];
+        prev = xs[i];
+      }
+      if (s >= 3) {
+        g.fillStyle(MAP_GRASS, 0.95);
+        for (const gx of xs) {
+          if (!solid.has(`${gx},${gy - 1}`)) g.fillRect(o.x + gx * s, o.y + gy * s, s + 0.5, Math.max(1, s * 0.22));
+        }
+      }
+    }
+    // Passages (sorties de bord), s'ils ont été vus.
+    for (const exit of zone.data.exits || []) {
+      if (!exit || !exit.edge || !exit.targetScene) continue;
+      const p = this.exitPoint(zone, exit);
+      if (!p || !this.nearKnown(zone, p.x, p.y)) continue;
+      this.drawChevron(g, o.x + p.x * z, o.y + p.y * z, exit.edge, Math.max(5, Math.min(9, 90 * z)));
+    }
+    // Feux : allumés (assise) ou simplement aperçus.
+    for (const f of zone.fires) {
+      if (!f.visited && !mapChunkKnown(zone, f.x, f.y - 20)) continue;
+      this.drawFlame(g, o.x + f.x * z, o.y + f.y * z, f.visited, Math.max(0.8, Math.min(1.4, 24 * z)));
+    }
+  }
+
+  // Point d'une sortie de bord (px de jeu, repère de la zone) : milieu du
+  // passage, juste au-dessus du sol pour les bords gauche/droit.
+  exitPoint(zone, exit) {
+    const w = zone.box.w;
+    if (exit.edge === 'left' || exit.edge === 'right') {
+      const x = exit.edge === 'left' ? 0 : w;
+      let ground = exit.to;
+      if (ground == null) {
+        // Sans `to` : le sol du bord, plus haute case de la moitié basse de la
+        // colonne (une voûte au-dessus ne compte pas).
+        const col = exit.edge === 'left' ? 0 : Math.floor((w - 1) / MAP_CELL);
+        const tops = zone.cells.filter(([gx]) => gx === col).map(([, gy]) => gy * MAP_CELL);
+        const low = tops.filter((t) => t >= 256);
+        ground = low.length ? Math.min(...low) : (tops.length ? Math.min(...tops) : 448);
+      }
+      return { x, y: ground - 48 };
+    }
+    const x = exit.from != null && exit.to != null ? (exit.from + exit.to) / 2 : w / 2;
+    return { x, y: exit.edge === 'top' ? zone.box.top : zone.box.bottom };
+  }
+
+  nearKnown(zone, x, y) {
+    const C = STORY_MAP_CHUNK;
+    for (const dx of [-C, 0, C]) for (const dy of [-C, 0, C]) if (mapChunkKnown(zone, x + dx, y + dy)) return true;
+    return false;
+  }
+
+  // Hachures d'encre (brouillard), découpées au rectangle.
+  drawHatch(g, x, y, w, h, alpha) {
+    g.lineStyle(1, MAP_INK, 0.16 * alpha);
+    const step = 9;
+    for (let c = -h; c < w; c += step) {
+      // Segment de la diagonale x - y = c (repère du rectangle), coupé au cadre.
+      const x0 = Math.max(c, 0);
+      const y0 = x0 - c;
+      const x1 = Math.min(c + h, w);
+      const y1 = x1 - c;
+      if (x1 <= x0) continue;
+      g.lineBetween(x + x0, y + h - y0, x + x1, y + h - y1);
+    }
+  }
+
+  drawFlame(g, x, y, lit, k) {
+    if (lit) {
+      g.fillStyle(0xffb050, 0.3);
+      g.fillCircle(x, y - 5 * k, 8 * k);
+    }
+    g.fillStyle(0x5a3a22, 1);
+    g.fillRect(x - 5 * k, y - 2 * k, 10 * k, 2.5 * k);
+    g.fillStyle(lit ? 0xe8622a : 0x9a8466, 1);
+    g.fillTriangle(x - 4.5 * k, y - 2 * k, x + 4.5 * k, y - 2 * k, x, y - 13 * k);
+    g.fillStyle(lit ? 0xffd25a : 0xcdb98e, 1);
+    g.fillTriangle(x - 2 * k, y - 2 * k, x + 2 * k, y - 2 * k, x, y - 7 * k);
+  }
+
+  // Chevron rouge qui pointe vers l'extérieur du bord.
+  drawChevron(g, x, y, edge, r) {
+    const d = { left: [-1, 0], right: [1, 0], top: [0, -1], bottom: [0, 1] }[edge] || [1, 0];
+    const [ux, uy] = d;
+    const px = -uy;
+    const py = ux;
+    g.fillStyle(MAP_PASSAGE, 0.9);
+    g.fillTriangle(x + ux * r, y + uy * r, x - ux * r * 0.4 + px * r * 0.8, y - uy * r * 0.4 + py * r * 0.8,
+      x - ux * r * 0.4 - px * r * 0.8, y - uy * r * 0.4 - py * r * 0.8);
+  }
+
+  drawPin() {
+    const pin = this.pin;
+    if (!pin) return;
+    pin.clear();
+    if (!this.here) return;
+    const p = this.toScreen(this.here.x, this.here.y);
+    const V = MAP_VIEW;
+    const inView = p.x > V.x && p.x < V.x + V.w && p.y > V.y && p.y < V.y + V.h;
+    this.pinLabel.setVisible(inView);
+    if (!inView) return;
+    const y = p.y + this.pinBob.dy;
+    pin.fillStyle(0x000000, 0.3);
+    pin.fillEllipse(p.x, p.y + 2, 14, 5);
+    pin.fillStyle(STORY_UI.pink, 1);
+    pin.fillCircle(p.x, y - 18, 7);
+    pin.fillTriangle(p.x - 6, y - 14, p.x + 6, y - 14, p.x, y);
+    pin.fillStyle(0xffffff, 1);
+    pin.fillCircle(p.x, y - 18, 2.6);
+    this.pinLabel.setPosition(p.x + 10, y - 30);
   }
 
   onKey(event) {
-    if (event.repeat || this.time.now - this.openedAt < 120) return;
+    if (this.time.now - this.openedAt < 120) return;
     const k = event.key.toLowerCase();
-    if (k === 'm' || k === 'escape' || k === 'e') this.close();
+    if (!event.repeat && (k === 'm' || k === 'escape' || k === 'e')) { this.close(); return; }
+    if (k === 'arrowleft' || k === 'q') this.pan(-1, 0);
+    else if (k === 'arrowright' || k === 'd') this.pan(1, 0);
+    else if (k === 'arrowup' || k === 'z') this.pan(0, -1);
+    else if (k === 'arrowdown' || k === 's') this.pan(0, 1);
+    else if (k === '+' || k === '=' || k === 'pageup') this.zoomBy(1);
+    else if (k === '-' || k === 'pagedown') this.zoomBy(-1);
+    else if (k === ' ' || k === 'enter') {
+      const f = this.here || this.lastZoneFocus();
+      if (f) { this.camX = f.x; this.camY = f.y; this.clampCamera(); this.redraw(); }
+    }
   }
 
   close() {
     this.input.keyboard.off('keydown', this.onKey, this);
     const parent = this.scene.get(this.parentKey);
     this.scene.stop();
-    if (parent) releaseStoryInput(parent);
+    if (this.returnTo) this.scene.resume(this.returnTo);
+    else if (parent) releaseStoryInput(parent);
   }
 }
