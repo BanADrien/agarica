@@ -18,6 +18,8 @@ const FORET_FLOTTANTE_2_DATA = {
   zoneName: 'Les îles flottantes',
   zoneSub: 'Forêt flottante',
   background: 'fond_foret_flottante',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_flottantes',
   levelWidth: 4096,
   levelHeight: 540,

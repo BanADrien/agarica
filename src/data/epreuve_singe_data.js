@@ -50,6 +50,8 @@ const EPREUVE_SINGE_DATA = {
   zoneName: 'Épreuve du singe',
   zoneSub: 'Ne touche pas le sol',
   background: 'fond_grand_arbre',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_ecorce',
   // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones
   // sombres ; l'épreuve se joue dans la cime, à la lumière.

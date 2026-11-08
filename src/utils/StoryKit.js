@@ -1909,6 +1909,222 @@ function hideStoryPrompt(scene) {
 }
 
 // ---------------------------------------------------------------------------
+// Agarica au début d'un dialogue ou d'une cinématique (2026-11-08, retour
+// utilisateur : « le personnage continue son animation actuelle (course,
+// marche…) et parfois au milieu du vide »)
+// ---------------------------------------------------------------------------
+// Au premier gel « d'histoire » (dialogue, cinématique, verrou de boss) :
+// actions coupées (course, sprint du loup, coup, ours), puis
+//  - posée : pose de repos tout de suite (forme humaine, idle) ;
+//  - en l'air : la physique (qui tourne pendant le gel) la fait retomber, en
+//    pose de saut humaine, en gardant son élan horizontal ; la boîte de
+//    dialogue attend qu'elle soit posée, STORY_SETTLE_MAX_MS au plus (elle
+//    continue ensuite de tomber, jamais figée au-dessus du vide). Ligne de
+//    chute franchie : chute dans le vide habituelle (fondu, point sûr, cœur),
+//    la boîte s'ouvre après la reprise ;
+//  - liane, eau : poses stables gardées (liane immobile, nage figée).
+// Pose narrative de la cinématique (`storyPose`), joueur piloté
+// (`__playerScripted` : playerMove, vol du crash, chute dans le vide), mort en
+// cours ou corps immobilisé par un script (`body.moves`) : rien n'est touché.
+// Les étapes d'une cinématique ne sont pas retardées ; seules ses répliques
+// (`say`) attendent, comme les dialogues.
+const STORY_SETTLE_MAX_MS = 1200;
+// Posée après une chute : la boîte attend qu'elle tienne debout ce temps-là.
+const STORY_SETTLE_STABLE_MS = 80;
+// Posée puis appui perdu : pose de saut au-delà de cette chute (px).
+const STORY_SETTLE_SLIP_PX = 10;
+// Garde-fou absolu (chute dans le vide et son fondu compris).
+const STORY_SETTLE_ABORT_MS = 6000;
+// Invulnérabilité à la sortie d'un dialogue ou d'une cinématique (retour
+// utilisateur : « elle peut se faire attaquer dès la sortie »), comptée à
+// partir du dégel du monde, signalée comme après un coup (cf.
+// Player.grantStoryInvulnerability). Les ennemis proches qui savent se calmer
+// (`enemy.calm(ms)`, cf. SingeCorrompu) annulent aussi leur attaque en cours.
+const STORY_EXIT_INVULN_MS = 1000;
+const STORY_EXIT_CALM_RANGE = 320;
+
+// Gel posé par l'histoire (et non par un menu : inventaire, carte, pause, feu).
+function isStoryFrozen(scene) {
+  return (scene.__cutsceneLock || 0) > 0 || (scene.__storyFreeze || 0) > 0;
+}
+
+function storySettleSkipped(scene, p) {
+  const st = scene.__story;
+  return !p || !p.active || !p.body || typeof p.storyRestPose !== 'function'
+    || scene.__playerScripted || p.fallingOut || !p.body.moves
+    || p.hearts <= 0 || p.storyPose === 'death' || !!(st && (st.airDeath || st.fallOut));
+}
+
+// En l'air : ni posée (sol, plateforme, mousse), ni sur une liane, ni dans
+// l'eau. Avant le premier pas de physique (cinématique lancée à la création de
+// la zone), `blocked.down` est encore faux : appui sous les pieds testé.
+function storyPlayerAirborne(scene, p) {
+  if (p.vine || p.form === 'octopus' || p.body.allowGravity === false) return false;
+  if (p.body.blocked.down || p.body.touching.down) return false;
+  return !storySupportedAt(scene, p.x, p.y);
+}
+
+// Commence la mise au repos (une fois par épisode de gel). Renvoie la mise au
+// repos en cours (`phase` : 'air', 'pose', 'chute', 'repos'), ou null si elle
+// est sautée (joueur piloté, mort…) ou déjà finie pour ce gel.
+function storyBeginSettle(scene) {
+  const st = scene.__story;
+  if (!st) return null;
+  if (st.settle && !st.settle.over) return st.settle;
+  if (st.settleEpisode) return null;
+  st.settleEpisode = true;
+  const p = scene.player;
+  if (storySettleSkipped(scene, p)) return null;
+  p.storyStopActions();
+  const s = { start: scene.time.now, visit: scene.__storyVisit, phase: null, over: false, ready: false, waiters: [] };
+  s.onShutdown = () => storySettleEnd(scene, s);
+  scene.events.once('shutdown', s.onShutdown);
+  st.settle = s;
+  storySettleStep(scene, s);
+  return s.over ? null : s;
+}
+
+// La boîte peut s'ouvrir (posée, ou délai écoulé).
+function storySettleReady(s) {
+  if (s.ready) return;
+  s.ready = true;
+  const w = s.waiters;
+  s.waiters = [];
+  w.forEach((resolve) => resolve());
+}
+
+function storySettleEnd(scene, s) {
+  if (s.over) return;
+  s.over = true;
+  if (s.onShutdown) scene.events.off('shutdown', s.onShutdown);
+  storySettleReady(s);
+}
+
+// Promesse résolue quand la boîte de dialogue peut s'ouvrir, ou null si rien
+// n'est en attente.
+function storySettleWait(scene) {
+  const s = scene.__story && scene.__story.settle;
+  if (!s || s.ready) return null;
+  return new Promise((resolve) => s.waiters.push(resolve));
+}
+
+// Phases : 'air' (elle retombe), 'chute' (chute dans le vide en cours),
+// 'pose' (compétence avec la forme), 'repos' (posée : la boîte peut s'ouvrir).
+// En 'repos', on continue de veiller tant que le monde est gelé : si elle perd
+// son appui (corps de repos moins large que celui du saut, posée au ras d'un
+// bord), elle retombe en pose de saut puis reprend la pose de repos -- jamais
+// l'idle en l'air.
+function storySettleStep(scene, s) {
+  if (s.over) return;
+  const st = scene.__story;
+  const p = scene.player;
+  const now = scene.time.now;
+  const age = now - s.start;
+  if (s.visit !== scene.__storyVisit || !p || !p.active || !p.body) {
+    storySettleEnd(scene, s);
+    return;
+  }
+  if (age >= STORY_SETTLE_ABORT_MS) storySettleReady(s);
+  // Chute dans le vide engagée pendant la mise au repos : sa reprise (fondu,
+  // point sûr) se joue ; une fois debout au point de reprise, pose de repos.
+  if (st.fallOut) {
+    s.phase = 'chute';
+    return;
+  }
+  if (s.phase === 'chute') {
+    if (!scene.__playerScripted) p.storyRestPose();
+    s.phase = 'repos';
+    s.restSince = now;
+    s.restY = p.y;
+    return;
+  }
+  // La cinématique a pris la main sur le joueur (playerMove, script...).
+  if (scene.__playerScripted || p.fallingOut || !p.body.moves || p.hearts <= 0) {
+    storySettleEnd(scene, s);
+    return;
+  }
+  // Compétence « avec la forme » (lancer de la pierre, nuée du papillon) :
+  // purement visuelle et courte, elle va au bout (boss_ghilt la rejoue aussi
+  // à son rythme pendant le soin de Ghil't), puis pose de repos.
+  if (p.skillFormPose && !p.storyPose) {
+    p.tickSkillFormPose(now);
+    if (p.skillFormPose && p.drawSkillFormPose(now)) {
+      s.phase = 'pose';
+      return;
+    }
+    if (p.skillFormPose) p.endSkillFormPose(true);
+  }
+  if (storyPlayerAirborne(scene, p)) {
+    // Appui perdu juste après la pose de repos (au ras d'une arête) : pose de
+    // saut seulement une fois vraiment en chute. Sinon les corps du repos et
+    // du saut (~1 px d'écart) se relaient sur l'arête : pose qui clignote.
+    if (s.phase === 'repos' && p.y - s.restY < STORY_SETTLE_SLIP_PX) return;
+    s.phase = 'air';
+    p.storyAirPose();
+    // Règle de chute de la zone : son crochet ne tourne pas pendant le gel.
+    updateStoryFall(scene);
+    if (st.fallOut) {
+      s.phase = 'chute';
+      return;
+    }
+    if (age >= STORY_SETTLE_MAX_MS) storySettleReady(s);
+    return;
+  }
+  if (s.phase !== 'repos') {
+    p.storyRestPose();
+    // Posée après une chute : la boîte attend qu'elle tienne (corps de repos
+    // posé) ; déjà au sol au début du gel : tout de suite.
+    s.restSince = s.phase ? now : -Infinity;
+    s.restY = p.y;
+    s.phase = 'repos';
+  }
+  if (now - s.restSince >= STORY_SETTLE_STABLE_MS) storySettleReady(s);
+}
+
+// Chaque image de gel (updateLevelFromData) : mise au repos commencée par un
+// gel de script (verrou de boss…) ou poursuivie. Renvoie vrai tant
+// qu'Agarica retombe (freezeWorldBodies lui laisse alors son élan horizontal).
+function storyFrozenTick(scene) {
+  const st = scene.__story;
+  if (!st || !scene.player) return false;
+  if (!isStoryFrozen(scene)) {
+    st.settleEpisode = false;
+    return false;
+  }
+  if (!st.settleEpisode) storyBeginSettle(scene);
+  const s = st.settle;
+  if (!s || s.over) return false;
+  storySettleStep(scene, s);
+  return !s.over && s.phase === 'air';
+}
+
+// Première image sans gel : fin de l'épisode ; invulnérabilité de sortie
+// minutée (armée par la fin du dialogue / de la cinématique).
+function storyUnfrozenTick(scene) {
+  const st = scene.__story;
+  if (st) {
+    st.settleEpisode = false;
+    if (st.settle && !st.settle.over) storySettleEnd(scene, st.settle);
+  }
+  const p = scene.player;
+  if (!p || !p.storyInvulnPending || typeof p.grantStoryInvulnerability !== 'function') return;
+  p.grantStoryInvulnerability(STORY_EXIT_INVULN_MS);
+  if (!scene.enemies) return;
+  scene.enemies.getChildren().forEach((e) => {
+    if (!e || !e.active || e.defeated || typeof e.calm !== 'function') return;
+    if (Math.abs(e.x - p.x) > STORY_EXIT_CALM_RANGE || Math.abs(e.y - p.y) > STORY_EXIT_CALM_RANGE) return;
+    e.calm(STORY_EXIT_INVULN_MS);
+  });
+}
+
+// Fin d'un dialogue ou d'une cinématique : Agarica est protégée dès
+// maintenant (même image) ; la durée court à partir du dégel.
+function storyArmExitInvulnerability(scene) {
+  const p = scene && scene.player;
+  if (p && p.active && typeof p.grantStoryInvulnerability === 'function') p.storyInvulnPending = true;
+}
+
+// ---------------------------------------------------------------------------
 // Dialogues
 // ---------------------------------------------------------------------------
 // `portrait` (optionnel) : id du portrait Codex `item-portrait_<id>` s'il
@@ -2093,8 +2309,12 @@ function showDialogue(scene, linesOrId) {
 function showDialogueBox(scene, lines) {
   scene.__storyFreeze = (scene.__storyFreeze || 0) + 1;
   hideStoryPrompt(scene);
-  if (scene.player && scene.player.body) scene.player.setVelocityX(0);
-  const run = () => new Promise((resolve) => {
+  // Agarica s'arrête et prend une pose stable ; en l'air, elle finit sa chute
+  // (élan horizontal gardé) avant que la boîte ne s'ouvre (cf. storyBeginSettle).
+  const settle = storyBeginSettle(scene);
+  if (scene.player && scene.player.body && !(settle && settle.phase === 'air')) scene.player.setVelocityX(0);
+  const visit = scene.__storyVisit;
+  const open = () => new Promise((resolve) => {
     scene.scene.launch('DialogueScene', {
       lines,
       parentKey: scene.scene.key,
@@ -2103,11 +2323,24 @@ function showDialogueBox(scene, lines) {
         storyStopSpeakerTalk(scene, null);
         scene.__storyFreeze = Math.max(0, (scene.__storyFreeze || 0) - 1);
         releaseStoryInput(scene);
+        storyArmExitInvulnerability(scene);
         resolve(result);
       },
     });
     scene.scene.bringToTop('DialogueScene');
   });
+  const run = () => {
+    const wait = storySettleWait(scene);
+    if (!wait) return open();
+    // Zone quittée pendant la mise au repos : plus de boîte à ouvrir ici (le
+    // gel de cette visite est rendu, la visite suivante repart de zéro).
+    return wait.then(() => {
+      const st = scene.sys && scene.sys.settings.status;
+      if (scene.__storyVisit === visit && st >= Phaser.Scenes.CREATING && st <= Phaser.Scenes.SLEEPING) return open();
+      if (scene.__storyVisit === visit) scene.__storyFreeze = Math.max(0, (scene.__storyFreeze || 0) - 1);
+      return { lastChoice: -1, choices: [], interrupted: true };
+    });
+  };
   const p = storyDialogueChain.then(run);
   storyDialogueChain = p.catch(() => {});
   return p;
@@ -2161,10 +2394,14 @@ function runCutscene(scene, idOrSteps) {
   }
   scene.__cutsceneLock = (scene.__cutsceneLock || 0) + 1;
   hideStoryPrompt(scene);
-  if (scene.player && scene.player.body) scene.player.setVelocityX(0);
+  // Pose stable, chute finie (cf. storyBeginSettle) : les étapes ne sont pas
+  // retardées, seules les répliques attendent qu'Agarica soit posée.
+  const settle = storyBeginSettle(scene);
+  if (scene.player && scene.player.body && !(settle && settle.phase === 'air')) scene.player.setVelocityX(0);
   const finish = () => {
     if (scene.__storyVisit !== visit) return;
     scene.__cutsceneLock = Math.max(0, (scene.__cutsceneLock || 0) - 1);
+    storyArmExitInvulnerability(scene);
     if (scene.__cutsceneLock === 0) {
       scene.__playerScripted = false;
       setPlayerStoryPose(scene, null);
@@ -2501,6 +2738,9 @@ function resetStoryState(scene, data) {
     fallOut: null, fallBounds: null, liquid: null,
     // Dernier cœur perdu en l'air, en attente de la suite (cf. storyWatchAirDeath).
     airDeath: null,
+    // Mise au repos d'Agarica au début d'un dialogue / d'une cinématique
+    // (cf. storyBeginSettle) ; `settleEpisode` : déjà faite pour ce gel.
+    settle: null, settleEpisode: false,
   };
 }
 
@@ -3740,7 +3980,10 @@ function storyFallRespawn(scene, fo = {}) {
   if (fo.dead) {
     player.reviveAfterAirDeath();
   } else {
-    const fatal = hurt && !player.isInvulnerable && player.hearts <= 1;
+    // Invulnérabilité d'un coup récent seulement (`hitInvulnerable`) : celle de
+    // la sortie d'un dialogue n'épargne pas une chute (cf. Player.hitByEnemy).
+    const hitInv = player.hitInvulnerable !== undefined ? player.hitInvulnerable : player.isInvulnerable;
+    const fatal = hurt && !hitInv && player.hearts <= 1;
     const back = fatal ? { x: player.spawnX, y: player.spawnY + 4 }
       : (fall.mode === 'respawn' && st.checkpoint) || st.safePos || { x: player.spawnX, y: player.spawnY };
     player.setPosition(back.x, back.y - 4);

@@ -38,6 +38,8 @@ const GRAND_ARBRE_RACINES_DATA = {
   zoneName: 'Racines du grand arbre',
   zoneSub: 'Là où la piste du loup s\'arrête',
   background: 'fond_grand_arbre',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_ecorce',
   // Pas de vignette (lot Codex n°8, décision H1) : elle est réservée aux
   // zones sombres (forêts sombres, forêt corrompue, arène de Ghil't, trou

@@ -6,6 +6,8 @@
 const TROU_SOMBRE_DATA = {
   zoneName: 'Le trou sombre',
   background: 'fond_trou_sombre',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_corrompues',
   levelWidth: 1344,
   levelHeight: 540,

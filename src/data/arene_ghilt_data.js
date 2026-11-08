@@ -8,6 +8,8 @@ const ARENE_GHILT_DATA = {
   zoneName: "Arène de Ghil't",
   // Décor/tuiles de l'acte 2 (repli sur le décor par défaut tant que l'art manque).
   background: 'fond_arene_ghilt',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_corrompues',
   levelWidth: 1344,
   levelHeight: 540,

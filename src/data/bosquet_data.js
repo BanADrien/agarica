@@ -20,6 +20,8 @@ const BOSQUET_DATA = {
   zoneName: "Bosquet d'Émeraude",
   zoneSub: 'La nuit où tout a basculé',
   background: 'fond_bosquet',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones sombres
   // (forêts sombres, forêt corrompue, arène de Ghil't, trou sombre) ; le
   // bosquet est le foyer, encore paisible.

@@ -10,6 +10,8 @@ const BOSQUET_RETOUR_DATA = {
   zoneName: "Bosquet d'Émeraude",
   zoneSub: 'Le retour',
   background: 'fond_bosquet',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   levelWidth: 1920,
   levelHeight: 540,
   groundCells: [...groundRow(0, 30, [7, 8])],

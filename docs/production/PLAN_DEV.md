@@ -101,6 +101,8 @@ Tu peux lire le screenshot avec l'outil Read pour vérifier visuellement.
   `{parallel: [steps…]}`.
 - `isWorldFrozen(scene)` — vrai si DialogueScene/InventoryScene/MapScene/CampfireMenuScene
   actif ou `scene.__cutsceneLock`. `updateLevelFromData` l'utilise.
+- Au début d'un dialogue ou d'une cinématique, Agarica s'arrête et se pose (pose stable) ; à la
+  sortie, courte invulnérabilité : cf. « Agarica au début et à la sortie d'un dialogue » plus bas.
 - `showBossBar(scene, name, getRatio)` / `hideBossBar(scene)` — barre de vie de boss HUD.
 - `showToast(scene, text, ms)` — petit texte informatif à l'écran (indices de Xara, etc.).
 - **Bulles de parole NON bloquantes** (2026-10-23) : `showSpeechBubble(scene, cible, texte,
@@ -993,6 +995,47 @@ le sol juste après (`LEVEL_DATA_HANDLERS.branches` / `.trunks` sont des entrée
   Arène de Kainati : `[[512, 1472]]` (ses plantes se confondaient avec les éclats de l'onde de choc).
 - **Éditeur** : clé non éditée, conservée telle quelle à l'aller-retour JSON (listée dans « Clés
   conservées sans édition ») ; Maj+flèche ne la décale pas (comme `avoidRanges`).
+
+### Plantes de premier plan (`foregroundPlants`, 2026-11-08, rétro-compatible)
+- `foregroundPlants: false` (facultatif, défaut `true`) : ni touffes au bas de l'écran
+  (`addProceduralGroundPlants`) ni lianes suspendues en haut (`addCaveCeiling` →
+  `addProceduralHangingPlants`, qui ne dessine aucun vrai plafond). Le reste du décor (fond, forêt,
+  sous-bois `addUndergrowth`) ne change pas. Sans la clé : rendu d'avant.
+- Décision utilisateur : ce premier plan ne reste que dans la forêt sombre (`foret_sombre_1`,
+  `foret_sombre_2`). Toutes les autres zones de la démo portent `foregroundPlants: false` (les
+  zones au fond `fond_foret_flottante` n'en avaient déjà pas) ; les anciennes zones de test
+  (zone1-5, sous_grotte, zone_aquatique, zonetest) gardent leur rendu. `addMoonlitDecor` prend un
+  10e paramètre `groundPlants` (défaut vrai : titre, prologue et écran de fin inchangés).
+- **Éditeur** : clé non éditée, conservée telle quelle à l'aller-retour JSON.
+
+### Agarica au début et à la sortie d'un dialogue / d'une cinématique (2026-11-08, rétro-compatible)
+- **Début** (premier gel « d'histoire » : `showDialogue`, `runCutscene` bloquante, ou verrou
+  `__cutsceneLock` posé par un script de boss) : `storyBeginSettle(scene)` coupe course, sprint du
+  loup, coup, ours (`Player.storyStopActions`). Posée : pose de repos tout de suite
+  (`Player.storyRestPose` : forme humaine, idle, vitesse nulle ; pieuvre figée dans l'eau). En
+  l'air : la physique (qui tourne pendant le gel) la fait retomber en pose de saut humaine
+  (`Player.storyAirPose`, élan horizontal gardé, freiné par l'air, même corps qu'un saut) ; la
+  boîte de dialogue attend qu'elle soit posée et tienne debout (`STORY_SETTLE_STABLE_MS`, 80 ms),
+  `STORY_SETTLE_MAX_MS` (1,2 s) au plus. Ligne de chute franchie pendant ce temps : chute dans le
+  vide habituelle (fondu, point sûr, cœur), boîte ouverte après la reprise. Tant que le monde reste
+  gelé, si elle perd son appui (corps de repos moins large au ras d'un bord), elle retombe en pose
+  de saut puis reprend la pose de repos.
+  Gardés tels quels : liane (pose de liane), pose narrative (`storyPose` : `sad`, `cast`…),
+  joueur piloté (`__playerScripted` : `playerMove`, vol du crash, chute dans le vide), mort en
+  cours, corps immobilisé par un script (`body.moves = false`), compétence « avec la forme »
+  (pierre, papillon : jouée jusqu'au bout). Les étapes d'une cinématique ne sont pas retardées ;
+  seules ses répliques (`say`) attendent. Chaque image de gel : `storyFrozenTick(scene)`
+  (LevelKit, avant `freezeWorldBodies(scene, playerFalling)`).
+- **Sortie** : à la fin de tout dialogue (boîte) ou cinématique bloquante, Agarica est invulnérable
+  (`Player.storyInvulnPending`, dès la même image), puis, au premier dégel
+  (`storyUnfrozenTick`), pendant `STORY_EXIT_INVULN_MS` (1 s, StoryKit), signalée comme après un
+  coup (clignotement `HIT_BLINK_*`). Les ennemis à moins de `STORY_EXIT_CALM_RANGE` (320 px) qui
+  exposent `calm(ms)` (aujourd'hui `SingeCorrompu`) annulent leur attaque en cours. Contrat
+  facultatif pour un ennemi : `calm(ms)` = attaque en cours annulée, immobile `ms`, pose de repos.
+- `player.isInvulnerable` (lecture) = coup reçu OU sortie de dialogue ; écriture = coup reçu
+  (`player.hitInvulnerable`, l'ancien booléen). Une chute dans le vide ignore l'invulnérabilité
+  de sortie (`hitByEnemy({ fall: true })` et `storyFallRespawn` ne lisent que `hitInvulnerable`) :
+  elle coûte toujours son cœur. `player.grantStoryInvulnerability(ms)` : API publique.
 
 ## Progression & flags d'histoire (noms figés)
 

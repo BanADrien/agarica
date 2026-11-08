@@ -344,7 +344,9 @@ function addProceduralHangingPlants(scene, levelWidth) {
 // camLow, camHigh, sky, treesScrollY } -- ligne de base des fonds, plage de
 // défilement vertical de la caméra, ciel qui se révèle (skyReveal). Sans
 // aucune de ces options : rendu historique à l'identique.
-function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null, largeTrees = true, treesAtScreenBottom = false, backdrop = {}) {
+// `groundPlants` (défaut vrai) : touffes de premier plan au bas de l'écran
+// (cf. clé de zone `foregroundPlants` dans buildLevelFromData).
+function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], background = null, largeTrees = true, treesAtScreenBottom = false, backdrop = {}, groundPlants = true) {
   const coverWidth = Math.ceil(levelWidth * 1.4);
   const bgKey = background && scene.textures.exists(`item-${background}`) ? `item-${background}` : 'decor-plan4';
   const sourceHeight = bgKey === 'decor-plan4' ? DECOR_SOURCE_HEIGHT : scene.textures.get(bgKey).getSourceImage().height;
@@ -382,7 +384,7 @@ function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], bac
     camLow,
   } : null;
   if (largeTrees) addProceduralForest(scene, height, levelWidth, canopyView && !treeBase ? [] : avoidRanges, canopyView, treesAtScreenBottom, treeBase);
-  if (!floatingBackground) addProceduralGroundPlants(scene, height, levelWidth, avoidRanges);
+  if (!floatingBackground && groundPlants) addProceduralGroundPlants(scene, height, levelWidth, avoidRanges);
 }
 
 // ===========================================================================
@@ -4469,9 +4471,15 @@ function buildLevelFromData(scene, data, sceneData) {
   scene.__sky = null;
   scene.liquidFloor = null;
   if (data.decor !== false) {
+    // `foregroundPlants: false` (clé de zone facultative, 2026-11-08) : ni touffes
+    // au bas de l'écran ni lianes suspendues en haut (plan1, devant le joueur).
+    // Décision utilisateur : ce premier plan reste propre au début, dans la forêt
+    // sombre ; les autres zones de la démo le coupent. Sans la clé : comme avant.
+    const foregroundPlants = data.foregroundPlants !== false;
     addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], zoneBackgroundId(data), data.largeTrees !== false,
-      data.treesAtScreenBottom === true, zoneBackdropSpec(data, { camLow, camHigh }));
-    if (zoneBackgroundId(data) !== 'fond_foret_flottante') addCaveCeiling(scene, levelWidth);
+      data.treesAtScreenBottom === true, zoneBackdropSpec(data, { camLow, camHigh }), foregroundPlants);
+    // (addCaveCeiling ne pose que les lianes suspendues : aucun vrai plafond à garder.)
+    if (foregroundPlants && zoneBackgroundId(data) !== 'fond_foret_flottante') addCaveCeiling(scene, levelWidth);
   }
   setupDebugToggle(scene);
 
@@ -4951,8 +4959,14 @@ function updateLevelFromData(scene, time, delta) {
   // ennemi, aucune sortie de zone -- seul le HUD continue d'être dessiné ici,
   // les overlays se dessinent eux-mêmes dans leur propre scène.
   if (isWorldFrozen(scene)) {
-    freezeWorldBodies(scene);
+    // Dialogue / cinématique : Agarica s'arrête, se pose (chute finie) et prend
+    // une pose stable (cf. storyBeginSettle, StoryKit) ; vrai tant qu'elle
+    // retombe, son élan horizontal est alors gardé.
+    const playerFalling = storyFrozenTick(scene);
+    freezeWorldBodies(scene, playerFalling);
   } else {
+    // Fin d'épisode de gel, invulnérabilité de sortie de dialogue (StoryKit).
+    storyUnfrozenTick(scene);
     scene.player.update();
     if (scene.xara) scene.xara.update(time, delta);
     scene.enemies.children.iterate((enemy) => enemy && enemy.update(scene.player));
@@ -5071,9 +5085,16 @@ function updateLevelFromData(scene, time, delta) {
 // Pendant un gel, la physique continue (gravité) : on coupe l'élan horizontal
 // du joueur (sauf s'il est piloté par une cinématique, cf. playerMove) et
 // celui des ennemis, sinon ils glisseraient sur leur dernière vitesse.
-function freezeWorldBodies(scene) {
+// `playerFalling` (cf. storyFrozenTick) : Agarica finit sa chute en gardant son
+// élan horizontal (fin de l'arc du saut) au lieu de tomber à la verticale.
+function freezeWorldBodies(scene, playerFalling = false) {
   const player = scene.player;
-  if (player.body && !scene.__playerScripted) player.setVelocityX(0);
+  if (player.body && !scene.__playerScripted && !playerFalling) player.setVelocityX(0);
+  // Dans l'eau (pieuvre, gravité coupée) : sans ceci, elle dérivait vers le
+  // haut ou le bas pendant tout le dialogue (dernière vitesse de nage).
+  if (player.body && !scene.__playerScripted && !player.vine && player.body.allowGravity === false && player.form === 'octopus') {
+    player.setVelocityY(0);
+  }
   // L'accélération de course (Player.update) restait appliquée pendant le
   // gel : Agarica glissait (~30 px/s) pendant un dialogue, jusqu'à tomber
   // d'un bord de ravin. Player.update la repose à chaque frame une fois dégelé.

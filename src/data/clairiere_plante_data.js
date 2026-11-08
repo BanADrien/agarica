@@ -12,6 +12,8 @@ const CLAIRIERE_PLANTE_DATA = {
   zoneName: 'La clairière préservée',
   zoneSub: 'Forêt flottante',
   background: 'fond_foret_flottante',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_flottantes',
   levelWidth: 2240,
   levelHeight: 540,

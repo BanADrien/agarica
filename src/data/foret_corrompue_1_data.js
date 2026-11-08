@@ -17,6 +17,8 @@ const FORET_CORROMPUE_1_DATA = {
   zoneName: 'La forêt corrompue',
   zoneSub: 'Cœur de la corruption',
   background: 'fond_foret_corrompue',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_corrompues',
   ambient: { tint: 0x1d3a12, darkness: 0.3 },
   // Spores toxiques qui dérivent dans l'air (lot Codex n°8,

@@ -13,6 +13,8 @@ const HUTTE_MORGAT_DATA = {
   zoneName: 'La hutte de Morgat',
   zoneSub: 'Forêt flottante',
   background: 'fond_foret_flottante',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_flottantes',
   levelWidth: 4800,
   levelHeight: 540,

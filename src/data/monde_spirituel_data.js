@@ -24,6 +24,8 @@ const MONDE_SPIRITUEL_DATA = {
   zoneName: 'Monde spirituel',
   zoneSub: "L'arbre d'avant la mousse",
   background: 'fond_monde_spirituel',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_ecorce',
   // Voile éthéré bleu-vert (lumière d'esprit, à l'opposé du violet de la nuit).
   // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones

@@ -27,6 +27,8 @@ const FORET_FLOTTANTE_1_DATA = {
   zoneName: 'Le chemin des hauteurs',
   zoneSub: 'Forêt flottante',
   background: 'fond_foret_flottante',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_ecorce',
   levelWidth: 3584,
   levelHeight: 540,

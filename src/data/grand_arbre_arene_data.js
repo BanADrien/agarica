@@ -21,6 +21,8 @@ const GRAND_ARBRE_ARENE_DATA = {
   zoneName: 'Grand arbre — la cime',
   // Même écorce et même fond que les racines : on est dans les branches du grand arbre.
   background: 'fond_grand_arbre',
+  // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
+  foregroundPlants: false,
   tileset: 'tuiles_ecorce',
   // Pas de grands arbres du fond : dans le tronc, leur feuillage brouille le
   // combat, et le fond montre déjà la masse de l'arbre.

@@ -1397,6 +1397,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.spawnX = x;
     this.spawnY = y;
     this.isInvulnerable = false;
+    // Invulnérabilité de sortie de dialogue / cinématique (cf.
+    // grantStoryInvulnerability) : armée au gel, minutée au dégel.
+    this.storyInvulnPending = false;
+    this.storyInvulnUntil = 0;
+    this.storyInvulnBlink = null;
 
     // Capacités débloquées par sanctuaire (cf. addAbilityShrine dans
     // LevelKit.js) — persistées dans le registry Phaser (survit aux
@@ -3940,6 +3945,162 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.wasOnGround = true;
   }
 
+  // --- Dialogue / cinématique : pose stable (2026-11-08, retour utilisateur :
+  // « quand un dialogue se lance, le personnage continue son animation
+  // actuelle, et parfois au milieu du vide ») --------------------------------
+  // Le monde est gelé (update() ne tourne plus) : l'image de course, de marche
+  // ou d'attaque restait affichée, une transformation (loup, aigle, singe)
+  // aussi, et un déclencheur franchi en plein saut ouvrait la boîte avec
+  // Agarica en l'air. StoryKit (storyBeginSettle / storySettleStep) appelle :
+  //   storyStopActions() une fois, au début du gel ;
+  //   storyAirPose()     à chaque image tant qu'elle tombe (la physique tourne) ;
+  //   storyRestPose()    une fois posée.
+  // Une pose narrative (`storyPose`, posée par la cinématique) et la liane
+  // gardent toujours la main.
+  storyStopActions() {
+    this.isAttacking = false;
+    this.slashDir = null;
+    this.biteAnimPending = false;
+    this.eagleDiving = false;
+    this.wolfSprintActive = false;
+    this.tapSprintDirection = null;
+    this.wolfJumpCarry = false;
+    this.formTransitionActive = false;
+    this.jumpBufferedAt = -Infinity;
+    this.monkeyReleasePoseUntil = 0;
+    this.featherFlapEndTime = 0;
+    this.throwPoseUntil = 0;
+    this.vineFlight = false;
+    this.vineMomentumSpeed = 0;
+    if (this.body) this.setAccelerationX(0);
+    // Ours (art dédié) en pleine transformation : coupé net, comme à sa fin
+    // normale dans update() (origine, teinte du repli sans art). Sa zone de
+    // dégâts n'agit de toute façon pas pendant le gel.
+    if (this.skillTransformActive) {
+      const def = SKILL_DEFS[this.activeSkillId];
+      this.skillTransformActive = false;
+      this.activeSkillId = null;
+      this.skillHitboxRect = null;
+      this.skillHitboxPendingRect = null;
+      this.skillHitboxId = null;
+      if (def && def.originX !== undefined) this.setOrigin(0.5, 1);
+      if (!def || !def.animKey) this.clearTint();
+    }
+  }
+
+  // Retour à la forme humaine sans anim de transfo (le monde est gelé, elle
+  // ne se jouerait pas) : petit éclat de la forme quittée à la place.
+  storyForceHuman() {
+    const from = this.form;
+    if (from === 'agarica') return;
+    this.resetVineArtAnchor();
+    this.setForm('agarica');
+    this.airJumpForm = null;
+    this.juiceFormChange(from, 'agarica', this.scene.time.now);
+    this.juicePrevForm = 'agarica';
+  }
+
+  // En l'air pendant le gel : forme humaine, pose de saut (montée / chute),
+  // gravité d'une chute normale (sans plané). La vitesse horizontale est
+  // gardée (fin de l'arc, freinée par l'air), cf. freezeWorldBodies.
+  storyAirPose() {
+    const b = this.body;
+    if (!b) return;
+    this.storyForceHuman();
+    const rising = b.velocity.y < 0;
+    b.setAllowGravity(true);
+    b.gravity.y = rising ? 0 : this.fallGravityBonus;
+    b.maxVelocity.y = PLAYER_MAX_FALL_SPEED;
+    if (this.storyPose) return;
+    const anim = rising ? 'jump_rise' : 'jump_fall';
+    if (hasManifestArt(this.scene, 'agarica_extra', anim)) {
+      this.applyAgaricaExtraPose(anim);
+    } else {
+      this.anims.stop();
+      this.setTexture(rising ? JUMP_RISE_TEXTURE : JUMP_FALL_TEXTURE);
+      this.applyBodyForScale(JUMP_SCALE, FORMS.agarica.body);
+      this.setFlipX(this.facingDir > 0);
+    }
+    // Même corps qu'un saut normal (décalé vers l'avant, cf. fin d'update) :
+    // elle se pose là où le saut l'aurait posée.
+    b.setOffset(b.offset.x + this.facingDir * AGARICA_BODY_FORWARD_SHIFT, b.offset.y);
+  }
+
+  // Posée (ou dans l'eau) : immobile, pose de repos de la forme humaine (la
+  // pieuvre garde sa pose de nage figée). Même rendu que la branche « forme
+  // humaine au sol » d'update(), décalage avant du corps compris.
+  storyRestPose() {
+    const b = this.body;
+    if (!b || this.vine || this.fallingOut) return;
+    this.setAccelerationX(0);
+    this.setVelocityX(0);
+    if (this.form === 'octopus') {
+      this.setVelocity(0, 0);
+      this.anims.stop();
+      this.setTexture('pieuvre-walk-0');
+      return;
+    }
+    this.storyForceHuman();
+    b.gravity.y = 0;
+    // Pas de « gros atterrissage » ni d'éclat de forme à la reprise.
+    this.wasOnGround = true;
+    this.juicePrevVy = 0;
+    if (this.storyPose) return;
+    this.resetVineArtAnchor();
+    if (this.scene.anims.exists(ANIM_IDLE_KEY)) this.anims.play(ANIM_IDLE_KEY, true);
+    this.applyBodyForScale(FORMS.agarica.scale, FORMS.agarica.body);
+    this.setFlipX(this.facingDir > 0);
+    b.setOffset(b.offset.x + this.facingDir * AGARICA_BODY_FORWARD_SHIFT, b.offset.y);
+  }
+
+  // --- Invulnérabilité ---------------------------------------------------------
+  // Deux sources, un seul test (`isInvulnerable`, lu par LevelKit, les boss,
+  // le duel...) : le coup reçu (`hitInvulnerable`, l'ancien booléen, posé et
+  // levé par hitByEnemy/finishHit -- l'écriture de `isInvulnerable` garde ce
+  // sens) et la sortie d'un dialogue ou d'une cinématique (ci-dessous).
+  get isInvulnerable() {
+    return !!this.hitInvulnerable || this.storyInvulnerable();
+  }
+
+  set isInvulnerable(v) {
+    this.hitInvulnerable = !!v;
+  }
+
+  storyInvulnerable() {
+    if (this.storyInvulnPending) return true;
+    const sc = this.scene;
+    return !!(sc && sc.time && sc.time.now < (this.storyInvulnUntil || 0));
+  }
+
+  // Sortie d'un dialogue ou d'une cinématique (StoryKit) : `storyInvulnPending`
+  // protège dès la fermeture (même image : un ennemi au contact ne frappe pas
+  // avant le dégel), puis cette méthode, au premier dégel, minute `ms`. Même
+  // signal que l'invulnérabilité d'un coup (clignotement HIT_BLINK_*), qui
+  // garde la main si elle tourne déjà.
+  grantStoryInvulnerability(ms) {
+    const sc = this.scene;
+    this.storyInvulnPending = false;
+    if (!sc || !this.active || !(ms > 0)) return;
+    this.storyInvulnUntil = Math.max(this.storyInvulnUntil || 0, sc.time.now + ms);
+    if (this.storyInvulnBlink) return;
+    const blink = sc.time.addEvent({
+      delay: HIT_BLINK_MS,
+      loop: true,
+      callback: () => {
+        if (!this.active || sc.time.now >= this.storyInvulnUntil) {
+          blink.remove(false);
+          this.storyInvulnBlink = null;
+          if (this.active && !this.hitInvulnerable) this.setAlpha(1);
+          return;
+        }
+        if (this.hitInvulnerable) return;
+        this.setAlpha(this.alpha < 1 ? 1 : HIT_BLINK_ALPHA);
+      },
+    });
+    this.storyInvulnBlink = blink;
+    if (!this.hitInvulnerable) this.setAlpha(HIT_BLINK_ALPHA);
+  }
+
   // Appelé par la scène quand un ennemi touche Agarica hors fenêtre
   // d'attaque : perd 1 cœur avec un court flash d'invulnérabilité ; seul
   // un cœur tombé à 0 renvoie au point de départ de la zone (et restaure
@@ -3950,7 +4111,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // `opts.fall` : perte de cœur due à une chute dans le vide (cf.
   // updateStoryFall), appelée au point de reprise, sous le fondu.
   hitByEnemy(opts = {}) {
-    if (this.isInvulnerable || this.fallingOut) return;
+    // Chute dans le vide : seule l'invulnérabilité d'un coup récent l'épargne
+    // (règle d'avant) ; celle de la sortie d'un dialogue ne protège que des
+    // ennemis -- une chute juste après un dialogue coûte toujours son cœur.
+    if ((opts.fall ? this.hitInvulnerable : this.isInvulnerable) || this.fallingOut) return;
     this.isInvulnerable = true;
     if (this.vine) this.releaseVine(false, this.scene.time.now);
     this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;
