@@ -55,6 +55,9 @@ const LOOK_CHAR_RESCAN_FRAMES = 15;
 const LOOK_SCAN_FRAMES = 10;
 const LOOK_FIREFLY_MAX = 4;
 const LOOK_SHADOW_FALLBACK_KEY = 'look-shadow-ellipse';
+// Opacité de toutes les ombres de contact, multipliée (2026-11-08 : « réduis
+// les ombres », trop sombres sous les formes et les ennemis).
+const LOOK_SHADOW_ALPHA_MUL = 0.5;
 const LOOK_GLOW_KEY = 'look-glow';
 // Suffixe des textures de fond précalculées : la clé garde son préfixe
 // d'origine (`item-…`), que certains scripts lisent (cf. a2SkyWash, acte2.js).
@@ -1519,12 +1522,16 @@ function lookSyncShadow(scene, st, src) {
   // changement de forme ne fasse pas sauter l'ombre d'un coup.
   let target;
   let off;
-  if (src === scene.player && src.body) {
-    target = src.body.width * 1.3;
+  // Retour utilisateur du 2026-11-08 : sous les formes et les bêtes (loup,
+  // crapaud), l'ombre tirée de la silhouette visible devenait une grande
+  // tache noire (110 px pour le loup sanguinaire) « agressive pour les yeux ».
+  // Tout personnage qui a un corps physique prend donc la largeur de ce corps,
+  // comme Agarica ; seuls ceux sans corps gardent l'appui visible.
+  if (src.body) {
+    target = src.body.width * 1.1;
     off = src.body.center.x - src.x;
   } else {
-    target = box ? (box.baseRight - box.baseLeft) : src.displayWidth * 0.4;
-    if (src.body) target = Math.max(target, src.body.width * 0.8);
+    target = box ? (box.baseRight - box.baseLeft) * 0.8 : src.displayWidth * 0.35;
     off = box ? (box.baseLeft + box.baseRight) / 2 - src.x : 0;
   }
   const ease = src === scene.player ? 0.25 : 0.08;
@@ -1550,9 +1557,11 @@ function lookSyncShadow(scene, st, src) {
   }
   sh.setVisible(k > 0.02);
   if (sh.depth !== src.depth - 0.6) sh.setDepth(src.depth - 0.6);
-  sh.setDisplaySize(w, Math.max(5, w * 0.26));
+  sh.setDisplaySize(w, Math.max(4, w * 0.22));
   sh.setPosition(cx, y);
-  sh.setAlpha((st.cfg.shadow.alpha ?? 0.7) * k * src.alpha * alphaMul);
+  // LOOK_SHADOW_ALPHA_MUL : ombres adoucies partout (même retour utilisateur),
+  // sans retoucher l'opacité de chaque profil.
+  sh.setAlpha((st.cfg.shadow.alpha ?? 0.7) * LOOK_SHADOW_ALPHA_MUL * k * src.alpha * alphaMul);
 }
 
 function lookPlateauAt(scene, st, x, top) {
