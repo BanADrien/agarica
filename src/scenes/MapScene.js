@@ -23,25 +23,46 @@
 // absente de la table est placée automatiquement (mapAutoPlace). Les zones de
 // test ne sont jamais sur la carte.
 const MAP_ZONE_LAYOUT = {
+  // Vague 3 (2026-11-08, VAGUE3_DESIGN.md § 1.4) : la forêt sombre 1 s'élargit de
+  // 512 px (gouffre aux lianes), tout ce qui est à sa droite glisse de +512 ;
+  // l'épreuve du singe monte (place du cercle de lune) ; chaque zone facultative
+  // tombe au droit du passage de sa voisine. Hauteurs réelles des boîtes (cf.
+  // mapZoneBox) : le sol descend jusqu'à 576 (rangée 8), pas 540 ; d'où les y
+  // décalés de 36 par rapport au document (aucune boîte ne se chevauche).
+  // Écarts voulus (monde pas tout à fait euclidien) : 144 px entre le bas des
+  // racines et le haut des galeries ; 416 px entre le belvédère du chemin des
+  // hauteurs et l'île du gardien, posée au-dessus des îles flottantes (dont la
+  // boîte monte à -400, cf. leur sortie vers l'île des vents).
   bosquet: { x: 0, y: 0 },
   foret_sombre_1: { x: 3840, y: 0 },
-  foret_sombre_2: { x: 7680, y: 0 },
-  grand_arbre_racines: { x: 13568, y: 0 },
+  foret_sombre_2: { x: 8192, y: 0 },
+  grand_arbre_racines: { x: 14080, y: 0 },
   // Sol de l'arène (448) au niveau de la sortie haute des racines (-192).
-  grand_arbre_arene: { x: 17408, y: -640 },
+  grand_arbre_arene: { x: 17920, y: -640 },
   // Longue course au-dessus de la forêt sombre, qui revient aux racines.
-  epreuve_singe: { x: 1280, y: -720 },
+  epreuve_singe: { x: 1792, y: -1152 },
   // Hors du chemin (fichiers gardés) : au-dessus du grand arbre.
-  monde_spirituel: { x: 14000, y: -2300 },
-  foret_flottante_1: { x: 19328, y: -640 },
-  foret_flottante_2: { x: 22912, y: -1856 },
-  clairiere_plante: { x: 27008, y: -1834 },
-  hutte_morgat: { x: 29248, y: -1834 },
+  monde_spirituel: { x: 14512, y: -3400 },
+  foret_flottante_1: { x: 19840, y: -640 },
+  foret_flottante_2: { x: 23424, y: -1856 },
+  clairiere_plante: { x: 27520, y: -1834 },
+  hutte_morgat: { x: 29760, y: -1834 },
   // Le crash : en contrebas, au-delà de la hutte.
-  foret_corrompue_1: { x: 32600, y: -500 },
-  arene_ghilt: { x: 36760, y: -500 },
-  trou_sombre: { x: 36760, y: 160 },
-  bosquet_retour: { x: 38104, y: -500 },
+  foret_corrompue_1: { x: 33112, y: -500 },
+  arene_ghilt: { x: 37272, y: -500 },
+  trou_sombre: { x: 37272, y: 160 },
+  bosquet_retour: { x: 38616, y: -500 },
+  // Zones facultatives (vague 3).
+  grotte_lisiere: { x: 7476, y: 720 },
+  galeries_racines: { x: 11956, y: 720 },
+  cercle_lune: { x: 10816, y: -576 },
+  cime_cachee: { x: 17216, y: -1216 },
+  ile_du_gardien: { x: 21490, y: -2796 },
+  ile_des_vents: { x: 23764, y: -2796 },
+  racines_suspendues: { x: 25280, y: -858 },
+  marais_brumes: { x: 28416, y: -1258 },
+  nid_cocons: { x: 33624, y: 76 },
+  canopee_malade: { x: 34712, y: -1040 },
 };
 // Échelles (px d'écran par px de jeu), de la vue d'ensemble (le monde de la
 // démo, ~40 000 px, tient dans le cadre) au détail.

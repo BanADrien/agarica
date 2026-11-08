@@ -81,7 +81,7 @@ const MENU_CHAPTERS = [
   {
     id: 'foret_sombre', act: 'Acte I', name: 'La forêt sombre',
     desc: 'Bannie, Agarica s\'enfonce seule dans les bois… mais quelqu\'un l\'observe.',
-    scene: 'ForetSombre1Scene', enterId: 'from_bosquet', zones: ['foret_sombre_1', 'foret_sombre_2'], color: 0x1d2a4a, bg: 'fond_foret_sombre',
+    scene: 'ForetSombre1Scene', enterId: 'from_bosquet', zones: ['foret_sombre_1', 'foret_sombre_2', 'grotte_lisiere', 'cercle_lune'], color: 0x1d2a4a, bg: 'fond_foret_sombre',
     gives: {
       flags: {
         visited_foret_sombre_1: true, visited_foret_sombre_2: true, xaraMet: true, hasWolfForm: true, planteVue: true,
@@ -93,7 +93,7 @@ const MENU_CHAPTERS = [
   {
     id: 'grand_arbre', act: 'Acte I', name: 'Le grand arbre',
     desc: 'Des racines immenses, un totem du singe endormi… et un roi furieux au sommet.',
-    scene: 'GrandArbreRacinesScene', enterId: 'from_foret_sombre', zones: ['grand_arbre_racines', 'grand_arbre_arene', 'epreuve_singe'], color: 0x4a3420, bg: 'fond_grand_arbre',
+    scene: 'GrandArbreRacinesScene', enterId: 'from_foret_sombre', zones: ['grand_arbre_racines', 'grand_arbre_arene', 'epreuve_singe', 'galeries_racines', 'cime_cachee'], color: 0x4a3420, bg: 'fond_grand_arbre',
     // Ordre (décision du 2026-10-25) : totem du singe allumé au bout de la
     // grande branche (forme singe, directement) → lianes de la cime →
     // Kainati épargné (l'épreuve reste optionnelle : pas de talisman). Le
@@ -109,7 +109,7 @@ const MENU_CHAPTERS = [
   {
     id: 'foret_flottante', act: 'Acte II', name: 'La forêt flottante',
     desc: 'Des îles suspendues, un cartographe douteux et son crabe… et une fleur rare.',
-    scene: 'ForetFlottante1Scene', enterId: 'from_arbre', zones: ['foret_flottante_1', 'foret_flottante_2', 'clairiere_plante', 'hutte_morgat'], color: 0x2a4470, bg: 'fond_foret_flottante',
+    scene: 'ForetFlottante1Scene', enterId: 'from_arbre', zones: ['foret_flottante_1', 'foret_flottante_2', 'clairiere_plante', 'hutte_morgat', 'ile_du_gardien', 'ile_des_vents', 'racines_suspendues', 'marais_brumes'], color: 0x2a4470, bg: 'fond_foret_flottante',
     gives: {
       flags: {
         visited_foret_flottante_1: true, visited_foret_flottante_2: true, visited_clairiere_plante: true, visited_hutte_morgat: true,
@@ -122,7 +122,7 @@ const MENU_CHAPTERS = [
   {
     id: 'foret_corrompue', act: 'Acte II', name: 'La forêt corrompue',
     desc: 'Après la chute, la mousse est vivante. Au fond des bois, Ghil\'t attend.',
-    scene: 'ForetCorrompue1Scene', enterId: 'from_crash', zones: ['foret_corrompue_1', 'arene_ghilt', 'trou_sombre', 'bosquet_retour'], color: 0x3a1838, bg: 'fond_foret_corrompue',
+    scene: 'ForetCorrompue1Scene', enterId: 'from_crash', zones: ['foret_corrompue_1', 'arene_ghilt', 'trou_sombre', 'bosquet_retour', 'nid_cocons', 'canopee_malade'], color: 0x3a1838, bg: 'fond_foret_corrompue',
     gives: {},
   },
 ];

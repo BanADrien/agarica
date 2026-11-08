@@ -1,5 +1,13 @@
 # Vague 3 — conception : zones facultatives, secrets, économie, marchand, quêtes
 
+> **Décisions de l'utilisateur (2026-11-08).** Le marchand est **Tamarin**, vieux singe colporteur du peuple de Kainati (remplace Margotte la pie) :
+> sprite `singe_gueri` + baluchon et lanterne dessinés par code (variante d'art `tamarin` facultative), boutique `SHOPS.tamarin`, talk `v3_tamarin` (§ 4).
+> Rencontre aux racines, dans un nid sur la corniche de la cime (x 3630, au bout des deux lianes qui suivent le totem du singe) ; ensuite, perchoirs au bout de
+> lianes (`requires: { marchandVu: true }`) : cime cachée (B), grotte de la lisière (A), racines suspendues (C). Plus de comptoir dans la forêt corrompue.
+> L'objet volé par Pépin devient la loupe `loupe_tamarin`, rendue à Tamarin dans n'importe quel perchoir (+15 éclats, drapeau `loupeRendue`).
+> Prix inchangés (baie 15, sève 20, corde 30) ; ennemi soigné : 0 éclat ; 5 cœurs ; éclats tels quels. Le reste est validé tel quel : choix tranchés au § 8.
+> **Pré-lot fait (2026-11-08)** : quelques valeurs des § 1.3, 1.4 et 7.1 ont été corrigées après mesure en jeu (gouffre de la forêt sombre 1 : plus d'ouverture sur la route, un bouchon de bois pourri relie le rocher au tronc et ne se casse à l'ours qu'avec le singe ; lianes x 3392 / 3680 de 160 px, sortie basse x 3712-4032 ; plateforme cachée de l'arène gx 23, gy 4 ; courant d'I1-I2 x 688-792 ; positions de la carte…). **Les valeurs qui font foi sont dans `PLAN_DEV.md`, section « Vague 3 : zones facultatives »**, avec les pièges des arrivées par le bas.
+
 Document de conception (2026-11-08), points 6 à 9 de la liste de l'utilisateur du 2026-11-04.
 Il ne contient pas de code. Il sert de cahier des charges à l'agent du **pré-lot** (modifications des
 zones existantes et enregistrements partagés), puis aux trois agents des **lots A, B et C**, qui
@@ -21,7 +29,7 @@ Sources : `CLAUDE.md`, `Legend_of_Agarica_GDD.md`, `docs/production/PLAN_DEV.md`
 - Cœur entier : pickup « graine de chêne-cœur » (`objet_graine_coeur`, déjà utilisé par le cœur
   de la forêt sombre 2), +1 cœur max. Un id par cœur (`coeur_grotte`…).
 - Éclats de lune : 1 à 3 par ennemi vaincu (automatique), plus les coffres.
-- `npcs[i].shop: 'margotte'` + table `SHOPS` ; table `QUESTS` + étapes de cinématique + onglet « Quêtes ».
+- `npcs[i].shop: 'tamarin'` + table `SHOPS` (`SHOPS.tamarin`, `src/data/shops_data.js`) ; table `QUESTS` + étapes de cinématique + onglet « Quêtes ».
 
 **Mesures du jeu** (PLAN_DEV) : grille 64 ; surface d'une rangée `gy` = `gy × 64` ; sol courant
 `gy` 7-8 (surface 448). Saut simple ≈ 172 px, soit 2 rangées au plus, portée ≈ 180 px. Second saut
@@ -45,7 +53,8 @@ liane → 448 px → liane → 96-128 px → appui. Un appui plus bas que le lâ
 4. **Rien d'obligatoire dans un secret**, aucune quête bloquante. La démo se finit sans rien de ce
    document.
 5. **Xara annonce chaque passage fermé** par une bulle non bloquante (`cutsceneBulles`) : le joueur
-   comprend qu'il reviendra. Margotte la pie répète ces indices sous forme de rumeurs (§ 4).
+   comprend qu'il reviendra. Tamarin, le vieux singe colporteur, répète ces indices sous forme de
+   rumeurs (§ 4).
 6. **Décors** : `foregroundPlants: false` partout (décision du 2026-11-08), sauf dans la forêt
    sombre 1-2 existante. Clé `look` copiée de la zone voisine indiquée, puis réglée à la capture.
 7. **Emplacements pour plus tard** (formes, morceaux de totem, armures, armes, compétences) :
@@ -214,6 +223,8 @@ approximatives ; celles des passages, des lianes et des gouffres sont à respect
   (25), bien en vue sur l'autel du sanctuaire : la récompense des lianes ; coffre petit
   `coffre_grotte_racine` (8) dans la poche au répulsif. **Emplacement futur** (arme) : dans la même poche,
   un vieux râtelier de druide vide (pierre runique + réplique « Ici reposait un bâton… plus maintenant »).
+- **Perchoir de Tamarin** (§ 4, `requires: { marchandVu: true }`) : au bout de la galerie des lianes,
+  côté sanctuaire ; `x` et appui (nid ou sol) au choix du lot.
 - **Xara** : arrivée « Ouf. Une grotte, sous la lisière… Il fait presque doux, ici. » ; bord des
   lianes « Des lianes, encore. Avec tes bras de singe, c'est une promenade. Sans… c'est une chute. » ;
   araignée « Une cousine. Ne la dérange pas, elle compte ses fils. » ; sanctuaire « Des croissants
@@ -321,6 +332,8 @@ approximatives ; celles des passages, des lianes et des gouffres sont à respect
   rien. » ; couronne « Là-haut, un nid. Et ce qui brille dedans ne ressemble pas à un œuf. »
 - **Villageois** (bulles) : « Kainati dit que tu te balances bien. Pour une humaine. » ; « Tu as vu
   Pépin ? Il est toujours là où il ne faut pas. »
+- **Perchoir de Tamarin** (§ 4, `requires: { marchandVu: true }`) : il revient à son village, mais
+  perché au bout d'une liane ; `x` et perchoir au choix du lot (pas dans le nid du cœur).
 - **Durée** : 7 min (village 2, couronne 3 à 5).
 
 ### 2.5 `ile_des_vents` — L'île des vents (lot B)
@@ -443,8 +456,10 @@ approximatives ; celles des passages, des lianes et des gouffres sont à respect
     cache de 5 éclats.
 - **Ennemis** (4) : deux `corbeau` adoucis (nid) ; `crapaud_piege` sur R1 (`reach: 160`, loin du feu) ;
   `singe_corrompu` sur R5.
+- **Perchoir de Tamarin** (§ 4, `requires: { marchandVu: true }`) : au bout des racines-lianes du
+  grand vide (route du singe ; l'aigle y arrive aussi en planant) ; `x` et perchoir au choix du lot.
 - **Xara** : arrivée « On est… sous les îles ? Le monde a un dessous, alors. » ; nid « Un nid de
-  corbeaux. Les corbeaux aiment ce qui brille. Comme une certaine pie. »
+  corbeaux. Les corbeaux aiment ce qui brille. Comme un certain vieux singe. »
 - **Durée** : 5 min.
 - Pourquoi ce passage : l'entrée est le bord gauche de la clairière, au pied du courant d'air qui
   ramène aux îles. Qui rate son plané en repartant tombe ici au lieu de perdre un cœur, et en remonte
@@ -503,7 +518,7 @@ approximatives ; celles des passages, des lianes et des gouffres sont à respect
 
 ### 3.1 Cœurs entiers (+1 cœur max chacun)
 
-Proposition : **5 cœurs cachés au total**, soit 8 cœurs au maximum (3 de base).
+**5 cœurs cachés au total** (choix de l'utilisateur, § 8), soit 8 cœurs au maximum (3 de base).
 
 | Id | Où | Comment | Capacités |
 |---|---|---|---|
@@ -513,7 +528,7 @@ Proposition : **5 cœurs cachés au total**, soit 8 cœurs au maximum (3 de base
 | `coeur_gardien` | île du gardien, reliquaire | porte de pierre cassable par l'ours | aigle + ours |
 | `coeur_ecaille` | marais, récompense de Dame Écaille | quête des 3 fleurs de lune | singe ou aigle, aigle, répulsif |
 
-Variante à 4 cœurs (7 au maximum) : le nid de la couronne donne un coffre grand au lieu d'un cœur.
+Variante à 4 cœurs (7 au maximum, écartée) : le nid de la couronne donne un coffre grand au lieu d'un cœur.
 Le cœur existant doit être rattaché au nouveau système (l'agent des systèmes s'en charge,
 rétro-compatible).
 
@@ -521,8 +536,9 @@ rétro-compatible).
 
 Hypothèse : 1 à 3 éclats par ennemi, environ 2 en moyenne ; ennemis non mémorisés (ils
 reviennent à chaque entrée de zone, donc on peut farmer, mais ce n'est pas nécessaire).
-**Recommandation** : un ennemi soigné au papillon rapporte autant qu'un ennemi vaincu ; le jeu ne
-doit pas punir la douceur.
+**Ennemi soigné au papillon : 0 éclat.** Ce document proposait « autant qu'un ennemi vaincu » ;
+l'utilisateur a gardé le réglage du système (`ECLATS_HEALED_DROP = 0`, PLAN_DEV) : le soin est
+récompensé par l'histoire, pas par la bourse.
 
 | Source | Détail | Éclats (un passage) |
 |---|---|---|
@@ -530,7 +546,7 @@ doit pas punir la douceur.
 | Ennemis des zones facultatives | 40 (grotte 4, galeries 5, cercle 3, cime 3, îles 4 + 4, marais 5, racines suspendues 4, nid 4, canopée 4) | ≈ 80 |
 | Coffres | 13 : 2 petits, 7 moyens, 4 grands (détail ci-dessous) | 221 |
 | Caches dans des cassables | 4 × 5 (île des vents, marais, racines suspendues, canopée) | 20 |
-| Quêtes | Pépin 25 + cuillère 15 ; Geralt 30 ; Écaille (cœur, pas d'éclats) | 70 |
+| Quêtes | Pépin 25 + loupe 15 ; Geralt 30 ; Écaille (cœur, pas d'éclats) | 70 |
 | **Total** | | **≈ 440** |
 
 | Coffre | Éclats | Lesquels |
@@ -557,64 +573,97 @@ galeries, cercle, cime) ≈ 125 de plus ; acte 2 (îles, marais, racines suspend
 
 Visée : le chemin principal seul rapporte ≈ 50 éclats, soit 3 baies, ou 1 baie et 1 sève, sans
 farmer. Avec l'exploration, la boutique ne retient plus personne : les articles grisés servent de
-puits pour la suite. Si l'utilisateur trouve la démo trop généreuse, diviser les coffres par 1,5.
+puits pour la suite. L'utilisateur garde les éclats tels quels (§ 8) ; si la démo s'avère trop
+généreuse au playtest, diviser les coffres par 1,5.
 Pas de bonus de boss (Kainati et Ghil't ne lâchent rien) : plus simple, et Kainati est épargné.
 
-## 4. Le marchand : Margotte, la pie brocanteuse
+## 4. Le marchand : Tamarin, le vieux singe colporteur
 
-**Qui.** Une pie bavarde et coquette (*margot* est le vieux nom de la pie). Elle collectionne tout
-ce qui brille, d'où son goût pour les Éclats de lune. Elle porte une besace de cuir rapiécée et un
-collier de babioles (clé de laiton, bouton d'argent, clochette, un éclat de lune en pendentif) avec
-un petit foulard rouge. Honnête mais dure en affaires. Elle se dit « brocanteuse, surtout pas
-voleuse ». Elle se dispute avec le peuple de Kainati : les singes aussi aiment ce qui brille. La
-mousse ne lui fait pas peur : « elle ne brille pas, donc elle ne m'intéresse pas ».
+Tout ce qui suit est déjà codé par le pré-lot dans `src/story/vague3_commun.js` (dialogues, rumeurs,
+loupe, accessoires) et `src/data/shops_data.js` (boutique) : les lots ne font que poser ses perchoirs.
 
-**Où.** Deux comptoirs, une seule boutique `SHOPS.margotte` :
-1. **Racines du grand arbre**, perchée sur le nid de singe de la fourche (x 1440, `onProp:
-   'grand_arbre_nid_singe'`), à côté du feu (x 1600). Sur le chemin principal, au milieu de l'acte 1 :
-   le joueur y arrive avec ≈ 10 à 14 éclats. Destination de vol.
-2. **Forêt corrompue**, près du second feu (x 3780) : après le crash, on ne peut plus voler, et le
-   combat contre Ghil't approche. « Elle a suivi le malheur : c'est là que sont les clients. »
+**Qui.** Le vieux Tamarin, un ancien du peuple de Kainati (« J'ai connu Kainati haut comme une noix
+de coco »), descendu de la cime il y a longtemps pour voir du pays, devenu colporteur. Il ne grimpe
+plus : il se **perche**, et attend que les clients montent jusqu'à lui ; on ne le trouve donc qu'au
+bout des lianes. Il aime ce qui brille, comme tout son peuple, d'où les éclats de lune. Il appelle
+Agarica « jeune pousse ». Ton doux et un peu drôle. C'est l'arrière-grand-oncle de Pépin (pour lui,
+Pépin est son « arrière-petit-neveu »). Un marchand par acte : pour la démo, c'est lui.
 
-**Comportement du PNJ** (racines) :
+**Art.** Sprite `singe_gueri` réutilisé (même échelle 0,28), avec des accessoires de colporteur
+dessinés par code (`v3MarchandAccessoires` : baluchon de toile rapiécée posé derrière lui, lanterne à
+éclat de lune au bout d'un bâton planté à côté, deux éclats « en vitrine »). Variante d'art
+facultative `tamarin` au manifeste (prompt Codex n°13) : prise automatiquement, sans les accessoires
+de code, dès qu'elle existe. Portrait `portrait_tamarin` ; locuteur `tamarin` (`SPEAKERS`).
+
+**Où.** Une seule boutique, `SHOPS.tamarin` (« Le bric-à-brac de Tamarin »), et un drapeau
+`marchandVu`, posé à la fin de la rencontre :
+1. **Racines du grand arbre** (rencontre, sans condition) : perché dans un nid
+   (`grand_arbre_nid_singe`) sur la **corniche de la cime**, x 3630, au bout des deux lianes qui
+   suivent le totem du singe, juste avant l'arène de Kainati. En se posant sur la corniche, une bulle
+   l'annonce (déclencheur `v3_tamarin`, `forbids: { marchandVu: true }`, cinématique
+   `v3_tamarin_appel`) : « Psst ! Par ici, la grimpeuse ! Approche, je ne mords pas. Plus beaucoup. »
+   Le nid de la fourche (x 1440) reste un simple décor.
+2. **Perchoirs des lots**, toujours au bout de lianes, visibles seulement avec
+   `requires: { marchandVu: true }` : **cime cachée** (lot B), **grotte de la lisière** (lot A),
+   **racines suspendues** (lot C). Chaque lot choisit `x` et le perchoir (§ 2).
+
+Pas de comptoir dans la forêt corrompue (retiré le 2026-11-08).
+
+**Comportement du PNJ.** Ligne de données à copier (clé `npcs`, en tête de `vague3_commun.js`) :
 ```
-talk: [
-  { forbids: { margotteVue: true }, talk: 'v3_margotte_rencontre' },          // pose margotteVue, ouvre la boutique
-  { requires: { item: 'cuillere_margotte' }, talk: 'v3_margotte_cuillere' },  // +15 éclats, retire la cuillère
-  { talk: 'v3_margotte_accueil' },                                            // une rumeur, puis la boutique
-]
+{ id: 'tamarin', sprite: 'singe_gueri', x: 1234, onProp: 'grand_arbre_nid_singe', facing: 'left',
+  shop: 'tamarin', talk: 'v3_tamarin', requires: { marchandVu: true } },
 ```
-Forêt corrompue : première visite `v3_margotte_fc1`, ensuite comme ci-dessus.
+avec son nid dans `props` (facultatif ; sans `onProp`, il se pose sur le sol) :
+`{ type: 'grand_arbre_nid_singe', x: 1234, y: <surface>, scale: 0.26 }`. Aux racines, la même ligne
+sans `requires`.
 
-**Répliques.**
-- Rencontre :
-  - Margotte : « Oh ! Une cliente ! Une vraie, avec des bras et tout ! »
-  - Agarica : « Une… pie ? Qui parle ? »
-  - Margotte : « Margotte. Brocanteuse, collectionneuse, et surtout pas voleuse, quoi qu'en disent les singes. »
-  - Margotte : « Ces petits éclats qui brillent, que les bêtes malades laissent tomber quand tu les bats… Ça brille, donc j'achète. Et toi, avec, tu m'achètes des choses. C'est ça, le commerce. »
-  - Xara (bulle) : « Elle a l'air honnête. Pour une pie. »
-- Accueil : « Approche, approche ! Tout est garanti. Sauf ce qui ne l'est pas. »
-- Achat : « Excellent choix. Moi, j'aurais pris pareil. » / « Vendu ! Ne le dis pas aux singes. »
-- Pas assez d'éclats : « Il te manque quelques éclats, ma brindille. La forêt en est pleine : va taper dedans. Gentiment. »
-- Poches pleines : « Tu en as déjà plein les poches. Reviens quand tu auras mangé les autres. »
-- Au revoir : « Reviens vite ! Et si tu trouves une petite cuillère en argent… c'est la mienne. »
-- Corde (quête de Geralt en cours) : « Une corde ? Pour un ranger coincé dans un trou ? Ha ! Trente éclats. Le prix de l'humiliation est compris. »
-- Cuillère rendue :
-  - Margotte : « MA CUILLÈRE ! Ma toute petite, ma toute brillante ! »
-  - Margotte : « Pépin ? Ce petit chapardeur à poils… Tiens, pour ta peine. Et ne lui dis pas que j'ai pleuré. »
-- Forêt corrompue :
-  - Margotte : « Toi aussi, tu es tombée ici ? Moi, je suis venue exprès. Là où il y a du malheur, il y a des clients. »
-  - Margotte : « Et la mousse ne brille pas. Donc elle ne m'intéresse pas. Donc elle ne me fait pas peur. C'est logique. »
-- **Rumeurs** (une par visite, à tour de rôle, `margotteRumeur`) :
-  1. « Au bout de la lisière, un tronc couché enjambe un gouffre. Dessous pendent des lianes. Moi, je vole, alors les lianes… »
-  2. « Ici même, au pied du grand tronc, il y a un trou entre les racines. Ça sent le loup mouillé. »
-  3. « Un mur qui sonne creux, tu tapes dedans. Un rocher fendu, il te faut de la force… une force d'ours, disons. »
-  4. « Les singes de Kainati ont un village tout là-haut. Ils ne m'invitent jamais. Ils disent que je chipe. Moi ! »
-  5. « Le vent qui monte près des premières îles… un oiseau le prendrait. Je dis ça, je suis un oiseau. »
-  6. « Sous la clairière de la plante, il y a un marais. Une vieille tortue y parle aux crapauds. Elle est lente. Même pour une tortue. »
-  7. « Au-dessus de la forêt sombre, on dit qu'il y a des pierres levées où la lune vient se poser. »
+E : la cinématique-fonction `CUTSCENES.v3_tamarin` (relue à chaque appui) choisit la réplique, puis
+la boutique s'ouvre d'elle-même (PNJ `shop`, pas d'étape `{shop}`) :
+1. `marchandVu` absent → **rencontre** (`v3_tamarin_rencontre`, plus la réplique « avant Kainati » si
+   `kainatiDefeated` manque, plus la bulle de Xara), puis `marchandVu` ;
+2. `loupe_tamarin` dans le sac → **loupe rendue** (`v3_tamarin_loupe`) : la loupe est retirée,
+   drapeau `loupeRendue`, +15 éclats ;
+3. sinon → **accueil** (une des quatre phrases, à tour de rôle, compteur `marchandVisites`), puis
+   une **rumeur** (`marchandRumeur`), ou la réplique de la corde si la quête de Geralt est à l'étape
+   `demande` et que la corde n'est pas dans le sac.
+
+**Répliques** (telles qu'écrites dans `vague3_commun.js`, selon `docs/production/STYLE_DIALOGUES.md` :
+court, parlé, une réplique = une info ; le marchand est radoteur, un peu filou, et ses rumeurs sont
+de vrais indices).
+- Rencontre (boîte de dialogue, puis `marchandVu` et la boutique) :
+  - Tamarin : « Une cliente ! Tamarin, colporteur. J'ai connu Kainati tout petit. »
+  - Tamarin : « Tes éclats de lune contre mes baies. Ça te va ? »
+  - Tamarin : « Je ne grimpe plus, je me perche. Cherche-moi au bout des lianes. »
+  - (avant la victoire sur Kainati) Tamarin : « Tu montes voir Kainati ? Prends des baies, il est grognon. »
+  - Xara (bulle) : « Il a l'air honnête. Pour un singe. »
+- Visites suivantes : UNE réplique, puis la boutique. La corde si la quête de Geralt est à l'étape
+  `demande` (« Une corde ? Pour un ranger coincé dans un trou ? Ha ! Trente éclats. »), sinon la
+  prochaine rumeur, sinon un bonjour à tour de rôle (« Approche ! Tout est garanti. Enfin,
+  presque. » · « Encore toi ! Tu as grimpé jusqu'ici pour mes baies ? » · « Les amulettes arrivent
+  bientôt. Les baies, elles, sont là. »), puis « J'ai tout dit. Repasse demain, je radoterai. »
+- Boutique (phrase du haut de `SHOPS.tamarin`) : « Tout est garanti. Enfin, presque. » Refus : texte
+  commun de la boutique ; poches pleines (5 baies, 3 sèves) : l'article quitte l'étal.
+- Loupe rendue : Agarica : « Pépin avait ta loupe. Il dit qu'il l'a trouvée. » / Tamarin : « Ma
+  loupe ! Sans elle, je confonds éclats et cailloux. Tiens, pour ta peine. » (+15 éclats)
+- **Rumeurs** (`V3_RUMEURS`), à tour de rôle (`marchandRumeur`), en sautant celles dont la zone est
+  déjà visitée (`visited_<zone>`) :
+  1. (grotte) « Sous le tronc couché de la forêt sombre, des lianes pendent. Et le bois est pourri. »
+  2. (galeries) « Il y a un trou entre les racines, au pied de l'arbre. Ça sent le loup mouillé. »
+  3. (toujours) « Un mur qui sonne creux, tape dedans. Un rocher fendu, c'est un travail d'ours. »
+  4. (cime) « Mon village est au-dessus de l'arène. On y monte par des traces de loup. »
+  5. (île des vents) « Un vent monte entre les premières îles. Un oiseau s'en servirait. Moi, je regarde. »
+  6. (marais) « Sous la clairière de la plante, il y a un marais. Et une tortue très, très lente. »
+  7. (cercle) « Un cercle de pierres, au-dessus de la forêt sombre. On y monte par la trouée du surplomb. »
+  8. (racines suspendues) « Sous les îles, des racines pendent dans le vide. Les corbeaux y cachent un trésor. »
+  9. (île du gardien) « Au belvédère, un courant d'air monte vers de vieilles ruines. »
 
 ## 5. Quêtes secondaires
+
+> **Textes** : les répliques ci-dessous sont des INTENTIONS. Chaque lot les écrit selon
+> `docs/production/STYLE_DIALOGUES.md` (au moins moitié moins de texte, 2 à 4 répliques par échange,
+> une info par réplique, pas d'images poétiques). Objets : descriptions d'une phrase, cf. `ITEM_INFO`
+> dans `vague3_commun.js`.
 
 Trois quêtes. Aucune ne bloque l'histoire. Chacune vit dans le fichier d'histoire de son lot
 (`QUESTS[id]` + dialogues + cinématiques). Les drapeaux ci-dessous sont le miroir de l'état de
@@ -630,10 +679,9 @@ Trois quêtes. Aucune ne bloque l'histoire. Chacune vit dans le fichier d'histoi
   1. `cherche` : « Tika, dans la cime cachée, cherche son petit Pépin, emporté par le vent au-dessus des îles flottantes. »
   2. `sac` : « Pépin est dans ton sac. Ramène-le à Tika, dans la cime cachée. »
   3. `finie` : « Pépin est rentré. Il est puni. Il a l'air ravi quand même. »
-  - Étape annexe : « Rendre la petite cuillère d'argent à Margotte, la pie des racines. »
-- **Objets** : `pepin_sac` (« Pépin (dans ton sac) » — « Il gigote, il chantonne. Il a sûrement mangé
-  une baie. ») ; `cuillere_margotte` (« Petite cuillère d'argent » — « Toute petite, très brillante,
-  un peu mordillée. Pépin jure qu'il l'a trouvée. »).
+  - Étape annexe : « Rendre la loupe à Tamarin, le vieux singe colporteur perché au bout des lianes. »
+- **Objets** : `pepin_sac` (« Pépin (dans ton sac) » — « Il gigote et il chantonne. ») ; `loupe_tamarin` (« Loupe de Tamarin » — « Pour compter les éclats de lune. Pépin dit qu'il
+  l'a trouvée. »).
 - **Dialogues** :
   - Tika (première fois) :
     - Tika : « Une humaine… qui grimpe comme nous ? Kainati avait raison, alors. »
@@ -648,16 +696,17 @@ Trois quêtes. Aucune ne bloque l'histoire. Chacune vit dans le fichier d'histoi
     - Agarica : « Ta maman te cherche, Pépin. »
     - Pépin : « J'ai presque eu un nuage ! Il était tout mou. Après il est parti. Les nuages, c'est pas sérieux. »
     - Pépin : « Je peux monter dans ton sac ? Je promets de pas manger tes affaires. Pas beaucoup. »
-    - Pépin : « Oh, et ça, c'est un trésor. Je l'ai trouvé dans le nid d'une pie. Elle dormait, alors c'est trouvé. »
-    - → `pepin_sac` et `cuillere_margotte` dans le sac ; Pépin disparaît de l'île.
+    - Pépin : « Et ça, c'est un trésor ! Je l'ai trouvé à côté d'un vieux singe qui ronflait. » (`V3_PEPIN_LOUPE`, déjà dans `vague3_commun.js`)
+    - → `pepin_sac` et `loupe_tamarin` dans le sac ; Pépin disparaît de l'île.
     - Si Tika n'a pas encore parlé : Pépin ajoute « Ma maman, c'est Tika. Elle habite tout en haut de l'arbre géant. Y a pas de nuages, là-bas. »
   - Tika (retour) : Pépin sort du sac (`npcAdd` près de Tika, anim `joie`) :
     - Tika : « Pépin ! Espèce de petite noix sans coquille ! »
     - Pépin : « Maman, j'ai volé ! Enfin, c'est le vent qui a volé. Moi, j'étais dedans. »
     - Tika : « Merci, druidesse. Prends ceci : les éclats que Pépin cachait sous son oreiller. Il ne s'en servira plus. Il est puni. »
     - Pépin : « Hé ! »
-- **Récompense** : 25 éclats (Tika) + 15 éclats (cuillère rendue à Margotte). Ensuite, Pépin reste
-  au village (`requires: { quetePepin: 'finie' }`).
+- **Récompense** : 25 éclats (Tika) + 15 éclats (loupe rendue à Tamarin, son arrière-grand-oncle,
+  dans n'importe quel perchoir : cinématique `v3_tamarin`, drapeau `loupeRendue`, § 4). Ensuite, Pépin
+  reste au village (`requires: { quetePepin: 'finie' }`).
 
 ### 5.2 Quête 2 — « Le ranger au fond du trou » (lot A)
 
@@ -667,17 +716,17 @@ Trois quêtes. Aucune ne bloque l'histoire. Chacune vit dans le fichier d'histoi
   qu'après sa rencontre ; il faut 30 éclats.
 - **Étapes** (`queteGeralt`) :
   1. `demande` : « Geralt est coincé dans les galeries, sous les racines du grand arbre. Il lui faut une corde tressée. »
-  2. (corde dans le sac) : « Margotte, la pie des racines, vend des cordes. Apporte-en une à Geralt. »
+  2. (corde dans le sac) : « Tamarin, le vieux singe colporteur, vend des cordes. Apporte-en une à Geralt. »
   3. `finie` : « Geralt est sorti. Il dit qu'il étudiait le trou. »
-- **Objet** : `corde_tressee` (« Corde tressée » — « Solide, souple. Vendue par une pie qui en vend
-  beaucoup trop. »), achetée chez Margotte (article visible seulement à l'étape `demande`).
+- **Objet** : `corde_tressee` (« Corde tressée » — « Assez longue pour sortir quelqu'un d'un trou. »), achetée chez Tamarin, 30 éclats (article de `SHOPS.tamarin` visible
+  seulement à l'étape `demande`, une fois).
 - **Dialogues** :
   - Geralt (première fois ; anim `map_reading`) :
     - Geralt : « Ah ! Agarica ! Quelle… coïncidence. Je ne suis pas coincé. J'étudie ce trou. De l'intérieur. »
     - Agarica : « Tu es tombé ? »
     - Geralt : « J'ai exploré verticalement. Très vite. Le sol des racines a cédé sous le poids de mon génie. »
     - Geralt : « Ces racines sont trop hautes pour mes jambes. Elles ont été mal conçues. Il me faudrait une corde. Une bonne corde tressée. »
-    - Xara (bulle) : « La pie, en haut, vend de tout. Même des cordes, sûrement. »
+    - Xara (bulle) : « Le vieux Tamarin, perché là-haut, vend de tout. Même des cordes, sûrement. »
     - Geralt : « Clak ? Clak garde l'entrée. C'est un rôle stratégique. Il ne sait pas où je suis. »
   - Geralt (sans corde) : « Toujours pas de corde ? Ce n'est pas grave. Je n'ai pas faim. Ni soif. Ni froid. »
   - Geralt (avec la corde) :
@@ -702,8 +751,7 @@ Trois quêtes. Aucune ne bloque l'histoire. Chacune vit dans le fichier d'histoi
   1. `demande` : « Dame Écaille veut rallumer le marais. Rapporte-lui trois fleurs de lune (n/3) : une dans son vieux saule, deux "très haut, ou très loin". »
   2. `finie` : « La lanterne de lune brille sur le marais. »
 - **Objets** : `fleur_lune_marais`, `fleur_lune_cercle`, `fleur_lune_gardien` (trois ids pour que
-  chaque `pickups` fonctionne seul ; même art `fleur_lune`) : « Fleur de lune » — « Ses pétales en
-  croissant brillent doucement, même en plein jour. »
+  chaque `pickups` fonctionne seul ; même art `fleur_lune`) : « Fleur de lune » — « Elle brille même en plein jour. »
 - **Dialogues** :
   - Dame Écaille (première fois) :
     - Écaille : « Doucement, doucement… Tu cours trop vite, petite. Moi, je traverse ce marais depuis le printemps dernier. J'en suis à la moitié. »
@@ -724,9 +772,13 @@ Trois quêtes. Aucune ne bloque l'histoire. Chacune vit dans le fichier d'histoi
 
 ### 6.1 Passages vus avant d'être franchissables
 
+> Les bulles réellement posées (déclencheurs `v3_*`) sont dans `src/story/vague3_commun.js`, réécrites selon
+> `docs/production/STYLE_DIALOGUES.md` ; les citations du tableau ne sont que l'intention. Gouffre de la forêt
+> sombre 1 : on y entre en cassant à l'ours un bouchon de bois pourri, qui n'existe qu'avec le singe.
+
 | Passage | Où et quand on le voit | Ce qui manque | Ce que voit le joueur et comment il comprend |
 |---|---|---|---|
-| Gouffre aux lianes (FS1 → grotte) | forêt sombre 1, en traversant le tronc couché, au début de l'acte 1 | singe (racines) | Deux lianes pendues sous le tronc, une lueur au fond. Xara : « Des lianes, sous le tronc… et une lueur, tout au fond. Sans bras de singe, n'y pense même pas. » Rumeur 1 de Margotte. Une fois le singe obtenu, une 2e bulle au même endroit : « Les lianes ! Laisse-toi tomber par l'ouverture et accroche-toi. » |
+| Gouffre aux lianes (FS1 → grotte) | forêt sombre 1, en traversant le tronc couché, au début de l'acte 1 | singe (racines) | Deux lianes pendues sous le tronc, une lueur au fond. Xara : « Des lianes, sous le tronc… et une lueur, tout au fond. Sans bras de singe, n'y pense même pas. » Rumeur 1 de Tamarin. Une fois le singe obtenu, une 2e bulle au même endroit : « Les lianes ! Laisse-toi tomber par l'ouverture et accroche-toi. » |
 | Le pont qui manque (galeries) | galeries, dès la 1re visite des racines (trou entre les racines) | singe | Même image que les lianes de l'arène. Xara : « On reviendra avec des bras de singe. » |
 | Trouée lumineuse (FS2 → cercle de lune) | forêt sombre 2, sur le surplomb, acte 1 | second saut (singe ou aigle) | Lueur de sortie haute entre les branches. Xara : « Cette lumière, là-haut… pas pour tes petites jambes. Pas encore. » ; avec une forme aérienne : « Un second saut, et tu y es. » |
 | Piste qui grimpe (arène → cime cachée) | arène de Kainati, derrière le rideau droit, après la victoire | loup (révèle) + second saut | Empreintes du loup qui montent vers le vide. Xara : « Des traces qui montent… dans le vide ? Ton flair de loup voit peut-être mieux que moi. » |
@@ -764,7 +816,7 @@ facultatives s'y dessinent au fil de l'exploration.
 | Marais, eau profonde | lueur au fond | la pieuvre (nage) |
 | Nid des cocons, derrière le gardien | socle vide | armure ou morceau de totem |
 | Grotte, poche au répulsif | râtelier de druide vide | une arme (bâton de druide) |
-| Boutique de Margotte | articles grisés « bientôt » | consommables, besace, amulettes, carte des rumeurs |
+| Boutique de Tamarin | articles grisés « bientôt » (la boutique n'en affiche pas encore : Tamarin en parle, « la caravane des amulettes est en retard ») | consommables, besace, amulettes, carte des rumeurs |
 
 ## 7. Découpage en lots
 
@@ -794,8 +846,11 @@ dans son rapport au lieu de le faire. Ports du harnais : pré-lot 8820, A 8821, 
 - **Forêt sombre 2** : sortie haute x 4736-4864 au-dessus du surplomb + entrée `from_cercle_lune` ;
   bulles `v3_fs2_trouee`.
 - **Racines** (`grand_arbre_racines_data.js`) : couper la racine du sol en deux branches (0 → 1664 et
-  1792 → 3840, pointes au trou) ; sortie basse x 1664-1792 + entrée `from_galeries` ; **Margotte** sur
-  le nid de la fourche ; bulle `v3_racines_trou`. Si le pied du tronc gêne la lecture du trou :
+  1792 → 3840, pointes au trou) ; sortie basse x 1664-1792 + entrée `from_galeries` ; **Tamarin**
+  perché dans un nid sur la corniche de la cime (x 3630, `onProp: 'grand_arbre_nid_singe'`, au bout
+  des deux lianes qui suivent le totem du singe, juste avant l'arène ; § 4), avec sa bulle d'appel
+  (déclencheur `v3_tamarin`, cinématique `v3_tamarin_appel`) ; le nid de la fourche reste un décor ;
+  bulle `v3_racines_trou`. Si le pied du tronc gêne la lecture du trou :
   x 2432-2560, et revoir la largeur des galeries et la carte.
 - **Arène de Kainati** : plateforme cachée `{ gx: 24, gy: 5, w: 2 }`, branche plate x 1600-1792
   surface 128, pistes x 1490-1680 ; sortie haute dans `kainatiArena.exitsAfterVictory` + entrée
@@ -813,8 +868,8 @@ dans son rapport au lieu de le faire. Ports du harnais : pré-lot 8820, A 8821, 
   l'ours** (terre, 128 × 128, id `bouchon_marais`) + sortie basse et entrée `from_marais` ; bulles
   `v3_clairiere_bouchon`, `v3_clairiere_bord`.
 - **Forêt corrompue** : sol coupé x 2688-2816 et **cassable à l'ours** (terre, id `sol_nid`) + sortie
-  basse et entrée `from_nid` ; sortie haute x 2496-2624 + entrée `from_canopee` ; Margotte x 3780 ;
-  créature x 2800 bornée à 2860-3050 ; racine tordue x 2680 → 2600 ; bulles `v3_fc1_sol`, `v3_fc1_haut`.
+  basse et entrée `from_nid` ; sortie haute x 2496-2624 + entrée `from_canopee` ; pas de marchand
+  (comptoir retiré le 2026-11-08) ; créature x 2800 bornée à 2860-3050 ; racine tordue x 2680 → 2600 ; bulles `v3_fc1_sol`, `v3_fc1_haut`.
 
 **Enregistrements partagés :**
 - 10 données de zone **minimales** mais valides (sol plat, `zoneName`, `background`, `tileset`, entrées
@@ -824,8 +879,9 @@ dans son rapport au lieu de le faire. Ports du harnais : pré-lot 8820, A 8821, 
   (MenuKit) : grotte et cercle → `foret_sombre`, galeries et cime → `grand_arbre`, îles, marais et
   racines suspendues → `foret_flottante`, nid et canopée → `foret_corrompue`.
 - `MAP_ZONE_LAYOUT` du § 1.4.
-- `src/story/vague3_commun.js` (nouveau) : `SPEAKERS` (`margotte`, `tika`, `pepin`, `ecaille`) ;
-  `ITEM_INFO` de tous les nouveaux objets ; `SHOPS.margotte` (§ 3.3) ; dialogues de Margotte (§ 4) ;
+- `src/story/vague3_commun.js` (nouveau) : `SPEAKERS` (`tamarin`, `tika`, `pepin`, `ecaille`) ;
+  `ITEM_INFO` de tous les nouveaux objets ; Tamarin (§ 4 : talk `v3_tamarin`, dialogues, rumeurs,
+  loupe rendue, accessoires de code) ; `SHOPS.tamarin` (§ 3.3) dans `src/data/shops_data.js` ;
   toutes les bulles `v3_*` des zones existantes (§ 6.1). Et trois fichiers d'histoire vides, un par
   lot : `vague3_sous_bois.js` (A), `vague3_hauteurs.js` (B), `vague3_marais.js` (C).
 - Entrées de manifeste du prompt n°13 (placeholders à la bonne taille) : à ajouter avant les lots
@@ -840,7 +896,8 @@ forêt sombre 2, du trou des racines, de la carte (M) avec les nouvelles zones p
 
 ### 7.2 Lot A — « Sous la forêt »
 
-- **Zones** : `grotte_lisiere`, `galeries_racines`, `cercle_lune` (+ la fleur `fleur_lune_cercle`).
+- **Zones** : `grotte_lisiere`, `galeries_racines`, `cercle_lune` (+ la fleur `fleur_lune_cercle`,
+  + le perchoir de Tamarin dans la grotte, ligne de données du § 4).
 - **Quête** : 2 (Geralt). `QUESTS.geralt_corde` dans `src/story/vague3_sous_bois.js`.
 - **Fichiers** : les 3 données de zone, `src/story/vague3_sous_bois.js`. Rien d'autre.
 - **Tests** (port 8821) :
@@ -851,9 +908,11 @@ forêt sombre 2, du trou des racines, de la carte (M) avec les nouvelles zones p
 
 ### 7.3 Lot B — « Les hauteurs »
 
-- **Zones** : `cime_cachee`, `ile_des_vents`, `ile_du_gardien` (+ `fleur_lune_gardien`).
-- **Quête** : 1 (Pépin). `QUESTS.pepin` dans `src/story/vague3_hauteurs.js` ; la cuillère est rendue
-  par les dialogues de Margotte du pré-lot (lien par l'objet `cuillere_margotte`).
+- **Zones** : `cime_cachee`, `ile_des_vents`, `ile_du_gardien` (+ `fleur_lune_gardien`, + le perchoir
+  de Tamarin dans la cime, ligne de données du § 4).
+- **Quête** : 1 (Pépin). `QUESTS.pepin` dans `src/story/vague3_hauteurs.js` ; Pépin donne
+  `loupe_tamarin` avec `pepin_sac` (réplique `V3_PEPIN_LOUPE`) ; la loupe est rendue par les dialogues
+  de Tamarin du pré-lot (cinématique `v3_tamarin`, lien par l'objet `loupe_tamarin`).
 - **Fichiers** : les 3 données, `src/story/vague3_hauteurs.js`.
 - **Tests** (port 8822) : chaque zone avec singe puis avec aigle ; montée de la cime au saut simple
   jusqu'au village ; couronne au singe ; courants des îles avec l'aigle ; chute = retour sans dégât ;
@@ -862,7 +921,7 @@ forêt sombre 2, du trou des racines, de la carte (M) avec les nouvelles zones p
 ### 7.4 Lot C — « Marais et corruption »
 
 - **Zones** : `marais_brumes`, `racines_suspendues`, `nid_cocons`, `canopee_malade` (la dernière
-  peut être reportée).
+  peut être reportée) ; + le perchoir de Tamarin dans les racines suspendues (ligne de données du § 4).
 - **Quête** : 3 (Dame Écaille). `QUESTS.fleurs_lune` dans `src/story/vague3_marais.js` (les fleurs du
   cercle et de l'île sont posées par les lots A et B avec les ids du pré-lot).
 - **Fichiers** : les 4 données, `src/story/vague3_marais.js`.
@@ -874,29 +933,36 @@ forêt sombre 2, du trou des racines, de la carte (M) avec les nouvelles zones p
 **Rapport de chaque lot** (en français, concis) : fichiers créés, ce qui marche, captures, écarts
 au présent document et pourquoi, besoins pour les fichiers partagés.
 
-## 8. Choix laissés à l'utilisateur
+## 8. Choix laissés à l'utilisateur (tranchés le 2026-11-08)
 
 1. **Cœurs** : 5 au total, 8 au maximum (proposé), ou 4 (sans celui de la couronne).
-2. **Marchand** : Margotte la pie (proposé, art à générer) ou un vieux singe du peuple de Kainati
-   (réutilise `singe_gueri`, moins d'art, moins de caractère).
-3. **Second comptoir** de Margotte dans la forêt corrompue : oui (proposé) ou non.
+   → **Tranché : 5 cœurs** (8 au maximum).
+2. **Marchand** : un nouveau personnage avec son propre art (proposé) ou un vieux singe du peuple de
+   Kainati (réutilise `singe_gueri`, moins d'art). → **Tranché : le vieux singe**, Tamarin (§ 4) ;
+   variante d'art `tamarin` facultative.
+3. **Second comptoir** du marchand dans la forêt corrompue : oui (proposé) ou non.
+   → **Tranché : non.** À la place, des perchoirs au bout de lianes dans trois zones facultatives
+   (cime cachée, grotte de la lisière, racines suspendues).
 4. **Forêt sombre 1 élargie de 512 px** pour le gouffre aux lianes (proposé). Autre solution sans
    l'élargir : une corniche haute avec une entrée de grotte « E : entrer » (une porte) atteinte par
-   les lianes.
+   les lianes. → **Gardé : élargie de 512 px.**
 5. **L'aigle ouvre aussi le gouffre** de la forêt sombre 1 en planant (proposé : accepté). Pour
-   exiger les lianes, il faut un gouffre plus large ou un plafond bas.
+   exiger les lianes, il faut un gouffre plus large ou un plafond bas. → **Gardé : l'aigle passe aussi.**
 6. **Contenu d'après la démo** (gardien du grand cocon, singe de la couronne au papillon) : garder ?
-7. **Appât de la pieuvre** (lueur au fond du marais) : garder ou retirer.
-8. **Canopée malade** (10e zone) : garder ou couper.
+   → **Gardé.**
+7. **Appât de la pieuvre** (lueur au fond du marais) : garder ou retirer. → **Gardé.**
+8. **Canopée malade** (10e zone) : garder ou couper. → **Gardée.**
 9. **Générosité** : ≈ 440 éclats disponibles pour une boutique à 15-30 ; diviser les coffres par 1,5 ?
+   → **Tranché : éclats tels quels** (prix inchangés : baie 15, sève 20, corde 30).
 10. **Ennemis soignés** : rapportent autant d'éclats que les ennemis vaincus (proposé) ?
+    → **Tranché : 0 éclat** pour un ennemi soigné (réglage du système gardé, § 3.2).
 
 ## Annexe — ids
 
 - **Scènes** : `GrotteLisiereScene`, `GaleriesRacinesScene`, `CercleLuneScene`, `CimeCacheeScene`,
   `IleDesVentsScene`, `IleDuGardienScene`, `MaraisBrumesScene`, `RacinesSuspenduesScene`,
   `NidCoconsScene`, `CanopeeMaladeScene`.
-- **Objets** : `pepin_sac`, `cuillere_margotte`, `corde_tressee`, `fleur_lune_marais`,
+- **Objets** : `pepin_sac`, `loupe_tamarin`, `corde_tressee`, `fleur_lune_marais`,
   `fleur_lune_cercle`, `fleur_lune_gardien`.
 - **Cœurs** : `coeur_grotte`, `coeur_cime`, `coeur_gardien`, `coeur_ecaille` (+ `coeurBonusForet`).
 - **Coffres** : `coffre_grotte_sanctuaire`, `coffre_grotte_racine`, `coffre_galeries_meute`,
@@ -908,8 +974,10 @@ au présent document et pourquoi, besoins pour les fichiers partagés.
   (épée), `porte_reliquaire` (ours), `racine_morte` (marais, épée), `racine_pourrie` (racines
   suspendues, épée), `ecorce_canopee` (ours).
 - **Murs de mousse** : `mur_grotte`, `mur_saule`, `mur_nid`.
-- **Drapeaux** : `margotteVue`, `margotteRumeur`, `cuillereRendue`, `quetePepin`, `queteGeralt`,
-  `queteEcaille`, `nidGardienSoigne`.
-- **PNJ / locuteurs** : `margotte`, `tika`, `pepin`, `ecaille` (nouveaux) ; `geralt`, `singe_gueri`
-  (existants).
-- **Boutique** : `SHOPS.margotte`. **Quêtes** : `QUESTS.pepin`, `QUESTS.geralt_corde`, `QUESTS.fleurs_lune`.
+- **Drapeaux** : `marchandVu`, `marchandRumeur`, `marchandVisites`, `loupeRendue`, `quetePepin`,
+  `queteGeralt`, `queteEcaille`, `nidGardienSoigne`.
+- **PNJ / locuteurs** : `tamarin` (sprite `singe_gueri`, variante d'art `tamarin`), `tika`, `pepin`,
+  `ecaille` (nouveaux) ; `geralt`, `singe_gueri` (existants).
+- **Marchand** : talk `v3_tamarin` (cinématique-fonction), bulle d'appel `v3_tamarin_appel`,
+  dialogues `v3_tamarin_rencontre` et `v3_tamarin_loupe`, rumeurs `V3_RUMEURS`.
+- **Boutique** : `SHOPS.tamarin`. **Quêtes** : `QUESTS.pepin`, `QUESTS.geralt_corde`, `QUESTS.fleurs_lune`.

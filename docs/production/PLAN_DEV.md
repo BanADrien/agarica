@@ -1217,8 +1217,8 @@ fermeture). `openShop(scene, id)` → Promise. Table `SHOPS` (`src/data/shops_da
 SHOPS.marchand_lune = {
   name: 'Marchand de lune', greet: 'Des baies, de la sève…',
   articles: [
-    { id: 'baie_soin', price: 8, give: { consommable: 'baie_soin', n: 1 } },
-    { id: 'seve_energie', price: 12, give: { consommable: 'seve_energie', n: 1 } },
+    { id: 'baie_soin', price: 15, give: { consommable: 'baie_soin', n: 1 } },   // prix de la vague 3
+    { id: 'seve_energie', price: 20, give: { consommable: 'seve_energie', n: 1 } },
     // plus tard : { id: 'armure_ecorce', price: 60, give: { item: 'armure_ecorce' }, stock: 1, name, desc }
   ],
 };
@@ -1264,6 +1264,146 @@ sans perte ; le reste (indice, récompense, `hits`) : « Propriétés (JSON) ».
 `break_<zone>_<id>`, `chest_<zone>_<id>`, `treasure_<zone>_<id>`. Une ancienne sauvegarde se charge
 telle quelle (0 éclat, aucun cœur entier, aucune quête).
 
+### Vague 3 : zones facultatives (pré-lot du 2026-11-08, rétro-compatible)
+Conception : `docs/production/VAGUE3_DESIGN.md` (les décisions de l'utilisateur du 2026-11-08 sont en
+tête). Ce qui suit fait foi pour les lots A, B et C : ids, bornes des passages, drapeaux.
+
+**Les dix zones** (données `src/data/<id>_data.js`, constante `<ID>_DATA` ; scènes gabarit ; balises
+dans `index.html` et `src/main.js` ; `DEMO_ZONES` chacune juste après sa voisine ; `MENU_CHAPTERS` ;
+`MAP_ZONE_LAYOUT`). Les données posées par le pré-lot sont des SQUELETTES (sol, passages définitifs,
+`foregroundPlants: false`, `look` provisoire copié sur la voisine) : chaque lot les réécrit.
+
+| id (scène) | Région | Lot | Fichier d'histoire du lot |
+|---|---|---|---|
+| `grotte_lisiere` (`GrotteLisiereScene`), `galeries_racines`, `cercle_lune` | forêt sombre / grand arbre | A | `src/story/vague3_sous_bois.js` |
+| `cime_cachee`, `ile_des_vents`, `ile_du_gardien` | grand arbre / forêt flottante | B | `src/story/vague3_hauteurs.js` |
+| `marais_brumes`, `racines_suspendues`, `nid_cocons`, `canopee_malade` | forêt flottante / corrompue | C | `src/story/vague3_marais.js` |
+
+Chargement : `src/story/vague3_commun.js` (pré-lot, commun) après `banc_essai.js`, puis les trois
+fichiers des lots. Un lot n'édite que ses données de zone et son fichier d'histoire.
+
+**Passages** (sorties de bord ; `x` = point écrit à la main, à côté du trou quand le plan le
+mettait au-dessus du vide). Une sortie et son entrée vont toujours par paire. Les entrées « par le
+bas » (on remonte d'un trou) sont des points posés à côté du trou, SANS `edge` (cf. pièges) ; les
+bornes indiquées pour elles ne sont plus que celles du passage d'en face :
+
+| Départ (sortie) | Arrivée (entrée) |
+|---|---|
+| forêt sombre 1 `bottom` 3712-4032 (`hint: 'lueur'`) | grotte `from_foret_sombre_1` `top` 200-400 (x 300) |
+| grotte `right` (sol 448) ⇄ galeries `left` | galeries `from_grotte` (x 110) ; grotte `from_galeries` (x 4380) |
+| racines `bottom` 1664-1792 | galeries `from_racines` `top` 3788-3916 (x 3850, y 100 : la corniche) |
+| galeries `top` 3788-3916 | racines `from_galeries` `bottom` 1664-1792 (x 1600) |
+| forêt sombre 2 `top` 4736-4864 | cercle `from_foret_sombre_2` `bottom` 2112-2240 (x 2300) |
+| cercle `bottom` 2112-2240 | forêt sombre 2 `from_cercle_lune` `top` 4736-4864 (x 4800, sur le surplomb) |
+| arène `top` 1600-1728 (dans `kainatiArena.exitsAfterVictory`) | cime `from_arene` `bottom` 2304-2432 (x 2240) |
+| cime `bottom` 2304-2432 | arène `from_cime` `top` 1600-1728 (x 1664) |
+| chemin des hauteurs `top` 3390-3510 | île du gardien `from_ff1` `bottom` 1740-1860 (x 1950) |
+| île du gardien `bottom` (tout le bord) | chemin des hauteurs `from_ile_du_gardien` `top` 3250-3550 |
+| îles flottantes `top` 690-790 | île des vents `from_ff2` `bottom` 340-460 (x 600, y 80) |
+| île des vents `bottom` (tout le bord) | îles flottantes `from_ile_des_vents` `top` 520-700 (au-dessus d'I1) |
+| clairière `bottom` 0-128 | racines suspendues `from_clairiere` `top` 2240-2368 |
+| racines suspendues `top` 2240-2368 | clairière `from_racines_suspendues` `bottom` **96-128** (x 200) |
+| racines suspendues `top` 384-512 | îles flottantes `from_racines_suspendues` `bottom` 2240-2368 (x 2420) |
+| clairière `bottom` 1472-1600 (sous le cassable `bouchon_marais`) | marais `from_clairiere` `top` 576-704 |
+| marais `top` 576-704 | clairière `from_marais` `bottom` 1472-1600 (x 1420) |
+| forêt corrompue `bottom` 2688-2816 (sous le cassable `sol_nid`) | nid `from_foret_corrompue` `top` 2176-2304 |
+| nid `top` 2176-2304 | forêt corrompue `from_nid` `bottom` 2688-2816 (x 2640) |
+| forêt corrompue `top` 2496-2624 | canopée `from_foret_corrompue` `bottom` 896-1024 (x 1100) |
+| canopée `bottom` (tout le bord) | forêt corrompue `from_canopee` `top` 2432-2624 (x 2530, branche haute) |
+
+Pièges mesurés (à respecter en construisant les zones) :
+- **Arrivée par un bord bas** (`edge: 'bottom'` sur une entrée) : mesuré, la poussée vers la lèvre
+  (`applyEdgeArrivalState`) est annulée dès l'image suivante si aucune touche n'est tenue : Agarica
+  remonte du trou et y retombe (aller-retour sans fin, ou 1 cœur au-dessus d'un vide). Moteur non
+  modifié : toutes les entrées par le bas de la vague 3 sont des points écrits à la main, sans `edge`,
+  posés à côté du trou. Les lots font de même.
+- **Arrivée par un bord haut sous un plafond** : un trou de plafond doit dépasser le passage de
+  64 px de chaque côté ; sinon le corps (50 px) mord sur le plafond et le jeu le remonte par-dessus.
+- **Courants d'air** (`CourantAir.js`) : ils n'agissent que si le CENTRE d'Agarica (x, y - 20) est
+  dans le rectangle, sur l'aigle (pas en piqué). À l'arrivée par le bas, la poussée de 190 px/s sort
+  vite d'un courant étroit : 240 px de large dans les squelettes de l'île des vents et de l'île du gardien.
+- **Lianes sous un plafond** (tronc de la forêt sombre 1) : le lâcher ne peut presque pas monter ;
+  compter ~300 px de portée pour une liane de 160 px.
+- Pas d'invulnérabilité à l'arrivée : un ennemi posé près d'un point d'arrivée frappe aussitôt
+  (surplomb de la forêt sombre 2 : crapaud sauteur ; branche haute de la forêt corrompue : singe corrompu).
+
+**Zones existantes modifiées** (données ; bulles dans `vague3_commun.js`, déclencheurs `v3_*`) :
+- Forêt sombre 1 : `levelWidth` 4352, `levelHeight` 720, `fall: { y: 620, mode: 'hurt' }`. La route
+  est un **escalier continu** : rocher (gx 48 surface 384, gx 49 surface 320), **bouchon de bois pourri**
+  (gx 50-51, surface 256), **tronc couché** (branche BrancheKit x 3328-4032, surface 256), roche gx 63,
+  marches gx 64-65, sol jusqu'à 4352 : ni trou ni saut risqué, on ne tombe pas dans le gouffre par
+  erreur. Le bouchon est un `breakables` (`bois_pourri`, ours) avec `requires: { hasMonkeyForm: true }` :
+  avant le singe, c'est un sol ordinaire ; avec, l'ours le casse et ouvre x 3200-3328. Dessous, **2
+  lianes** x 3392 et 3680 (attache 310, longueur 160) ; fond x 3200-3712 mortel (sol de second plan),
+  x 3712-4032 sortie basse. `avoidRanges [[3430, 4300]]` (pas de touffes de premier plan devant le
+  gouffre). Déplacés : `mousse_partout` 2950, crapaud-piège x 3020 (`reach: 180`), entrée
+  `from_foret_sombre_2` x 4290, trois décors de l'autre côté du gouffre. Bulles `v3_gouffre` (sans
+  singe, sur le tronc) et `v3_gouffre_singe` (sur le bouchon, avec l'aide des touches).
+- Forêt sombre 2 : sortie haute et `from_cercle_lune` ; bulles `v3_trouee` (`forbids: { airForm: true }`)
+  et `v3_trouee_saut` (`requires: { airForm: true }`). Retour des joueurs : le premier ravin du loup
+  passe de 5 à 4 cases (x 1280-1536).
+- Racines : sol coupé en deux branches (0-1664, 1792-3840) ; sortie basse, `from_galeries` ; **Tamarin**
+  (PNJ `tamarin`) dans un nid sur la corniche de la cime (x 3630) ; bulles `v3_trou` et `v3_tamarin`.
+- Arène de Kainati : `hiddenPlatforms [{ gx: 23, gy: 4, w: 2 }]` (et non gx 24, gy 5 : révélée, elle
+  bloquait la route de la forêt flottante au sol), branche plate x 1600-1792 surface 128, `tracks`
+  x 1490-1680 ; sortie haute dans `exitsAfterVictory`, `from_cime` ; bulle `v3_traces`.
+- Chemin des hauteurs : courant `{ x: 3420, y: -1400, w: 60, h: 504, force: 320 }` sur le belvédère,
+  sortie haute, `from_ile_du_gardien` ; bulles `v3_vent` / `v3_vent_aigle`.
+- Îles flottantes : `levelTop: -400` écrit ; courant d'I1-I2 prolongé **x 688-792** (`{ x: 688, y: -560,
+  w: 104, h: 1040, force: 330 }` : à 56 px, l'aigle le traversait sans monter) ; sortie haute,
+  `from_ile_des_vents`, `from_racines_suspendues` ; corbeau d'I1 passé sur I0 ; bulle `v3_vent`.
+  Retour des joueurs : bulle `v3_ff2_trou` (« Trop loin pour sauter… », `once: false`) au bord du
+  vide de 384 px entre la rampe T3 et l'île I5, des deux côtés.
+- Clairière : sol à partir de gx 2 (trou x 0-128 sous le courant) ; `breakables` `bouchon_marais`
+  (ours, cases gx 23-24, rangées 7-8) ; deux sorties basses, deux entrées ; déclencheurs `v3_bouchon`,
+  `v3_bord` (après la fleur).
+- Forêt corrompue : `breakables` `sol_nid` (ours, gx 42-43) ; sortie basse et `from_nid` ; sortie haute
+  et `from_canopee` ; créature x 2950 bornée 2860-3050 ; racine tordue x 2600 ; pas de marchand ;
+  bulles `v3_sol`, `v3_haut`.
+
+**Le marchand : Tamarin** (`vague3_commun.js`). Vieux singe colporteur, un ancien du peuple de
+Kainati. Sprite `singe_gueri` + baluchon et lanterne dessinés par code (variante `tamarin` du
+manifeste prise d'office quand l'art existe). Boutique `SHOPS.tamarin` (`src/data/shops_data.js`) :
+baie 15 (5 en poche au plus), sève 20 (3 au plus), corde 30 (`stock: 1`, seulement à l'étape
+`geralt_corde:demande`). `SHOPS.marchand_lune` (banc d'essai) passe aussi à 15 et 20. Ligne à copier
+dans `npcs` (perchoirs au bout de lianes ; nid facultatif dans `props`) :
+```
+{ id: 'tamarin', sprite: 'singe_gueri', x: 1234, onProp: 'grand_arbre_nid_singe', facing: 'left',
+  shop: 'tamarin', talk: 'v3_tamarin', requires: { marchandVu: true } },
+{ type: 'grand_arbre_nid_singe', x: 1234, y: <surface>, scale: 0.26 },   // dans props
+```
+`talk: 'v3_tamarin'` est une cinématique-fonction : rencontre (pose `marchandVu`), loupe rendue
+(`loupe_tamarin` retirée, `loupeRendue`, +15 éclats), sinon UNE réplique : la corde, ou la prochaine
+rumeur (`marchandRumeur`, sautée si sa zone est déjà visitée), ou un bonjour (`marchandVisites`) ;
+la boutique s'ouvre ensuite d'elle-même. Textes selon `docs/production/STYLE_DIALOGUES.md`.
+Rencontre aux racines (sans condition) ; perchoirs des lots avec `requires: { marchandVu: true }` :
+cime cachée (B), grotte de la lisière (A), racines suspendues (C).
+
+**Commun** : `SPEAKERS` `tamarin`, `tika`, `pepin`, `ecaille` ; `ITEM_INFO` `pepin_sac`,
+`loupe_tamarin`, `corde_tressee`, `fleur_lune_marais`, `fleur_lune_cercle`, `fleur_lune_gardien` ;
+réplique de Pépin `V3_PEPIN_LOUPE` (lot B). Quêtes (dans les fichiers des lots) : `QUESTS.pepin`
+(B), `QUESTS.geralt_corde` (A, étape `demande` obligatoire), `QUESTS.fleurs_lune` (C).
+
+**Cassables conditionnels** (extension de `breakables`, dans `vague3_commun.js`, sans toucher
+SecretKit) : `requires` / `forbids` sur un cassable ; hors condition, il n'existe pas et ses cases
+(peintes en sol) restent un sol ordinaire, sans indice.
+
+**Drapeaux** : `marchandVu`, `marchandRumeur`, `marchandVisites`, `loupeRendue` ;
+`break_foret_sombre_1_bois_pourri`, `break_clairiere_plante_bouchon_marais`,
+`break_foret_corrompue_1_sol_nid` ; `trig_<zone>_v3_*`.
+
+**Manifeste** (prompt Codex n°13) : nouvelles entrées `tamarin`, `tika`, `pepin`, `ecaille`, `coffre`
+(`ASSET_MANIFEST`) ; `eclat_lune_tas`, `hud_eclat`, `fissure_{ecorce,pierre,terre}_{a,b}`, `pepin_sac`,
+`loupe_tamarin`, `corde_tressee`, `fleur_lune` (+ 3 alias au même `src`), `decor_nenuphar`,
+`decor_socle_lune`, `portrait_{tamarin,tika,pepin,ecaille}` (`ITEM_MANIFEST`). `eclat_lune` et
+`fissure_secret` (système des secrets) sont désormais tirés des planches `eclats.png` et `fissures.png`.
+Pas encore branchés : tas d'éclats, icône du compteur, fissures par matière, coffre animé ; nénuphar et
+socle à ajouter à `DECOR_SECTIONS.decor` (LevelKit) quand l'art existe.
+
+**Divers** : menu « Zones de test » du titre en deux colonnes de démo (25 zones). Contrôle de la carte :
+aucune boîte de zone ne se chevauche (hauteur réelle : le sol descend à 576), écarts voulus de 144 px
+(racines / galeries), 416 px (belvédère / île du gardien), 22 px (îles / racines suspendues).
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |
@@ -1291,7 +1431,8 @@ ZoneAquatique) restent intactes, accessibles depuis le menu titre « Zones de te
 
 ### Forêt sombre (acte 1) — connexions, flags, mur de répulsif
 - `foret_sombre_1` — entrées `from_bosquet` (x 140, arrivée du bannissement) et
-  `from_foret_sombre_2` (x 3700). Sortie droite → `ForetSombre2Scene` `{enterId:
+  `from_foret_sombre_2` (x 4290 depuis la vague 3 : zone élargie à 4352 pour le gouffre aux lianes,
+  sortie basse x 3712-4032 vers la grotte de la lisière, cf. « Vague 3 : zones facultatives »). Sortie droite → `ForetSombre2Scene` `{enterId:
   'from_foret_sombre_1'}`. Pas de retour au bosquet (bannie). Amas `mossBlocks` id
   `amas_racines` (flag `moss_foret_sombre_1_amas_racines`) sous un mur de racines ;
   le trigger `talisman` donne `{skill:'ours'}` + énergie pleine (filet : le talisman
@@ -1309,8 +1450,8 @@ ZoneAquatique) restent intactes, accessibles depuis le menu titre « Zones de te
   → flag **`coeurBonusForet`** = +1 cœur max permanent (lu par
   `Player.recomputeTotemBonuses`).
 - Autres flags : `xaraMet` (FS1), `hasWolfForm` (totem FS2, sur la butte x 896,
-  accessible sans loup), `planteVue` (trigger `plante`, FS2). Ravin de 5 cases
-  (x 1280-1600, 3 cases plates d'élan avant) : loup obligatoire ; ravin de 9 cases (x 2816-3392) :
+  accessible sans loup), `planteVue` (trigger `plante`, FS2). Ravin de 4 cases
+  (x 1280-1536 depuis le 2026-11-08, 5 avant ; 3 cases plates d'élan avant) : loup obligatoire ; ravin de 9 cases (x 2816-3392) :
   `hiddenPlatforms` gx 46-48 et 51-52 (gy 6) révélées par le loup. Mare aux trois
   poissons dessinée par le script (pas de clé `water`). `levelHeight: 720` +
   `fall: {y: 620, mode: 'hurt'}` pour que les chutes se déclenchent.
@@ -1387,7 +1528,7 @@ Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
   Racines : 2 + 2 lianes à 448 px (épreuve à gauche, cime à droite) ; monde spirituel : 4 (2 par vide, tutoriel) ;
   arène de Kainati : 2 (x 792 et 1192, y 64, longueur 170 ; 4 avant le 2026-10-25) ; épreuve : 24.
 - **Saut simple sur le chemin critique** (avant le singe) : marches de 1-2 cases, ravin
-  de 5 cases de la forêt sombre 2 précédé de 3 cases plates (fenêtre d'appel du loup
+  de 4 cases (5 avant le 2026-11-08) de la forêt sombre 2 précédé de 3 cases plates (fenêtre d'appel du loup
   x ≈ 1180-1340) ; aucune marche de 3 cases avant le singe.
 - **Forêt flottante 1/2** : caméra verticale + ciel (`skyReveal`) ; FF2 en plein jour
   (`skyReveal: { start: -1, end: 0, leaves: false }`, `largeTrees: false` dans la donnée,

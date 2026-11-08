@@ -22,7 +22,10 @@
 //                singe, l'arène est inaccessible. Dessous, un filet de branche
 //                (y=128) et une marche (y=0) : on remonte sur la grande
 //                branche au bond du singe (3 cases), sinon on redescend au sol.
-//   x 3584-3840  CORNICHE DE LA CIME (y=-192) : sortie vers l'arène.
+//   x 3584-3840  CORNICHE DE LA CIME (y=-192) : sortie vers l'arène. Vague 3 :
+//                Tamarin, le vieux singe colporteur, perché dans un nid (boutique).
+//   x 1664-1792  Vague 3 : TROU ENTRE LES RACINES, au pied du tronc (sortie
+//                basse vers les galeries des racines ; on en remonte par une corniche).
 // Mesures : saut simple ~172 px (128 = 2 cases, facile), portée ~180 px, loup
 // en sprint ~376 px ; le chemin jusqu'au totem se fait au saut simple. Le
 // bond du singe (264 px, 192 = 3 cases) ouvre la branche d'élan et la marche
@@ -121,8 +124,10 @@ const GRAND_ARBRE_RACINES_DATA = {
       from: [552, 474], via: [[566, 424], [576, 384], [704, 384], [716, 424]], to: [730, 474], thickness: 50, scaleX: 0.28,
       cells: groundRow(9, 11, [6]),
     },
-    // Sol au pied de l'arbre, sur toute la largeur : la racine qui court au sol.
-    { from: [0, RACINES_SURFACE_Y], to: [3840, RACINES_SURFACE_Y], rows: 2, thickness: 100, attach: 'none' },
+    // Sol au pied de l'arbre : la racine qui court au sol, coupée en deux par le
+    // trou des galeries (vague 3, x 1664-1792), pointes vers le trou.
+    { from: [0, RACINES_SURFACE_Y], to: [1664, RACINES_SURFACE_Y], rows: 2, thickness: 100, attach: 'none', tip: 'right' },
+    { from: [1792, RACINES_SURFACE_Y], to: [3840, RACINES_SURFACE_Y], rows: 2, thickness: 100, attach: 'none', tip: 'left' },
     // --- La fourche et ses rameaux.
     // Branche d'élan vers les lianes (x 960-1216, y=-128) : un rameau de la
     // fourche, coupé en deux. Sa partie courbe (dessinée avant, sans case,
@@ -189,6 +194,8 @@ const GRAND_ARBRE_RACINES_DATA = {
     { type: 'grand_arbre_nid_singe', x: 1440, y: 64, scale: 0.26 },                  // sur la fourche
     { type: 'grand_arbre_tas_pierres', x: 2400, y: -192, scale: 0.26 },
     { type: 'grand_arbre_statue_simien', x: 3700, y: -192, scale: 0.32 },             // corniche de la cime
+    // Vague 3 : le nid où se perche Tamarin, le marchand (au bord de la corniche).
+    { type: 'grand_arbre_nid_singe', x: 3630, y: -192, scale: 0.26 },
     { type: 'grand_arbre_champignon_etagere', x: 2420, y: RACINES_SURFACE_Y, scale: 0.4 },
     { type: 'grand_arbre_trou_tronc', x: 2880, y: RACINES_SURFACE_Y, scale: 0.4 },
     { type: 'grand_arbre_nid_singe', x: 1090, y: -128, scale: 0.24 },                 // branche d'élan
@@ -209,6 +216,13 @@ const GRAND_ARBRE_RACINES_DATA = {
   // surfaceY = là où l'on marche sur la grande branche (gy -3, haut de case
   // -192 + GROUND_STAND_SINK, cf. LevelKit) : ombre et impact au ras des pieds.
   // x2 avant le totem : on l'éveille sans pierre sur la tête.
+  // Vague 3 : Tamarin, le vieux singe colporteur (boutique, cf.
+  // src/story/vague3_commun.js), perché dans son nid sur la corniche de la cime :
+  // on l'atteint par les deux lianes qui suivent le totem du singe. La rencontre
+  // pose `marchandVu` (ses autres perchoirs, dans les zones facultatives).
+  npcs: [
+    { id: 'tamarin', sprite: 'singe_gueri', x: 3630, onProp: 'grand_arbre_nid_singe', facing: 'left', shop: 'tamarin', talk: 'v3_tamarin' },
+  ],
   rockfall: { x1: 2260, x2: 2700, surfaceY: -192 + GROUND_STAND_SINK, every: 1700, telegraph: 1000 },
   triggers: [
     { id: 'intro', x: 200, w: 160, cutscene: 'racines_intro' },
@@ -220,6 +234,10 @@ const GRAND_ARBRE_RACINES_DATA = {
     // Bout de la grande branche : le totem, et les lianes de la cime au-dessus du vide.
     { id: 'cime', x: 2760, y: -240, w: 60, h: 120, forbids: { hasMonkeyForm: true }, cutscene: 'racines_cime' },
     { id: 'cime_singe', x: 2900, y: -240, w: 60, h: 120, requires: { hasMonkeyForm: true }, forbids: { kainatiDefeated: true }, cutscene: 'racines_cime_singe' },
+    // Vague 3 : le trou entre les racines (galeries), et l'appel de Tamarin
+    // quand on se pose sur la corniche de la cime (bulles, ne gèlent rien).
+    { id: 'v3_trou', x: 1600, y: 400, w: 80, h: 120, cutscene: 'v3_racines_trou' },
+    { id: 'v3_tamarin', x: 3560, y: -240, w: 96, h: 120, forbids: { marchandVu: true }, cutscene: 'v3_tamarin_appel' },
   ],
   exits: [
     // Bord gauche, deux passages séparés par la corniche : le pied de l'arbre…
@@ -229,6 +247,8 @@ const GRAND_ARBRE_RACINES_DATA = {
     { edge: 'left', from: -576, to: -128, targetScene: 'EpreuveSingeScene', data: { enterId: 'from_racines' } },
     // Au bout de la corniche de la cime : l'arène de Kainati.
     { edge: 'right', from: -576, to: -192, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_racines' } },
+    // Vague 3 : le trou entre les racines -> les galeries (on tombe sur leur corniche).
+    { edge: 'bottom', from: 1664, to: 1792, targetScene: 'GaleriesRacinesScene', data: { enterId: 'from_racines' } },
   ],
   entries: [
     { id: 'from_foret_sombre', x: 110, y: 400, height: 100, edge: 'left', from: -64, to: 448 },
@@ -238,5 +258,10 @@ const GRAND_ARBRE_RACINES_DATA = {
     // arrêtée au monde spirituel (qui n'est plus sur le chemin de
     // l'histoire, cf. ZONE_SCRIPTS.monde_spirituel) et sorties de cette zone de test.
     { id: 'totem_singe', x: 2780, y: -230, height: 80 },
+    // Vague 3 : on remonte des galeries par le trou.
+    // Entrée par le bas = point posé à côté du trou (sans `edge`) : mesuré le
+    // 2026-11-08, l'arrivée « on surgit du trou » ne pousse pas vers la lèvre si
+    // aucune touche n'est tenue, Agarica retombait dans le trou (aller-retour).
+    { id: 'from_galeries', x: 1632, y: 400, height: 100 },
   ],
 };

@@ -496,17 +496,21 @@ class TitleScene extends Phaser.Scene {
     const layer = this.layers.test = this.add.container(0, 0).setDepth(50);
     const items = [];
     LEGACY_TEST_ZONES.forEach((z, row) => items.push({ label: z.name, col: 0, row, action: () => goToScene(this, z.scene) }));
-    DEMO_ZONES.forEach((z, row) => items.push({ label: `${row + 1}. ${z.name}`, col: 1, row, action: () => goToScene(this, z.scene) }));
+    // Vague 3 : 25 zones de démo -> deux colonnes (13 lignes au plus), sinon
+    // la liste sortait de l'écran par le bas.
+    const perCol = Math.ceil(DEMO_ZONES.length / 2);
+    DEMO_ZONES.forEach((z, i) => items.push({ label: `${i + 1}. ${z.name}`, col: 1 + Math.floor(i / perCol), row: i % perCol, action: () => goToScene(this, z.scene) }));
     items.push({ label: '← Retour', col: 0, row: LEGACY_TEST_ZONES.length + 1, action: () => this.showMainMenu() });
     const top = 84;
-    for (const [x, label] of [[width / 2 - 200, 'Anciennes zones'], [width / 2 + 200, 'Démo (accès direct)']]) {
+    const colX = [width / 2 - 300, width / 2 + 10, width / 2 + 290];
+    for (const [x, label] of [[colX[0], 'Anciennes zones'], [(colX[1] + colX[2]) / 2, 'Démo (accès direct)']]) {
       layer.add(this.add.text(x, top - 30, label, {
         fontFamily: STORY_UI.serif, fontSize: '18px', fontStyle: 'bold', color: STORY_UI.title,
         stroke: '#15101f', strokeThickness: 4, padding: { x: 4, y: 3 },
       }).setOrigin(0.5));
     }
     items.forEach((it, i) => {
-      it.text = this.add.text(it.col === 0 ? width / 2 - 200 : width / 2 + 200, top + it.row * 26, it.label, {
+      it.text = this.add.text(colX[it.col], top + it.row * 26, it.label, {
         fontFamily: 'sans-serif', fontSize: '16px', color: STORY_UI.text, stroke: '#15101f', strokeThickness: 4,
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
       it.text.on('pointerover', () => this.selectTest(i));
@@ -535,7 +539,11 @@ class TitleScene extends Phaser.Scene {
       const pos = same.findIndex(({ i }) => i === this.testIndex);
       this.selectTest(same[(pos + (action === 'up' ? -1 : 1) + same.length) % same.length].i);
     } else if (action === 'left' || action === 'right') {
-      const other = items.map((it, i) => ({ it, i })).filter(({ it }) => it.col !== cur.col);
+      // Colonne voisine (dans le sens de la flèche, en boucle), ligne la plus proche.
+      const cols = [...new Set(items.map((it) => it.col))].sort((a, b) => a - b);
+      const ci = cols.indexOf(cur.col);
+      const col = cols[(ci + (action === 'left' ? -1 : 1) + cols.length) % cols.length];
+      const other = items.map((it, i) => ({ it, i })).filter(({ it }) => it.col === col);
       const best = other.reduce((a, b) => (Math.abs(b.it.row - cur.row) < Math.abs(a.it.row - cur.row) ? b : a));
       this.selectTest(best.i);
     }

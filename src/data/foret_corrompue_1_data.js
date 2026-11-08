@@ -13,6 +13,9 @@
 //                marqué d'une spirale
 //   x 3168-3232  mur de mousse vivante pleine hauteur : répulsif (E)
 //   x 3232-4160  chemin de préparation, 2e feu de camp, entrée de l'arène
+// Vague 3 (2026-11-08) : au carrefour, un sol creux cassable à l'ours (x 2688-
+// 2816, sortie basse vers le nid des cocons) et, au-dessus de la branche haute,
+// une sortie haute vers la canopée malade (x 2496-2624, second saut).
 const FORET_CORROMPUE_1_DATA = {
   zoneName: 'La forêt corrompue',
   zoneSub: 'Cœur de la corruption',
@@ -77,7 +80,8 @@ const FORET_CORROMPUE_1_DATA = {
     { type: 'bosquet_log_pile', x: 1690, y: 448, scale: 0.3 },   // à côté de la note (x 1600), pas devant
     { type: 'foret_corrompue_champignon_toxique', x: 2020, y: 448, scale: 0.3 },
     { type: 'foret_corrompue_arbre_malade', x: 2470, y: 448, scale: 0.5 },     // l'arbre à la spirale (gravée par le script)
-    { type: 'foret_corrompue_racine_tordue', x: 2680, y: 448, scale: 0.33 },
+    // Vague 3 : x 2600 (et non 2680) : elle cachait le sol creux du nid.
+    { type: 'foret_corrompue_racine_tordue', x: 2600, y: 448, scale: 0.33 },
     { type: 'foret_corrompue_rocher_fissure', x: 2960, y: 448, scale: 0.3 },
     { type: 'foret_corrompue_pustule_mousse', x: 3060, y: 448, scale: 0.26 },
     { type: 'foret_corrompue_souche_corrompue', x: 3500, y: 448, scale: 0.34 },
@@ -93,6 +97,11 @@ const FORET_CORROMPUE_1_DATA = {
   // jeu 'floor', 448 avec 'tuiles') et 128 px de large : cf. le mur de
   // foret_sombre_2 (traversée en passant humain → loup contre le mur).
   mossWalls: [{ id: 'mur_coeur', x: 3200, y: (448 + GROUND_STAND_SINK) / 2, w: 128, h: 448 + GROUND_STAND_SINK }],
+  // Vague 3 : le sol creux du nid des cocons (gx 42-43, peint aussi en sol
+  // ci-dessus) : fracas de l'ours, puis on tombe dans le nid.
+  breakables: [
+    { id: 'sol_nid', by: 'bear', hint: 'fissure', cells: [[42, 7], [43, 7], [42, 8], [43, 8]] },
+  ],
   enemies: [
     { type: 'mousse_creature', x: 1100, y: 400, patrolMinX: 900, patrolMaxX: 1300 },
     // Crapaud sauteur au sol, sous la branche basse (x 2112-2304, y 320) : ses
@@ -100,7 +109,8 @@ const FORET_CORROMPUE_1_DATA = {
     // pour ne pas déborder sur la zone du singe (x 2440-2620).
     { type: 'crapaud_sauteur', x: 2250, y: 400, patrolMinX: 2120, patrolMaxX: 2420 },
     { type: 'singe_corrompu', x: 2560, y: 150, patrolMinX: 2440, patrolMaxX: 2620 },
-    { type: 'mousse_creature', x: 2800, y: 400, patrolMinX: 2650, patrolMaxX: 3050 },
+    // Vague 3 : bornée à droite du sol creux (x 2688-2816), qui peut être ouvert.
+    { type: 'mousse_creature', x: 2950, y: 400, patrolMinX: 2860, patrolMaxX: 3050 },
     { type: 'mousse_creature', x: 3450, y: 400, patrolMinX: 3300, patrolMaxX: 3600 },
   ],
   triggers: [
@@ -109,13 +119,25 @@ const FORET_CORROMPUE_1_DATA = {
     { id: 'spirale', x: 2380, w: 64, cutscene: 'fc1_spirale' },
     { id: 'mur', x: 3080, w: 64, cutscene: 'fc1_mur' },
     { id: 'avant_arene', x: 3880, w: 64, cutscene: 'fc1_avant_arene' },
+    // Vague 3 : bulles de Xara (sol creux, branche haute).
+    { id: 'v3_sol', x: 2752, y: 400, w: 200, h: 120, forbids: { break_foret_corrompue_1_sol_nid: true }, cutscene: 'v3_fc1_sol' },
+    { id: 'v3_haut', x: 2530, y: 150, w: 192, h: 100, cutscene: 'v3_fc1_haut' },
   ],
   entries: [
     { id: 'from_crash', x: 160, y: 400, height: 128 },
     { id: 'from_arene_ghilt', x: 4040, y: 400, height: 128, edge: 'right', to: 448 },
+    // Vague 3 : retours du nid (par le trou) et de la canopée (sur la branche haute).
+    // Entrée par le bas = point posé à côté du trou (sans `edge`) : mesuré le
+    // 2026-11-08, l'arrivée « on surgit du trou » ne pousse pas vers la lèvre si
+    // aucune touche n'est tenue, Agarica retombait dans le trou (aller-retour).
+    { id: 'from_nid', x: 2640, y: 400, height: 128 },
+    { id: 'from_canopee', x: 2530, y: 150, height: 100, edge: 'top', from: 2432, to: 2624 },
   ],
   exits: [
     { edge: 'right', to: 448, targetScene: 'AreneGhiltScene', data: { enterId: 'from_foret_corrompue' } },
+    // Vague 3 : le sol creux (une fois cassé) et la trouée au-dessus de la branche haute.
+    { edge: 'bottom', from: 2688, to: 2816, targetScene: 'NidCoconsScene', data: { enterId: 'from_foret_corrompue' } },
+    { edge: 'top', from: 2496, to: 2624, targetScene: 'CanopeeMaladeScene', data: { enterId: 'from_foret_corrompue' } },
   ],
   script: 'acte2_fc1',
 };

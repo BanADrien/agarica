@@ -63,6 +63,9 @@ const config = {
     OptionsScene, ControlsScene, CreditsScene, PauseScene, ShopScene,
     BosquetScene, ForetSombre1Scene, ForetSombre2Scene, GrandArbreRacinesScene, GrandArbreAreneScene, MondeSpirituelScene, EpreuveSingeScene, ForetFlottante1Scene,
     ForetFlottante2Scene, ClairierePlanteScene, HutteMorgatScene, ForetCorrompue1Scene, AreneGhiltScene, TrouSombreScene, BosquetRetourScene,
+    // Vague 3 : zones facultatives.
+    GrotteLisiereScene, GaleriesRacinesScene, CercleLuneScene, CimeCacheeScene, IleDesVentsScene,
+    IleDuGardienScene, MaraisBrumesScene, RacinesSuspenduesScene, NidCoconsScene, CanopeeMaladeScene,
   ],
 };
 

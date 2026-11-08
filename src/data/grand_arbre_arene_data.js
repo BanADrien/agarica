@@ -13,6 +13,9 @@
 //               branches basses : sous les grandes attaques, seul abri = une liane.
 //   x 1472-1920 au-delà du rideau droit (ouvert après la victoire) : la
 //               route des hauteurs (-> ForetFlottante1Scene, créée après la victoire).
+//               Vague 3 : des traces du loup y montent vers une plateforme
+//               cachée, puis une branche plate (x 1600-1792, surface 128) sous
+//               la sortie haute vers la cime cachée (loup qui révèle + second saut).
 const GRAND_ARBRE_ARENE_SURFACE_Y = 448;
 
 const GRAND_ARBRE_ARENE_DATA = {
@@ -60,6 +63,22 @@ const GRAND_ARBRE_ARENE_DATA = {
     // L'énorme branche-plancher, qui sort de l'écran des deux côtés. Sa fourche
     // (décor, sans collision), passé le rideau droit : le combat reste dégagé.
     { from: [0, GRAND_ARBRE_ARENE_SURFACE_Y], to: [1920, GRAND_ARBRE_ARENE_SURFACE_Y], rows: 2, thickness: 100, attach: 'none', forks: [{ at: 1480 }] },
+    // Vague 3 : branche plate sous la sortie haute vers la cime cachée
+    // (x 1600-1792, surface 128) ; on y monte depuis la plateforme cachée.
+    { from: [1600, 128], to: [1792, 128], tip: 'both', thickness: 56 },
+  ],
+  // Vague 3 : plateforme cachée révélée par le loup (pistes ci-dessous), puis
+  // second saut (+192) ; de là, un saut simple jusqu'à la branche (+128) et un
+  // autre passe le bord haut. gy 4 et gx 23-24 (et non gy 5, gx 24 du plan) :
+  // à gy 5, révélée, elle laissait 64 px sous elle sur la route de la forêt
+  // flottante (Agarica en fait 83 : elle butait dedans) ; en gx 24-25, la
+  // branche, 64 px au-dessus, cognait la tête. Le rideau droit est à x 1472 :
+  // rien à révéler pendant le combat.
+  hiddenPlatforms: [
+    { gx: 23, gy: 4, w: 2 },
+  ],
+  tracks: [
+    { x: 1490, y: GRAND_ARBRE_ARENE_SURFACE_Y, w: 190 },
   ],
   avoidRanges: [[512, 1472]],
   // Pas de sous-bois au sol de l'arène : ses plantes se confondaient avec les
@@ -109,12 +128,16 @@ const GRAND_ARBRE_ARENE_DATA = {
     calmX: 1300,        // Kainati apaisé (revisite, si sa place n'a pas été mémorisée)
     exitsAfterVictory: [
       { edge: 'right', to: 448, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_arbre' } },
+      // Vague 3 : au-dessus de la branche des traces -> la cime cachée.
+      { edge: 'top', from: 1600, to: 1728, targetScene: 'CimeCacheeScene', data: { enterId: 'from_arene' } },
     ],
   },
   // Filet (ancienne sauvegarde sans la forme singe, démarrage de test) : la
   // route des hauteurs l'exige -- Xara renvoie vers le totem des racines.
   triggers: [
     { id: 'sans_singe', x: 1850, w: 40, once: false, requires: { kainatiDefeated: true }, forbids: { hasMonkeyForm: true }, cutscene: 'arene_sans_singe' },
+    // Vague 3 : les traces qui montent (bulle de Xara, après la victoire).
+    { id: 'v3_traces', x: 1540, y: 400, w: 60, h: 120, requires: { kainatiDefeated: true }, cutscene: 'v3_arene_traces' },
   ],
   exits: [
     { edge: 'left', to: 448, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_arene' } },
@@ -124,5 +147,7 @@ const GRAND_ARBRE_ARENE_DATA = {
     { id: 'from_foret_flottante', x: 1810, y: 380, height: 140, edge: 'right', to: 448 },
     // Ancien passage du totem (sauvegardes d'avant la refonte) : au palier.
     { id: 'from_monde_spirituel', x: 110, y: 380, height: 140 },
+    // Vague 3 : retour de la cime cachée, sur la branche des traces.
+    { id: 'from_cime', x: 1664, y: 64, height: 100, edge: 'top', from: 1600, to: 1728 },
   ],
 };

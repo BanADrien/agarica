@@ -380,18 +380,30 @@ const STORY_REGIONS = [
 ];
 
 const DEMO_ZONES = [
+  // Vague 3 (2026-11-08) : les 10 zones facultatives (VAGUE3_DESIGN.md § 1.2)
+  // suivent chacune la zone d'où l'on y entre ; la région colore la carte.
   { zone: 'bosquet', scene: 'BosquetScene', region: 'bosquet', name: "Bosquet d'Émeraude" },
   { zone: 'foret_sombre_1', scene: 'ForetSombre1Scene', region: 'foret_sombre', name: 'Forêt sombre' },
+  { zone: 'grotte_lisiere', scene: 'GrotteLisiereScene', region: 'foret_sombre', name: 'Grotte de la lisière' },
   { zone: 'foret_sombre_2', scene: 'ForetSombre2Scene', region: 'foret_sombre', name: 'Forêt sombre — les ravins' },
+  { zone: 'cercle_lune', scene: 'CercleLuneScene', region: 'foret_sombre', name: 'Cercle de lune' },
   { zone: 'grand_arbre_racines', scene: 'GrandArbreRacinesScene', region: 'grand_arbre', name: 'Racines du grand arbre' },
+  { zone: 'galeries_racines', scene: 'GaleriesRacinesScene', region: 'grand_arbre', name: 'Galeries des racines' },
   { zone: 'grand_arbre_arene', scene: 'GrandArbreAreneScene', region: 'grand_arbre', name: 'Cime du grand arbre' },
+  { zone: 'cime_cachee', scene: 'CimeCacheeScene', region: 'grand_arbre', name: 'Cime cachée' },
   { zone: 'monde_spirituel', scene: 'MondeSpirituelScene', region: 'grand_arbre', name: 'Monde spirituel' },
   { zone: 'epreuve_singe', scene: 'EpreuveSingeScene', region: 'grand_arbre', name: 'Épreuve du singe' },
   { zone: 'foret_flottante_1', scene: 'ForetFlottante1Scene', region: 'foret_flottante', name: 'Forêt flottante' },
+  { zone: 'ile_du_gardien', scene: 'IleDuGardienScene', region: 'foret_flottante', name: 'Île du gardien' },
   { zone: 'foret_flottante_2', scene: 'ForetFlottante2Scene', region: 'foret_flottante', name: 'Îles flottantes' },
+  { zone: 'ile_des_vents', scene: 'IleDesVentsScene', region: 'foret_flottante', name: 'Île des vents' },
   { zone: 'clairiere_plante', scene: 'ClairierePlanteScene', region: 'foret_flottante', name: 'Clairière de la plante' },
+  { zone: 'racines_suspendues', scene: 'RacinesSuspenduesScene', region: 'foret_flottante', name: 'Racines suspendues' },
+  { zone: 'marais_brumes', scene: 'MaraisBrumesScene', region: 'foret_flottante', name: 'Marais des brumes' },
   { zone: 'hutte_morgat', scene: 'HutteMorgatScene', region: 'foret_flottante', name: 'Hutte de Morgat' },
   { zone: 'foret_corrompue_1', scene: 'ForetCorrompue1Scene', region: 'foret_corrompue', name: 'Forêt corrompue' },
+  { zone: 'nid_cocons', scene: 'NidCoconsScene', region: 'foret_corrompue', name: 'Nid des cocons' },
+  { zone: 'canopee_malade', scene: 'CanopeeMaladeScene', region: 'foret_corrompue', name: 'Canopée malade' },
   { zone: 'arene_ghilt', scene: 'AreneGhiltScene', region: 'foret_corrompue', name: "Antre de Ghil't" },
   { zone: 'trou_sombre', scene: 'TrouSombreScene', region: 'foret_corrompue', name: 'Trou sombre' },
   { zone: 'bosquet_retour', scene: 'BosquetRetourScene', region: 'bosquet', name: 'Retour au bosquet' },

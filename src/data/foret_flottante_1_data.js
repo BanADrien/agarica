@@ -132,6 +132,9 @@ const FORET_FLOTTANTE_1_DATA = {
     // Sur le belvédère, juste après son point de reprise et hors de portée de
     // la créature de mousse : le ciel en plein jour.
     { id: 'vue', x: 3290, y: -940, w: 64, h: 160, cutscene: 'ff1_vue' },
+    // Vague 3 : le courant du belvédère (bulles de Xara, sans puis avec l'aigle).
+    { id: 'v3_vent', x: 3450, y: -940, w: 64, h: 160, forbids: { hasEagleForm: true }, cutscene: 'v3_ff1_vent' },
+    { id: 'v3_vent_aigle', x: 3450, y: -940, w: 64, h: 160, requires: { hasEagleForm: true }, cutscene: 'v3_ff1_vent_aigle' },
   ],
   enemies: [
     // Corbeaux adoucis : ils ne piquent que sur Agarica posée
@@ -152,15 +155,25 @@ const FORET_FLOTTANTE_1_DATA = {
   // Visible mais inutilisable sans l'aigle (il n'agit que sur le plané) : on le
   // remarque ici, on s'en sert dans les îles flottantes (au retour, il remonte
   // l'aigle le long de l'ascension).
-  windCurrents: [{ x: 3120, y: -760, w: 60, h: 1240, force: 300 }],
+  windCurrents: [
+    { x: 3120, y: -760, w: 60, h: 1240, force: 300 },
+    // Vague 3 : le courant du belvédère, vers l'île du gardien (sortie haute
+    // x 3390-3510). Il dépasse le haut du monde (-1200) : le corps de l'aigle
+    // doit franchir entièrement le bord pour changer de zone.
+    { x: 3420, y: -1400, w: 60, h: 504, force: 320 },
+  ],
   entries: [
     { id: 'from_arbre', x: 110, y: 400, height: 128, edge: 'left', to: 448 },
     { id: 'from_ff2', x: 3490, y: -950, height: 120, edge: 'right', from: -1200, to: -896 },
+    // Vague 3 : chute de l'île du gardien (tout son bord bas) -> le belvédère.
+    { id: 'from_ile_du_gardien', x: 3400, y: -950, height: 120, edge: 'top', from: 3250, to: 3550 },
   ],
   exits: [
     { edge: 'left', to: 448, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_foret_flottante' } },
     // En haut à droite, au bout du belvédère : les îles flottantes.
     { edge: 'right', from: -1200, to: -896, targetScene: 'ForetFlottante2Scene', data: { enterId: 'from_ff1' } },
+    // Vague 3 : en haut du courant du belvédère -> l'île du gardien (aigle).
+    { edge: 'top', from: 3390, to: 3510, targetScene: 'IleDuGardienScene', data: { enterId: 'from_ff1' } },
   ],
   script: 'acte2_ff1',
 };

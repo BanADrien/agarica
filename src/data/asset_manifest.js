@@ -270,6 +270,89 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P1] Vague 3 (prompt Codex n°13) : Tamarin, le vieux singe colporteur
+  // (boutique SHOPS.tamarin). VARIANTE de singe_gueri (même espèce, même échelle) :
+  // museau grisonnant, sourcils blancs, baluchon et lanterne. Tant qu'elle manque,
+  // le PNJ garde singe_gueri et ses accessoires dessinés par code (vague3_commun.js).
+  tamarin: {
+    dir: "assets/sprites/tamarin_frames", prefix: "tamarin",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 5, repeat: -1 },
+      talk: { row: 1, frames: 4, fps: 8, repeat: -1 },
+    },
+    scale: 0.28,
+    facing: "right",
+    placeholder: { w: 48, h: 60, color: 0x8a6a4a, label: "Tamarin" },
+    sheets: [
+      { file: "assets/sprites/tamarin.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // [P1] Vague 3 : Tika, mère singe (quête de Pépin).
+  tika: {
+    dir: "assets/sprites/tika_frames", prefix: "tika",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 5, repeat: -1 },
+      talk: { row: 1, frames: 4, fps: 8, repeat: -1 },
+    },
+    scale: 0.28,
+    facing: "right",
+    placeholder: { w: 50, h: 66, color: 0x8a5a32, label: "Tika" },
+    sheets: [
+      { file: "assets/sprites/tika.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // [P1] Vague 3 : Pépin, bébé singe (quête de Pépin).
+  pepin: {
+    dir: "assets/sprites/pepin_frames", prefix: "pepin",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 6, repeat: -1 },
+      talk: { row: 1, frames: 4, fps: 10, repeat: -1 },
+      joie: { row: 2, frames: 4, fps: 10, repeat: -1 },
+    },
+    scale: 0.28,
+    facing: "right",
+    placeholder: { w: 32, h: 41, color: 0xa86a3a, label: "Pepin" },
+    sheets: [
+      { file: "assets/sprites/pepin.png", rows: [0, 1, 2] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // [P1] Vague 3 : Dame Écaille, vieille tortue (quête des fleurs de lune).
+  ecaille: {
+    dir: "assets/sprites/ecaille_frames", prefix: "ecaille",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 3, repeat: -1 },
+      talk: { row: 1, frames: 4, fps: 5, repeat: -1 },
+    },
+    scale: 0.28,
+    facing: "right",
+    placeholder: { w: 78, h: 50, color: 0x5a6a3a, label: "Ecaille" },
+    sheets: [
+      { file: "assets/sprites/ecaille.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // [P2] Vague 3 : coffre secret ANIMÉ (fermé, ouverture, ouvert). Pas encore
+  // branché : le système des coffres lit coffre_ferme / coffre_ouvert (ITEM_MANIFEST),
+  // tirés de cette même feuille (cf. prompt n°13). À brancher dès que
+  // hasManifestArt(scene, "coffre").
+  coffre: {
+    dir: "assets/sprites/coffre_frames", prefix: "coffre",
+    anims: {
+      ferme: { row: 0, frames: 2, fps: 2, repeat: -1 },
+      ouvre: { row: 1, frames: 4, fps: 10, repeat: 0 },
+      ouvert: { row: 2, frames: 2, fps: 3, repeat: -1 },
+    },
+    scale: 0.22,
+    facing: "right",
+    placeholder: { w: 54, h: 42, color: 0x6b4a2a, label: "Coffre" },
+    sheets: [
+      { file: "assets/sprites/coffre.png", rows: [0, 1, 2] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   habitant_garde: {
     dir: "assets/sprites/habitant_garde_frames", prefix: "habitant_garde",
     anims: {
@@ -2213,7 +2296,8 @@ const ITEM_MANIFEST = {
   eclat_lune: {
     path: "assets/items/objets/eclat_lune.png", scale: 0.1,
     placeholder: { w: 14, h: 20, color: 0xa9e8ff, label: "Eclat" },
-    src: { file: "assets/_codex_src/eclat_lune.png" },
+    // Vague 3 (prompt n°13) : 1re cellule de la planche eclats.png (tas et icône à côté).
+    src: { planche: "assets/_codex_src/eclats.png", grid: [3, 1], cell: 0, cut: "grid" },
     norm: { mode: "fit", value: 128 },
   },
   // Coffre de bois sombre cerclé de vert lunaire, fermé puis ouvert (lueur dedans).
@@ -2241,8 +2325,149 @@ const ITEM_MANIFEST = {
   fissure_secret: {
     path: "assets/decors/elements/fissure_secret.png", scale: 0.1,
     placeholder: { w: 20, h: 26, color: 0x1a1020, label: "Fissure" },
-    src: { file: "assets/_codex_src/fissure_secret.png" },
+    // Vague 3 (prompt n°13) : la fissure de pierre A de la planche fissures.png.
+    src: { planche: "assets/_codex_src/fissures.png", grid: [3, 2], cell: 1, cut: "grid" },
     norm: { mode: "fit", value: 256 },
+  },
+  // [P1] Vague 3 (prompt Codex n°13). Éclats : la planche eclats.png (3 x 1)
+  // donne aussi eclat_lune (entrée ci-dessus, src mise à jour) ; le tas et l'icône
+  // du compteur ne sont pas encore branchés (le code dessine/réutilise l'éclat).
+  eclat_lune_tas: {
+    path: "assets/items/objets/eclat_lune_tas.png", scale: 0.1,
+    placeholder: { w: 26, h: 20, color: 0xbfe8ff, label: "Eclats" },
+    src: { planche: "assets/_codex_src/eclats.png", grid: [3, 1], cell: 1, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  hud_eclat: {
+    path: "assets/ui/hud_eclat.png", scale: 0.17,
+    placeholder: { w: 22, h: 22, color: 0xbfe8ff, label: "hud_eclat" },
+    src: { planche: "assets/_codex_src/eclats.png", grid: [3, 1], cell: 2, cut: "grid" },
+    norm: { mode: "fit", value: 128 },
+  },
+  // [P1] Vague 3 : fissures par matière (calques centrés sur une case de 64 px),
+  // A et B en alternance. Pas encore branchées : les cassables montrent
+  // fissure_secret (entrée ci-dessus, tirée de la même planche, pierre A).
+  fissure_ecorce_a: {
+    path: "assets/decors/elements/fissure_ecorce_a.png", scale: 0.2,
+    placeholder: { w: 44, h: 44, color: 0x2a1f45, label: "Fissure" },
+    src: { planche: "assets/_codex_src/fissures.png", grid: [3, 2], cell: 0, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fissure_pierre_a: {
+    path: "assets/decors/elements/fissure_pierre_a.png", scale: 0.2,
+    placeholder: { w: 44, h: 44, color: 0x2a1f45, label: "Fissure" },
+    src: { planche: "assets/_codex_src/fissures.png", grid: [3, 2], cell: 1, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fissure_terre_a: {
+    path: "assets/decors/elements/fissure_terre_a.png", scale: 0.2,
+    placeholder: { w: 44, h: 44, color: 0x2a1f45, label: "Fissure" },
+    src: { planche: "assets/_codex_src/fissures.png", grid: [3, 2], cell: 2, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fissure_ecorce_b: {
+    path: "assets/decors/elements/fissure_ecorce_b.png", scale: 0.2,
+    placeholder: { w: 44, h: 44, color: 0x2a1f45, label: "Fissure" },
+    src: { planche: "assets/_codex_src/fissures.png", grid: [3, 2], cell: 3, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fissure_pierre_b: {
+    path: "assets/decors/elements/fissure_pierre_b.png", scale: 0.2,
+    placeholder: { w: 44, h: 44, color: 0x2a1f45, label: "Fissure" },
+    src: { planche: "assets/_codex_src/fissures.png", grid: [3, 2], cell: 4, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fissure_terre_b: {
+    path: "assets/decors/elements/fissure_terre_b.png", scale: 0.2,
+    placeholder: { w: 44, h: 44, color: 0x2a1f45, label: "Fissure" },
+    src: { planche: "assets/_codex_src/fissures.png", grid: [3, 2], cell: 5, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  // [P1] Vague 3 : objets de quête (objets_D.png, 3 x 2), même gabarit que objets_A/B.
+  pepin_sac: {
+    path: "assets/items/objets/pepin_sac.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0x8a6a3e, label: "pepin_sac" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 0, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  // Loupe du marchand Tamarin, volée par Pépin (remplace la cuillère de la pie).
+  loupe_tamarin: {
+    path: "assets/items/objets/loupe_tamarin.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0xd9b46a, label: "loupe" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 1, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  corde_tressee: {
+    path: "assets/items/objets/corde_tressee.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0xc9a26b, label: "corde" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 2, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fleur_lune: {
+    path: "assets/items/objets/fleur_lune.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0xe8f6ff, label: "fleur_lune" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 3, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  // Trois objets d'inventaire distincts (un ramassable par lieu), une seule image :
+  // même path et même src que fleur_lune (l'importeur exige un src ; il recoupe
+  // la même cellule au même endroit).
+  fleur_lune_marais: {
+    path: "assets/items/objets/fleur_lune.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0xe8f6ff, label: "fleur_lune" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 3, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fleur_lune_cercle: {
+    path: "assets/items/objets/fleur_lune.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0xe8f6ff, label: "fleur_lune" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 3, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  fleur_lune_gardien: {
+    path: "assets/items/objets/fleur_lune.png", scale: 0.16,
+    placeholder: { w: 36, h: 36, color: 0xe8f6ff, label: "fleur_lune" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 3, cut: "grid" },
+    norm: { mode: "fit", value: 256 },
+  },
+  // [P2] Vague 3 : deux décors (objets_D.png). Pour les poser en `props`, ajouter
+  // "nenuphar" et "socle_lune" à DECOR_SECTIONS.decor (LevelKit) quand l'art existe.
+  decor_nenuphar: {
+    path: "assets/decors/elements/decor_nenuphar.png", scale: 0.25,
+    placeholder: { w: 120, h: 28, color: 0x2d6b3a, label: "Nenuphar" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 4, cut: "grid" },
+    norm: { mode: "fit", value: 512 },
+  },
+  decor_socle_lune: {
+    path: "assets/decors/elements/decor_socle_lune.png", scale: 0.2,
+    placeholder: { w: 50, h: 60, color: 0x5a5470, label: "Socle" },
+    src: { planche: "assets/_codex_src/objets_D.png", grid: [3, 2], cell: 5, cut: "grid" },
+    norm: { mode: "fit", value: 512 },
+  },
+  // [P1] Vague 3 : portraits (portraits_D.png, 2 x 2), médaillon de la boîte de dialogue.
+  portrait_tamarin: {
+    path: "assets/ui/portraits/tamarin.png", scale: 0.25,
+    placeholder: { w: 128, h: 128, color: 0x2a1e14, label: "tamarin" },
+    src: { planche: "assets/_codex_src/portraits_D.png", grid: [2, 2], cell: 0, cut: "grid" },
+    norm: { mode: "square", value: 512 },
+  },
+  portrait_tika: {
+    path: "assets/ui/portraits/tika.png", scale: 0.25,
+    placeholder: { w: 128, h: 128, color: 0x2a1e14, label: "tika" },
+    src: { planche: "assets/_codex_src/portraits_D.png", grid: [2, 2], cell: 1, cut: "grid" },
+    norm: { mode: "square", value: 512 },
+  },
+  portrait_pepin: {
+    path: "assets/ui/portraits/pepin.png", scale: 0.25,
+    placeholder: { w: 128, h: 128, color: 0x2a1e14, label: "pepin" },
+    src: { planche: "assets/_codex_src/portraits_D.png", grid: [2, 2], cell: 2, cut: "grid" },
+    norm: { mode: "square", value: 512 },
+  },
+  portrait_ecaille: {
+    path: "assets/ui/portraits/ecaille.png", scale: 0.25,
+    placeholder: { w: 128, h: 128, color: 0x2a1e14, label: "ecaille" },
+    src: { planche: "assets/_codex_src/portraits_D.png", grid: [2, 2], cell: 3, cut: "grid" },
+    norm: { mode: "square", value: 512 },
   },
 };
 

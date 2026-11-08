@@ -8,8 +8,10 @@
 //   x 0-1280     sentier de chasse (empreintes) ; butte du totem du loup
 //                (gx 12-15, surface y=320) : accessible SANS le loup ; 3 cases
 //                plates (x 1088-1280) d'élan avant le ravin
-//   x 1280-1600  ravin de 5 cases : infranchissable sans le sprint du loup
-//   x 1600-2816  sous-bois du loup sanguinaire ; la piste du loup commence
+//   x 1280-1536  ravin de 4 cases : infranchissable sans le sprint du loup
+//                (5 cases avant le 2026-11-08 : ~95 px de marge seulement pour
+//                le tout premier saut du loup, retour des joueurs)
+//   x 1536-2816  sous-bois du loup sanguinaire ; la piste du loup commence
 //   x 2816-3392  ravin de 9 cases : deux plateformes cachées (révélées par
 //                le loup) + pistes
 //   x 3392-3968  clairière préservée : feu de camp (x 3430), mare aux trois poissons (pont de
@@ -21,6 +23,9 @@
 //                `mur_repulsif_foret_sombre` (répulsif, acte 2) → cœur secret
 //                + vieux sentier vers la hutte de Morgat
 //   x 5248-5888  vue sur le grand arbre ; sortie → racines du grand arbre
+// Vague 3 (2026-11-08) : au-dessus du surplomb, la TROUÉE x 4736-4864 (sortie
+// haute vers le cercle de lune) : du surplomb (192), le saut simple n'y monte
+// pas (pieds à 20), le second saut du singe ou de l'aigle la franchit.
 const FORET_SOMBRE_2_SURFACE_Y = 448;
 
 const FORET_SOMBRE_2_DATA = {
@@ -54,8 +59,8 @@ const FORET_SOMBRE_2_DATA = {
     ...groundRow(10, 12, [6]),       // marche de la butte
     ...groundRow(12, 16, [5, 6]),    // butte du totem (surface y=320)
     ...groundRow(16, 17, [6]),       // marche côté ravin (pas de face de 2 cases depuis le sol)
-    // gx 20-24 : RAVIN DE 5 CASES (x 1280-1600)
-    ...groundRow(25, 44, [7, 8]),    // sous-bois
+    // gx 20-23 : RAVIN DE 4 CASES (x 1280-1536)
+    ...groundRow(24, 44, [7, 8]),    // sous-bois
     ...groundRow(30, 31, [6]),       // rocher moussu, en escalier
     ...groundRow(31, 32, [5, 6]),
     ...groundRow(32, 33, [6]),
@@ -86,7 +91,7 @@ const FORET_SOMBRE_2_DATA = {
   // hutte de Morgat) reste ouvert : c'est un passage, sa lueur chaude et son
   // panneau doivent se lire comme une ouverture.
   groundBackCells: [
-    ...groundRow(20, 25, [7, 8]),    // ravin de 5 cases (x 1280-1600)
+    ...groundRow(20, 24, [7, 8]),    // ravin de 4 cases (x 1280-1536)
     ...groundRow(44, 53, [7, 8]),    // ravin de 9 cases (x 2816-3392), sous les plateformes cachées
   ],
   playerSpawn: { x: 110, y: 412 },
@@ -158,17 +163,25 @@ const FORET_SOMBRE_2_DATA = {
     { id: 'plante', x: 3470, w: 40, cutscene: 'fs2_plante' },
     { id: 'mur', x: 4250, w: 40, cutscene: 'fs2_mur' },
     { id: 'grand_arbre', x: 5320, w: 40, cutscene: 'fs2_grand_arbre' },
+    // Vague 3 : bulles de Xara sous la trouée (cf. src/story/vague3_commun.js) ;
+    // `airForm` posé = une forme aérienne (singe ou aigle) donne le second saut.
+    { id: 'v3_trouee', x: 4800, y: 150, w: 128, h: 100, forbids: { airForm: true }, cutscene: 'v3_fs2_trouee' },
+    { id: 'v3_trouee_saut', x: 4800, y: 150, w: 128, h: 100, requires: { airForm: true }, cutscene: 'v3_fs2_trouee_saut' },
   ],
   entries: [
     { id: 'from_foret_sombre_1', x: 110, y: 400, height: 128, edge: 'left' },
     { id: 'from_racines', x: 5760, y: 400, height: 128, edge: 'right' },
     // Par le vieux sentier de la hutte de Morgat : on arrive DANS la poche.
     { id: 'from_hutte_morgat', x: 4960, y: 400, height: 128 },
+    // Vague 3 : retour du cercle de lune, par la trouée (on retombe sur le surplomb).
+    { id: 'from_cercle_lune', x: 4800, y: 150, height: 100, edge: 'top', from: 4736, to: 4864 },
   ],
   exits: [
     { edge: 'left', targetScene: 'ForetSombre1Scene', data: { enterId: 'from_foret_sombre_2' } },
     { edge: 'right', targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_foret_sombre' } },
     // Fond de la poche (derrière le mur de répulsif) : le trou du sentier vers la hutte.
     { edge: 'bottom', from: 4992, to: 5120, targetScene: 'HutteMorgatScene', data: { enterId: 'from_foret_sombre' } },
+    // Vague 3 : la trouée au-dessus du surplomb -> le cercle de lune.
+    { edge: 'top', from: 4736, to: 4864, targetScene: 'CercleLuneScene', data: { enterId: 'from_foret_sombre_2' } },
   ],
 };

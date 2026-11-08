@@ -45,6 +45,9 @@ const FORET_FLOTTANTE_2_DATA = {
   tileset: 'tuiles_flottantes',
   levelWidth: 4096,
   levelHeight: 540,
+  // Vague 3 : écrit (c'était déjà la valeur par défaut d'une caméra verticale) :
+  // le bord haut, celui de la sortie vers l'île des vents, est à -400.
+  levelTop: -400,
   // Au-dessus de la canopée, dans la continuité de la montée de la forêt
   // flottante 1 : plein jour (ciel déjà révélé), caméra qui suit l'aigle en
   // hauteur (zone morte), plus de forêt procédurale (on est au-dessus).
@@ -114,6 +117,13 @@ const FORET_FLOTTANTE_2_DATA = {
     { id: 'intro', x: 260, w: 64, cutscene: 'ff2_intro' },
     { id: 'amanite', x: 1720, w: 64, cutscene: 'amanite_rencontre', forbids: { amaniteMet: true } },
     { id: 'envol', x: 3330, w: 64, cutscene: 'ff2_envol', requires: { hasEagleForm: true } },
+    // Vague 3 : le vent du début, revu avec l'aigle (bulle de Xara, sur I1).
+    { id: 'v3_vent', x: 610, y: 340, w: 180, h: 140, requires: { hasEagleForm: true }, cutscene: 'v3_ff2_vent' },
+    // Retour des joueurs (2026-11-08) : le vide de 384 px entre la rampe T3 et
+    // l'île I5 (x 3456-3840) ne se passe qu'en planant. Rappel court de Xara au
+    // bord, des deux côtés, à chaque fois qu'on s'en approche.
+    { id: 'v3_trou', x: 3420, y: 150, w: 72, h: 100, once: false, cutscene: 'v3_ff2_trou' },
+    { id: 'v3_trou_retour', x: 3876, y: 150, w: 72, h: 100, once: false, cutscene: 'v3_ff2_trou' },
   ],
   // Corbeaux adoucis comme ceux de la forêt flottante 1 (revue du 2026-11-05) :
   // piqué sur une Agarica posée seulement, plus lent, plus rare, et patrouille
@@ -125,7 +135,10 @@ const FORET_FLOTTANTE_2_DATA = {
   // l'évite, qui s'arrête dessous est touchée (à 40 px au-dessus de T2, il frappait
   // 16 passages sur 16, même en marchant).
   enemies: [
-    { type: 'corbeau', x: 608, y: 90, patrolMinX: 563, patrolMaxX: 653, diveDepth: 220, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
+    // Vague 3 : passé d'I1 (x 608, y 90) à I0, même hauteur au-dessus de son île
+    // (I0 est 64 px plus haut) : on retombe de l'île des vents au-dessus d'I1, il
+    // était dans la colonne de chute.
+    { type: 'corbeau', x: 250, y: 26, patrolMinX: 205, patrolMaxX: 295, diveDepth: 220, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
     // Crapaud-piège sur l'îlot I2 (x 768-960, y 256), au bord du saut : il faut
     // s'y poser pour aller de I1 à I3. Portée 160 : ni I1 ni le point de reprise
     // de I3 (x 1120) à portée (avec 220, il visait encore Agarica sur I3).
@@ -136,8 +149,13 @@ const FORET_FLOTTANTE_2_DATA = {
     { type: 'corbeau', x: 2975, y: -30, patrolMinX: 2935, patrolMaxX: 3015, diveDepth: 180, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
   ],
   windCurrents: [
-    // Décor avant l'aigle (entre I1 et I2) : on voit le vent monter.
-    { x: 720, y: 40, w: 40, h: 440, force: 300 },
+    // Entre I1 et I2 : on voit le vent monter avant l'aigle. Vague 3 : prolongé
+    // au-dessus du bord haut (-400) : l'aigle y monte vers l'île des vents.
+    // x 688-792 (et non 712-768, valeur du plan), la largeur de la sortie haute :
+    // le courant n'agit que si le CENTRE d'Agarica est dedans ; 56 px entre deux
+    // îles, l'aigle le traversait sans monter. Il mord de 16 px sur I1 : on
+    // s'envole d'un saut depuis son bord, sans élan.
+    { x: 688, y: -560, w: 104, h: 1040, force: 330 },
     // Sur le filet N : ramène l'aigle au niveau de T2.
     { x: 2690, y: 90, w: 120, h: 422, force: 330 },
   ],
@@ -145,12 +163,22 @@ const FORET_FLOTTANTE_2_DATA = {
     { id: 'from_ff1', x: 110, y: 250, height: 120, edge: 'left', from: -400, to: 320 },
     // Bas de plage (from) : posée sur I5 avant d'avoir plané au-delà de l'île.
     { id: 'from_clairiere', x: 4000, y: 150, height: 80, edge: 'right', from: 130, to: 192 },
+    // Vague 3 : chute de l'île des vents (tout son bord bas) -> au-dessus d'I1 ;
+    // le crapaud-piège d'I2 reste hors de portée.
+    { id: 'from_ile_des_vents', x: 600, y: 330, height: 100, edge: 'top', from: 520, to: 700 },
+    // Vague 3 : des racines suspendues, on arrive sur le filet N.
+    // Entrée par le bas = point posé à côté du trou (sans `edge`) : mesuré le
+    // 2026-11-08, l'arrivée « on surgit du trou » ne pousse pas vers la lèvre si
+    // aucune touche n'est tenue, Agarica retombait dans le trou (aller-retour).
+    { id: 'from_racines_suspendues', x: 2420, y: 470, height: 80 },
   ],
   exits: [
     // Sous l'île d'arrivée, le bord gauche reste un mur au-dessus du vide.
     { edge: 'left', from: -400, to: 320, targetScene: 'ForetFlottante1Scene', data: { enterId: 'from_ff2' } },
     // Bord droit, toute la hauteur : on l'atteint en planant depuis T3.
     { edge: 'right', targetScene: 'ClairierePlanteScene', data: { enterId: 'from_ff2' } },
+    // Vague 3 : en haut du vent d'I1-I2 -> l'île des vents (aigle).
+    { edge: 'top', from: 690, to: 790, targetScene: 'IleDesVentsScene', data: { enterId: 'from_ff2' } },
   ],
   script: 'acte2_ff2',
 };
