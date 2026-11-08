@@ -58,7 +58,12 @@ const EDITOR_ENEMY_TYPES = [
   { value: 'crapaud', label: 'Crapaud (fixe, langue)', color: 0x55aa55, letter: 'Cr' },
   { value: 'mousse_creature', label: 'Créature de mousse (corrompue)', color: 0x7fdc3a, letter: 'M', patrol: true },
   { value: 'singe_corrompu', label: 'Singe corrompu (lance des pierres)', color: 0xc9a040, letter: 'S', patrol: true },
-  { value: 'crapaud_corrompu', label: 'Crapaud corrompu', color: 0x9bff5a, letter: 'Cc' },
+  // Crapauds corrompus (2026-11-08, cf. CrapaudCorrompu.js / CrapaudPiege.js) :
+  // le sauteur reste entre patrolMinX et patrolMaxX ; l'ancien type
+  // `crapaud_corrompu` est un alias du sauteur. Le piège ne bouge pas.
+  { value: 'crapaud_sauteur', label: 'Crapaud sauteur (corrompu, sauts + langue visée)', color: 0x9bff5a, letter: 'Cs', patrol: true },
+  { value: 'crapaud_piege', label: 'Crapaud-piège (corrompu, caché sous la mousse)', color: 0x7f8f6a, letter: 'Cp' },
+  { value: 'crapaud_corrompu', label: 'Crapaud corrompu (= crapaud sauteur)', color: 0x9bff5a, letter: 'Cc', patrol: true },
   { value: 'ghilt', label: "Ghil't (boss)", color: 0xff5533, letter: 'G' },
 ];
 const EDITOR_ENEMY_BY_TYPE = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t) => [t.value, t]));

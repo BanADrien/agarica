@@ -629,6 +629,55 @@ const ASSET_MANIFEST = {
     cut: "blob", align: "left-bottom",
     canvas: [1434, 237],
   },
+  // [P2] Crapaud sauteur (prompt Codex n°12) : corps SEUL, la langue est
+  // l'image à part `crapaud_langue` (ITEM_MANIFEST), tournée vers la cible par
+  // le code. Centré bas, tourné à droite (flipX pour la gauche). jump = 0
+  // accroupi (télégraphe), 1 détente, 2 en l'air, 3 réception ; tongue = 0
+  // gorge gonflée (télégraphe), 1 bouche grande ouverte SANS langue. `mouth` =
+  // point d'attache de la langue dans la pose tongue 1, en px depuis le
+  // bas-centre du cadre importé (x vers l'avant, y négatif vers le haut) --
+  // valeur provisoire, à remplacer par la mesure du rapport d'import.
+  // Tant que l'art manque : découpes de crapaud_corrompu (CrapaudCorrompu.js).
+  crapaud_sauteur: {
+    dir: "assets/sprites/crapaud_sauteur_frames", prefix: "crapaud_sauteur",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 4, repeat: -1 },
+      jump: { row: 1, frames: 4, fps: 10, repeat: 0 },
+      tongue: { row: 2, frames: 2, fps: 1, repeat: 0 },
+    },
+    scale: 0.25,
+    facing: "right",
+    mouth: [96, -104],
+    placeholder: { w: 60, h: 52, color: 0x6a7a2a, label: "Crapaud s." },
+    sheets: [
+      { file: "assets/sprites/crapaud_sauteur.png", rows: [0, 1, 2] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // [P2] Crapaud-piège (prompt Codex n°12) : gros crapaud camouflé en rocher
+  // moussu. hidden = 0 caché (yeux clos), 1 un œil qui s'entrouvre (indice) ;
+  // reveal = il jaillit de sa mousse ; idle = sorti ; tongue = comme le
+  // sauteur. Même échelle et même langue que le sauteur ; `mouth` idem
+  // (provisoire). Tant que l'art manque : découpes de crapaud_corrompu
+  // enfoncées dans le sol + mousse dessinée par code (CrapaudPiege.js).
+  crapaud_piege: {
+    dir: "assets/sprites/crapaud_piege_frames", prefix: "crapaud_piege",
+    anims: {
+      hidden: { row: 0, frames: 2, fps: 1, repeat: -1 },
+      reveal: { row: 1, frames: 4, fps: 18, repeat: 0 },
+      idle: { row: 2, frames: 4, fps: 4, repeat: -1 },
+      tongue: { row: 3, frames: 2, fps: 1, repeat: 0 },
+    },
+    scale: 0.25,
+    facing: "right",
+    mouth: [122, -118],
+    placeholder: { w: 78, h: 60, color: 0x5f6b4a, label: "Crapaud p." },
+    sheets: [
+      { file: "assets/sprites/crapaud_piege.png", rows: [0, 1] },
+      { file: "assets/sprites/crapaud_piege_p2.png", rows: [2, 3] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P2] Petit singe corrompu (sbire de Kainati)
   singe_corrompu: {
     dir: "assets/sprites/singe_corrompu_frames", prefix: "singe_corrompu",
@@ -2126,6 +2175,19 @@ const ITEM_MANIFEST = {
     placeholder: { w: 350, h: 256, color: 0x4a2c28, label: "Tronc base" },
     src: { file: "assets/_codex_src/tronc_base.png" },
     norm: { mode: "height", value: 1024, trim_x: true },
+  },
+  // [P2] Langue des crapauds corrompus (prompt Codex n°12) : bande horizontale
+  // de 128 px de haut, axe de la tige sur la rangée 64 (setOrigin(0, 0.5)),
+  // bout coupé net à GAUCHE (caché dans la bouche), boule collante à DROITE.
+  // Même résolution que les feuilles crapaud_sauteur / crapaud_piege (même
+  // échelle). Le code en montre la FIN depuis la bouche (rognage glissant) et
+  // la tourne vers la cible. Mode height + trim_x : pas de rognage vertical,
+  // l'axe reste au milieu. Tant qu'elle manque : langue de crapaud_corrompu.
+  crapaud_langue: {
+    path: "assets/sprites/crapaud_langue.png", scale: 0.25,
+    placeholder: { w: 280, h: 32, color: 0x7a3a5a, label: "Langue" },
+    src: { file: "assets/_codex_src/crapaud_langue.png" },
+    norm: { mode: "height", value: 128, trim_x: true },
   },
 };
 

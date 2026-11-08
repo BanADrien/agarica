@@ -134,6 +134,7 @@ Script de zone → zone :
 - **Rayons du bandeau « forme débloquée »** (LevelKit) et voile de sous-bois du ciel qui se révèle.
 - **Panneaux de menus** (titre, pause, options, inventaire, carte) : `drawStoryPanel` / cadre `dialogue_box`, hors du périmètre du lot n°8.
 - **Lianes** : tracé Graphics seulement en repli sans art `liane`.
+- **Crapauds corrompus** (2026-11-08, `CrapaudCorrompu.js` / `CrapaudPiege.js`) : **REPLI** jusqu'au prompt Codex n°12. Le corps et la langue sont des cadres taillés à l'exécution dans la planche `crapaud_corrompu`. Le coussin de mousse du crapaud-piège (`crapaud-piege-mousse` : touffes, cailloux, fougère) et sa teinte « pierre » sont dessinés par code ; ils sont remplacés par `crapaud_piege`. **TOUJOURS** : la lueur de bouche et les 3 points de visée du télégraphe (`fx-glow-dot` teinté), qui sont un repère de jeu.
 
 ## Art présent mais non utilisé (au 2026-10-25)
 - Lot n°8 : `decor_marches_racines` (H6 : l'arche est gardée), `decor_autel_sommet` (H5 : autel actuel gardé), `fx_eclaboussure_toxique` (aucun usage recommandé), `couche_brume_avant` (H2 écartée), `decor_fleur_perchee` (second choix), `decor_tapis_mousse` (variante `'lisere'` seulement). Les décors du manifest restent posables dans l'éditeur (sections `decor`, `objet`, `rocher`).
