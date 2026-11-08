@@ -56,6 +56,20 @@ const EPREUVE_SINGE_DATA = {
   // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones
   // sombres ; l'épreuve se joue dans la cime, à la lumière.
   ambient: { tint: 0x0b1424, darkness: 0.12, vignette: false },
+  // Rendu de cohésion (LookKit, réglé à la capture le 2026-11-08) : celui des
+  // racines (même arbre : troncs et branches au contraste adouci, jamais en
+  // aplat), un cran plus clair -- on est dans la cime, à la lumière : voile
+  // gardé à 60 %, fond un peu plus lumineux. Feu du départ adouci : collé au
+  // premier tronc, il le teintait de rouge sur toute sa hauteur. Saturation
+  // pleine et carte de couleurs à 8 % : la mousse toxique du bas et sa marée
+  // (S4) gardent leur vert vif de danger.
+  look: {
+    profile: 'nuit',
+    grade: { exposure: 1.05, contrast: 1.06, pivot: 0.2, sat: 1.0, mapAmt: 0.08, shadowAmt: 0.02 },
+    overlay: 0.6,
+    back: { sat: 0.82, bright: 0.88, fog: 0x28183c, fogAmt: 0.1, mist: 0.14 },
+    lights: { rules: { feu: { radius: 180, intensity: 0.55, glow: 0.18 } } },
+  },
   script: 'epreuve_singe',
   // Troncs juste derrière le plan de jeu : au départ, puis aux corniches. Ils
   // descendent sous la mousse toxique (seul le premier a un pied, sur le sol).

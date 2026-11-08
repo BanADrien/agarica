@@ -31,6 +31,29 @@ const MONDE_SPIRITUEL_DATA = {
   // Pas de vignette (lot Codex n°8, décision H1) : réservée aux zones
   // sombres ; le monde spirituel est lumineux.
   ambient: { tint: 0x6fe3d0, darkness: 0.12, vignette: false },
+  // Rendu de cohésion (LookKit, réglé à la capture le 2026-11-08) : sobre et
+  // éthéré, à l'opposé de la nuit. Base `jour` : à peine de contraste, carte de
+  // couleurs bleu-vert d'esprit (10 %), hautes lumières vers le blanc-cyan ;
+  // fond flouté et éclairci dans une brume cyan (celle du voile) au lieu d'être
+  // assombri. Lumières discrètes (lanterne, lucioles), ombre de contact légère.
+  look: {
+    profile: 'jour',
+    grade: {
+      exposure: 1.04, contrast: 1.0, pivot: 0.3, sat: 1.0,
+      map: [0x0c2630, 0x4a8a92, 0xeafffa], mapAmt: 0.1,
+      shadowTint: 0x1c3a5a, shadowAmt: 0.02,
+      highTint: [0.96, 1.03, 1.03], highAmt: 0.2, ambient: [0.98, 1.0, 1.02],
+    },
+    overlay: 0.85,
+    back: { blur: 1.0, bright: 1.0, sat: 0.95, contrast: 0.95, fog: 0x6fe3d0, fogAmt: 0.07, mist: 0.16, mistBand: [0.5, 0.95] },
+    lights: {
+      glow: 0.14, propMul: 0.4, raiAlpha: 0.9, haloAlpha: 0.9,
+      rules: { lanterne: { intensity: 0.45, glow: 0.15 } },
+      fly: { intensity: 0.08, radius: 50, glow: 0.04 },
+      self: { intensity: 0.06, radius: 140, color: 0xd8fff6 },
+    },
+    shadow: { alpha: 0.45 },
+  },
   // Agarica y entre seule : Xara attend dans le monde réel.
   xara: false,
   script: 'monde_spirituel',

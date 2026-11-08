@@ -45,6 +45,19 @@ const GRAND_ARBRE_RACINES_DATA = {
   // zones sombres (forêts sombres, forêt corrompue, arène de Ghil't, trou
   // sombre) ; ici l'arbre est encore sain, la mousse ne fait que monter.
   ambient: { tint: 0x0b1424, darkness: 0.18, vignette: false },
+  // Rendu de cohésion (LookKit, clé `look`, réglé à la capture le 2026-11-08) :
+  // base `nuit`, adoucie pour l'arbre encore sain. Le tronc et les branches SONT
+  // le sol de jeu (rôle 'world', BrancheKit) : avec le contraste de `nuit` (1,15
+  // autour de 0,3), l'écorce sombre du grand tronc tombait en aplat (12 % de
+  // pixels bouchés contre 3 % sans le rendu) ; ici contraste 1,06 autour de 0,2
+  // et exposition 1,05 : même valeur qu'avant, grain de l'écorce gardé. Fond un
+  // peu moins désaturé que la forêt sombre (0,78) : le bleu de lune et les
+  // champignons cyan du fond restent ceux du grand arbre.
+  look: {
+    profile: 'nuit',
+    grade: { exposure: 1.05, contrast: 1.06, pivot: 0.2, mapAmt: 0.1, shadowAmt: 0.02 },
+    back: { sat: 0.78, bright: 0.84, fog: 0x28183c, fogAmt: 0.1, mist: 0.14 },
+  },
   script: 'grand_arbre_racines',
   // Le grand tronc : la fourche s'y raccorde à gauche, la grande branche à droite,
   // et la branche intermédiaire y fait une console. Juste derrière le plan de jeu.

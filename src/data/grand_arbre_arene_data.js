@@ -24,6 +24,18 @@ const GRAND_ARBRE_ARENE_DATA = {
   // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
   foregroundPlants: false,
   tileset: 'tuiles_ecorce',
+  // Rendu de cohésion (LookKit, réglé à la capture le 2026-11-08) : celui des
+  // racines (même arbre : tronc et branches au contraste adouci, fond reculé),
+  // mais la carte de couleurs presque coupée (4 % au lieu de 10 %), saturation
+  // pleine : les bandes d'alerte de Kainati (orange = fracas, vert = rugissement,
+  // beige = balayage), la vague de mousse et les rochers gardent leur couleur
+  // d'origine (saturation de la bande orange 0,29 contre 0,31 sans le rendu).
+  // Pas de voile `ambient` dans l'arène : `overlay` est sans effet ici.
+  look: {
+    profile: 'nuit',
+    grade: { exposure: 1.05, contrast: 1.06, pivot: 0.2, sat: 1.0, mapAmt: 0.04, shadowAmt: 0.02, highAmt: 0.1 },
+    back: { sat: 0.78, bright: 0.84, fog: 0x28183c, fogAmt: 0.1, mist: 0.14 },
+  },
   // Pas de grands arbres du fond : dans le tronc, leur feuillage brouille le
   // combat, et le fond montre déjà la masse de l'arbre.
   largeTrees: false,
