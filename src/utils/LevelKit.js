@@ -1195,7 +1195,35 @@ function drawCombatDebugOverlays(scene) {
   }
 }
 
+// Retour joueurs (2026-11-08) : « j'ai activé les hitbox de mes attaques »
+// (Maj+A : Maj = sprint, A = compétence, pressées ensemble sans le vouloir).
+// Les bascules de debug (Ctrl+I, Maj+A, Maj+J, Ctrl+Maj+H) et la triche
+// Ctrl+Maj+D sont réservées au développement : `?debug` dans l'URL, l'éditeur
+// (`?editor`, playtest compris) ou les anciennes zones de test (menu « Zones
+// de test » du titre). En partie normale, aucune de ces touches n'agit.
+const DEV_KEYS_TEST_SCENES = ['Zone1Scene', 'Zone2Scene', 'Zone3Scene', 'Zone4Scene', 'Zone5Scene',
+  'SousGrotteScene', 'ZoneAquatiqueScene', 'ZonetestScene', 'PlaytestScene'];
+
+function devKeysAllowed(scene) {
+  if (typeof window !== 'undefined' && window.location) {
+    const q = new URLSearchParams(window.location.search);
+    if (q.has('debug') || q.has('editor')) return true;
+  }
+  return !!(scene && scene.scene && DEV_KEYS_TEST_SCENES.includes(scene.scene.key));
+}
+
 function setupDebugToggle(scene) {
+  // Hors développement : tout éteint (une bascule restée allumée dans une zone
+  // de test ne suit pas dans l'histoire) et aucun écouteur.
+  if (!devKeysAllowed(scene)) {
+    debugHitboxesVisible = false;
+    attackHitboxesVisible = false;
+    entityHitboxesVisible = false;
+    groundHitboxesVisible = false;
+    applyDebugVisibility(scene);
+    ensureCombatDebugGraphics(scene);
+    return;
+  }
   applyDebugVisibility(scene);
   ensureCombatDebugGraphics(scene);
   scene.input.keyboard.on('keydown-I', (event) => {
@@ -1278,6 +1306,14 @@ function setupDebugToggle(scene) {
 // en tout début de `create()` pour l'aller-retour symétrique.
 const FADE_DURATION = 250;
 const FADE_COLOR = [13, 11, 26]; // #0d0b1a, fond du jeu
+// Passage par un bord (retour joueurs 2026-11-08 : « la transition vers son
+// arène, on dirait que ça me téléporte ») : fondus courts et symétriques (même
+// durée à la sortie et à l'entrée, courbes en miroir), SANS le « posé » de
+// caméra (zoom 1,025 en sortie, 1,03 -> 1 à l'arrivée) : ce zoom faisait
+// glisser le décor autour d'Agarica pendant ~0,7 s après l'arrivée (mesuré :
+// défilement -14 -> 0 px, scratchpad exp_transition.py). Les autres
+// changements de zone (portes, cinématiques, reprise) gardent le leur.
+const EDGE_FADE_MS = 220;
 
 // Fondu d'entrée adouci (cf. juiceFadeIn, section « Juice » en fin de
 // fichier) ; `opts.zoom` : léger « posé » de la caméra (zones de jeu).
@@ -1325,10 +1361,11 @@ function goToScene(scene, key, data) {
   scene.__transitioningAway = true;
   // Même durée qu'avant (FADE_DURATION), courbe adoucie + léger zoom (juice).
   playSfx('zone_exit', { key });
-  juiceFadeOut(scene, FADE_DURATION, () => {
+  const edge = !!(data && data.edgeArrival);
+  juiceFadeOut(scene, edge ? EDGE_FADE_MS : FADE_DURATION, () => {
     scene.scene.stop();
     scene.scene.start(key, data);
-  });
+  }, { zoom: !edge });
 }
 
 // Totems de capacité (assets/items/totems.png, fond noir opaque -> découpé
@@ -2708,7 +2745,12 @@ function campfireSit(scene, fireInfo, { quiet = false } = {}) {
   const res = storyCampfireRest(scene, fireInfo.id);
   // Petit mot de ce qui vient de se passer (la sauvegarde a déjà son indicateur).
   const bits = ['Vie et énergie restaurées'];
-  if (res.mapAdded > 0) bits.push('carte mise à jour');
+  // Retour joueurs (2026-11-08) : « ça me dit "carte mise à jour", mais je ne
+  // sais pas comment l'ouvrir ». Sans la carte (storyMapAvailable faux), les
+  // découvertes s'enregistrent en silence : on n'en parle pas. Avec la carte,
+  // la touche qui l'ouvre.
+  const hasMap = typeof storyMapAvailable !== 'function' || storyMapAvailable();
+  if (res.mapAdded > 0 && hasMap) bits.push('carte mise à jour [M]');
   showToast(scene, bits.join(' · '), 2200);
   return res;
 }
@@ -4089,6 +4131,9 @@ const EDGE_ARRIVAL_BODY_HEIGHT = 83;
 // touche est encore tenue vers ce bord. Il reste un mur tant qu'elle n'est pas
 // repartie à cette distance, sinon aller-retour sans fin entre les deux zones.
 const EDGE_REARM_DISTANCE = 120;
+// Pas d'entrée automatiques après un bord latéral (cf. applyEdgeArrivalState).
+const EDGE_ENTRY_WALK_PX = 72;
+const EDGE_ENTRY_WALK_MS = 600;
 
 function edgeExitIsLateral(edge) {
   return edge === 'left' || edge === 'right';
@@ -4228,11 +4273,122 @@ function edgeArrivalSpawn(scene, entry, arrival, fallback) {
 // Touches tenues à travers le changement de scène : chaque scène a ses propres
 // objets Key, qui repartent « relâchés », et le clavier ne répète que la
 // dernière touche pressée (Maj + flèche : le sprint retombait à l'arrivée).
+// C'est aussi l'état « physique » du clavier vu de la page, tenu par la garde
+// ci-dessous (touches fantômes).
 const EDGE_HELD_KEYCODES = new Set();
+
+// --- Garde des touches fantômes ----------------------------------------------
+// Retour joueurs (2026-11-08) : « mon perso va à droite tout seul sans que je
+// fasse rien ». Reproduit au harnais (scratchpad retours_joueurs/exp_touches.py) :
+// une touche tenue dont le keyup n'arrive JAMAIS à la page reste enfoncée pour
+// Phaser, qui ne remet ses touches à zéro que sur `blur` de la fenêtre et sur
+// pause/sommeil de scène. Cas reproduits : clic droit (le menu contextuel natif
+// avale le keyup sans `blur`), onglet caché sans `blur` (visibilitychange).
+// Cas connus ailleurs : Cmd tenu sur Mac (les keyup des autres touches sont
+// supprimés). Remèdes, du plus sûr au filet de sécurité :
+//  1. menu contextuel bloqué sur le canvas en jeu (le clic droit ne sert à
+//     rien : seul le gauche attaque, cf. Player.js) -> le keyup arrive normalement ;
+//  2. tout relâcher sur blur, onglet caché, pagehide, menu contextuel ailleurs,
+//     relâche de Cmd/Windows ;
+//  3. modificateurs (Maj, Ctrl, Alt) revérifiés sur chaque événement clavier ou
+//     souris (`shiftKey`…) : l'état réel est connu, on corrige au premier écart ;
+//  4. répétition automatique : le clavier répète la DERNIÈRE touche pressée tant
+//     qu'elle est tenue. Si cette touche a déjà été vue se répéter sur cette
+//     machine (sur Mac, une lettre tenue peut ne jamais se répéter : jamais
+//     jugée) et qu'elle se tait plus de INPUT_GUARD_STUCK_MS, son keyup a été
+//     perdu -> relâchée. Couvre aussi la touche « gardée » à l'arrivée d'une
+//     zone (applyEdgeArrivalState) si elle n'est plus vraiment tenue.
+// Les bots de test envoient des keydown sans `repeat` : jamais jugés.
+const INPUT_GUARD_STUCK_MS = 1500;
+const INPUT_GUARD_MODIFIERS = [[16, 'shiftKey'], [17, 'ctrlKey'], [18, 'altKey']];
+const INPUT_GUARD_META_CODES = [91, 92, 93, 224];
+const INPUT_GUARD = { lastPressed: null, lastEventAt: new Map(), repeats: new Set(), releases: 0 };
+
+function inputGuardKeyboards() {
+  const game = typeof window !== 'undefined' ? window.__game : null;
+  if (!game || !game.scene) return [];
+  const out = [];
+  for (const s of game.scene.getScenes(false)) {
+    const kb = s && s.input && s.input.keyboard;
+    if (kb && kb.keys) out.push(kb);
+  }
+  return out;
+}
+
+// Relâche une touche partout (toutes les scènes ont leurs propres objets Key).
+function inputGuardReleaseKey(code) {
+  EDGE_HELD_KEYCODES.delete(code);
+  INPUT_GUARD.lastEventAt.delete(code);
+  if (INPUT_GUARD.lastPressed === code) INPUT_GUARD.lastPressed = null;
+  for (const kb of inputGuardKeyboards()) {
+    const key = kb.keys[code];
+    if (key && key.isDown) key.reset();
+  }
+  INPUT_GUARD.releases += 1;
+}
+
+function inputGuardReleaseAll() {
+  EDGE_HELD_KEYCODES.clear();
+  INPUT_GUARD.lastEventAt.clear();
+  INPUT_GUARD.lastPressed = null;
+  for (const kb of inputGuardKeyboards()) kb.resetKeys();
+  INPUT_GUARD.releases += 1;
+}
+
+// Remède 3 : l'événement porte l'état réel des modificateurs. Événements du
+// navigateur seulement (`isTrusted`) : ceux des bots de test, fabriqués à la
+// main, ne renseignent pas toujours `shiftKey`.
+function inputGuardCheckModifiers(e, ownCode) {
+  if (!e.isTrusted) return;
+  for (const [code, flag] of INPUT_GUARD_MODIFIERS) {
+    if (code !== ownCode && e[flag] === false && EDGE_HELD_KEYCODES.has(code)) inputGuardReleaseKey(code);
+  }
+}
+
+// Remède 4, appelé à chaque image de jeu (updateLevelFromData).
+function inputGuardWatchdog() {
+  const code = INPUT_GUARD.lastPressed;
+  if (code == null || !INPUT_GUARD.repeats.has(code) || !EDGE_HELD_KEYCODES.has(code)) return;
+  const last = INPUT_GUARD.lastEventAt.get(code);
+  if (last != null && performance.now() - last > INPUT_GUARD_STUCK_MS) inputGuardReleaseKey(code);
+}
+
+// Menu contextuel : bloqué sur le canvas d'une partie (pas dans l'éditeur, où
+// le clic droit reste au navigateur) ; ailleurs, il prendra le clavier.
+function inputGuardOnContextMenu(e) {
+  const game = window.__game;
+  const editor = typeof EDITOR_MODE !== 'undefined' && EDITOR_MODE;
+  if (!editor && game && e.target === game.canvas) {
+    e.preventDefault();
+    return;
+  }
+  inputGuardReleaseAll();
+}
+
 if (typeof window !== 'undefined') {
-  window.addEventListener('keydown', (e) => EDGE_HELD_KEYCODES.add(e.keyCode), true);
-  window.addEventListener('keyup', (e) => EDGE_HELD_KEYCODES.delete(e.keyCode), true);
-  window.addEventListener('blur', () => EDGE_HELD_KEYCODES.clear());
+  window.addEventListener('keydown', (e) => {
+    EDGE_HELD_KEYCODES.add(e.keyCode);
+    INPUT_GUARD.lastPressed = e.keyCode;
+    INPUT_GUARD.lastEventAt.set(e.keyCode, performance.now());
+    if (e.repeat) INPUT_GUARD.repeats.add(e.keyCode);
+    inputGuardCheckModifiers(e, e.keyCode);
+  }, true);
+  window.addEventListener('keyup', (e) => {
+    EDGE_HELD_KEYCODES.delete(e.keyCode);
+    INPUT_GUARD.lastEventAt.delete(e.keyCode);
+    if (INPUT_GUARD.lastPressed === e.keyCode) INPUT_GUARD.lastPressed = null;
+    inputGuardCheckModifiers(e, e.keyCode);
+    // Mac : tant que Cmd est tenu, les keyup des autres touches sont supprimés.
+    if (INPUT_GUARD_META_CODES.includes(e.keyCode)) inputGuardReleaseAll();
+  }, true);
+  window.addEventListener('mousedown', (e) => inputGuardCheckModifiers(e, null), true);
+  window.addEventListener('mousemove', (e) => inputGuardCheckModifiers(e, null), true);
+  window.addEventListener('blur', inputGuardReleaseAll);
+  window.addEventListener('pagehide', inputGuardReleaseAll);
+  window.addEventListener('contextmenu', inputGuardOnContextMenu, true);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => { if (document.hidden) inputGuardReleaseAll(); });
+  }
 }
 
 // Repose l'élan et la forme sur le nouveau joueur. Sens de marche : vers
@@ -4271,6 +4427,17 @@ function applyEdgeArrivalState(player, entry, arrival) {
   if (entry && entry.edge === 'bottom' && Math.abs(vx) < EDGE_ARRIVAL_RISE_PUSH) {
     vx = (arrival.facing || 1) * EDGE_ARRIVAL_RISE_PUSH;
     player.vineMomentumSpeed = EDGE_ARRIVAL_RISE_PUSH;
+  }
+  // Quelques pas d'entrée (bord latéral, elle marchait vers ce bord) : la
+  // touche lâchée pendant le fondu, elle ne reste pas plantée au ras de
+  // l'écran -- elle fait quelques pas vers l'intérieur (Player.edgeEntryWalk,
+  // interrompus par la moindre touche de direction ou de saut).
+  if (entry && edgeExitIsLateral(entry.edge) && Math.abs(arrival.vx || 0) > 30) {
+    const inward = entry.edge === 'left' ? 1 : -1;
+    const held = [player.cursors.left, player.cursors.right, player.keys.left, player.keys.right].some((k) => k && k.isDown);
+    if (!held) {
+      player.edgeEntryWalk = { dir: inward, toX: player.x + inward * EDGE_ENTRY_WALK_PX, until: player.scene.time.now + EDGE_ENTRY_WALK_MS };
+    }
   }
   // Vitesse max du tour d'avant : sans ça, le premier pas de physique
   // écrêterait l'élan du loup à la marche (update() la remet ensuite à jour).
@@ -4588,7 +4755,8 @@ function buildLevelFromData(scene, data, sceneData) {
   scene.__juiceFx = null;
   scene.__hudFx = null;
   scene.__juiceZooming = false;
-  fadeInScene(scene, { zoom: 1.03 });
+  // Arrivée par un bord : fondu court, sans zoom (cf. EDGE_FADE_MS).
+  fadeInScene(scene, sceneData && sceneData.edgeArrival ? { ms: EDGE_FADE_MS } : { zoom: 1.03 });
   // Retour utilisateur : "je ne peux plus retourner a la zone1, ça me met
   // un écran vide" -- `goToScene` pose `__transitioningAway = true` sur LA
   // SCÈNE (cf. son commentaire) pour ignorer les frames suivantes tant que
@@ -4834,6 +5002,10 @@ function buildLevelFromData(scene, data, sceneData) {
   // Suivi historique (centré, immédiat), ou caméra de zone (`camera.vertical` :
   // zone morte + ressort, ciel qui se révèle), cf. setupZoneCamera.
   setupZoneCamera(scene, data, { camLow, camHigh });
+  // Arrivée par un bord en courant : le regard devant (juiceUpdateCameraLook)
+  // part déjà à sa valeur, sinon la caméra glissait de ~46 px dans la seconde
+  // qui suit l'arrivée.
+  if (edgeArrival) juicePresetCameraLook(scene);
 
   if (scene.water.length) {
     scene.physics.add.overlap(scene.player, scene.water, () => { scene.player.inWater = true; });
@@ -5001,6 +5173,113 @@ function buildLevelFromData(scene, data, sceneData) {
   // désactivée : rien. Démonté à l'arrêt de la scène (sortie, redémarrage).
   // Garde `typeof` : prototype/coherence.html charge LevelKit sans LookKit.
   if (typeof lookAttach === 'function') lookAttach(scene, data);
+  // Rendu sans tremblement des décors (cf. renderSnapSetup).
+  renderSnapSetup(scene);
+  // Première baie dans le sac : la touche pour la manger (cf. bagHintSetup).
+  bagHintSetup(scene);
+}
+
+// --- Astuce du sac (retour joueurs 2026-11-08) ---------------------------------
+// « Y a moyen de se soigner ou pas ? » (combat de Kainati) : les consommables
+// s'utilisent partout depuis le sac (touche I), mais rien ne le disait. La
+// première fois qu'une baie de soin entre dans le sac (coffre, marchand, baie
+// tombée en combat… : toutes les sources passent par le registre
+// `consumables`), un message court donne la touche. Montré une seule fois
+// (flag sauvegardé), sur une image où le monde n'est pas gelé (pas sous le
+// marchand ni sous un dialogue) et après la bannière « Objet obtenu ».
+const BAG_HINT_FLAG = 'astuceSacVue';
+const BAG_HINT_TEXT = '[I] : ton sac, pour manger une baie (+1 cœur)';
+const BAG_HINT_MS = 4200;
+let bagHintHooked = false;
+
+function bagHintBerries(v) {
+  return v && typeof v === 'object' && Number.isFinite(v.baie_soin) ? v.baie_soin : 0;
+}
+
+function bagHintSetup(scene) {
+  if (bagHintHooked || !scene.registry || !scene.registry.events) return;
+  bagHintHooked = true;
+  const onGain = (value, prev) => {
+    if (bagHintBerries(value) <= bagHintBerries(prev)) return;
+    if (typeof storyGet === 'function' && storyGet(BAG_HINT_FLAG)) return;
+    const sc = currentLevelScene;
+    if (sc && sc.sys && sc.sys.isActive()) sc.__bagHintPending = true;
+  };
+  scene.registry.events.on('changedata-consumables', (parent, value, prev) => onGain(value, prev));
+  scene.registry.events.on('setdata', (parent, key, value) => { if (key === 'consumables') onGain(value, null); });
+}
+
+// Appelée à chaque image de jeu (monde non gelé, cf. updateLevelFromData).
+function bagHintUpdate(scene) {
+  if (!scene.__bagHintPending || scene.time.now < (scene.__storyBannerFreeAt || 0)) return;
+  scene.__bagHintPending = false;
+  if (typeof storyGet === 'function' && storyGet(BAG_HINT_FLAG)) return;
+  if (typeof storySet === 'function') storySet(BAG_HINT_FLAG, true);
+  if (typeof showToast === 'function') showToast(scene, BAG_HINT_TEXT, BAG_HINT_MS);
+}
+
+// --- Rendu sans tremblement (retour joueurs 2026-11-08) ------------------------
+// « Les assets sol/arbres bougent parfois ». Mesuré image par image
+// (scratchpad retours_joueurs/exp_rendu.py, un plan isolé, bords suivis au
+// sous-pixel) : la caméra suit Agarica avec roundPixels (startFollow(p, true)),
+// et le shader de Phaser 3.80 arrondit alors CHAQUE COIN de chaque image au
+// pixel. Avec un défilement fractionnaire, les deux bords d'un objet dont la
+// largeur à l'écran n'est pas entière (décors à échelle aléatoire) s'arrondissent
+// différemment d'une image à l'autre : il s'élargit et rétrécit en défilant
+// (jusqu'à 2,7 px pour les décors du plan de jeu, 3,9 px pour les buissons du
+// premier plan, ×2 à l'écran une fois le canvas agrandi) et son image est
+// rééchantillonnée -- il « tremble ». Le sol (cases de 64 px à des positions
+// entières) ne bougeait pas, d'où le « parfois ».
+// Remède, sans toucher à l'arrondi (textes et interface restent nets) :
+//  1. défilement de la caméra arrondi au pixel AU RENDU seulement : un objet
+//     immobile du plan de jeu garde la même phase sous-pixel, donc le même
+//     arrondi, à chaque image. La vraie valeur est remise après le rendu : le
+//     ressort vertical (updateZoneCamera) et le regard devant la relisent ;
+//  2. plans en parallaxe (scrollFactor ni 0 ni 1 : arbres du fond, lianes,
+//     buissons du premier plan) : taille à l'écran ramenée à un nombre entier
+//     de pixels (échelle à peine retouchée, < 0,5 px) -- leurs deux bords ont
+//     alors la même phase et ils glissent d'un bloc, sans se déformer.
+function renderSnapSetup(scene) {
+  const cam = scene.cameras.main;
+  if (cam && !cam.__pixelSnap) {
+    const snap = { on: false, tx: 0, ty: 0, rx: 0, ry: 0 };
+    cam.__pixelSnap = snap;
+    const base = cam.preRender;
+    cam.preRender = function pixelSnapPreRender() {
+      base.call(this);
+      snap.tx = this.scrollX;
+      snap.ty = this.scrollY;
+      snap.rx = Math.round(this.scrollX);
+      snap.ry = Math.round(this.scrollY);
+      this.scrollX = snap.rx;
+      this.scrollY = snap.ry;
+      snap.on = true;
+    };
+    // Après le rendu des caméras de la scène : la vraie position revient (sauf
+    // si quelqu'un l'a changée entre-temps).
+    levelSceneOn(scene, 'render', () => {
+      if (!snap.on) return;
+      snap.on = false;
+      if (cam.scrollX === snap.rx) cam.scrollX = snap.tx;
+      if (cam.scrollY === snap.ry) cam.scrollY = snap.ty;
+    });
+  }
+  for (const o of scene.children.list) renderSnapObjectSize(o);
+}
+
+function renderSnapObjectSize(o) {
+  if (!o || o.type !== 'Image' || o.__lkSnapScale || o.rotation || !o.frame) return;
+  const sx = o.scrollFactorX;
+  const sy = o.scrollFactorY;
+  if ((sx === 1 && sy === 1) || (sx === 0 && sy === 0)) return;
+  const fw = o.frame.realWidth;
+  const fh = o.frame.realHeight;
+  if (!(fw > 0 && fh > 0) || !o.scaleX || !o.scaleY) return;
+  const w = Math.max(1, Math.round(Math.abs(o.scaleX) * fw));
+  const h = Math.max(1, Math.round(Math.abs(o.scaleY) * fh));
+  // Échelle d'origine gardée (mesures « avant », et pour qui voudrait la relire).
+  o.__lkSnapScale = [o.scaleX, o.scaleY];
+  o.setScale(Math.sign(o.scaleX) * (w / fw), Math.sign(o.scaleY) * (h / fh));
 }
 
 // Mêlée / piqué de l'aigle contre UN ennemi : vrai si la portée de l'attaque
@@ -5166,6 +5445,9 @@ function updateLevelFromData(scene, time, delta) {
   // recevoir des frames update() fantômes ; ignorées ici avant de toucher
   // le moindre objet (player/xara/...) potentiellement déjà détruit.
   if (scene !== currentLevelScene) return;
+  // Touche dont le keyup a été perdu (cf. INPUT_GUARD) : relâchée avant que
+  // le joueur ne la lise.
+  inputGuardWatchdog();
   // `scene.create()` attend maintenant `resolveZoneData(...)` (une
   // promesse IndexedDB, cf. son commentaire) avant d'appeler
   // buildLevelFromData -- Phaser continue d'appeler update() à chaque
@@ -5187,6 +5469,7 @@ function updateLevelFromData(scene, time, delta) {
   } else {
     // Fin d'épisode de gel, invulnérabilité de sortie de dialogue (StoryKit).
     storyUnfrozenTick(scene);
+    bagHintUpdate(scene);
     scene.player.update();
     if (scene.xara) scene.xara.update(time, delta);
     scene.enemies.children.iterate((enemy) => enemy && enemy.update(scene.player));
@@ -6169,6 +6452,22 @@ function juiceOnEnemyHit(scene, enemy, source = {}) {
 // elle-même `camera.lookAheadX`.
 const JUICE_LOOK_AHEAD = 46;
 
+// Même cible que juiceUpdateCameraLook, posée d'un coup (arrivée par un bord).
+function juicePresetCameraLook(scene) {
+  const cam = scene.cameras.main;
+  const p = scene.player;
+  if (!cam || !p || !p.body || cam._follow !== p) return;
+  const facing = p.facingDir >= 0 ? 1 : -1;
+  const zc = scene.__zoneCamera;
+  if (zc && zc.cfg && zc.cfg.lookAheadX) {
+    zc.lookX = -facing * zc.cfg.lookAheadX;
+    cam.followOffset.x = zc.lookX;
+    return;
+  }
+  const run = Phaser.Math.Clamp((Math.abs(p.body.velocity.x) - 30) / 330, 0, 1);
+  cam.followOffset.x = -facing * JUICE_LOOK_AHEAD * (0.3 + 0.7 * run);
+}
+
 function juiceUpdateCameraLook(scene, dt) {
   const cam = scene.cameras.main;
   const p = scene.player;
@@ -6277,13 +6576,13 @@ function juiceFadeIn(scene, { ms = JUICE_FADE_IN_MS, zoom = 0 } = {}) {
   }
 }
 
-function juiceFadeOut(scene, ms, onDone) {
+function juiceFadeOut(scene, ms, onDone, { zoom = true } = {}) {
   const { width, height } = scene.scale;
   const veil = scene.add.rectangle(0, 0, width, height, 0x0d0b1a, 1).setOrigin(0).setScrollFactor(0)
     .setDepth(JUICE_VEIL_DEPTH).setAlpha(0);
   scene.tweens.add({ targets: veil, alpha: 1, duration: ms, ease: 'Sine.easeIn', onComplete: onDone });
   const cam = scene.cameras.main;
-  if (cam && Math.abs(cam.zoom - 1) < 0.001) scene.tweens.add({ targets: cam, zoom: 1.025, duration: ms, ease: 'Sine.easeIn' });
+  if (zoom && cam && Math.abs(cam.zoom - 1) < 0.001) scene.tweens.add({ targets: cam, zoom: 1.025, duration: ms, ease: 'Sine.easeIn' });
 }
 
 // Remise à zéro par visite (instance de scène réutilisée) + crochet caméra +

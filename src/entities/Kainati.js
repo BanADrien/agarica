@@ -110,11 +110,11 @@ const KAINATI_PHASE2_TINT = 0xffd4d4;
 // choc était impossible à esquiver sans sprint depuis le rideau opposé.
 const KAINATI_TIMINGS = {
   1: {
-    idle: 950, throwWind: 650, throwRelease: 450, chargeWind: 1200, chargeSpeed: 620, stun: 3200, returnSpeed: 330,
+    idle: 950, throwWind: 650, throwRelease: 450, throwTurn: 520, chargeWind: 1200, chargeSpeed: 620, stun: 3200, returnSpeed: 330,
     fullWind: 1250, recover: 550, quake: 1900, moss: 2300, rocks: 6, rockEvery: 230,
   },
   2: {
-    idle: 650, throwWind: 550, throwRelease: 380, chargeWind: 1200, chargeSpeed: 700, stun: 2700, returnSpeed: 400,
+    idle: 650, throwWind: 550, throwRelease: 380, throwTurn: 440, chargeWind: 1200, chargeSpeed: 700, stun: 2700, returnSpeed: 400,
     fullWind: 1200, recover: 420, quake: 2000, moss: 2400, rocks: 8, rockEvery: 200,
   },
 };
@@ -321,6 +321,37 @@ function addKainatiStoneImage(scene, x, y, size = null) {
 // blessent.
 const KAINATI_STONE_SIZE = 2 * KAINATI_STONE_RADIUS + 4;
 
+// Lisibilité des pierres lancées (retour joueurs 2026-11-08 : « les projectiles
+// de base de Kainati sont trop peu visibles ») : une pierre grise de 28 px se
+// perdait dans les troncs et la mousse sombres de l'arène, d'autant plus sous
+// le voile d'ambiance du rendu de cohésion (LookKit, profondeur 900) qui
+// assombrit tout ce qui est dessous. La pierre garde sa taille (= sa zone de
+// dégâts, rayon KAINATI_STONE_RADIUS inchangé) ; on ajoute :
+//  - un liseré clair (silhouette de la pierre, un peu plus grande, en blanc
+//    chaud) : la forme se découpe sur tous les fonds ;
+//  - une lueur chaude additive qui respire autour ;
+//  - une traînée courte (positions récentes) : on lit la trajectoire ;
+//  - le tout AU-DESSUS du voile d'ambiance (sous le premier plan, 1000) et en
+//    rôle 'ui' pour LookKit (couleurs gardées telles quelles) : même rendu,
+//    rendu de cohésion actif ou non.
+// Au lancer : une pierre luisante apparaît dans sa main pendant la préparation.
+const KAINATI_STONE_DEPTH = 960;
+const KAINATI_STONE_RIM_COLOR = 0xfff1d0;
+const KAINATI_STONE_RIM_SCALE = 1.32;
+const KAINATI_STONE_GLOW_COLOR = 0xffc45c;
+const KAINATI_STONE_GLOW_SIZE = 80;
+const KAINATI_STONE_TRAIL_N = 8;
+const KAINATI_STONE_TRAIL_COLOR = 0xffe2a0;
+// Jet : seulement devant lui (retour joueurs : « c'est bizarre qu'il puisse
+// les balancer vers l'arrière, ce n'est pas instinctif, et ça fait punitif »).
+// Agarica derrière : il se retourne d'abord (état 'throwTurn', T.throwTurn ms,
+// pivot visible au premier tiers), puis prépare son jet normalement. Passée
+// derrière lui pendant la préparation : il lance quand même devant lui (au
+// moins KAINATI_THROW_FRONT_MIN px devant), jamais en arrière.
+const KAINATI_THROW_FRONT_MIN = 90;
+const KAINATI_THROW_BEHIND_SLACK = 20;
+const KAINATI_THROW_PIVOT_AT = 0.35;
+
 // Rocher roulant (art `rocher_roulant`, sinon la pierre dessinée agrandie)
 // au diamètre `d` px (pixels visibles).
 function addKainatiBoulderImage(scene, x, y, d) {
@@ -400,7 +431,77 @@ class KainatiHazards {
     const vx = (tx - sx) / T;
     const vy = (ty - sy - 0.5 * KAINATI_STONE_GRAVITY * T * T) / T;
     const img = addKainatiStoneImage(this.scene, sx, sy, KAINATI_STONE_SIZE).setDepth(KAINATI_FX_DEPTH);
-    return this.push({ kind: 'stone', img, vx, vy, g: KAINATI_STONE_GRAVITY, spin: Phaser.Math.Between(-8, 8) });
+    const h = this.push({ kind: 'stone', img, vx, vy, g: KAINATI_STONE_GRAVITY, spin: Phaser.Math.Between(-8, 8) });
+    this.dressStone(h);
+    return h;
+  }
+
+  // Liseré, lueur et traînée d'une pierre (cf. KAINATI_STONE_DEPTH).
+  dressStone(h) {
+    const sc = this.scene;
+    const img = h.img;
+    if (!img) return;
+    if (typeof juiceEnsureTextures === 'function') juiceEnsureTextures(sc);
+    img.setDepth(KAINATI_STONE_DEPTH);
+    img.lookRole = 'ui';
+    const glow = sc.textures.exists('juice-glow')
+      ? sc.add.image(img.x, img.y, 'juice-glow').setDisplaySize(KAINATI_STONE_GLOW_SIZE, KAINATI_STONE_GLOW_SIZE).setTint(KAINATI_STONE_GLOW_COLOR)
+      : sc.add.circle(img.x, img.y, KAINATI_STONE_GLOW_SIZE / 3, KAINATI_STONE_GLOW_COLOR, 0.35);
+    glow.setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.7).setDepth(KAINATI_STONE_DEPTH - 0.03);
+    glow.lookRole = 'ui';
+    const rim = sc.add.image(img.x, img.y, img.texture.key, img.frame.name)
+      .setScale(img.scaleX * KAINATI_STONE_RIM_SCALE, img.scaleY * KAINATI_STONE_RIM_SCALE)
+      .setTintFill(KAINATI_STONE_RIM_COLOR).setAlpha(0.95).setDepth(KAINATI_STONE_DEPTH - 0.01);
+    rim.lookRole = 'ui';
+    h.glow = glow;
+    h.rim = rim;
+    h.trail = [];
+    h.age = 0;
+    if (!this.trailG || !this.trailG.active) {
+      this.trailG = sc.add.graphics().setDepth(KAINATI_STONE_DEPTH - 0.05).setBlendMode(Phaser.BlendModes.ADD);
+      this.trailG.lookRole = 'ui';
+    }
+  }
+
+  // Suit la pierre : liseré et lueur collés, lueur qui respire, traînée.
+  syncStoneDress(h, dt) {
+    const img = h.img;
+    if (!img || !h.rim) return;
+    h.age = (h.age || 0) + dt;
+    h.rim.setPosition(img.x, img.y).setRotation(img.rotation);
+    const pulse = 0.5 + 0.5 * Math.sin(h.age / 90);
+    h.glow.setPosition(img.x, img.y).setAlpha(0.55 + 0.25 * pulse);
+    h.trail.push(img.x, img.y);
+    if (h.trail.length > KAINATI_STONE_TRAIL_N * 2) h.trail.splice(0, 2);
+  }
+
+  // Traînées de toutes les pierres en vol (une seule Graphics, redessinée).
+  drawStoneTrails() {
+    const g = this.trailG;
+    if (!g || !g.active) return;
+    g.clear();
+    for (const h of this.list) {
+      if (h.dead || h.kind !== 'stone' || !h.trail || h.trail.length < 4) continue;
+      const t = h.trail;
+      const n = t.length / 2;
+      for (let i = 1; i < n; i++) {
+        const k = i / (n - 1);
+        g.lineStyle(3 + 9 * k, KAINATI_STONE_TRAIL_COLOR, 0.08 + 0.4 * k);
+        g.lineBetween(t[(i - 1) * 2], t[(i - 1) * 2 + 1], t[i * 2], t[i * 2 + 1]);
+      }
+    }
+  }
+
+  // Détruit l'habillage d'une pierre (impact, coup, fin du combat).
+  undressStone(h, fade = false) {
+    for (const o of [h.glow, h.rim]) {
+      if (!o || !o.active) continue;
+      if (fade) this.scene.tweens.add({ targets: o, alpha: 0, duration: 350, onComplete: () => o.destroy() });
+      else o.destroy();
+    }
+    h.glow = null;
+    h.rim = null;
+    h.trail = null;
   }
 
   // Bande d'alerte au ras du sol (toute la largeur) pendant `ms`. Playtest :
@@ -520,6 +621,7 @@ class KainatiHazards {
           h.img.x += h.vx * s;
           h.img.y += h.vy * s;
           h.img.rotation += h.spin * s;
+          this.syncStoneDress(h, dt);
           const c = new Phaser.Geom.Circle(h.img.x, h.img.y, KAINATI_STONE_RADIUS);
           if (attack && Phaser.Geom.Intersects.CircleToRectangle(c, attack)) this.kill(h); // un coup de dague la brise
           else if (pRect && Phaser.Geom.Intersects.CircleToRectangle(c, pRect)) { hurt(h); this.kill(h); }
@@ -660,7 +762,9 @@ class KainatiHazards {
             h.shadow.destroy();
             if (h.marker) h.marker.destroy();
             const img = addKainatiStoneImage(this.scene, h.x, a.ceilingY + 66, KAINATI_STONE_SIZE).setDepth(KAINATI_FX_DEPTH);
-            added.push({ kind: 'stone', img, vx: 0, vy: 120, g: 1700, spin: 5, dead: false, serial: h.serial, fromCeiling: true });
+            const stone = { kind: 'stone', img, vx: 0, vy: 120, g: 1700, spin: 5, dead: false, serial: h.serial, fromCeiling: true };
+            this.dressStone(stone);
+            added.push(stone);
           }
           break;
         }
@@ -670,6 +774,7 @@ class KainatiHazards {
     }
     if (added.length) this.list.push(...added);
     this.list = this.list.filter((h) => !h.dead);
+    this.drawStoneTrails();
   }
 
   // Éruption de l'onde de choc en x (art `vfx_onde_choc`, sinon dessinée).
@@ -720,6 +825,7 @@ class KainatiHazards {
       if (impact) spawnKainatiImpact(this.scene, h.img.x, Math.min(h.img.y, this.arena.floorY));
       h.img.destroy();
     }
+    this.undressStone(h);
   }
 
   // Tout efface ; `fade` : en douceur (fin du combat).
@@ -730,9 +836,11 @@ class KainatiHazards {
         if (fade) this.scene.tweens.add({ targets: o, alpha: 0, duration: 350, onComplete: () => o.destroy() });
         else o.destroy();
       }
+      this.undressStone(h, fade);
       h.dead = true;
     }
     this.list = [];
+    if (this.trailG && this.trailG.active) this.trailG.clear();
   }
 
   // Un danger au sol est-il actif (bots, indices) ?
@@ -857,14 +965,17 @@ class KainatiBoss {
     this.t = 0;
     this.fired = false;
     Object.assign(this, extra);
+    if (state === 'throwWind') this.makeHandStone();
+    else if (state !== 'throwRelease') this.dropHandStone();
     const pose = {
-      wait: 'idle', idle: 'idle', throwWind: 'throwWind', throwRelease: 'throwRelease', chargeWind: 'chargeWind',
+      wait: 'idle', idle: 'idle', throwTurn: 'idle', throwWind: 'throwWind', throwRelease: 'throwRelease', chargeWind: 'chargeWind',
       charge: 'charge', stunned: 'stunned', slamWind: 'slamWind', slam: 'slamHit', roarWind: 'roarWind', roar: 'roarWind',
       sweepWind: 'sweepWind', sweep: 'sweepThrow', phaseRoar: 'roarWind', defeated: 'defeated', calm: 'calm', talk: 'talk',
       return: 'trot',
     }[state];
     if (pose) this.setPose(pose);
-    const telegraph = ['throwWind', 'chargeWind', 'slamWind', 'roarWind', 'sweepWind'].includes(state);
+    // (Demi-tour avant un jet compris : le « ! » annonce le jet dès le pivot.)
+    const telegraph = ['throwTurn', 'throwWind', 'chargeWind', 'slamWind', 'roarWind', 'sweepWind'].includes(state);
     this.alertIcon.setVisible(telegraph);
     if (telegraph) {
       this.scene.tweens.killTweensOf(this.alertIcon);
@@ -873,6 +984,63 @@ class KainatiBoss {
     }
     this.stunStars.setVisible(state === 'stunned');
     if (!telegraph) this.restoreTint();
+  }
+
+  // Télégraphe du jet : pierre luisante (lueur, liseré) dans sa main pendant
+  // la préparation ; elle grossit, puis part avec la salve.
+  makeHandStone() {
+    this.dropHandStone();
+    const sc = this.scene;
+    // Avec l'art, il brandit déjà sa pierre (main levée DERRIÈRE la tête) :
+    // seule la lueur s'y ajoute. Sans l'art : une pierre luisante devant lui.
+    const art = !!(this.poseSource && !this.poseSource.placeholder);
+    const p = this.windHandPoint(art);
+    const hs = { art, age: 0 };
+    if (art) {
+      if (typeof juiceEnsureTextures === 'function') juiceEnsureTextures(sc);
+      hs.glow = (sc.textures.exists('juice-glow')
+        ? sc.add.image(p.x, p.y, 'juice-glow').setDisplaySize(KAINATI_STONE_GLOW_SIZE * 1.8, KAINATI_STONE_GLOW_SIZE * 1.8).setTint(KAINATI_STONE_GLOW_COLOR)
+        : sc.add.circle(p.x, p.y, KAINATI_STONE_GLOW_SIZE / 2, KAINATI_STONE_GLOW_COLOR, 0.35))
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(KAINATI_STONE_DEPTH - 0.03).setAlpha(0);
+      hs.glow.lookRole = 'ui';
+    } else {
+      hs.img = addKainatiStoneImage(sc, p.x, p.y, KAINATI_STONE_SIZE);
+      this.hazards.dressStone(hs);
+      hs.img.setScale(hs.img.scaleX * 0.4);
+      hs.rim.setScale(hs.rim.scaleX * 0.4);
+      sc.tweens.add({ targets: hs.img, scaleX: hs.img.scaleX / 0.4, scaleY: hs.img.scaleY / 0.4, duration: 220, ease: 'Back.Out' });
+      sc.tweens.add({ targets: hs.rim, scaleX: hs.rim.scaleX / 0.4, scaleY: hs.rim.scaleY / 0.4, duration: 220, ease: 'Back.Out' });
+    }
+    this.handStone = hs;
+  }
+
+  // Main levée pendant la préparation (art `throw_stone`, frames 0-1 : la
+  // pierre est derrière sa tête), sinon la main qui lance.
+  windHandPoint(art) {
+    if (!art) return this.handPoint();
+    const box = this.visibleBox();
+    return { x: this.x - this.dir * 58, y: box.top + 22 };
+  }
+
+  syncHandStone() {
+    const hs = this.handStone;
+    if (!hs || !hs.glow || !hs.glow.active) return;
+    const p = this.windHandPoint(hs.art);
+    if (hs.img) hs.img.setPosition(p.x, p.y);
+    if (hs.rim) hs.rim.setPosition(p.x, p.y);
+    const k = 0.5 + 0.5 * Math.sin(this.t / 70);
+    const on = Math.min(1, this.t / 150);
+    hs.glow.setPosition(p.x, p.y).setAlpha(on * (0.75 + 0.25 * k));
+  }
+
+  dropHandStone() {
+    const hs = this.handStone;
+    if (!hs) return;
+    this.handStone = null;
+    const objs = [hs.img, hs.rim].filter(Boolean);
+    if (objs.length) this.scene.tweens.killTweensOf(objs);
+    if (hs.img && hs.img.active) hs.img.destroy();
+    this.hazards.undressStone(hs);
   }
 
   restoreTint() {
@@ -1010,8 +1178,13 @@ class KainatiBoss {
     else this.patternIndex += 1;
     const evt = (kind) => this.scene.events.emit('kainati-attack', { kind, phase: this.phase, boss: this });
     if (action === 'throw') {
-      if (player) this.face(player.x > this.x ? 1 : -1);
-      this.setState('throwWind');
+      // Derrière lui : demi-tour lisible d'abord (cf. KAINATI_THROW_FRONT_MIN).
+      const side = player ? (player.x > this.x ? 1 : -1) : this.dir;
+      if (player && side !== this.dir && Math.abs(player.x - this.x) > KAINATI_THROW_BEHIND_SLACK) {
+        this.setState('throwTurn', { turnTo: side });
+      } else {
+        this.setState('throwWind');
+      }
     } else if (action === 'charge') {
       this.face(this.centerDir);
       this.setState('chargeWind');
@@ -1025,19 +1198,33 @@ class KainatiBoss {
     evt(action);
   }
 
-  // Salve de pierres visées sur Agarica (où qu'elle soit, liane comprise).
+  // Main qui lance (pierre luisante de la préparation, départ des pierres).
+  handPoint() {
+    const box = this.visibleBox();
+    return { x: this.x + this.dir * 40, y: box.top + 30 };
+  }
+
+  // Salve de pierres visées sur Agarica (où qu'elle soit, liane comprise),
+  // TOUJOURS devant lui : passée derrière pendant la préparation, elle n'est
+  // plus visée (les pierres partent devant, à distance de jet ordinaire).
   throwVolley(player) {
     const n = this.phase === 2 ? 3 : 2;
-    const box = this.visibleBox();
-    const hand = { x: this.x + this.dir * 40, y: box.top + 30 };
-    const px = player ? player.x + Phaser.Math.Clamp(player.body.velocity.x * 0.25, -80, 80) : this.x + this.dir * 300;
-    const py = player ? player.y - 40 : this.cfg.floorY - 40;
+    const hand = this.handPoint();
+    let px = player ? player.x + Phaser.Math.Clamp(player.body.velocity.x * 0.25, -80, 80) : this.x + this.dir * 300;
+    let py = player ? player.y - 40 : this.cfg.floorY - 40;
+    if ((px - this.x) * this.dir < KAINATI_THROW_FRONT_MIN) {
+      px = this.x + this.dir * 300;
+      py = this.cfg.floorY - 40;
+    }
     // 1re pierre sur elle, 2e entre elle et lui (on recule pour esquiver),
     // 3e (phase 2) derrière elle.
-    const toward = player && player.x > this.x ? -1 : 1;
+    const toward = -this.dir;
+    const frontX = this.x + this.dir * KAINATI_THROW_FRONT_MIN;
     for (let i = 0; i < n; i++) {
       const off = i === 0 ? 0 : (i % 2 ? toward : -toward) * 110 * Math.ceil(i / 2);
-      const tx = Phaser.Math.Clamp(px + off, this.cfg.minX + 20, this.cfg.maxX - 20);
+      let tx = px + off;
+      if ((tx - frontX) * this.dir < 0) tx = frontX;
+      tx = Phaser.Math.Clamp(tx, this.cfg.minX + 20, this.cfg.maxX - 20);
       this.scene.time.delayedCall(i * 200, () => {
         if (this.active && !this.defeated) this.hazards.throwStone(hand.x, hand.y, tx, py, 900 + i * 90);
       });
@@ -1083,12 +1270,23 @@ class KainatiBoss {
         // -- un cœur perdu que le télégraphe ne laissait pas éviter (bot).
         if (this.active && this.t >= T.idle && !this.hazards.thrownStonesAirborne()) this.nextAction(player);
         break;
+      case 'throwTurn':
+        // Pieds plantés, puis pivot (au premier tiers) : on voit qu'il se
+        // retourne AVANT de préparer son jet. Pas de lueur jaune (pas encore armé).
+        if (this.dir !== this.turnTo && this.t >= T.throwTurn * KAINATI_THROW_PIVOT_AT) {
+          this.face(this.turnTo);
+          if (typeof juiceSquash === 'function') juiceSquash(this.sprite, 0.92, 1.06, 160);
+          spawnFx(this.scene, 'step', this.x, this.cfg.floorY, { dir: this.dir, power: 1, count: 3 });
+        }
+        if (this.t >= T.throwTurn) this.setState('throwWind');
+        break;
       case 'throwWind':
         this.glow(0xffe066);
+        this.syncHandStone();
         if (this.t >= T.throwWind) this.setState('throwRelease');
         break;
       case 'throwRelease':
-        if (!this.fired && this.t >= 90) { this.fired = true; this.throwVolley(player); }
+        if (!this.fired && this.t >= 90) { this.fired = true; this.dropHandStone(); this.throwVolley(player); }
         if (this.t >= T.throwRelease) this.setState('idle');
         break;
       case 'chargeWind':
@@ -1290,6 +1488,7 @@ class KainatiBoss {
   }
 
   destroy() {
+    this.dropHandStone();
     this.hazards.clear();
     this.alertIcon.destroy();
     this.stunStars.destroy();

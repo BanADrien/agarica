@@ -190,7 +190,15 @@ class InventoryScene extends Phaser.Scene {
 
     this.refreshCounts();
     // Premier objet de quête s'il y en a, sinon le premier consommable.
-    this.select(this.selectable.length ? this.selectable[0] : 0);
+    // Retour joueurs (2026-11-08, combat de Kainati : « y a moyen de se soigner
+    // ou pas ? ») : blessée avec une baie dans le sac, la baie est choisie
+    // d'emblée -- I puis E suffit pour la manger, même en plein combat.
+    const parent = this.scene.get(this.parentKey);
+    const pl = parent && parent.player;
+    const hurt = pl && pl.active && pl.hearts < pl.maxHearts;
+    const berry = hurt ? this.cells.findIndex((c) => c.kind === 'consumable' && c.id === 'baie_soin' && consumableCount(c.id) > 0) : -1;
+    if (berry >= 0) this.select(berry);
+    else this.select(this.selectable.length ? this.selectable[0] : 0);
     if (!items.length) {
       this.add.text(gx + 2 * step, py + 78 + step, 'Aucun objet de quête pour l\'instant.', {
         fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'italic', color: '#8f86a8',

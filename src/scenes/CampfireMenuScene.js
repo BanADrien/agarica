@@ -348,6 +348,12 @@ class CampfireMenuScene extends Phaser.Scene {
       it.text = this.addPanelText(ix + 22, y, it.label, { size: 16, bold: true, serif: true, originX: 0, originY: 0.5, color: dim ? '#8f86a8' : '#ffe9f5' });
       if (it.soon) {
         this.addPanelText(L.x1 - 14, y, 'bientôt', { size: 10, color: '#a99bd6', originX: 1, originY: 0.5 }).setFontStyle('italic');
+      } else if (dim) {
+        // Retour joueurs (2026-11-08, carte) : entrée grisée avec sa raison en
+        // court sur la ligne même (la phrase complète s'affiche dessous quand
+        // on la choisit) -- on comprend sans avoir à la sélectionner.
+        const tag = it.id === 'map' ? 'pas encore de carte' : 'indisponible';
+        this.addPanelText(L.x1 - 14, y, tag, { size: 10, color: '#a99bd6', originX: 1, originY: 0.5 }).setFontStyle('italic');
       }
       const zone = this.add.zone((L.x0 + L.x1) / 2, y, L.x1 - L.x0, L.rowH).setInteractive({ useHandCursor: true });
       zone.on('pointerover', () => this.selectHub(i));

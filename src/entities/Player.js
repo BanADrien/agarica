@@ -896,7 +896,12 @@ const MONKEY_JUMP_VELOCITY = -500;
 // quitté le sol SANS sauter (pas de trop au bord d'une plateforme) compte
 // encore comme un saut au sol. Sans forme aérienne, c'est la seule façon de
 // sauter en l'air -- sans elle, rater le bord d'un pixel ne laisse plus rien.
-const JUMP_COYOTE_MS = 110;
+// Retour joueurs (2026-11-08 : « deux fois que je tombe, quand même ») :
+// fenêtre mesurée au pilote à 103-120 ms (scratchpad exp_coyote.py), soit
+// ~21 px de marche après le bord ; portée à 140 ms (~27 px à la marche, ~55 px
+// en sprint de loup) : plus tolérante pour qui découvre, sans saut « dans le
+// vide » visible (Agarica n'est descendue que de ~13 px à 140 ms).
+const JUMP_COYOTE_MS = 140;
 // Tampon de saut (« jump buffer », passage juice) : un appui sur Espace en
 // l'air qui ne fait RIEN (aucun saut aérien disponible) déclenche le saut au
 // sol s'il arrive dans les 120 ms avant l'atterrissage -- sinon l'appui
@@ -944,6 +949,24 @@ const MONKEY_TRANSFO_MS = 200;
 // sinon il était coupé à la 3e frame (saut de pose visible).
 const MONKEY_RELEASE_POSE_MS = 360;
 const HURT_POSE_MS = 300;
+// Transitions d'animation adoucies (retour joueurs 2026-11-08 : « certaines
+// transitions d'animation sont brusques »). Repérées en jeu, les pires :
+//  1. réception du loup : la pose `loup-jump-3` ne durait qu'UNE image (16 ms,
+//     un flash) -> durée minimale WOLF_LAND_POSE_MS ;
+//  2. fin d'une transformation (sortie du loup, de l'aigle, de la pieuvre,
+//     du singe) : la dernière image de la transfo cédait d'un coup la place à
+//     la forme cible, à une autre échelle -> fondu enchaîné court ;
+//  3. fin d'un coup (arc de dague, morsure) : retour sec à la marche / au
+//     repos -> fondu enchaîné court ;
+//  4. réception humaine : pose de chute -> repos/marche d'une image à l'autre
+//     -> fondu enchaîné court.
+// Fondu enchaîné = copie de l'image d'avant posée PAR-DESSUS Agarica, qui
+// s'efface en suivant ses pas (cf. poseCrossfade) : purement visuel, aucune
+// durée de jeu (hitbox, temps d'attaque) n'est changée.
+const WOLF_LAND_POSE_MS = 110;
+const POSE_XFADE_TRANSFO_MS = 110;
+const POSE_XFADE_ATTACK_MS = 90;
+const POSE_XFADE_LAND_MS = 80;
 // Invulnérabilité après un coup (cf. hitByEnemy) : durée totale, et
 // clignotement pendant la partie qui suit le flash rouge.
 const HIT_INVULN_MS = 950;
@@ -1716,8 +1739,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Triche Ctrl+Shift+D (écouteur principal dans LevelKit, qui ignore le
     // singe) : débloque aussi la forme singe, sans la rendre active (l'aigle
     // posé par LevelKit reste la forme aérienne -- anciennes zones).
+    // Réservée au développement comme les autres (cf. devKeysAllowed, LevelKit).
     scene.input.keyboard.on('keydown-D', (event) => {
       if (!event.ctrlKey || !event.shiftKey || !this.active) return;
+      if (typeof devKeysAllowed === 'function' && !devKeysAllowed(scene)) return;
       this.hasMonkeyForm = true;
       this.airFormsSeen.monkey = true;
       playerStateSet(scene, 'hasMonkeyForm', true);
@@ -1782,6 +1807,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     this.form = null;
     this.setForm('agarica');
+    // Pas d'entrée automatiques après un bord de zone (cf. update()).
+    this.edgeEntryWalk = null;
 
     this.cursors = scene.input.keyboard.createCursorKeys();
     this.keys = scene.input.keyboard.addKeys({
@@ -1802,8 +1829,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Assise au feu de camp : immobile tant qu'aucune action ne la relève.
     if (this.campfireRest && this.updateCampfireRest()) return;
     this.syncFormSlots();
-    const left = this.cursors.left.isDown || this.keys.left.isDown;
-    const right = this.cursors.right.isDown || this.keys.right.isDown;
+    let left = this.cursors.left.isDown || this.keys.left.isDown;
+    let right = this.cursors.right.isDown || this.keys.right.isDown;
     const leftJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.left)
       || Phaser.Input.Keyboard.JustDown(this.keys.left);
     const rightJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.right)
@@ -1816,6 +1843,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const downHeld = this.cursors.down.isDown || this.keys.down.isDown;
 
     const now = this.scene.time.now;
+    // Pas d'entrée après un passage par un bord (cf. applyEdgeArrivalState,
+    // LevelKit) : direction tenue pour elle, le temps de quelques pas. La
+    // moindre touche de direction ou de saut rend la main aussitôt.
+    const ew = this.edgeEntryWalk;
+    if (ew) {
+      const reached = ew.dir > 0 ? this.x >= ew.toX : this.x <= ew.toX;
+      if (left || right || jumpJustPressed || reached || now >= ew.until || this.vine) this.edgeEntryWalk = null;
+      else if (ew.dir > 0) right = true;
+      else left = true;
+    }
     // Calculé tôt (avant saut/sprint) : la Pieuvre a la priorité absolue
     // dans l'eau — sans ça, un double-saut (Aigle) ou un sprint (Loup)
     // déclenché en nageant lançait quand même son anim de transfo (et sa
@@ -1945,6 +1982,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.isAttacking && now >= this.attackEndTime) {
       this.isAttacking = false;
       this.slashDir = null;
+      this.poseCrossfade(POSE_XFADE_ATTACK_MS);
     }
 
     if (leftJustDown) {
@@ -1973,6 +2011,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // de réception dédiée pour la forme Loup (cf. WOLF_LANDING_TEXTURE).
     const justLandedThisFrame = onGround && !this.wasOnGround;
     this.wasOnGround = onGround;
+    if (justLandedThisFrame && !this.formTransitionActive && !this.isAttacking) {
+      if (this.form === 'wolf') this.wolfLandPoseUntil = now + WOLF_LAND_POSE_MS;
+      else if (this.form === 'agarica' && !this.vine) this.poseCrossfade(POSE_XFADE_LAND_MS);
+    }
     const shiftHeld = this.cursors.shift.isDown;
     // `onGround` n'est requis qu'au DÉCLENCHEMENT du sprint, pas en continu :
     // passer en forme Loup redimensionne le corps physique (cf. setForm),
@@ -2332,6 +2374,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // juste avant la coupure. Le bloc ci-dessous applique échelle ET
         // texture ensemble, dès cette même frame (pas de retour anticipé).
         this.formTransitionActive = false;
+        this.poseCrossfade(POSE_XFADE_TRANSFO_MS);
       } else {
         // Échelle intermédiaire le temps de l'anim de transfo. Hitbox
         // réajustée au canvas/échelle de la transfo (cf. transfoBodyConfig)
@@ -2463,7 +2506,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           this.applyBodyForScale(WOLF_BITE_SCALE, WOLF_BITE_BODY);
           // Sens figé à l'appui, comme les crocs (loup de face à droite).
           this.setFlipX(this.slashFacing < 0);
-        } else if (justLandedThisFrame) {
+        } else if (onGround && now < (this.wolfLandPoseUntil || 0)) {
+          // Réception tenue WOLF_LAND_POSE_MS (une seule image : un flash).
           this.anims.stop();
           this.setTexture(WOLF_LANDING_TEXTURE);
         } else if (onGround) {
@@ -3843,6 +3887,38 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // Petite portion d'énergie gagnée par coup porté (mêlée ET plume, cf.
   // l'overlap dans LevelKit.js et Feather.js) — façon SOUL de Hollow Knight,
   // seule source de recharge hors feu de camp (cf. refillAtCampfire).
+  // Fondu enchaîné (cf. WOLF_LAND_POSE_MS et suivants) : l'image affichée
+  // juste avant le changement de pose est recopiée par-dessus Agarica et
+  // s'efface en `ms`, en la suivant. Une seule copie (réutilisée).
+  poseCrossfade(ms) {
+    const sc = this.scene;
+    if (!sc || !sc.add || !this.visible || !this.frame || this.alpha < 0.5) return;
+    let g = this.poseXfade;
+    if (!g || !g.scene) {
+      g = sc.add.image(0, 0, this.texture.key, this.frame.name);
+      this.poseXfade = g;
+      g.lookRole = this.lookRole;
+    }
+    sc.tweens.killTweensOf(g);
+    const dx = 0;
+    const dy = 0;
+    g.setTexture(this.texture.key, this.frame.name)
+      .setOrigin(this.originX, this.originY)
+      .setPosition(this.x, this.y)
+      .setScale(this.scaleX, this.scaleY)
+      .setFlip(this.flipX, this.flipY)
+      .setRotation(this.rotation)
+      .setDepth(this.depth + 0.001)
+      .setAlpha(0.85)
+      .setVisible(true);
+    if (this.isTinted) g.setTint(this.tintTopLeft); else g.clearTint();
+    sc.tweens.add({
+      targets: g, alpha: 0, duration: ms, ease: 'Sine.easeOut',
+      onUpdate: () => { if (this.active) g.setPosition(this.x + dx, this.y + dy); },
+      onComplete: () => g.setVisible(false),
+    });
+  }
+
   gainEnergy(amount) {
     this.energy = Phaser.Math.Clamp(this.energy + amount, 0, this.maxEnergy);
     this.scene.registry.set('energy', this.energy);

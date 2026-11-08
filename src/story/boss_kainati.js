@@ -185,6 +185,34 @@ function kainatiSetCurtain(scene, curtain, closed, instant = false) {
   });
 }
 
+// Bornes de la caméra déplacées EN DOUCEUR (retour joueurs 2026-11-08 : « on
+// dirait que ça me téléporte ») : au début du combat, les bornes passaient
+// d'un coup à l'arène (512..1472) alors qu'Agarica, au seuil (x 600), était au
+// centre de l'écran -- la vue sautait de ~390 px et elle se retrouvait au bord
+// gauche ; même saut en sens inverse à la victoire. Les bornes partent de ce
+// que la caméra montre et rejoignent la cible en KAINATI_CAM_BOUNDS_MS.
+const KAINATI_CAM_BOUNDS_MS = 700;
+
+function kainatiCamBounds(scene, st, target, instant = false) {
+  const cam = scene.cameras.main;
+  if (st.camTween) { st.camTween.stop(); st.camTween = null; }
+  if (instant) { cam.setBounds(target.x, target.y, target.width, target.height); return; }
+  const cur = cam.getBounds();
+  const view = { l: cam.scrollX, r: cam.scrollX + cam.width / cam.zoom };
+  // Départ : des bornes qui ne contraignent pas la vue actuelle.
+  const from = { l: Math.min(view.l, target.x), r: Math.max(view.r, target.x + target.width) };
+  if (cur.x > from.l && cur.x <= view.l) from.l = cur.x;
+  if (cur.right < from.r && cur.right >= view.r) from.r = cur.right;
+  const o = { l: from.l, r: from.r };
+  const apply = () => cam.setBounds(o.l, target.y, Math.max(cam.width, o.r - o.l), target.height);
+  apply();
+  st.camTween = scene.tweens.add({
+    targets: o, l: target.x, r: target.x + target.width, duration: KAINATI_CAM_BOUNDS_MS, ease: 'Sine.easeInOut',
+    onUpdate: apply,
+    onComplete: () => { st.camTween = null; cam.setBounds(target.x, target.y, target.width, target.height); },
+  });
+}
+
 // --- Coups d'Agarica : Kainati n'est pas dans scene.enemies (pas de corps
 // Arcade) ; on teste mêlée / piqué / pierre nous-mêmes, une fois par
 // attaque, et on branche le « juice » générique (juiceOnEnemyHit : hit-stop,
@@ -231,6 +259,122 @@ function kainatiCheckPlayerHits(scene, st, time) {
   }
 }
 
+// --- Baies de soin (retour joueurs 2026-11-08 : « y a moyen de se soigner ou
+// pas ? ») --------------------------------------------------------------------
+// Blessée (au moins un cœur perdu), une baie de soin tombe de la canopée :
+//  - au changement de phase (cri de rage) ;
+//  - après une ouverture réussie : au moins KAINATI_BERRY_OPENING_HITS coups
+//    placés pendant qu'il était sonné (pas plus d'une toutes les
+//    KAINATI_BERRY_GAP_MS, KAINATI_BERRY_MAX par tentative, une seule au sol).
+// Elle tombe du côté d'Agarica, loin de lui, et se ramasse en passant dessus :
+// elle va dans le sac (consommable `baie_soin`) ; la première fois, LevelKit
+// donne la touche pour la manger (« [I] : ton sac… », cf. bagHintSetup) et le
+// sac s'ouvre sur la baie (InventoryScene) : I puis E.
+const KAINATI_BERRY_MAX = 3;
+const KAINATI_BERRY_GAP_MS = 20000;
+const KAINATI_BERRY_OPENING_HITS = 2;
+const KAINATI_BERRY_SAFE_DIST = 180;
+const KAINATI_BERRY_PICK_R = 48;
+const KAINATI_BERRY_SIZE = 34;
+const KAINATI_BERRY_DEPTH = 958;
+
+function kainatiBerryX(st, p) {
+  const cfg = st.cfg;
+  const bx = st.boss.x;
+  const lo = cfg.minX + 70;
+  const hi = cfg.maxX - 70;
+  let side = p.x >= bx ? 1 : -1;
+  let x = Math.abs(p.x - bx) < KAINATI_BERRY_SAFE_DIST ? bx + side * KAINATI_BERRY_SAFE_DIST : p.x;
+  // Pas la place de son côté (coincée contre le rideau) : de l'autre côté de lui.
+  if (x < lo || x > hi) {
+    side = -side;
+    x = bx + side * KAINATI_BERRY_SAFE_DIST;
+  }
+  return Phaser.Math.Clamp(x, lo, hi);
+}
+
+function kainatiDropBerry(scene, st, reason) {
+  const p = scene.player;
+  if (!p || !p.active || st.disposed || st.won || st.downFired || !st.boss) return false;
+  if (p.hearts >= p.maxHearts || p.hearts <= 0) return false;
+  if (st.berries.some((b) => !b.taken)) return false;
+  if (st.berryCount >= KAINATI_BERRY_MAX) return false;
+  const now = scene.time.now;
+  if (reason === 'opening' && now - st.lastBerryAt < KAINATI_BERRY_GAP_MS) return false;
+  if (typeof consumableAdd !== 'function') return false;
+  st.berryCount += 1;
+  st.lastBerryAt = now;
+  const cfg = st.cfg;
+  const x = kainatiBerryX(st, p);
+  const restY = cfg.floorY - KAINATI_BERRY_SIZE / 2 - 2;
+  const img = typeof addItemImage === 'function'
+    ? addItemImage(scene, x, cfg.ceilingY + 90, 'baie_soin')
+    : scene.add.circle(x, cfg.ceilingY + 90, KAINATI_BERRY_SIZE / 2, 0xd8345f);
+  if (img.type === 'Image') img.setScale(KAINATI_BERRY_SIZE / Math.max(img.width, img.height, 1));
+  img.setDepth(KAINATI_BERRY_DEPTH);
+  img.lookRole = 'ui';
+  if (typeof juiceEnsureTextures === 'function') juiceEnsureTextures(scene);
+  const glow = scene.textures.exists('juice-glow')
+    ? scene.add.image(x, img.y, 'juice-glow').setDisplaySize(90, 90).setTint(0xff7fb0)
+    : scene.add.circle(x, img.y, 30, 0xff7fb0, 0.3);
+  glow.setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.75).setDepth(KAINATI_BERRY_DEPTH - 0.01);
+  glow.lookRole = 'ui';
+  const berry = { img, glow, x, landed: false, taken: false, t: 0 };
+  st.berries.push(berry);
+  spawnFx(scene, 'chip', x, cfg.ceilingY + 70, { count: 3, angle: [80, 100], speed: [60, 140] });
+  scene.tweens.add({
+    targets: img, y: restY, duration: 750, ease: 'Bounce.Out',
+    onComplete: () => {
+      berry.landed = true;
+      if (!berry.taken) spawnFx(scene, 'motes', x, restY, { count: 6, spread: 16, color: [0xff9fc9, 0xffe9f5] });
+    },
+  });
+  if (typeof playSfx === 'function') playSfx('pickup_drop', { key: 'baie' });
+  return true;
+}
+
+function kainatiUpdateBerries(scene, st, dt) {
+  const p = scene.player;
+  if (!st.berries.length || !p || !p.body) return;
+  for (const b of st.berries) {
+    if (b.taken || !b.img.active) continue;
+    b.t += dt;
+    // Lueur qui respire, légère flottaison une fois posée : on la voit de loin.
+    b.glow.setPosition(b.img.x, b.img.y).setAlpha(0.55 + 0.25 * Math.sin(b.t / 150));
+    const dx = p.body.center.x - b.img.x;
+    const dy = p.body.center.y - b.img.y;
+    if (dx * dx + dy * dy > KAINATI_BERRY_PICK_R * KAINATI_BERRY_PICK_R && !(Math.abs(dx) < KAINATI_BERRY_PICK_R && p.body.bottom >= b.img.y - 10 && p.body.top <= b.img.y + 10)) continue;
+    b.taken = true;
+    consumableAdd(scene, 'baie_soin', 1, { silent: true });
+    spawnFx(scene, 'motes', b.img.x, b.img.y, { count: 10, spread: 22, color: [0xff9fc9, 0xffe9f5, 0xd8345f] });
+    if (typeof juiceBurstImage === 'function') juiceBurstImage(scene, 'glow', b.img.x, b.img.y, { size: 110, from: 0.4, to: 1.2, ms: 380, color: 0xff9fc9, alpha: 0.7 });
+    if (typeof playSfx === 'function') playSfx('pickup', { key: 'baie' });
+    // Déjà vu l'astuce du sac : rappel court sous forme de texte flottant.
+    if (typeof storyGet !== 'function' || storyGet('astuceSacVue')) {
+      const t = scene.add.text(b.img.x, b.img.y - 30, '+1 baie  (I)', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#ffd1e3', stroke: '#2a1f45', strokeThickness: 4,
+      }).setOrigin(0.5).setDepth(KAINATI_BERRY_DEPTH + 1);
+      t.lookRole = 'ui';
+      scene.tweens.add({ targets: t, y: t.y - 36, alpha: 0, duration: 1100, ease: 'Sine.easeOut', onComplete: () => t.destroy() });
+    }
+    for (const o of [b.img, b.glow]) {
+      scene.tweens.killTweensOf(o);
+      scene.tweens.add({ targets: o, alpha: 0, scale: o.scale * 1.4, duration: 220, onComplete: () => o.destroy() });
+    }
+  }
+  st.berries = st.berries.filter((b) => !b.taken);
+}
+
+// Ouverture réussie : fin d'un étourdissement où elle a placé assez de coups.
+function kainatiWatchOpening(scene, st) {
+  const boss = st.boss;
+  if (boss.state === 'stunned' && st.prevBossState !== 'stunned') st.stunHits0 = boss.hitsTaken;
+  if (st.prevBossState === 'stunned' && boss.state !== 'stunned' && st.fightActive) {
+    if (boss.hitsTaken - (st.stunHits0 || 0) >= KAINATI_BERRY_OPENING_HITS) kainatiDropBerry(scene, st, 'opening');
+  }
+  st.prevBossState = boss.state;
+}
+
 // --- Indices (une fois chacun par combat) ---
 function kainatiOnAttack(scene, st, ev) {
   if (!st.fightActive || st.disposed) return;
@@ -250,8 +394,7 @@ async function kainatiStartFight(scene, st) {
   st.told = {};
   kainatiSetCurtain(scene, st.leftCurtain, true);
   kainatiSetCurtain(scene, st.rightCurtain, true, true);
-  const cam = scene.cameras.main;
-  cam.setBounds(st.cfg.minX, 0, st.cfg.maxX - st.cfg.minX, scene.scale.height);
+  kainatiCamBounds(scene, st, { x: st.cfg.minX, y: 0, width: st.cfg.maxX - st.cfg.minX, height: scene.scale.height });
   const firstTime = !kainatiFlag(scene, 'kainatiIntroSeen', false);
   st.boss.face(scene.player.x > st.boss.x ? 1 : -1);
   st.boss.setPose('roarWind');
@@ -302,7 +445,7 @@ async function kainatiPlayerDown(scene, st) {
 function kainatiRevealPassage(scene, st, instant) {
   kainatiSetCurtain(scene, st.leftCurtain, false, instant);
   kainatiSetCurtain(scene, st.rightCurtain, false, instant);
-  scene.cameras.main.setBounds(st.camBounds.x, st.camBounds.y, st.camBounds.width, st.camBounds.height);
+  kainatiCamBounds(scene, st, st.camBounds, instant);
   if (st.passageRevealed) return;
   st.passageRevealed = true;
   // Nouveau tableau : scene.__exits EST le tableau `exits` de la donnée de
@@ -354,6 +497,7 @@ ZONE_SCRIPTS.kainati_arene = {
     const st = {
       scene, cfg, fightActive: false, starting: false, disposed: false, won: false, downFired: false,
       passageRevealed: false, told: {}, camBounds: { x: b.x, y: b.y, width: b.width, height: b.height },
+      berries: [], berryCount: 0, lastBerryAt: -Infinity, prevBossState: null, stunHits0: 0,
     };
     if (scene.__kainati) scene.__kainati.disposed = true;
     scene.__kainati = st;
@@ -422,7 +566,11 @@ ZONE_SCRIPTS.kainati_arene = {
       kainatiToast(scene, 'Kainati est sonné : fonce (Maj) et frappe, chaque coup compte double !', 2600);
     };
     scene.events.on('kainati-stunned', st.onStunned);
-    st.onPhase2 = () => kainatiBubble(scene, 'xara', 'Il enrage ! Des pierres tombent de là-haut : bouge sur ta liane !', 3000);
+    st.onPhase2 = () => {
+      kainatiBubble(scene, 'xara', 'Il enrage ! Des pierres tombent de là-haut : bouge sur ta liane !', 3000);
+      // Changement de phase : une baie si elle est blessée (cf. kainatiDropBerry).
+      scene.time.delayedCall(900, () => kainatiDropBerry(scene, st, 'phase'));
+    };
     scene.events.on('kainati-phase2', st.onPhase2);
     scene.events.once('shutdown', () => {
       st.disposed = true;
@@ -457,6 +605,8 @@ ZONE_SCRIPTS.kainati_arene = {
 
     st.boss.update(dt, p);
     kainatiCheckPlayerHits(scene, st, time);
+    kainatiWatchOpening(scene, st);
+    kainatiUpdateBerries(scene, st, dt);
     if (st.fightActive && st.boss.defeated) kainatiVictory(scene, st);
 
     // Invite « E : parler » près de Kainati apaisé.
