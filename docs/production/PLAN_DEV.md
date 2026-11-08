@@ -103,7 +103,7 @@ Tu peux lire le screenshot avec l'outil Read pour vérifier visuellement.
   `{goto: {scene, data}}` (fin de cinématique), `{call: (scene) => Promise|void}`,
   `{parallel: [steps…]}`.
 - `isWorldFrozen(scene)` — vrai si DialogueScene/InventoryScene/MapScene/CampfireMenuScene
-  actif ou `scene.__cutsceneLock`. `updateLevelFromData` l'utilise.
+  (ou PauseScene, ShopScene) actif ou `scene.__cutsceneLock`. `updateLevelFromData` l'utilise.
 - Au début d'un dialogue ou d'une cinématique, Agarica s'arrête et se pose (pose stable) ; à la
   sortie, courte invulnérabilité : cf. « Agarica au début et à la sortie d'un dialogue » plus bas.
 - `showBossBar(scene, name, getRatio)` / `hideBossBar(scene)` — barre de vie de boss HUD.
@@ -139,14 +139,16 @@ Clés gérées par la **Fondation** :
   `ambient: {tint: 0xRRGGBB, darkness: 0..1, vignette?}` — voile de couleur (forêt corrompue, trou sombre) ;
   `vignette` : voir « Lot Codex n°8 : intégration ».
 - `xara: false` — pas de Xara dans la zone (sinon Xara présente si `storyGet('xaraMet')`).
-- `npcs: [{id, x, y, anim?, facing?, talk?: dialogueId | cutsceneId, requires?, forbids?, name?}]`
+- `npcs: [{id, x, y, anim?, facing?, talk?: dialogueId | cutsceneId, requires?, forbids?, name?, shop?}]`
   → PNJ (`scene.npcs[id]`), invite « E : parler » à portée ; `talk` lance
-  `runCutscene` si l'id existe dans CUTSCENES, sinon `showDialogue`.
+  `runCutscene` si l'id existe dans CUTSCENES, sinon `showDialogue`. `shop` (vague 3) :
+  marchand, cf. « Secrets, récompenses, marchand, quêtes ».
 - `triggers: [{id?, x, y, w, h, cutscene, once?: true, requires?, forbids?}]` — zone
   invisible qui lance une cinématique quand le joueur y entre. `once` mémorisé via flag
   `trig_<zone>_<id>`.
 - `pickups: [{item, x, y, requires?, cutscene?}]` — objet ramassable (E), disparaît si déjà
-  dans l'inventaire.
+  dans l'inventaire. `requires`/`forbids` relus en continu depuis la vague 3 (l'objet d'une quête
+  apparaît dès qu'elle commence, sans attendre une nouvelle visite).
 - `mossBlocks: [{x, y, w, h}]` — amas de mousse solide, détruit par la compétence `ours`
   (hitbox de compétence qui le touche) ; mémorisé par flag.
 - `mossWalls: [{id, x, y, w, h}]` — mur de mousse ; s'ouvre si le joueur a l'objet
@@ -1050,7 +1052,9 @@ le sol juste après (`LEVEL_DATA_HANDLERS.branches` / `.trunks` sont des entrée
 - **Sortie** : à la fin de tout dialogue (boîte) ou cinématique bloquante, Agarica est invulnérable
   (`Player.storyInvulnPending`, dès la même image), puis, au premier dégel
   (`storyUnfrozenTick`), pendant `STORY_EXIT_INVULN_MS` (1 s, StoryKit), signalée comme après un
-  coup (clignotement `HIT_BLINK_*`). Les ennemis à moins de `STORY_EXIT_CALM_RANGE` (320 px) qui
+  coup (clignotement `HIT_BLINK_*`) — **depuis la vague 3, le clignotement ne s'affiche que si un
+  ennemi est à moins de `STORY_EXIT_BLINK_RANGE` (300 px, centre à centre ; `storyThreatNear`)** ;
+  l'invulnérabilité, elle, est toujours là (`grantStoryInvulnerability(ms, { blink: false })`). Les ennemis à moins de `STORY_EXIT_CALM_RANGE` (320 px) qui
   exposent `calm(ms)` (aujourd'hui `SingeCorrompu`) annulent leur attaque en cours. Contrat
   facultatif pour un ennemi : `calm(ms)` = attaque en cours annulée, immobile `ms`, pose de repos.
 - `player.isInvulnerable` (lecture) = coup reçu OU sortie de dialogue ; écriture = coup reçu
@@ -1084,7 +1088,8 @@ le sol juste après (`LEVEL_DATA_HANDLERS.branches` / `.trunks` sont des entrée
 - **Consommables** (StoryKit) : `CONSUMABLE_INFO` (`baie_soin` : +1 cœur, `seve_energie` : énergie
   pleine), registre `consumables` = `{ id: nombre }`. `consumableCount(id)`, `consumableAdd(scene, id,
   n = 1, { silent })` (popup « Objet obtenu »), `consumableUse(scene, id)` → `{ ok, text }` (rien de
-  consommé si sans effet). Aucune source en jeu pour l'instant. Utilisables depuis le sac (I, ou
+  consommé si sans effet). Sources (vague 3) : coffres, trésors, boutique, récompenses de quête.
+  Utilisables PARTOUT depuis le sac (I, ou
   entrée Inventaire du feu) : E / Entrée sur la case. Icônes dessinées (`STORY_DRAWN_ITEMS`).
 - **Découvertes** (StoryKit, `storyMapRecord` dans `storyUpdateHook`, monde non gelé, zones de
   l'histoire) : blocs de `STORY_MAP_CHUNK` (128 px) dans ±`STORY_MAP_REVEAL_X/Y` (448 / 320 px)
@@ -1119,6 +1124,145 @@ le sol juste après (`LEVEL_DATA_HANDLERS.branches` / `.trunks` sont des entrée
   `mapExplored = {}` dès son entrée en zone (jamais prise pour une ancienne).
 - Nouvelles clés de sauvegarde : `campfiresVisited`, `lastCampfire`, `mapExplored`, `mapPending`,
   `consumables` ; `lastEnterId` peut valoir `feu:<id>`.
+
+### Secrets, récompenses, marchand, quêtes (vague 3, 2026-11-08, rétro-compatible)
+Fichiers : `src/utils/SecretKit.js` (chargé juste après StoryKit), `src/scenes/ShopScene.js`,
+`src/data/shops_data.js` (table `SHOPS`), quêtes dans StoryKit (`QUESTS`). Tout s'affiche sans art :
+images du manifeste (`eclat_lune`, `coffre_ferme`, `coffre_ouvert`, `coeur_entier`,
+`fissure_secret`, PNJ `marchand`) dès qu'elles existent, sinon dessinées par code
+(`STORY_DRAWN_ITEMS`) ou placeholder. Banc d'essai complet : zone `zonetest` (« Zones de test »),
+quête d'exemple dans `src/story/banc_essai.js`.
+
+**Trois décisions de l'utilisateur.**
+- Feu de camp : assise, Agarica est invulnérable (`player.isInvulnerable` vaut vrai tant que
+  `campfireRest` est posé ; une chute dans le vide coûte toujours son cœur).
+- Consommables (baie de soin, sève d'énergie) : utilisables partout depuis le sac (I), et toujours
+  depuis le menu du feu (entrée Inventaire).
+- Sortie de dialogue : invulnérable 1 s comme avant ; ne clignote que près d'un ennemi (cf. plus haut).
+
+**Contenu (format commun)** des coffres, trésors, quêtes, cassables et articles de boutique : un
+objet (plusieurs clés possibles) ou un tableau d'objets, versé par `secretGrantContents(scene,
+contenu, { source, silent, x, y })` :
+`{ eclats: n }` (éclats qui jaillissent de (x, y) puis sont aspirés) · `{ item: 'id' }` (objet de
+quête, ITEM_INFO) · `{ coeur: true }` (cœur entier) · `{ consommable: 'baie_soin', n: 2 }` ·
+`{ skill: 'id' }` · `{ set: { flag: true } }`. `secretContentsLabel(contenu)` → texte court.
+
+**Éclats de lune (la monnaie).** Registre `eclats` (nombre, sauvegardé ; absent = 0).
+`eclatsCount()`, `eclatsAdd(scene, n)`, `eclatsSpend(scene, n)` → faux si pas assez (rien retiré),
+`eclatsSpawn(scene, x, y, total)` (au plus 12 morceaux : un gros éclat en vaut plusieurs). Un éclat
+saute, rebondit, puis, après 380 ms, est aspiré vers la poitrine d'Agarica à moins de 120 px ;
+tombé dans le vide, il est compté quand même. Compteur discret à droite des cœurs (icône, total,
+« +n »), visible 2,4 s après chaque changement puis effacé ; aussi dans le sac (en haut à droite)
+et en bas de la boutique.
+- Butin : seuls les ennemis de la DONNÉE (`enemies`) en lâchent, à leur défaite. Table
+  `ECLATS_ENEMY_DROPS` par type (défaut [1, 2] ; loup [1, 3], singe et crapauds corrompus [2, 3],
+  araignée 0, loup alpha [6, 8]) ; réglage par ennemi : `enemies: [{ type, x, y, eclats: 0 | n | [a, b] }]`.
+  Ennemis ajoutés par un script (renforts, mousses de Ghil't) : rien (pas de récolte sans fin en combat).
+- **Ennemi soigné par le papillon : aucun éclat** (`ECLATS_HEALED_DROP = 0`, choix argumenté). Il
+  repart vivant, et la nuée purifie plusieurs créatures d'un coup sans risque : avec un butin, soigner
+  deviendrait la façon la plus rentable de récolter, au lieu d'un choix de cœur. Le soin reste
+  récompensé par l'histoire, pas par la bourse.
+
+**Cœurs entiers.** +1 cœur maximum et vie pleine, pour toujours. Registre `heartUpgrades` = liste
+des sources prises (`'chest:<zone>:<id>'`, `'tresor:<zone>:<id>'`, `'quest:<id>'`…) : une source ne
+compte qu'une fois. Lu par `Player.recomputeTotemBonuses` (en plus de `coeurBonusForet`) et par le
+résumé « Continuer ». `heartUpgradeCount()`, `heartUpgradeGrant(scene, source)` (bandeau « Cœur entier »).
+
+**Murs et sols cassables** — clé `breakables` :
+```
+breakables: [
+  { id: 'mur_epee', by: 'sword', hits: 3, hint: 'fissure',
+    cells: [[16, 3], [16, 4], [17, 3], [17, 4]] },          // le mur ET la salle cachée derrière
+  { id: 'sol_ours', by: 'bear', hint: 'poussiere', x: 2656, y: 352, w: 192, h: 64,
+    reward: { eclats: 5 } },
+]
+```
+- Cases de la grille (`cells`), ou rectangle `x, y, w, h` (x, y = CENTRE, comme la mousse : toutes
+  les cases dont le centre est dedans). Peindre AUSSI ces cases en sol (`groundCells`) : l'éditeur et
+  la carte les montrent alors pleines (le jeu les ajoute de toute façon).
+- Avant la casse : solides et rendues AVEC le sol (même jeu de tuiles, dispositions `atlas` et
+  `blob`, mêmes raccords) ; seul l'indice les trahit : `hint: 'fissure'` (défaut ; petite fissure sur
+  une face exposée, art `fissure_secret` sinon tracée), `'mousse'` (touffe un peu plus pâle et plus
+  bleue), `'poussiere'` (filet de terre toutes les 3-6 s, à l'écran), `false` (rien).
+- Une salle ou une grotte cachée se met DANS `cells` avec son mur : tout tombe d'un coup (avant, on ne
+  voit qu'un bloc plein). Pour son fond : `groundBackCells`. Un coffre ou un trésor posé dans des
+  cases intactes est dessiné derrière le sol et ne s'ouvre pas (ni invite) tant qu'elles tiennent.
+- `by: 'sword'` : `hits` coups de mêlée (défaut 3 ; dague ou croc du loup, un coup = un jeton),
+  fissures qui grandissent, tremblement ; l'ours casse aussi. `by: 'bear'` : seulement le fracas de
+  l'ours (sa zone est prolongée de 28 px sous les pieds pour atteindre un sol) ; la dague n'y fait
+  rien (poussière + toast « Ça sonne creux… Il faudrait frapper bien plus fort. », une fois par visite).
+- La casse : corps et images retirés, cases voisines redessinées (`secretRerenderGround` : bords
+  exposés, herbe, faces de collision ; même place dans la liste d'affichage ; variante de case pleine
+  tirée d'un hachage, `autotileCenterVariant`), éclats de tuiles, onde, secousse, `reward` versée.
+  Flag `break_<zone>_<id>` : ouvert pour toujours. Événement scène `'breakable-broken'` (b).
+- LevelKit : `renderAutotileGrid(…, { solid, cellObjects })` (voisinage imposé, objets par case),
+  `scene.__groundRender = { cells, solid, cellObjects, tileset, noArt, end }`.
+
+**Coffres** — `chests: [{ id, x, y?, contents, requires?, forbids? }]` : posé au sol (`y` = ligne des
+pieds, OBLIGATOIRE dans une salle cachée : le sol de la grille sous lui, cassables ignorés), E pour
+ouvrir (« E : ouvrir »), couvercle, lueur, contenu qui jaillit. Flag `chest_<zone>_<id>` ; ouvert, il
+reste ouvert. Événement `'chest-opened'`. Exemple : `{ id: 'coffre_salle', x: 1248, y: 320,
+contents: { eclats: 25 } }`.
+
+**Trésors posés** — `treasures: [{ id, x, y?, contents, requires?, forbids? }]` : objet flottant
+ramassé au CONTACT (cœur entier d'une grotte secrète, poignée d'éclats…), `y` = centre (défaut 34 px
+au-dessus du sol). Flag `treasure_<zone>_<id>`. Exemple : `{ id: 'coeur_grotte', x: 2592, y: 470,
+contents: { coeur: true } }`.
+
+**Marchand.** PNJ `npcs: [{ id: 'marchand', x, shop: 'marchand_lune', talk?: 'accueil' }]` (sprite
+`marchand` du manifeste) : E (« E : marchander ») ouvre la boutique, après la réplique `talk` s'il en
+a une (sauf cinématique qui contient déjà `{shop}`). Étape de cinématique `{shop: 'id'}` (attend la
+fermeture). `openShop(scene, id)` → Promise. Table `SHOPS` (`src/data/shops_data.js`) :
+```
+SHOPS.marchand_lune = {
+  name: 'Marchand de lune', greet: 'Des baies, de la sève…',
+  articles: [
+    { id: 'baie_soin', price: 8, give: { consommable: 'baie_soin', n: 1 } },
+    { id: 'seve_energie', price: 12, give: { consommable: 'seve_energie', n: 1 } },
+    // plus tard : { id: 'armure_ecorce', price: 60, give: { item: 'armure_ecorce' }, stock: 1, name, desc }
+  ],
+};
+```
+`stock` (total vendable sur la partie ; registre `shopBought` = { 'boutique:article': n }), `name` /
+`desc` / `icon` (sinon tirés de l'objet), `requires` / `forbids`. `shopArticles(id)`, `shopBuy(scene,
+id, article)` → `{ ok, reason: 'eclats' | 'stock', text }` (rien retiré en cas de refus). ShopScene :
+monde gelé, cadre de lianes (`addStoryVineFrame`, sinon `drawStoryPanel`), ↑/↓ choisir, E / Entrée
+acheter (refus : la ligne tremble, « Il te manque n éclats de lune. »), Échap partir.
+
+**Quêtes secondaires** (StoryKit). Registre global `QUESTS`, rempli par les fichiers d'histoire :
+```
+QUESTS.galet = {
+  title: 'Le galet de lune', giver: 'Druide', desc: '…',
+  steps: [{ id: 'chercher', text: 'Trouver le galet…' }, { id: 'rapporter', text: 'Le rapporter.' }],
+  reward: { eclats: 15, consommable: 'baie_soin', n: 1 },   // même format que les coffres
+  hidden: false,                                            // vrai : absente du sac avant la fin
+};
+```
+- État sauvegardé `quests` = { id: { step, done } } (absent = pas commencée). `questStatus(id)` →
+  'none' | 'active' | 'done', `questCurrentStep(id)`, `questStart(scene, id)`, `questSetStep(scene, id,
+  step?)` (null : étape suivante), `questComplete(scene, id)` (verse `reward`), `questJournal()`.
+- Étapes de cinématique : `{questStart: 'id'}` (bandeau « Nouvelle quête »), `{questStep: 'id'}` ou
+  `{questStep: {id, step}}` (toast « Quête mise à jour », ne gèle rien), `{questComplete: 'id'}`
+  (bandeau « Quête terminée » + récompense), `{reward: contenu}` (récompense hors quête) ; `{give}` /
+  `{take}` existants pour les objets de quête. `{…, silent: true}` : sans bandeau.
+- Conditions (`requires` / `forbids`, `talk` conditionnel des PNJ) : `quest: 'id'` (en cours),
+  `questDone`, `questNone` (pas commencée), `questStep: 'id:étape'`, `eclats: n` (au moins n).
+  PNJ dont la réplique suit la quête :
+  `talk: [{ requires: { questDone: 'galet' }, talk: 'merci' }, { requires: { quest: 'galet', item:
+  'galet_lune' }, talk: 'quete_fin' }, { requires: { quest: 'galet' }, talk: 'attente' },
+  { talk: 'quete_debut' }]` ; objet de quête : `pickups: [{ item: 'galet_lune', x, requires: { quest:
+  'galet' }, cutscene: 'galet_trouve' }]` (cinématique `[{questStep: {id: 'galet', step: 'rapporter'}}]`).
+- Sac (I) : onglets « Objets » / « Quêtes » (Tab ou clic) ; quêtes en cours puis terminées, étapes
+  franchies (✓), étape en cours (➤), suivantes cachées, récompense.
+
+**Éditeur.** « Plus d'outils » : **Mur/sol cassable** (glisser = cases couvertes ; id, épée ou ours),
+**Coffre** (id, contenu JSON), **Trésor** (cœur par défaut) ; PNJ `marchand` (avec `shop:
+'marchand_lune'`). `breakables`, `chests`, `treasures` et `npcs[].shop` passent l'aller-retour JSON
+sans perte ; le reste (indice, récompense, `hits`) : « Propriétés (JSON) ».
+
+**Nouvelles clés de sauvegarde** : `eclats`, `heartUpgrades`, `quests`, `shopBought`, flags
+`break_<zone>_<id>`, `chest_<zone>_<id>`, `treasure_<zone>_<id>`. Une ancienne sauvegarde se charge
+telle quelle (0 éclat, aucun cœur entier, aucune quête).
 
 ## Progression & flags d'histoire (noms figés)
 

@@ -701,6 +701,108 @@ function consumableUse(scene, id) {
 }
 
 // ---------------------------------------------------------------------------
+// Quêtes secondaires (vague 3, 2026-11-08) : légères et pilotées par les
+// données. Registre global rempli par les fichiers d'histoire :
+//   QUESTS[id] = { title, giver?, desc?, steps: [{ id, text }], reward?: contenu,
+//                  hidden?: bool (pas dans le sac tant qu'elle n'est pas finie) }
+// `reward` : même format que le contenu d'un coffre (cf. secretGrantContents,
+// SecretKit.js : { eclats }, { item }, { coeur }, { consommable, n }…).
+// État sauvegardé : registre `quests` = { id: { step: 'idÉtape', done: bool } }
+// (une quête absente = pas commencée ; vieilles sauvegardes : aucune).
+// Pilotage : étapes de cinématique {questStart}, {questStep}, {questComplete}
+// et conditions `quest` / `questDone` / `questNone` / `questStep` (cf.
+// storyConditionPart) pour les variantes de `talk` des PNJ.
+// ---------------------------------------------------------------------------
+const QUESTS = {};
+
+function questStates() {
+  const v = storyGet('quests');
+  return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+}
+
+// 'none' (pas commencée), 'active' ou 'done'.
+function questStatus(id) {
+  const s = questStates()[id];
+  if (!s) return 'none';
+  return s.done ? 'done' : 'active';
+}
+
+function questCurrentStep(id) {
+  const s = questStates()[id];
+  return s && !s.done ? (s.step || null) : null;
+}
+
+function questStepDef(id, stepId) {
+  const q = QUESTS[id];
+  return q && Array.isArray(q.steps) ? q.steps.find((st) => st.id === stepId) || null : null;
+}
+
+function questWrite(id, state) {
+  storySet('quests', { ...questStates(), [id]: state });
+}
+
+// Commence la quête (1re étape). Faux si inconnue ou déjà commencée.
+function questStart(scene, id, { silent = false } = {}) {
+  const q = QUESTS[id];
+  if (!q) {
+    console.warn(`questStart : quête "${id}" introuvable dans QUESTS.`);
+    return false;
+  }
+  if (questStatus(id) !== 'none') return false;
+  const first = (q.steps && q.steps[0]) || null;
+  questWrite(id, { step: first ? first.id : null, done: false });
+  if (!silent && scene && scene.add) {
+    showStoryBanner(scene, { kicker: 'Nouvelle quête', title: q.title || id, desc: first ? first.text : (q.desc || ''), color: STORY_UI.vineLight });
+  }
+  return true;
+}
+
+// Passe à l'étape `stepId` (null : la suivante). Commence la quête si besoin.
+// Faux si rien n'a changé (quête finie, étape inconnue, déjà à cette étape).
+function questSetStep(scene, id, stepId = null, { silent = false } = {}) {
+  const q = QUESTS[id];
+  if (!q || questStatus(id) === 'done') return false;
+  if (questStatus(id) === 'none') questStart(scene, id, { silent: true });
+  const steps = q.steps || [];
+  const cur = questCurrentStep(id);
+  let next = stepId;
+  if (next == null) {
+    const i = steps.findIndex((st) => st.id === cur);
+    next = i >= 0 && i + 1 < steps.length ? steps[i + 1].id : null;
+  }
+  if (!next || next === cur || !questStepDef(id, next)) return false;
+  questWrite(id, { step: next, done: false });
+  if (!silent && scene && scene.add) showToast(scene, `Quête mise à jour : ${questStepDef(id, next).text}`, 2800);
+  return true;
+}
+
+// Termine la quête et verse sa récompense (une seule fois).
+function questComplete(scene, id, { silent = false } = {}) {
+  const q = QUESTS[id];
+  if (!q || questStatus(id) === 'done') return false;
+  questWrite(id, { step: questCurrentStep(id), done: true });
+  if (!silent && scene && scene.add) {
+    const what = typeof secretContentsLabel === 'function' ? secretContentsLabel(q.reward) : '';
+    showStoryBanner(scene, { kicker: 'Quête terminée', title: q.title || id, desc: what ? `Récompense : ${what}` : '', color: STORY_UI.vineLight });
+  }
+  if (q.reward && typeof secretGrantContents === 'function') secretGrantContents(scene, q.reward, { source: `quest:${id}`, silent: true });
+  return true;
+}
+
+// Quêtes à montrer dans le sac : en cours d'abord, puis terminées.
+function questJournal() {
+  const st = questStates();
+  const out = [];
+  for (const [id, s] of Object.entries(st)) {
+    const q = QUESTS[id];
+    if (!q) continue;
+    if (q.hidden && !s.done) continue;
+    out.push({ id, quest: q, done: !!s.done, step: s.step || null });
+  }
+  return out.sort((a, b) => Number(a.done) - Number(b.done));
+}
+
+// ---------------------------------------------------------------------------
 // Carte du monde : découvertes (2026-11-08, points 3 et 4 de la liste)
 // ---------------------------------------------------------------------------
 // Pendant le jeu, chaque bloc de STORY_MAP_CHUNK px autour d'Agarica (un
@@ -1026,9 +1128,23 @@ function unlockFormFromStory(scene, flag, { silent = false } = {}) {
 // `{flag: valeur, item: 'id' | ['id'…], noItem: 'id'}` : toutes les clés
 // doivent être vraies. `true`/`false` comparent la valeur « vraie/fausse »
 // du flag (un flag absent vaut faux), toute autre valeur est comparée strictement.
+// Quêtes (vague 3) : `quest: 'id'` (en cours), `questDone: 'id'` (finie),
+// `questNone: 'id'` (pas commencée), `questStep: 'id:étape'` (en cours, à
+// cette étape) ; chacune accepte aussi un tableau (toutes vraies).
+// Monnaie : `eclats: n` (au moins n Éclats de lune).
 function storyConditionPart(key, expected) {
   if (key === 'item') return [].concat(expected).every((id) => inventoryHas(id));
   if (key === 'noItem') return [].concat(expected).every((id) => !inventoryHas(id));
+  if (key === 'quest') return [].concat(expected).every((id) => questStatus(id) === 'active');
+  if (key === 'questDone') return [].concat(expected).every((id) => questStatus(id) === 'done');
+  if (key === 'questNone') return [].concat(expected).every((id) => questStatus(id) === 'none');
+  if (key === 'questStep') {
+    return [].concat(expected).every((s) => {
+      const [id, step] = String(s).split(':');
+      return questCurrentStep(id) === step;
+    });
+  }
+  if (key === 'eclats' && typeof expected === 'number') return (typeof eclatsCount === 'function' ? eclatsCount() : 0) >= expected;
   const v = storyGet(key);
   if (expected === true) return !!v;
   if (expected === false) return !v;
@@ -2237,7 +2353,7 @@ function hideBossBar(scene) {
 // ---------------------------------------------------------------------------
 // Gel du monde (dialogue, cinématique, menus)
 // ---------------------------------------------------------------------------
-const WORLD_FREEZING_SCENES = ['DialogueScene', 'InventoryScene', 'MapScene', 'CampfireMenuScene', 'PauseScene'];
+const WORLD_FREEZING_SCENES = ['DialogueScene', 'InventoryScene', 'MapScene', 'CampfireMenuScene', 'PauseScene', 'ShopScene'];
 
 function isWorldFrozen(scene) {
   if (!scene || !scene.scene) return false;
@@ -2293,6 +2409,10 @@ const STORY_SETTLE_ABORT_MS = 6000;
 // (`enemy.calm(ms)`, cf. SingeCorrompu) annulent aussi leur attaque en cours.
 const STORY_EXIT_INVULN_MS = 1000;
 const STORY_EXIT_CALM_RANGE = 320;
+// Clignotement de cette invulnérabilité (vague 3, décision de l'utilisateur) :
+// seulement si un ennemi est à moins de ~300 px (centre à centre). Sinon
+// Agarica est protégée tout pareil, sans signal inutile à chaque dialogue.
+const STORY_EXIT_BLINK_RANGE = 300;
 
 // Gel posé par l'histoire (et non par un menu : inventaire, carte, pause, feu).
 function isStoryFrozen(scene) {
@@ -2459,13 +2579,37 @@ function storyUnfrozenTick(scene) {
   }
   const p = scene.player;
   if (!p || !p.storyInvulnPending || typeof p.grantStoryInvulnerability !== 'function') return;
-  p.grantStoryInvulnerability(STORY_EXIT_INVULN_MS);
+  p.grantStoryInvulnerability(STORY_EXIT_INVULN_MS, { blink: storyThreatNear(scene, p, STORY_EXIT_BLINK_RANGE) });
   if (!scene.enemies) return;
   scene.enemies.getChildren().forEach((e) => {
     if (!e || !e.active || e.defeated || typeof e.calm !== 'function') return;
     if (Math.abs(e.x - p.x) > STORY_EXIT_CALM_RANGE || Math.abs(e.y - p.y) > STORY_EXIT_CALM_RANGE) return;
     e.calm(STORY_EXIT_INVULN_MS);
   });
+}
+
+// Un ennemi encore dangereux à moins de `range` px d'Agarica (centre à
+// centre) ? Ennemis du groupe (boss compris : Ghil't y est), Kainati (hors
+// groupe, sauf calmé ou vaincu). Les soignés, vaincus et inoffensifs ne
+// comptent pas (le crapaud-piège, `harmless` mais à langue, compte).
+function storyThreatNear(scene, p, range) {
+  const cx = p.x;
+  const cy = p.y - 40;
+  const near = (o) => {
+    if (!o || !o.active) return false;
+    const c = typeof o.getCenter === 'function' ? o.getCenter() : o;
+    return Phaser.Math.Distance.Between(cx, cy, c.x, c.y) <= range;
+  };
+  if (scene.enemies) {
+    const list = scene.enemies.getChildren();
+    for (const e of list) {
+      if (!e || e.defeated || e.healed) continue;
+      if (e.harmless && typeof e.calm !== 'function' && !e.corrupted) continue;
+      if (near(e)) return true;
+    }
+  }
+  const k = scene.kainati;
+  return !!(k && !k.defeated && !k.calm && near(k));
 }
 
 // Fin d'un dialogue ou d'une cinématique : Agarica est protégée dès
@@ -2493,6 +2637,8 @@ const SPEAKERS = {
   ghilt: { name: "Ghil't", color: 0x7bd35a },
   habitant: { name: 'Habitant', color: 0xa99bd6 },
   garde: { name: 'Garde', color: 0x8a8fb5 },
+  // Vague 3 : marchand des Éclats de lune (PNJ `shop`, cf. SHOPS).
+  marchand: { name: 'Marchand', color: 0xd9c27a },
   narrateur: { name: '', color: 0xe8d9ff },
 };
 
@@ -2729,7 +2875,8 @@ function resolveCutsceneSteps(scene, idOrSteps) {
 
 // Étapes qui ne bloquent rien : une cinématique faite uniquement de bulles
 // ne pose pas __cutsceneLock (le monde continue, le joueur garde la main).
-const CUTSCENE_NON_BLOCKING_STEPS = ['bubble'];
+// `questStep` (vague 3) : une avancée de quête (toast) ne gèle rien non plus.
+const CUTSCENE_NON_BLOCKING_STEPS = ['bubble', 'questStep'];
 function isNonBlockingCutsceneStep(step) {
   return !!step && typeof step === 'object' && Object.keys(step).length === 1
     && CUTSCENE_NON_BLOCKING_STEPS.includes(Object.keys(step)[0]);
@@ -3003,6 +3150,30 @@ const CUTSCENE_STEP_HANDLERS = {
   take: (scene, id) => { inventoryRemove(id); },
   skill: (scene, id) => { unlockSkillFromStory(scene, id); return storyWait(scene, 300); },
   form: (scene, flag) => { unlockFormFromStory(scene, flag); return storyWait(scene, 300); },
+  // Quêtes (vague 3) : `{questStart: 'id'}`, `{questStep: 'id'}` (étape
+  // suivante) ou `{questStep: {id, step}}`, `{questComplete: 'id'}` (verse la
+  // récompense). Bandeau / toast, sauf `{questStart: {id, silent: true}}`.
+  questStart: (scene, v) => {
+    const o = typeof v === 'object' ? v : { id: v };
+    if (questStart(scene, o.id, { silent: !!o.silent })) return storyWait(scene, 300);
+    return null;
+  },
+  questStep: (scene, v) => {
+    const o = typeof v === 'object' ? v : { id: v };
+    questSetStep(scene, o.id, o.step ?? null, { silent: !!o.silent });
+  },
+  questComplete: (scene, v) => {
+    const o = typeof v === 'object' ? v : { id: v };
+    if (questComplete(scene, o.id, { silent: !!o.silent })) return storyWait(scene, 300);
+    return null;
+  },
+  // Récompense hors quête (contenu de coffre) : `{reward: {eclats: 10}}`.
+  reward: (scene, contents) => {
+    if (typeof secretGrantContents === 'function') secretGrantContents(scene, contents, { source: 'cutscene' });
+    return storyWait(scene, 300);
+  },
+  // Boutique (ShopScene) : la cinématique attend qu'elle soit refermée.
+  shop: (scene, id) => (typeof openShop === 'function' ? openShop(scene, id) : null),
   // Xara rejoint Agarica : le compagnon réel remplace le PNJ « xara » s'il existe.
   xaraJoin: (scene) => {
     storySet('xaraMet', true);
@@ -3242,6 +3413,9 @@ function createStoryNpc(scene, n) {
   const npc = addManifestSprite(scene, n.x, storyNpcFootY(scene, n), n.sprite || n.id, n.anim || 'idle');
   npc.npcKey = key;
   npc.talk = n.talk || null;
+  // Marchand (vague 3) : `shop: 'id'` de SHOPS -- E ouvre la boutique
+  // (après la réplique `talk` s'il en a une), cf. updateStoryInteractables.
+  npc.shopId = n.shop || null;
   npc.npcName = n.name || null;
   npc.lookAtPlayer = n.lookAtPlayer !== false;
   setNpcFacing(npc, n.facing === 'left' ? -1 : 1);
@@ -3355,11 +3529,14 @@ LEVEL_DATA_HANDLERS.triggers = (scene, list) => {
   });
 };
 
+// `requires` / `forbids` d'un ramassable (vague 3) : relus en continu --
+// l'objet d'une quête apparaît dès qu'elle commence, même pendant la visite
+// (avant : seulement à l'entrée de la zone ; aucune zone n'en dépendait).
 LEVEL_DATA_HANDLERS.pickups = (scene, list) => {
   const zone = storyZoneId(scene);
   (list || []).forEach((p) => {
     const flag = `pickup_${zone}_${p.item}`;
-    if (storyGet(flag) || inventoryHas(p.item) || !storyAllowed(p)) return;
+    if (storyGet(flag) || inventoryHas(p.item)) return;
     const y = p.y != null ? p.y : storyGroundY(scene, p.x) - 30;
     // Juice : halo d'objet (art `fx_halo_objet`, sinon halo dessiné) qui
     // respire, objet qui flotte en se balançant ; petites étoiles de temps en
@@ -3380,9 +3557,21 @@ LEVEL_DATA_HANDLERS.pickups = (scene, list) => {
     scene.tweens.add({ targets: img, angle: { from: -5, to: 5 }, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     storyPutBehindPlayer(scene, glow);
     storyPutBehindPlayer(scene, img);
-    scene.__story.interactables.push({ kind: 'pickup', data: p, flag, img, glow, x: p.x, y, glintAt: 0 });
+    const it = { kind: 'pickup', data: p, flag, img, glow, x: p.x, y, glintAt: 0, gated: !!(p.requires || p.forbids) };
+    scene.__story.interactables.push(it);
+    if (it.gated) storyPickupGate(it);
   });
 };
+
+// Ramassable conditionnel : caché tant que ses conditions ne tiennent pas.
+// Vrai s'il est disponible.
+function storyPickupGate(it) {
+  if (!it.gated) return true;
+  const ok = storyAllowed(it.data);
+  if (it.img && it.img.visible !== ok) it.img.setVisible(ok);
+  if (it.glow && it.glow.visible !== ok) it.glow.setVisible(ok);
+  return ok;
+}
 
 function ensureMossGroup(scene) {
   const st = scene.__story;
@@ -3711,13 +3900,13 @@ function updateStoryInteractables(scene) {
         setNpcFacing(npc, player.x >= npc.x ? 1 : -1);
       }
       it.talk = resolveStoryTalk(scene, npc.talk, npc);
-      if (!it.talk) continue;
+      if (!it.talk && !npc.shopId) continue;
       x = npc.x;
       topY = npc.y - npc.displayHeight;
       if (Math.abs(player.y - npc.y) > STORY_INTERACT_RANGE_Y) continue;
-      label = 'E : parler';
+      label = it.talk ? 'E : parler' : 'E : marchander';
     } else if (it.kind === 'pickup') {
-      if (it.done) continue;
+      if (it.done || !storyPickupGate(it)) continue;
       // Juice : étoile qui scintille sur l'objet de temps en temps.
       if (typeof spawnFx === 'function' && scene.time.now >= it.glintAt) {
         it.glintAt = scene.time.now + Phaser.Math.Between(700, 1500);
@@ -3734,6 +3923,15 @@ function updateStoryInteractables(scene) {
       topY = it.wall.y - it.wall.h / 2 - 6;
       if (player.y < it.wall.y - it.wall.h / 2 - 40 || player.y > it.wall.y + it.wall.h / 2 + 60) continue;
       label = inventoryHas('repulsif') ? 'E : verser le répulsif' : 'E : examiner';
+    } else if (typeof it.probe === 'function') {
+      // Objet interactif générique (vague 3 : coffres, cf. SecretKit.js) :
+      // `probe(scene, player)` -> { x, topY, label } à portée, sinon null ;
+      // `activate(scene)` à l'appui sur E.
+      const pr = it.probe(scene, player);
+      if (!pr) continue;
+      ({ x, topY, label } = pr);
+    } else {
+      continue;
     }
     const d = Math.abs(player.x - x);
     if (d > STORY_INTERACT_RANGE_X || d >= bestDist) continue;
@@ -3750,7 +3948,21 @@ function updateStoryInteractables(scene) {
   prompt.setVisible(false);
   const it = best.it;
   if (it.kind === 'npc') {
-    storyTalk(scene, it.talk);
+    const shopId = it.npc.shopId;
+    if (!shopId) {
+      storyTalk(scene, it.talk);
+    } else {
+      // Marchand : sa réplique (s'il en a une) puis la boutique -- sauf si la
+      // réplique est une cinématique qui l'ouvre déjà (étape `{shop}`).
+      const visit = scene.__storyVisit;
+      const opensItself = typeof it.talk === 'string' && Array.isArray(CUTSCENES[it.talk]) && CUTSCENES[it.talk].some((s) => s && s.shop);
+      Promise.resolve(it.talk ? storyTalk(scene, it.talk) : null).then(() => {
+        if (opensItself || scene.__storyVisit !== visit || scene.__transitioningAway || typeof openShop !== 'function') return;
+        openShop(scene, shopId);
+      });
+    }
+  } else if (typeof it.activate === 'function') {
+    it.activate(scene);
   } else if (it.kind === 'pickup') {
     it.done = true;
     storySet(it.flag, true);

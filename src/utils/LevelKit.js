@@ -3301,13 +3301,29 @@ function autotileBiomePlatformMossShift(scene, tileset, textureKey, baseSize) {
   return (1 - pf) * heightOf(platKey) - (1 - gf) * heightOf(groundKey);
 }
 
+// Variante de case pleine (pos 'c') : tirée d'un hachage de la case plutôt
+// qu'au hasard, pour qu'une case redessinée (murs cassables, cf.
+// secretRerenderGround dans SecretKit.js) garde exactement la même image.
+function autotileCenterVariant(gx, gy) {
+  const h = (Math.imul(gx, 73856093) ^ Math.imul(gy, 19349663)) >>> 0;
+  return h % DIRT_CENTER_VARIANT_COUNT;
+}
+
+// Options communes aux deux rendus (rétro-compatibles, toutes facultatives) :
+// - `solid` (Set de gridCellKey) : voisinage à utiliser au lieu des seules
+//   `cells` -- pour redessiner quelques cases d'un sol existant (cassables) ;
+// - `cellObjects` (Map gridCellKey -> { body, images, grass }) : objets créés
+//   par case, pour pouvoir les retirer/remplacer ensuite.
 function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
   if (autotileLayoutFor(scene, options.tileset) === 'atlas') return renderAtlasAutotileGrid(scene, groundGroup, cells, options);
   const isBackLayer = !!options.back;
-  const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
+  const solid = options.solid || new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
+  const record = options.cellObjects || null;
   const images = [];
   const tileBodies = []; // corps créés, cf. arêtes internes en fin de fonction
   for (const [gx, gy, material] of cells) {
+    const rec = record ? { body: null, images: [], grass: null } : null;
+    if (rec) record.set(gridCellKey(gx, gy), rec);
     const hasNorth = solid.has(gridCellKey(gx, gy - 1));
     const hasSouth = solid.has(gridCellKey(gx, gy + 1));
     const hasEast = solid.has(gridCellKey(gx + 1, gy));
@@ -3369,7 +3385,7 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       }
       isPlatform = true;
     } else if (pos === 'c') {
-      textureKey = `autotile-dirt-c-var${Phaser.Math.Between(0, DIRT_CENTER_VARIANT_COUNT - 1)}`;
+      textureKey = `autotile-dirt-c-var${autotileCenterVariant(gx, gy)}`;
     } else if (pos === 'l' && !hasEast) {
       // Milieu d'une colonne d'une case de large (exposée des DEUX côtés) :
       // 'l' laissait le flanc droit coupé net.
@@ -3417,6 +3433,7 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       const tile = groundGroup.create(cx, cy, GROUND_HITBOX_KEY).setVisible(false);
       tile.__cell = { gx, gy };
       tileBodies.push(tile);
+      if (rec) rec.body = tile;
       if (AUTOTILE_GRASS_TOP_POSITIONS.has(pos)) {
         // Retour utilisateur : deux essais précédents ici (un rectangle
         // uniformément rehaussé du même `heightBoost` que l'image, puis un
@@ -3493,6 +3510,7 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
       plug.lookRole = 'world';
       plug.lookTile = 'back';
       images.push(plug);
+      if (rec) rec.images.push(plug);
     }
     const img = scene.add.image(cx, tileCenterY, visualKey)
       .setDisplaySize(baseSize, displayHeight)
@@ -3505,6 +3523,7 @@ function renderAutotileGrid(scene, groundGroup, cells, options = {}) {
     img.lookRole = 'world';
     img.lookTile = isBackLayer ? 'back' : 'blob';
     images.push(img);
+    if (rec) rec.images.push(img);
   }
   // Un corps STATIQUE redimensionné après coup (cf. AUTOTILE_GRASS_TOP_POSITIONS
   // ci-dessus) ne met pas à jour tout seul l'arbre de collision du groupe —
@@ -3638,7 +3657,9 @@ function atlasTileFor(solid, gx, gy) {
 // (cf. autotileLayoutFor) ; incomplet, il est ignoré ici.
 function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
   const isBackLayer = !!options.back;
-  const solid = new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
+  // `solid` / `cellObjects` : cf. renderAutotileGrid.
+  const solid = options.solid || new Set(cells.map(([gx, gy]) => gridCellKey(gx, gy)));
+  const record = options.cellObjects || null;
   const scale = GROUND_TILE_SIZE / AUTOTILE_ATLAS_SOURCE_TILE;
   const images = [];
   const grassCells = [];
@@ -3646,9 +3667,12 @@ function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
   for (const [gx, gy] of cells) {
     const { tile, grass } = atlasTileFor(solid, gx, gy);
     const { x: cx, y: cy } = gridToWorld(gx, gy);
+    const rec = record ? { body: null, images: [], grass: null } : null;
+    if (rec) record.set(gridCellKey(gx, gy), rec);
     if (groundGroup && !isBackLayer) {
       const body = groundGroup.create(cx, cy, GROUND_HITBOX_KEY).setVisible(false);
       body.__cell = { gx, gy };
+      if (rec) rec.body = body;
       // Haut de la hitbox = haut de la case (ligne de marche) ; dessous
       // raccourci si rien en dessous, cf. AUTOTILE_UNDERSIDE_TRIM.
       if (AUTOTILE_UNDERSIDE_TRIM && !solid.has(gridCellKey(gx, gy + 1))) {
@@ -3667,12 +3691,13 @@ function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
     img.lookRole = 'world';
     img.lookTile = isBackLayer ? 'back' : 'body';
     images.push(img);
-    if (grass) grassCells.push([gx, gy, grass]);
+    if (rec) rec.images.push(img);
+    if (grass) grassCells.push([gx, gy, grass, rec]);
   }
   // Herbes créées APRÈS toutes les cases de ce rendu (ordre d'affichage =
   // ordre de création) : un débord latéral passerait sinon sous la case
   // voisine créée après lui.
-  for (const [gx, gy, grass] of grassCells) {
+  for (const [gx, gy, grass, rec] of grassCells) {
     const spec = AUTOTILE_ATLAS_GRASS[grass];
     const g = scene.add.image(gx * GROUND_TILE_SIZE + spec.dx * scale, gy * GROUND_TILE_SIZE, `${AUTOTILE_ATLAS_PREFIX}${spec.file}`)
       .setOrigin(0, 0).setScale(scale);
@@ -3681,6 +3706,7 @@ function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
     g.lookRole = 'world';
     g.lookTile = isBackLayer ? 'back' : 'grass';
     images.push(g);
+    if (rec) rec.grass = g;
   }
   if (groundGroup && !isBackLayer) {
     groundGroup.refresh();
@@ -4659,9 +4685,27 @@ function buildLevelFromData(scene, data, sceneData) {
   // Branches (clé `branches`) : leurs cases passent dans le même rendu que le sol
   // (mêmes corps, faces internes comprises), sans image de tuile. Construites ici
   // et non dans un handler : totems, décors et feux se calent sur le sol juste après.
-  const frontImages = renderAutotileGrid(scene, scene.ground, zoneGroundCells(data), {
-    tileset: data.tileset, noArt: zoneBranchOnlyCellKeys(data),
+  // Murs et sols cassables (clé `breakables`, SecretKit.js) : leurs cases
+  // intactes sont rendues AVEC le sol (même jeu de tuiles, mêmes raccords),
+  // celles déjà cassées (sauvegarde) en sont retirées. Les objets de chaque
+  // case sont notés (`cellObjects`) pour les retirer et redessiner les
+  // voisines au moment de la casse.
+  const groundCells = typeof secretPrepareGroundCells === 'function'
+    ? secretPrepareGroundCells(scene, data, zoneGroundCells(data)) : zoneGroundCells(data);
+  const groundNoArt = zoneBranchOnlyCellKeys(data);
+  const groundCellObjects = new Map();
+  const frontImages = renderAutotileGrid(scene, scene.ground, groundCells, {
+    tileset: data.tileset, noArt: groundNoArt, cellObjects: groundCellObjects,
   });
+  // Repère invisible juste après la dernière image du sol : une herbe ajoutée
+  // plus tard (case redessinée) se glisse là, au-dessus de toutes les cases.
+  const groundEnd = scene.add.graphics().setVisible(false);
+  groundEnd.lookRole = 'world';
+  scene.__groundRender = {
+    cells: groundCells,
+    solid: new Set(groundCells.map(([gx, gy]) => gridCellKey(gx, gy))),
+    cellObjects: groundCellObjects, tileset: data.tileset, noArt: groundNoArt, end: groundEnd,
+  };
   const branchImages = addZoneBranches(scene, data);
   scene.__frontGroundFirstImage = frontImages[0] || branchImages[0];
   // Bande de liquide/brume devant les fonds (cf. addLiquidFloor) : masque le
@@ -4825,6 +4869,11 @@ function buildLevelFromData(scene, data, sceneData) {
       patrolMaxX: e.patrolMaxX ?? e.x + 150,
     });
     if (!enemy) continue;
+    // Éclats de lune (SecretKit.js) : seuls les ennemis de la DONNÉE en lâchent
+    // (type pour la table par défaut, `eclats` pour régler celui-ci) ; ceux
+    // qu'un script ajoute (renforts, mousses de Ghil't) n'en lâchent pas.
+    enemy.__lootType = e.type;
+    if (e.eclats !== undefined) enemy.__lootEclats = e.eclats;
     // `group.add()` réinitialise `body.allowGravity` à `true`, écrasant le
     // `setAllowGravity(false)` posé dans le constructeur des ennemis fixes/
     // volants — sans ce rattrapage ils tombent hors du niveau dès l'ajout.

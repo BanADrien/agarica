@@ -94,9 +94,10 @@ const EDITOR_ENEMY_MARKER_LABELS = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t)
 // compagnon par l'étape {xaraJoin}).
 const EDITOR_NPC_IDS = [
   'xara_extra', 'pere_chef', 'amanite', 'habitant_druide', 'habitant_porteur', 'habitant_garde',
-  'geralt', 'clak', 'morgat', 'kainati', 'kainati_esprit', 'ghilt', 'ghilt_gueri',
+  'geralt', 'clak', 'morgat', 'kainati', 'kainati_esprit', 'ghilt', 'ghilt_gueri', 'marchand',
 ];
-const EDITOR_NPC_DEFAULTS = { xara_extra: { id: 'xara', sprite: 'xara_extra' } };
+// Marchand (vague 3) : PNJ avec sa boutique (`shop`, cf. SHOPS) ; `talk` facultatif.
+const EDITOR_NPC_DEFAULTS = { xara_extra: { id: 'xara', sprite: 'xara_extra' }, marchand: { id: 'marchand', shop: 'marchand_lune' } };
 // Objets d'ITEM_MANIFEST qui ne sont pas des objets ramassables (UI, fonds...).
 // Lot Codex n°8 : interface (ui_), particules et halos (fx_), couches de fond
 // (couche_), décors et liquides (decor_, liquide_ : posés en `props` ou par
@@ -255,7 +256,8 @@ const EDITOR_STORY_KINDS = {
       if (e.facing === 'left') sprite.setFlipX(true);
       if (e.onProp) sprite.y = editorNpcFootY(ed, e, sprite);
       const talk = typeof e.talk === 'string' ? e.talk : (e.talk ? '(conditionnel)' : '—');
-      return [sprite, ed.markerLabel(e.x, y - sprite.displayHeight - 10, `PNJ ${e.key || e.id} : ${talk}`, '#ffe08a')];
+      const shop = e.shop ? ` · boutique ${e.shop}` : '';
+      return [sprite, ed.markerLabel(e.x, y - sprite.displayHeight - 10, `PNJ ${e.key || e.id} : ${talk}${shop}`, '#ffe08a')];
     },
     anchor: (ed, e) => ({ x: e.x, y: editorNpcFootY(ed, e) }),
     move(ed, e, x, y) { e.x = Math.round(x); e.y = ed.snapY(x, y); },
@@ -437,6 +439,103 @@ const EDITOR_STORY_KINDS = {
     },
     anchor: (ed, e) => ({ x: e.x, y: e.y }),
     move(ed, e, x, y) { e.x = Math.round(x); e.y = ed.snapY(x, y + 11) - 11; },
+  },
+  // Vague 3 (SecretKit.js) : mur/sol cassable (clé `breakables`). Glisser =
+  // cases de la grille couvertes (à peindre AUSSI en sol, pour l'aperçu et la
+  // carte) ; épée ou ours, indice, récompense : « Propriétés (JSON) ».
+  breakable: {
+    defaultSize: { w: 64, h: 128 },
+    key: 'breakables', shape: 'rect', label: 'Mur/sol cassable',
+    create(ed, g) {
+      const a = worldToGrid(g.x + 1, g.y + 1);
+      const b = worldToGrid(g.x + Math.max(2, g.w) - 1, g.y + Math.max(2, g.h) - 1);
+      const cells = [];
+      for (let gy = a.gy; gy <= b.gy; gy++) for (let gx = a.gx; gx <= b.gx; gx++) cells.push([gx, gy]);
+      const n = (ed.data.breakables || []).length + 1;
+      const id = window.prompt('Identifiant du cassable (flag break_<zone>_<id>) :', `cassable${n}`);
+      if (id === null) return null;
+      const by = window.prompt("Cassé par : 'sword' (épée, 3 coups ; l'ours aussi) ou 'bear' (ours seulement)", 'sword');
+      return { id: id.trim() || `cassable${n}`, by: by && by.trim() === 'bear' ? 'bear' : 'sword', hint: 'fissure', cells };
+    },
+    draw(ed, e) {
+      const T = GROUND_TILE_SIZE;
+      const cells = typeof secretBreakableCells === 'function' ? secretBreakableCells(e) : (e.cells || []);
+      const xs = cells.map(([gx]) => gx);
+      const ys = cells.map(([, gy]) => gy);
+      const x0 = (xs.length ? Math.min(...xs) : 0) * T;
+      const y0 = (ys.length ? Math.min(...ys) : 0) * T;
+      const x1 = (xs.length ? Math.max(...xs) + 1 : 1) * T;
+      const y1 = (ys.length ? Math.max(...ys) + 1 : 1) * T;
+      const color = e.by === 'bear' ? 0xd9a066 : 0xd8ccf5;
+      const box = ed.add.rectangle((x0 + x1) / 2, (y0 + y1) / 2, x1 - x0, y1 - y0, color, 0.06).setDepth(400);
+      const g = ed.add.graphics().setDepth(400);
+      g.fillStyle(color, 0.22);
+      g.lineStyle(2, color, 0.9);
+      for (const [gx, gy] of cells) { g.fillRect(gx * T, gy * T, T, T); g.strokeRect(gx * T + 1, gy * T + 1, T - 2, T - 2); }
+      const label = `Cassable ${e.id || ''} (${e.by === 'bear' ? 'ours' : 'épée'}${e.reward ? ', récompense' : ''})`;
+      return [box, g, ed.markerLabel((x0 + x1) / 2, y0 - 10, label, e.by === 'bear' ? '#ffd9a0' : '#e8d8ff')];
+    },
+    anchor(ed, e) {
+      const cells = typeof secretBreakableCells === 'function' ? secretBreakableCells(e) : (e.cells || []);
+      if (!cells.length) return { x: e.x || 0, y: e.y || 0 };
+      const T = GROUND_TILE_SIZE;
+      return {
+        x: (cells.reduce((s, [gx]) => s + gx, 0) / cells.length + 0.5) * T,
+        y: (cells.reduce((s, [, gy]) => s + gy, 0) / cells.length + 0.5) * T,
+      };
+    },
+    move(ed, e, x, y) {
+      const T = GROUND_TILE_SIZE;
+      const mid = EDITOR_STORY_KINDS.breakable.anchor(ed, e);
+      const dgx = Math.round((x - mid.x) / T);
+      const dgy = Math.round((y - mid.y) / T);
+      if (Array.isArray(e.cells)) e.cells = e.cells.map(([gx, gy]) => [gx + dgx, gy + dgy]);
+      else if (e.x != null) { e.x += dgx * T; e.y += dgy * T; }
+    },
+  },
+  // Coffre (clé `chests`) : posé au sol ; E l'ouvre. Contenu demandé en JSON.
+  chest: {
+    key: 'chests', shape: 'point', label: 'Coffre',
+    create(ed, g) {
+      const n = (ed.data.chests || []).length + 1;
+      const id = window.prompt('Identifiant du coffre (flag chest_<zone>_<id>) :', `coffre${n}`);
+      if (id === null) return null;
+      let contents = { eclats: 20 };
+      const raw = window.prompt('Contenu (JSON) : {"eclats": n} · {"item": "id"} · {"coeur": true} · {"consommable": "baie_soin", "n": 2}', JSON.stringify(contents));
+      try { if (raw) contents = JSON.parse(raw); } catch (err) { /* contenu par défaut */ }
+      return { id: id.trim() || `coffre${n}`, x: Math.round(g.x), y: ed.snapY(g.x, g.y), contents };
+    },
+    draw(ed, e) {
+      const y = e.y != null ? e.y : ed.groundYOr(e.x, 400);
+      const icon = addItemIcon(ed, e.x, y - 20, 'coffre_ferme', 44);
+      const what = typeof secretContentsLabel === 'function' ? secretContentsLabel(e.contents) : '';
+      return [icon, ed.markerLabel(e.x, y - 50, `Coffre ${e.id || ''} : ${what || '?'}`, '#ffe08a')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: (e.y != null ? e.y : ed.groundYOr(e.x, 400)) - 20 }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = ed.snapY(x, y + 20); },
+  },
+  // Trésor posé (clé `treasures`, ramassé au contact) : cœur entier par défaut.
+  treasure: {
+    key: 'treasures', shape: 'point', label: 'Trésor (cœur, éclats…)',
+    create(ed, g) {
+      const n = (ed.data.treasures || []).length + 1;
+      const id = window.prompt('Identifiant du trésor (flag treasure_<zone>_<id>) :', `tresor${n}`);
+      if (id === null) return null;
+      let contents = { coeur: true };
+      const raw = window.prompt('Contenu (JSON) : {"coeur": true} · {"eclats": n} · {"item": "id"}', JSON.stringify(contents));
+      try { if (raw) contents = JSON.parse(raw); } catch (err) { /* contenu par défaut */ }
+      return { id: id.trim() || `tresor${n}`, x: Math.round(g.x), y: Math.round(g.y), contents };
+    },
+    draw(ed, e) {
+      const y = e.y != null ? e.y : ed.groundYOr(e.x, 400) - 34;
+      const id = typeof secretContentsIcon === 'function' ? secretContentsIcon(e.contents) : 'coeur_entier';
+      const icon = addItemIcon(ed, e.x, y, id, 32);
+      const ring = ed.add.circle(e.x, y, 20, 0xff9fc9, 0.15).setStrokeStyle(1, 0xff9fc9, 0.8);
+      const what = typeof secretContentsLabel === 'function' ? secretContentsLabel(e.contents) : '';
+      return [icon, ring, ed.markerLabel(e.x, y - 30, `Trésor ${e.id || ''} : ${what || '?'}`, '#ffb3d9')];
+    },
+    anchor: (ed, e) => ({ x: e.x, y: e.y != null ? e.y : ed.groundYOr(e.x, 400) - 34 }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = Math.round(y); },
   },
 };
 const EDITOR_STORY_KIND_BY_KEY = Object.fromEntries(Object.entries(EDITOR_STORY_KINDS).map(([k, d]) => [d.key, k]));

@@ -2878,7 +2878,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // +1 cœur permanent : secret de la forêt sombre 2 (flag d'histoire
     // `coeurBonusForet`, cf. src/story/acte1.js), cumulé au bonus de totem.
     const storyHeartBonus = this.scene && this.scene.registry.get('coeurBonusForet') ? 1 : 0;
-    this.maxHearts = HEART_MAX + bonus.heartBonus + storyHeartBonus;
+    // Cœurs entiers ramassés (coffres, trésors, marchand : registre
+    // `heartUpgrades`, cf. heartUpgradeCount dans SecretKit.js).
+    const upgrades = typeof heartUpgradeCount === 'function' ? heartUpgradeCount() : 0;
+    this.maxHearts = HEART_MAX + bonus.heartBonus + storyHeartBonus + upgrades;
     this.maxEnergy = ENERGY_MAX + bonus.energyBonus;
     this.skillSizeMultiplier = 1 + bonus.skillSizeBonus;
     this.hearts = Math.min(this.hearts, this.maxHearts);
@@ -4146,8 +4149,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // le duel...) : le coup reçu (`hitInvulnerable`, l'ancien booléen, posé et
   // levé par hitByEnemy/finishHit -- l'écriture de `isInvulnerable` garde ce
   // sens) et la sortie d'un dialogue ou d'une cinématique (ci-dessous).
+  // Assise au feu de camp (décision de l'utilisateur, vague 3) : rien ne la
+  // touche tant qu'elle reste assise -- un ennemi qui passe ne la relève plus.
+  // Une chute dans le vide (`hitByEnemy({ fall })`) ne lit que `hitInvulnerable`.
   get isInvulnerable() {
-    return !!this.hitInvulnerable || this.storyInvulnerable();
+    return !!this.hitInvulnerable || this.storyInvulnerable() || !!this.campfireRest;
   }
 
   set isInvulnerable(v) {
@@ -4165,12 +4171,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // avant le dégel), puis cette méthode, au premier dégel, minute `ms`. Même
   // signal que l'invulnérabilité d'un coup (clignotement HIT_BLINK_*), qui
   // garde la main si elle tourne déjà.
-  grantStoryInvulnerability(ms) {
+  // `blink: false` (vague 3, décision de l'utilisateur) : protégée sans
+  // clignoter -- StoryKit ne fait clignoter que si un ennemi est proche
+  // (STORY_EXIT_BLINK_RANGE) : loin de tout danger, le signal n'apprend rien.
+  grantStoryInvulnerability(ms, opts = {}) {
     const sc = this.scene;
     this.storyInvulnPending = false;
     if (!sc || !this.active || !(ms > 0)) return;
     this.storyInvulnUntil = Math.max(this.storyInvulnUntil || 0, sc.time.now + ms);
-    if (this.storyInvulnBlink) return;
+    if (this.storyInvulnBlink || opts.blink === false) return;
     const blink = sc.time.addEvent({
       delay: HIT_BLINK_MS,
       loop: true,

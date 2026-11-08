@@ -1,10 +1,15 @@
 // InventoryScene — sac d'Agarica (touche I en jeu, cf. updateStoryKeys dans
 // StoryKit.js, ou entrée « Inventaire » du menu du feu de camp). Overlay
-// au-dessus de la zone, qui reste gelée. À gauche : objets de quête
-// (ITEM_INFO) puis consommables (CONSUMABLE_INFO, avec leur nombre) ; à
-// droite : nom + description de la case choisie. Flèches / ZQSD pour
-// naviguer, E / Entrée pour utiliser un consommable, I / Échap pour fermer,
-// M pour la carte si elle est disponible (cf. storyMapAvailable).
+// au-dessus de la zone, qui reste gelée. Deux onglets (Tab ou clic) :
+// - « Objets » : à gauche, objets de quête (ITEM_INFO) puis consommables
+//   (CONSUMABLE_INFO, avec leur nombre) ; à droite, nom + description de la
+//   case choisie. E / Entrée utilise un consommable, PARTOUT (pas seulement
+//   au feu : décision de l'utilisateur, vague 3).
+// - « Quêtes » (vague 3) : quêtes en cours puis terminées (questJournal,
+//   StoryKit) ; à droite, étapes franchies, étape en cours et récompense.
+// En haut à droite : les Éclats de lune d'Agarica.
+// Flèches / ZQSD pour naviguer, I / Échap pour fermer, M pour la carte si
+// elle est disponible (cf. storyMapAvailable).
 // `returnTo` (menu du feu) : à la fermeture, cette scène-là reprend la main
 // au lieu de rendre les touches à la zone.
 const INVENTORY_COLS = 4;
@@ -12,6 +17,10 @@ const INVENTORY_CELL = 84;
 const INVENTORY_GAP = 10;
 // Au-delà de 2 rangées d'objets de quête : cases plus petites (tout tient).
 const INVENTORY_CELL_SMALL = 68;
+// Onglet des quêtes : hauteur d'une ligne de la liste, lignes visibles.
+const INVENTORY_QUEST_ROW = 50;
+const INVENTORY_QUEST_ROWS = 6;
+const INVENTORY_TABS = [{ id: 'items', label: 'Objets' }, { id: 'quests', label: 'Quêtes' }];
 
 class InventoryScene extends Phaser.Scene {
   constructor() {
@@ -21,6 +30,8 @@ class InventoryScene extends Phaser.Scene {
   init(data) {
     this.parentKey = data.parentKey;
     this.returnTo = data.returnTo || null;
+    this.tab = data.tab === 'quests' ? 'quests' : 'items';
+    this.noIntro = !!data.noIntro;
     this.selected = 0;
   }
 
@@ -32,17 +43,75 @@ class InventoryScene extends Phaser.Scene {
     const py = 52;
     const pw = width - 180;
     const ph = height - 104;
+    this.panel = { px, py, pw, ph };
     drawStoryPanel(this.add.graphics(), px, py, pw, ph, { seed: 4 });
 
-    this.add.text(px + 28, py + 18, "Sac d'Agarica", {
+    const title = this.add.text(px + 28, py + 18, "Sac d'Agarica", {
       fontFamily: STORY_UI.serif, fontSize: '24px', fontStyle: 'bold', color: STORY_UI.title,
     });
     const hasMap = storyMapAvailable();
     const closeHint = this.returnTo ? 'I / Échap : retour au feu' : 'I / Échap : fermer';
-    this.add.text(px + pw - 24, py + 26, `${hasMap ? 'M : carte   ·   ' : ''}${closeHint}`, {
+    this.add.text(px + pw - 24, py + 14, `Tab : ${this.tab === 'items' ? 'quêtes' : 'objets'}   ·   ${hasMap ? 'M : carte   ·   ' : ''}${closeHint}`, {
       fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.textSoft,
     }).setOrigin(1, 0);
+    this.drawTabs(px + 28 + title.width + 26, py + 22);
+    this.drawPurse(px + pw - 24, py + 42);
 
+    if (this.tab === 'quests') this.buildQuests();
+    else this.buildItems();
+
+    // Tab : changer d'onglet sans que le navigateur déplace le focus.
+    this.input.keyboard.addCapture('TAB');
+    this.input.keyboard.on('keydown', this.onKey, this);
+    this.events.once('shutdown', () => this.input.keyboard.off('keydown', this.onKey, this));
+    // Juice : ouverture avec un léger rebond (pas à chaque changement d'onglet).
+    if (!this.noIntro) juiceOverlayIn(this);
+  }
+
+  // Onglets « Objets » / « Quêtes » (clic ou Tab).
+  drawTabs(x0, y) {
+    let x = x0;
+    for (const t of INVENTORY_TABS) {
+      const on = t.id === this.tab;
+      const label = this.add.text(x + 12, y, t.label, {
+        fontFamily: 'sans-serif', fontSize: '14px', fontStyle: 'bold', color: on ? '#ffe066' : '#a99bd6',
+      }).setOrigin(0, 0.5);
+      const w = label.width + 24;
+      const g = this.add.graphics();
+      g.fillStyle(on ? STORY_UI.pink : STORY_UI.nightSoft, on ? 0.2 : 0.6);
+      g.fillRoundedRect(x, y - 13, w, 26, 9);
+      g.lineStyle(1.5, on ? STORY_UI.pink : STORY_UI.vineLight, on ? 0.9 : 0.35);
+      g.strokeRoundedRect(x, y - 13, w, 26, 9);
+      this.children.bringToTop(label);
+      const zone = this.add.zone(x + w / 2, y, w, 26).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => this.switchTab(t.id));
+      x += w + 8;
+    }
+  }
+
+  // Éclats de lune d'Agarica (registre `eclats`, cf. SecretKit.js).
+  drawPurse(right, y) {
+    const n = typeof eclatsCount === 'function' ? eclatsCount() : 0;
+    const t = this.add.text(right, y, `${n} éclat${n > 1 ? 's' : ''} de lune`, {
+      fontFamily: 'sans-serif', fontSize: '14px', fontStyle: 'bold', color: '#e6f7ff', stroke: '#15101f', strokeThickness: 3,
+    }).setOrigin(1, 0.5);
+    if (typeof eclatTextureKey === 'function') {
+      const icon = this.add.image(right - t.width - 12, y, eclatTextureKey(this));
+      icon.setScale(18 / icon.height);
+    }
+    this.purseText = t;
+  }
+
+  switchTab(tab) {
+    if (tab === this.tab) return;
+    this.input.keyboard.off('keydown', this.onKey, this);
+    this.scene.restart({ parentKey: this.parentKey, returnTo: this.returnTo, tab, noIntro: true });
+  }
+
+  // --- Onglet « Objets » ------------------------------------------------------
+
+  buildItems() {
+    const { px, py, pw, ph } = this.panel;
     // Cases : objets de quête (rangées 0..), puis une rangée de consommables
     // (toujours tous affichés, même à 0 : on voit ce qui existe).
     const items = inventoryList();
@@ -127,10 +196,6 @@ class InventoryScene extends Phaser.Scene {
         fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'italic', color: '#8f86a8',
       }).setOrigin(0.5);
     }
-
-    this.input.keyboard.on('keydown', this.onKey, this);
-    // Juice : ouverture avec un léger rebond.
-    juiceOverlayIn(this);
   }
 
   refreshCounts() {
@@ -201,6 +266,7 @@ class InventoryScene extends Phaser.Scene {
     this.select(inRow[0]);
   }
 
+  // Consommable utilisé sur Agarica (zone parente), au feu comme ailleurs.
   useSelected() {
     const c = this.cells[this.selected];
     if (!c || c.kind !== 'consumable' || !c.id) return;
@@ -216,12 +282,104 @@ class InventoryScene extends Phaser.Scene {
     this.select(this.selected);
   }
 
+  // --- Onglet « Quêtes » --------------------------------------------------------
+
+  buildQuests() {
+    const { px, py, pw, ph } = this.panel;
+    const lx = px + 30;
+    const lw = INVENTORY_COLS * (INVENTORY_CELL + INVENTORY_GAP) - INVENTORY_GAP;
+    const top = py + 74;
+    this.quests = typeof questJournal === 'function' ? questJournal() : [];
+    this.questList = { x: lx, w: lw, top };
+    this.add.text(lx, py + 58, 'En cours, puis terminées', {
+      fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: '#c9b8f0',
+    });
+    this.questHighlight = this.add.graphics();
+    this.questRows = [];
+    this.quests.slice(0, INVENTORY_QUEST_ROWS).forEach((q, i) => {
+      const y = top + 8 + i * INVENTORY_QUEST_ROW;
+      const mark = this.add.text(lx + 10, y + 4, q.done ? '✓' : '◆', {
+        fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: q.done ? '#8fe3b8' : '#ffe066',
+      }).setOrigin(0, 0);
+      const name = this.add.text(lx + 32, y + 2, q.quest.title || q.id, {
+        fontFamily: STORY_UI.serif, fontSize: '16px', fontStyle: 'bold', color: q.done ? '#8f86a8' : STORY_UI.text,
+      });
+      const stepDef = q.step ? questStepDef(q.id, q.step) : null;
+      const sub = this.add.text(lx + 32, y + 24, q.done ? 'Terminée' : (stepDef ? stepDef.text : ''), {
+        fontFamily: 'sans-serif', fontSize: '11px', color: q.done ? '#6f6391' : '#c9b8f0',
+        wordWrap: { width: lw - 44 }, maxLines: 1,
+      });
+      const zone = this.add.zone(lx + lw / 2, y + INVENTORY_QUEST_ROW / 2 - 4, lw, INVENTORY_QUEST_ROW - 4).setInteractive({ useHandCursor: true });
+      zone.on('pointerdown', () => this.selectQuest(i));
+      this.questRows.push({ y, mark, name, sub });
+    });
+    const dx = lx + lw + 24;
+    this.descX = dx;
+    this.descW = px + pw - 28 - dx;
+    const descTop = py + 66;
+    const dg = this.add.graphics();
+    dg.fillStyle(STORY_UI.nightSoft, 0.6);
+    dg.fillRoundedRect(dx, descTop, this.descW, ph - 96, 10);
+    this.questDesc = this.add.text(dx + 16, descTop + 14, '', {
+      fontFamily: 'sans-serif', fontSize: '13px', color: '#d8ccf5', lineSpacing: 5, wordWrap: { width: this.descW - 32 },
+    });
+    this.questTitle = this.add.text(dx + 16, descTop + 14, '', {
+      fontFamily: STORY_UI.serif, fontSize: '20px', fontStyle: 'bold', color: STORY_UI.text, wordWrap: { width: this.descW - 32 },
+    });
+    if (!this.quests.length) {
+      this.add.text(lx + lw / 2, top + 70, 'Aucune quête pour l\'instant.', {
+        fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'italic', color: '#8f86a8',
+      }).setOrigin(0.5);
+      this.questDesc.setText('Les habitants de la forêt te confieront peut-être leurs soucis…').setY(descTop + 20);
+      return;
+    }
+    this.selectQuest(0);
+  }
+
+  selectQuest(i) {
+    const q = this.quests && this.quests[i];
+    if (!q || !this.questRows[i]) return;
+    this.selected = i;
+    const L = this.questList;
+    const r = this.questRows[i];
+    const g = this.questHighlight;
+    g.clear();
+    g.fillStyle(STORY_UI.pink, 0.12);
+    g.fillRoundedRect(L.x, r.y - 4, L.w, INVENTORY_QUEST_ROW - 4, 9);
+    g.lineStyle(1.5, STORY_UI.pink, 0.8);
+    g.strokeRoundedRect(L.x, r.y - 4, L.w, INVENTORY_QUEST_ROW - 4, 9);
+    // Étapes : franchies (cochées), en cours (flèche) ; les suivantes restent cachées.
+    const steps = q.quest.steps || [];
+    const cur = steps.findIndex((s) => s.id === q.step);
+    const lines = [];
+    if (q.quest.giver) lines.push(`Confiée par : ${q.quest.giver}`);
+    if (q.quest.desc) lines.push(q.quest.desc);
+    lines.push('');
+    steps.forEach((s, k) => {
+      if (q.done || k < cur) lines.push(`✓  ${s.text}`);
+      else if (k === cur) lines.push(`➤  ${s.text}`);
+    });
+    if (q.done) lines.push('', 'Quête terminée.');
+    const reward = typeof secretContentsLabel === 'function' ? secretContentsLabel(q.quest.reward) : '';
+    if (reward) lines.push('', `Récompense : ${reward}${q.done ? ' (reçue)' : ''}`);
+    this.questTitle.setText(q.quest.title || q.id);
+    this.questDesc.setY(this.questTitle.y + this.questTitle.height + 10).setText(lines.join('\n'));
+  }
+
+  // --- Touches ----------------------------------------------------------------
+
   onKey(event) {
     if (event.repeat || this.time.now - this.openedAt < 120) return;
     const k = event.key.toLowerCase();
     if (k === 'i' || k === 'escape') this.close();
+    else if (k === 'tab') this.switchTab(this.tab === 'items' ? 'quests' : 'items');
     else if (k === 'm' && storyMapAvailable()) this.close('MapScene');
-    else if (k === 'e' || k === 'enter') this.useSelected();
+    else if (this.tab === 'quests') {
+      const n = Math.min((this.quests || []).length, INVENTORY_QUEST_ROWS);
+      if (!n) return;
+      if (k === 'arrowup' || k === 'z') this.selectQuest((this.selected - 1 + n) % n);
+      else if (k === 'arrowdown' || k === 's') this.selectQuest((this.selected + 1) % n);
+    } else if (k === 'e' || k === 'enter') this.useSelected();
     else if (k === 'arrowleft' || k === 'q') this.move(-1, 0);
     else if (k === 'arrowright' || k === 'd') this.move(1, 0);
     else if (k === 'arrowup' || k === 'z') this.move(0, -1);

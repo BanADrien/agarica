@@ -243,7 +243,9 @@ function menuSaveSummary() {
   const entry = storyZoneEntry(v.lastZone) || DEMO_ZONES[0];
   const chapter = MENU_CHAPTERS[Math.max(0, menuChapterIndexOfZone(entry.zone))];
   const base = typeof HEART_MAX === 'number' ? HEART_MAX : 3;
-  const maxHearts = base + (v.coeurBonusForet ? 1 : 0);
+  // Cœurs entiers (vague 3, registre `heartUpgrades` : liste des sources).
+  const upgrades = Array.isArray(v.heartUpgrades) ? v.heartUpgrades.length : 0;
+  const maxHearts = base + (v.coeurBonusForet ? 1 : 0) + upgrades;
   const hearts = typeof v.hearts === 'number' && v.hearts > 0 ? Math.min(v.hearts, maxHearts) : maxHearts;
   const forms = [
     ['hasWolfForm', 'wolf', 'Loup'], ['hasMonkeyForm', 'monkey', 'Singe'],

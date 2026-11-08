@@ -253,6 +253,23 @@ const ASSET_MANIFEST = {
     cut: "blob", align: "bottom",
   },
   // [P2] Garde du bosquet
+  // [P2] Vague 3 : marchand des Éclats de lune (PNJ `shop`, cf. SHOPS). Un
+  // colporteur nocturne voûté, grand sac de toile sur le dos, lanterne à
+  // éclats bleutés pendue au bâton ; mêmes proportions que les habitants.
+  marchand: {
+    dir: "assets/sprites/marchand_frames", prefix: "marchand",
+    anims: {
+      idle: { row: 0, frames: 4, fps: 5, repeat: -1 },
+      talk: { row: 1, frames: 4, fps: 8, repeat: -1 },
+    },
+    scale: 0.34,
+    facing: "right",
+    placeholder: { w: 46, h: 92, color: 0x7a5a9a, label: "Marchand" },
+    sheets: [
+      { file: "assets/sprites/marchand.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   habitant_garde: {
     dir: "assets/sprites/habitant_garde_frames", prefix: "habitant_garde",
     anims: {
@@ -2188,6 +2205,44 @@ const ITEM_MANIFEST = {
     placeholder: { w: 280, h: 32, color: 0x7a3a5a, label: "Langue" },
     src: { file: "assets/_codex_src/crapaud_langue.png" },
     norm: { mode: "height", value: 128, trim_x: true },
+  },
+  // [P2] Vague 3 : secrets et récompenses. Tant que l'art manque, le jeu les
+  // dessine par code (STORY_DRAWN_ITEMS, SecretKit.js) ; la taille à l'écran
+  // est fixée par le code (éclat ~15 px, coffre ~40 px de haut, cœur ~34 px).
+  // Éclat de lune (la monnaie) : petit cristal bleuté à facettes, reflet rose.
+  eclat_lune: {
+    path: "assets/items/objets/eclat_lune.png", scale: 0.1,
+    placeholder: { w: 14, h: 20, color: 0xa9e8ff, label: "Eclat" },
+    src: { file: "assets/_codex_src/eclat_lune.png" },
+    norm: { mode: "fit", value: 128 },
+  },
+  // Coffre de bois sombre cerclé de vert lunaire, fermé puis ouvert (lueur dedans).
+  coffre_ferme: {
+    path: "assets/items/objets/coffre_ferme.png", scale: 0.2,
+    placeholder: { w: 52, h: 40, color: 0x6d4a30, label: "Coffre" },
+    src: { file: "assets/_codex_src/coffre_ferme.png" },
+    norm: { mode: "fit", value: 256 },
+  },
+  coffre_ouvert: {
+    path: "assets/items/objets/coffre_ouvert.png", scale: 0.2,
+    placeholder: { w: 52, h: 47, color: 0x8a6440, label: "Coffre ouvert" },
+    src: { file: "assets/_codex_src/coffre_ouvert.png" },
+    norm: { mode: "fit", value: 256 },
+  },
+  // Cœur entier (+1 cœur maximum) : cœur rose framboise ceint d'une liane.
+  coeur_entier: {
+    path: "assets/items/objets/coeur_entier.png", scale: 0.15,
+    placeholder: { w: 34, h: 32, color: 0xe0346a, label: "Coeur" },
+    src: { file: "assets/_codex_src/coeur_entier.png" },
+    norm: { mode: "fit", value: 256 },
+  },
+  // Fissure discrète d'un mur cassable (décalque posé sur la tuile, ~26 px,
+  // traits sombres fins sur fond transparent, orientée verticalement).
+  fissure_secret: {
+    path: "assets/decors/elements/fissure_secret.png", scale: 0.1,
+    placeholder: { w: 20, h: 26, color: 0x1a1020, label: "Fissure" },
+    src: { file: "assets/_codex_src/fissure_secret.png" },
+    norm: { mode: "fit", value: 256 },
   },
 };
 
