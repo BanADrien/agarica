@@ -29,6 +29,28 @@ const FORET_FLOTTANTE_1_DATA = {
   background: 'fond_foret_flottante',
   // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
   foregroundPlants: false,
+  // Rendu de cohésion (LookKit.js, PLAN_DEV.md « Rendu de cohésion ») : jour
+  // sous la canopée puis plein ciel. Profil `jour` allégé comme les îles (cf.
+  // foret_flottante_2_data.js) : fond peint, ciel et nuages gardent leurs
+  // couleurs (léger flou de profondeur seulement). Écorce du sol entre le
+  // réglage du jeu `tuiles_ecorce` (saturation 0,6, trop terne en plein jour)
+  // et l'image d'origine. Lumières très douces : la lanterne du point de
+  // reprise de la corniche (0,6 par défaut) verdissait Agarica, le feu du camp
+  // posait une flaque orange et un halo en étoile.
+  look: {
+    profile: 'jour',
+    grade: { sat: 1.0, contrast: 1.05, mapAmt: 0.05, highAmt: 0.12 },
+    back: { blur: 0.8, bright: 1.0, sat: 0.95, contrast: 1.0, fog: 0x9fc4e8, fogAmt: 0.03, mist: 0.06, mistBand: [0.55, 1.0] },
+    tiles: { grade: { warm: { hueAmt: 0.1, sat: 0.8, light: 1.0, contrast: 0.92 } } },
+    lights: {
+      raiAlpha: 1, haloAlpha: 1,
+      rules: {
+        feu: { radius: 160, intensity: 0.2, glow: 0.07 },
+        lanterne: { radius: 130, intensity: 0.18, glow: 0.06 },
+        rai: { radius: 180, intensity: 0.12, glow: 0.03 },
+      },
+    },
+  },
   tileset: 'tuiles_ecorce',
   levelWidth: 3584,
   levelHeight: 540,

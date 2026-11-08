@@ -155,7 +155,12 @@ function a2Glow(scene, x, y, size, color, alpha, depth = 5) {
 // faisait alors que délaver `fond_foret_flottante` (clairière, hutte).
 function a2SkyWash(scene, color, alpha) {
   const far = scene.__farBackground;
-  const farKey = far && far.active && far.texture ? far.texture.key : '';
+  // Fond en TileSprite : `texture` est son canevas de travail (clé aléatoire),
+  // la vraie image est `displayTexture`. Lire `texture.key` ratait toujours le
+  // test « fond peint » : le voile délavait le fond Codex de la clairière et de
+  // la hutte (mesuré par la revue du rendu, 2026-11-08).
+  const tex = far && far.active ? (far.displayTexture || far.texture) : null;
+  const farKey = tex ? tex.key : '';
   if (farKey.startsWith('item-')) return null;
   const { width, height } = scene.scale;
   const rect = scene.add.rectangle(0, 0, width, height, color, alpha).setOrigin(0).setScrollFactor(0);

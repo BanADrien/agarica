@@ -20,6 +20,28 @@ const FORET_FLOTTANTE_2_DATA = {
   background: 'fond_foret_flottante',
   // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
   foregroundPlants: false,
+  // Rendu de cohésion (LookKit.js, PLAN_DEV.md « Rendu de cohésion ») : plein
+  // jour, à peine retouché (mêmes réglages que la clairière et la hutte, même
+  // fond et mêmes tuiles). Profil `jour` allégé : seul, il voilait le fond
+  // peint de bleu-gris (saturation 0,75, brume 8 %) ; ici le ciel garde ses
+  // couleurs, avec juste un léger flou de profondeur. Terre un peu calmée sans
+  // virer au mauve. Lumières très douces : en plein jour, une lanterne de
+  // point de reprise à 0,6 verdissait Agarica et le rai de 0,5 brûlait la
+  // fleur de la clairière ; halos et rais peints gardés tels quels.
+  look: {
+    profile: 'jour',
+    grade: { sat: 1.0, contrast: 1.05, mapAmt: 0.05, highAmt: 0.12 },
+    back: { blur: 0.8, bright: 1.0, sat: 0.95, contrast: 1.0, fog: 0x9fc4e8, fogAmt: 0.03, mist: 0.06, mistBand: [0.55, 1.0] },
+    tiles: { grade: { warm: { hueAmt: 0.04, sat: 0.85, light: 1.03, contrast: 0.95 } } },
+    lights: {
+      raiAlpha: 1, haloAlpha: 1,
+      rules: {
+        feu: { radius: 160, intensity: 0.2, glow: 0.07 },
+        lanterne: { radius: 130, intensity: 0.18, glow: 0.06 },
+        rai: { radius: 180, intensity: 0.12, glow: 0.03 },
+      },
+    },
+  },
   tileset: 'tuiles_flottantes',
   levelWidth: 4096,
   levelHeight: 540,
