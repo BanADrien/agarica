@@ -15,6 +15,18 @@ const ARENE_GHILT_DATA = {
   levelHeight: 540,
   // Voile verdâtre léger : on est au cœur de la corruption (géré par la Fondation).
   ambient: { tint: 0x1d3a12, darkness: 0.25 },
+  // Rendu de cohésion (LookKit) : le réglage de la forêt corrompue (cf.
+  // foret_corrompue_1_data.js : vert toxique gardé, fonds en brume vert sombre).
+  // En plus : halos des papillons du soin à pleine force (`haloAlpha` 1 : pas de
+  // feu de camp ici, c'est leur lumière qui raconte la guérison) et lumière du
+  // rai de l'arène calme (teinté blanc chaud 0xfff6e0 par le script) à sa
+  // couleur, au lieu du bleu lunaire par défaut.
+  look: {
+    profile: 'nuit',
+    grade: { sat: 1.02, map: [0x141026, 0x4a526a, 0xd9ffc8], mapAmt: 0.12 },
+    back: { sat: 0.85, bright: 0.8, fog: 0x16221a, fogAmt: 0.1, mist: 0.16 },
+    lights: { haloAlpha: 1, rules: { rai: { color: 0xfff0d8, intensity: 0.25 } } },
+  },
   groundCells: [...groundRow(0, 21, [7, 8])],
   // Ruines de l'arène (`foret_corrompue`), en fond : piliers sur les côtés,
   // arche au centre (Ghil't et Agarica passent devant). Pas devant les sorties.

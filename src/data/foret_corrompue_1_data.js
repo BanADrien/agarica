@@ -21,6 +21,17 @@ const FORET_CORROMPUE_1_DATA = {
   foregroundPlants: false,
   tileset: 'tuiles_corrompues',
   ambient: { tint: 0x1d3a12, darkness: 0.3 },
+  // Rendu de cohésion (LookKit, cf. PLAN_DEV « Rendu de cohésion ») : la nuit
+  // générique réglée pour la corruption (même réglage dans l'arène de Ghil't).
+  // Plan de jeu : carte violet nuit -> vert lunaire un peu plus verte, saturation
+  // gardée : la mousse toxique reste le signal de l'histoire. Fonds : moins
+  // désaturés que la nuit (0,85 contre 0,62) et brume vert sombre au lieu du
+  // violet, pour que le ciel toxique et la mousse du fond restent verts en reculant.
+  look: {
+    profile: 'nuit',
+    grade: { sat: 1.02, map: [0x141026, 0x4a526a, 0xd9ffc8], mapAmt: 0.12 },
+    back: { sat: 0.85, bright: 0.8, fog: 0x16221a, fogAmt: 0.1, mist: 0.16 },
+  },
   // Spores toxiques qui dérivent dans l'air (lot Codex n°8,
   // `ambientLife.spores`) : le cœur de la corruption. Les lucioles gardent
   // leur nombre par défaut. (Pas de spores d'ambiance dans l'arène de
