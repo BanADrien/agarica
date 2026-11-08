@@ -23,6 +23,21 @@ const BOSQUET_RETOUR_DATA = {
   lights: [
     { id: 'fx_rai_lumiere', x: 1560, y: 448, w: 130, h: 380, tint: 0xfff2d8, alpha: 0.32 },
   ],
+  // Rendu de cohésion (LookKit.js, PLAN_DEV.md « Rendu de cohésion ») : fin de
+  // la démo, plus apaisée que le bosquet de l'acte 1 -- contraste adouci, hautes
+  // lumières et ambiance un peu chaudes (l'aube), brume rose-violet du matin sur
+  // les fonds ; le rai de l'autel garde sa lumière chaude (couleur de la règle
+  // `rai`) mais son image est atténuée (sinon elle tournait au blanc).
+  look: {
+    profile: 'nuit',
+    grade: {
+      exposure: 1.05, contrast: 1.06, sat: 0.98,
+      map: [0x1a1030, 0x6a5878, 0xffeee6], mapAmt: 0.12,
+      highTint: [1.0, 1.0, 0.96], highAmt: 0.25, ambient: [0.99, 0.96, 0.98],
+    },
+    back: { bright: 0.92, sat: 0.8, fog: 0x5a3a60, fogAmt: 0.1, mist: 0.2, mistBand: [0.38, 0.9] },
+    lights: { raiAlpha: 0.5, rules: { rai: { color: 0xffe2c0, intensity: 0.35 } } },
+  },
   // Bâtiments du village d'abord (derrière les autres décors et les
   // habitants), aux mêmes échelles que dans le bosquet de l'acte 1.
   props: [

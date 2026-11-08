@@ -26,6 +26,15 @@ const BOSQUET_DATA = {
   // (forêts sombres, forêt corrompue, arène de Ghil't, trou sombre) ; le
   // bosquet est le foyer, encore paisible.
   ambient: { tint: 0x0a1030, darkness: 0.12, vignette: false },
+  // Rendu de cohésion (LookKit.js, PLAN_DEV.md « Rendu de cohésion ») : la nuit
+  // générique, mais le foyer encore paisible garde son ciel de lune bleu-violet
+  // (fonds moins reculés et moins brumeux que la forêt sombre) et un plan de jeu
+  // un peu plus ouvert (exposition +, contraste et saturation adoucis).
+  look: {
+    profile: 'nuit',
+    grade: { exposure: 1.05, contrast: 1.12, sat: 1.0 },
+    back: { bright: 0.92, sat: 0.8, fogAmt: 0.06, mist: 0.1 },
+  },
   // Clair de lune sur l'idole (lot Codex n°8, clé `lights`, H15) : rai posé
   // sur la marche de l'autel (y 320, où l'on marche ; posé à 448 il
   // traverserait deux rangées de tuiles). Il s'éteint en fondu quand Amanite

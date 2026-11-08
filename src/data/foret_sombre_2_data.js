@@ -30,6 +30,13 @@ const FORET_SOMBRE_2_DATA = {
   background: 'fond_foret_sombre',
   zoneSub: 'Le sentier des ravins',
   ambient: { tint: 0x070b22, darkness: 0.28 },
+  // Rendu de cohésion (LookKit.js, PLAN_DEV.md « Rendu de cohésion ») : même
+  // profil que la forêt sombre 1 (zone de référence, même forêt, même fond),
+  // pour que le passage de l'une à l'autre ne se voie pas. Seul écart : le sol
+  // de second plan des ravins (groundBackCells) plus sombre que par défaut
+  // (0,55) : il cache le pied des arbres du fond sans se lire comme un sol où
+  // l'on pourrait atterrir.
+  look: { profile: 'foret_sombre', tiles: { backBright: 0.4 } },
   script: 'foret_sombre_2',
   // Trouée dans la forêt d'arrière-plan (coordonnées de la couche d'arbres,
   // parallaxe 0.35) : elle s'ouvre à l'écran près de la sortie, pour laisser
@@ -68,6 +75,19 @@ const FORET_SOMBRE_2_DATA = {
     ...groundRow(82, 83, [4, 5, 6]),
     ...groundRow(83, 84, [5, 6]),
     ...groundRow(84, 85, [6]),
+  ],
+  // Sol de second plan (sans collision, assombri, derrière le sol de jeu) au
+  // fond des deux ravins : au-dessus du vide, on voyait le bas coupé net des
+  // arbres du fond (images arrêtées vers y 470). Haut à la hauteur du sol
+  // voisin (gy 7, y 448) -- une rangée plus bas, la coupure restait visible --
+  // jusqu'au bas du sol de jeu (gy 8). La brume sombre des trous mortels
+  // (addEdgeHints) passe DEVANT ce sol : le fond des ravins s'enfonce toujours
+  // dans le noir. Le trou du vieux sentier (gx 78-79, sortie basse vers la
+  // hutte de Morgat) reste ouvert : c'est un passage, sa lueur chaude et son
+  // panneau doivent se lire comme une ouverture.
+  groundBackCells: [
+    ...groundRow(20, 25, [7, 8]),    // ravin de 5 cases (x 1280-1600)
+    ...groundRow(44, 53, [7, 8]),    // ravin de 9 cases (x 2816-3392), sous les plateformes cachées
   ],
   playerSpawn: { x: 110, y: 412 },
   hiddenPlatforms: [
