@@ -264,6 +264,10 @@ const LOOK_LIGHT_RULES = [
   { id: 'mousse', test: (o) => lookTexKey(o).startsWith('item-decor_mousse_lumineuse') || (o.propType || '').startsWith('decor_mousse_lumineuse'), color: 0x9dffb4, radius: 110, intensity: 0.38, glow: 0.1, dy: 0 },
   { id: 'rai', test: (o) => lookTexKey(o) === 'item-fx_rai_lumiere', color: 0xbfe6ff, radius: 210, intensity: 0.5, glow: 0.1, dy: 0.3 },
   { id: 'lanterne', test: (o) => lookTexKey(o) === 'item-decor_lanterne_allumee', color: 0x9fffc8, radius: 170, intensity: 0.6, glow: 0.2, dy: -0.1 },
+  // Lueur chaude du village (réglage du bosquet, 2026-11-08) : lampadaires et
+  // druide qui brûle la mousse n'étaient reconnus par aucune règle, le village
+  // restait sans halo autour de ses lumières.
+  { id: 'lanterne_chaude', test: (o) => (o.propType || '') === 'bosquet_lamp_post' || lookTexKey(o).startsWith('habitant_druide-burn-'), color: 0xffc070, radius: 120, intensity: 0.5, glow: 0.16, dy: -0.3, flicker: 0.05 },
 ];
 
 // Squelette complet d'un réglage (une clé absente du profil = neutre).
