@@ -84,7 +84,10 @@ const FORET_CORROMPUE_1_DATA = {
   mossWalls: [{ id: 'mur_coeur', x: 3200, y: (448 + GROUND_STAND_SINK) / 2, w: 128, h: 448 + GROUND_STAND_SINK }],
   enemies: [
     { type: 'mousse_creature', x: 1100, y: 400, patrolMinX: 900, patrolMaxX: 1300 },
-    { type: 'crapaud_corrompu', x: 2250, y: 400 },
+    // Crapaud sauteur au sol, sous la branche basse (x 2112-2304, y 320) : ses
+    // langues butent sur la branche, il se combat au sol ; bornes resserrées
+    // pour ne pas déborder sur la zone du singe (x 2440-2620).
+    { type: 'crapaud_sauteur', x: 2250, y: 400, patrolMinX: 2120, patrolMaxX: 2420 },
     { type: 'singe_corrompu', x: 2560, y: 150, patrolMinX: 2440, patrolMaxX: 2620 },
     { type: 'mousse_creature', x: 2800, y: 400, patrolMinX: 2650, patrolMaxX: 3050 },
     { type: 'mousse_creature', x: 3450, y: 400, patrolMinX: 3300, patrolMaxX: 3600 },

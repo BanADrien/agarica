@@ -83,6 +83,10 @@ const FORET_SOMBRE_1_DATA = {
   enemies: [
     // Première créature corrompue (2 PV) : elle rampe vers Agarica.
     { type: 'mousse_creature', x: 2250, y: 400, patrolMinX: 1980, patrolMaxX: 2560, hp: 2 },
+    // Premier crapaud-piège du jeu (optionnel, à juger en jouant) : sur du plat
+    // sans danger, après la cinématique « la mousse est partout » (x 3240) ; il
+    // apprend qu'une bosse moussue peut mordre, et garde la sortie (x 3840).
+    { type: 'crapaud_piege', x: 3600, y: 400, facing: 'left' },
   ],
   // L'amas, pile sous le mur de racines (aucun moyen de passer par-dessus).
   mossBlocks: [{ id: 'amas_racines', x: 2752, y: 352, w: 128, h: 192 }],

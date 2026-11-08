@@ -160,6 +160,11 @@ const GRAND_ARBRE_RACINES_DATA = {
     // Sur la grande branche haute, parmi les pierres (assez loin du bout de
     // la branche pour ne pas viser Agarica pendant le saut vers les lianes).
     { type: 'singe_corrompu', x: 2500, y: -240, patrolMinX: 2400, patrolMaxX: 2600 },
+    // Crapaud-piège à la sortie du tunnel (avant les marches de la butte) : le
+    // plafond empêche de le sauter proprement -- le tuer, le soigner ou
+    // encaisser la langue ; le toit reste une route sans piège. Portée 200 :
+    // il ne mord pas pendant le combat contre la mousse (bornes 560-1080).
+    { type: 'crapaud_piege', x: 1300, y: 400, facing: 'left', reach: 200 },
   ],
   campfires: [{ x: 1600, y: 64 }],
   // Décors du grand arbre (`grand_arbre`). Petits décors dans le tunnel (144 px libres).

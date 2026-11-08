@@ -39,7 +39,10 @@ const CLAIRIERE_PLANTE_DATA = {
     // x 660 : en 700, son corps chevauchait le coin de la butte (x 704) et
     // elle restait perchée dessus, 64 px au-dessus du sol.
     { type: 'mousse_creature', x: 660, y: 400, patrolMinX: 520, patrolMaxX: 900 },
-    { type: 'crapaud_corrompu', x: 1720, y: 400 },
+    // Crapaud sauteur, roi de la butte de racines (x 1664-1856, y 384) : il
+    // bondit dessus sans en tomber (bornes + sol sondé) et vise Agarica en
+    // contrebas, entre le cercle et la sortie vers la hutte.
+    { type: 'crapaud_sauteur', x: 1760, y: 340, patrolMinX: 1680, patrolMaxX: 1840 },
   ],
   windCurrents: [{ x: 0, y: 40, w: 112, h: 410, force: 330 }],
   entries: [

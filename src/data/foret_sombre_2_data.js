@@ -14,8 +14,9 @@
 //                le loup) + pistes
 //   x 3392-3968  clairière préservée : feu de camp (x 3430), mare aux trois poissons (pont de
 //                bois), plante résistante sur une haute branche
-//                (gx 55-57, y=64 : hors d'atteinte), crapaud corrompu
-//   x 3968-5248  surplomb (gx 65-81, gy 3, surface y=192) : le chemin passe DESSUS ;
+//                (gx 55-57, y=64 : hors d'atteinte), crapaud-piège (x 3850)
+//   x 3968-5248  surplomb (gx 65-81, gy 3, surface y=192) : le chemin passe DESSUS,
+//                gardé par un crapaud sauteur (x 4700) ;
 //                dessous, la poche fermée par le mur de mousse
 //                `mur_repulsif_foret_sombre` (répulsif, acte 2) → cœur secret
 //                + vieux sentier vers la hutte de Morgat
@@ -112,10 +113,16 @@ const FORET_SOMBRE_2_DATA = {
   ],
   enemies: [
     { type: 'loup', x: 2350, y: 400, patrolMinX: 2000, patrolMaxX: 2700 },
-    // Fixe, langue vers la droite : on l'approche par derrière (venant de l'ouest).
-    // x 3850 : en 3880, l'avant de son corps (±35 px) mordait sur le marchepied
-    // (x 3904) et le crapaud restait perché sur son coin, 64 px au-dessus du sol.
-    { type: 'crapaud_corrompu', x: 3850, y: 400 },
+    // Crapaud-piège, gardien du passage entre la mare (x 3520-3776) et la
+    // montée vers le surplomb (marchepied x 3904) : un sauteur y serait à
+    // l'étroit (128 px de plat) et se poserait sur la mare dessinée. Le feu de
+    // camp (x 3430) est à 390 px de sa bouche, hors de portée (220).
+    // x 3850 : en 3880, l'avant de son corps mordait sur le marchepied.
+    { type: 'crapaud_piege', x: 3850, y: 400, facing: 'left' },
+    // Duel sur le surplomb (x 4160-5248, surface y 192), le chemin principal :
+    // réveillé (380 px) après le dialogue du mur (x 4250), à plus de 380 px de
+    // la cinématique du grand arbre (x 5320) ; bornes dans le surplomb.
+    { type: 'crapaud_sauteur', x: 4700, y: 150, patrolMinX: 4350, patrolMaxX: 5150 },
   ],
   // Mur de mousse vivante à l'entrée de la poche, sous le surplomb : s'ouvre
   // avec le répulsif de Morgat (acte 2). Id cité dans PLAN_DEV.md.

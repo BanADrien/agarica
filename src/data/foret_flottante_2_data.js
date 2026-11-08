@@ -104,6 +104,10 @@ const FORET_FLOTTANTE_2_DATA = {
   // 16 passages sur 16, même en marchant).
   enemies: [
     { type: 'corbeau', x: 608, y: 90, patrolMinX: 563, patrolMaxX: 653, diveDepth: 220, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
+    // Crapaud-piège sur l'îlot I2 (x 768-960, y 256), au bord du saut : il faut
+    // s'y poser pour aller de I1 à I3. Portée 160 : ni I1 ni le point de reprise
+    // de I3 (x 1120) à portée (avec 220, il visait encore Agarica sur I3).
+    { type: 'crapaud_piege', x: 915, y: 220, facing: 'left', reach: 160 },
     { type: 'mousse_creature', x: 1290, y: 260, patrolMinX: 1150, patrolMaxX: 1340 },
     // Côté gauche de T2 : un saut vers T3 pris sous son piqué (bord droit de la
     // patrouille à 3053) le prenait encore en plein vide, 1 fois sur 12.
