@@ -19,7 +19,9 @@ d'autre. Un point terminé et commité sort de la liste ; l'historique Git le ga
 
 ## P1 : gêne tous les joueurs
 
-Rien pour l'instant.
+| Point | Pourquoi | État |
+|---|---|---|
+| Rattacher en dessous les plateformes qui flottent : une trentaine, repérées par un script, dans le bosquet, les forêts sombres 1 et 2, les racines, l'arène, l'épreuve, la forêt flottante 1, la forêt corrompue, le trou sombre et 3 zones de la vague 3 | ta règle : « jamais de plateforme en diagonale sans la rattacher à un élément en dessous » | à décider : comment les rattacher, et lesquelles garder flottantes |
 
 ## P2 : améliore nettement le jeu
 

@@ -1610,12 +1610,17 @@ Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
 #editor-ui) pour placer les nouvelles clés.
 
 ## Niveaux et histoire — règles (agent Niveaux 2, 2026-10-23)
-- **Jamais de plateforme qui flotte en diagonale** (règle de l'utilisateur, 2026-11-09) :
-  une marche ou une plateforme décalée en diagonale par rapport à la précédente doit être
-  rattachée à un élément en dessous (colonne de sol jusqu'en bas, tronc, roche). Seules
-  exceptions : les vraies plateformes volantes d'un biome qui l'assume (îles de la forêt
-  flottante), et une branche ou un tronc fixé par un bout dans un mur ou un arbre.
-  Exemple corrigé : le bouchon du gouffre de la forêt sombre 1, devenu une colonne pleine.
+- **Jamais de diagonale vide entre deux cases de sol** (règle de l'utilisateur,
+  2026-11-09) : deux cases qui ne se touchent que par un coin, comme une marche posée en
+  diagonale au-dessus du vide, c'est interdit. Il faut au moins faire un escalier en
+  ajoutant la case du coin, de préférence SOUS la case du haut, pour qu'elle ait un appui.
+  Les plateformes isolées qui flottent sont permises, et les îles de la forêt flottante
+  aussi.
+  Corrigés : le bouchon du gouffre de la forêt sombre 1 (devenu une colonne pleine) et la
+  corniche du surplomb de la forêt sombre 2 (+1 case).
+  Exception laissée : forêt flottante 2, entre les îles gx 47-49 (gy 2) et gx 50-53 (gy 3).
+  Script de contrôle : chercher les paires (x, y) / (x ± 1, y − 1) pleines dont les deux
+  cases du coin sont vides.
 - **Pas de faux sol là où on ne peut pas descendre** (même retour : « je suis censé
   descendre comment ? ») : un `groundBackCells` à la hauteur du vrai sol, sous des lianes
   ou près d'une sortie qui luit, se lit comme un sol accessible. Au fond d'un trou mortel,

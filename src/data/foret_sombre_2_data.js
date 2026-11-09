@@ -72,7 +72,12 @@ const FORET_SOMBRE_2_DATA = {
     ...groundRow(80, 92, [7, 8]),
     ...groundRow(55, 58, [1]),       // haute branche : la plante (hors d'atteinte)
     ...groundRow(61, 62, [6]),       // marchepied vers la corniche
-    ...groundRow(62, 65, [4]),       // corniche vers le surplomb ; on passe dessous
+    // Corniche vers le surplomb ; on passe dessous. Elle va jusqu'à gx 65
+    // (et non 64), sous le bout du surplomb : avant, corniche et surplomb ne se
+    // touchaient que par un coin, une diagonale vide que l'utilisateur ne veut
+    // jamais (2026-11-09 : « au moins faire en escalier en rajoutant une
+    // cellule dans le coin »). La marche reste la même : 256 puis 192.
+    ...groundRow(62, 66, [4]),
     ...groundRow(65, 82, [3]),       // le surplomb (chemin principal, surface y=192)
     ...groundRow(80, 82, [4, 5, 6]), // fond de la poche secrète
     // Escalier de retour (venant des racines) vers le surplomb : marches d'une
