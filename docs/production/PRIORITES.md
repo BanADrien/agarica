@@ -51,9 +51,12 @@ Rien pour l'instant.
 
 ## À toi (je ne peux pas le faire)
 
-- **Images Codex** : générer les prompts n°9 (Geralt au combat, Kainati calmé), n°12
-  (crapauds) et n°13 (vague 3), qui sont dans `docs/production/PROMPT_CODEX_*.md`.
-  En attendant, chaque élément sans image s'affiche en version provisoire.
+- **Redessiner les assets à la main** : la liste par priorité est dans
+  `docs/production/ASSETS_A_REFAIRE.md` (6 lots, à commencer par Agarica au repos et en
+  course pour valider l'échelle). Chaque feuille terminée, je l'intègre tout de suite.
+- **Images Codex** : il reste à générer les prompts n°9 (Geralt au combat, Kainati calmé),
+  n°12 (crapauds) et n°13 (vague 3), dans `docs/production/PROMPT_CODEX_*.md`. Un élément
+  que tu dessines à la main n'en a plus besoin.
 - **Partie test** : jouer la démo en entier et me faire tes retours.
 - **Mise en ligne** : lancer `python tools/build_netlify.py`, puis déposer `dist/` sur
   Netlify Drop.
