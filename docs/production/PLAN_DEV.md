@@ -1610,6 +1610,16 @@ Vague 2 (après la vague 1) : Acte 1 (`src/story/acte1.js`, zones 1-7), Acte 2
 #editor-ui) pour placer les nouvelles clés.
 
 ## Niveaux et histoire — règles (agent Niveaux 2, 2026-10-23)
+- **Jamais de plateforme qui flotte en diagonale** (règle de l'utilisateur, 2026-11-09) :
+  une marche ou une plateforme décalée en diagonale par rapport à la précédente doit être
+  rattachée à un élément en dessous (colonne de sol jusqu'en bas, tronc, roche). Seules
+  exceptions : les vraies plateformes volantes d'un biome qui l'assume (îles de la forêt
+  flottante), et une branche ou un tronc fixé par un bout dans un mur ou un arbre.
+  Exemple corrigé : le bouchon du gouffre de la forêt sombre 1, devenu une colonne pleine.
+- **Pas de faux sol là où on ne peut pas descendre** (même retour : « je suis censé
+  descendre comment ? ») : un `groundBackCells` à la hauteur du vrai sol, sous des lianes
+  ou près d'une sortie qui luit, se lit comme un sol accessible. Au fond d'un trou mortel,
+  laisser le vide assombri.
 - **Lianes** : chaque liane pend sous une case solide (attache = haut de la case + 64,
   x dans la case) ; dans un enchaînement, écarts réglés pour le lâcher puissant (il
   faut de l'élan, la liane précédente seule n'atteint jamais l'appui suivant).

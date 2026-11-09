@@ -12,7 +12,8 @@
 //   x 2816-3200  la forêt s'ouvre : la mousse est partout ; rocher en escalier
 //   x 3200-4032  LE GOUFFRE AUX LIANES (vague 3, 2026-11-08) : un tronc
 //                couché (x 3328-4032, surface 256) relié au rocher par un
-//                bouchon de bois pourri (x 3200-3328) : la route est un
+//                bouchon de bois pourri (x 3200-3328, colonne pleine jusqu'en
+//                bas, jamais de marche qui flotte) : la route est un
 //                escalier continu, sans trou ni saut risqué. Dessous, 2 lianes ;
 //                au fond, x 3200-3712 mortel (1 cœur), x 3712-4032 = sortie
 //                basse vers la grotte de la lisière. On n'y descend qu'exprès :
@@ -69,9 +70,14 @@ const FORET_SOMBRE_1_DATA = {
     // Rocher en escalier au bord du gouffre (marches d'une case : 384, 320),
     // puis le bouchon de bois pourri (gx 50-51, surface 256, une marche de
     // plus) qui relie le rocher au tronc : de 448 à 256, rien que des marches.
+    // Règle de l'utilisateur (2026-11-09) : jamais de marche ou de plateforme
+    // décalée en diagonale sans un appui dessous. Le bouchon est donc une
+    // colonne pleine jusqu'au bas du monde (avant : une seule rangée qui
+    // flottait au-dessus du vide) ; l'ours la fait tomber d'un bloc
+    // (cf. `breakables`).
     ...groundRow(48, 49, [6]),
     ...groundRow(49, 50, [5, 6]),
-    ...groundRow(50, 52, [4]),
+    ...groundRow(50, 52, [4, 5, 6, 7, 8]),
     // Après le tronc : roche pleine (gx 63, du tronc au fond du monde : le
     // gouffre est fermé à droite), marches d'une case, puis le sol jusqu'au bord.
     ...groundRow(63, 64, [4, 5, 6, 7, 8]),
@@ -88,16 +94,16 @@ const FORET_SOMBRE_1_DATA = {
   // L'entrée du gouffre : le bouchon (peint aussi en sol ci-dessus), cassable à
   // l'ours (fracas sous les pieds), seulement une fois la forme singe obtenue
   // (`requires`, cf. src/story/vague3_commun.js) : avant, c'est un sol comme
-  // un autre, impossible d'y tomber par erreur. Cassé, il ouvre x 3200-3328.
+  // un autre, impossible d'y tomber par erreur. Cassé, toute la colonne tombe
+  // (gy 4-8) et ouvre un puits x 3200-3328 jusqu'au fond du gouffre.
   breakables: [
-    { id: 'bois_pourri', by: 'bear', hint: 'fissure', cells: [[50, 4], [51, 4]], requires: { hasMonkeyForm: true } },
+    { id: 'bois_pourri', by: 'bear', hint: 'fissure', cells: [[50, 4], [51, 4], [50, 5], [51, 5], [50, 6], [51, 6], [50, 7], [51, 7], [50, 8], [51, 8]], requires: { hasMonkeyForm: true } },
   ],
-  // Fond du gouffre, partie mortelle seulement (sol de second plan, sans
-  // collision, assombri) : la brume noire des trous mortels passe devant. La
-  // partie x 3712-4032 reste ouverte : c'est la sortie basse, sa lueur doit se lire.
-  groundBackCells: [
-    ...groundRow(50, 58, [7, 8]),
-  ],
+  // (Plus de `groundBackCells` au fond du gouffre, retiré le 2026-11-09 :
+  // ce sol de second plan, à la hauteur du vrai sol et touché par le bas des
+  // lianes, se lisait comme un sol où descendre. Retour de l'utilisateur :
+  // « je suis censé descendre comment ? ». Le fond est maintenant le vide
+  // assombri des trous mortels ; la sortie basse garde sa lueur.)
   // Lianes sous le tronc (attache = dessous du tronc, x dans le gouffre) :
   // chute par le bouchon cassé, saut humain, 2e saut (singe), liane 1,
   // liane 2, lâcher vers le trou de la grotte (x 3712-4032).

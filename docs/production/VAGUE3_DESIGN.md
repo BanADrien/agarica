@@ -38,6 +38,12 @@ Lianes : chaque liane pend sous une case solide (attache = haut de la case + 64 
 BrancheKit : surface + épaisseur − 2). Gabarit éprouvé entre deux lianes : bord → 96-128 px →
 liane → 448 px → liane → 96-128 px → appui. Un appui plus bas que le lâcher allonge le vol.
 
+**Règle de l'utilisateur (2026-11-09), à appliquer partout.** Jamais de plateforme qui flotte en
+diagonale : une marche ou une plateforme décalée doit être rattachée à un élément en dessous
+(colonne de sol, tronc, roche). Pas de faux sol (`groundBackCells`) à la hauteur du vrai sol au
+fond d'un trou où l'on ne peut pas descendre. Détail : `PLAN_DEV.md`, « Niveaux et histoire —
+règles ».
+
 **Règles propres à la vague 3.**
 1. **Bords seulement.** Chaque nouvelle zone se branche par une sortie de bord (`exits` avec `edge`,
    `from`, `to`). Vers le bas : un trou lisible (lueur chaude, grains, panneau à flèche,
