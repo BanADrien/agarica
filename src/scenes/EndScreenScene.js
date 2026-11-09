@@ -4,12 +4,12 @@
 // clairière comme avant. Une touche ramène à l'écran-titre. Textes ajustables.
 const END_TITLE = 'Fin de la démo';
 const END_SUBTITLE = 'À suivre…';
+// (Geralt vient de dire que Ghil't n'était pas la source : pas de redite ici.)
 const END_BODY_LINES = [
-  "Ghil't n'était pas la source de la mousse : seulement une victime.",
-  "Amanite s'en est allée, et quelque part, la corruption grandit encore.",
-  'Xara, elle, se tait… mais ce symbole, elle le connaissait.',
+  'La source de la mousse est toujours là, quelque part.',
+  "Et Xara n'a pas tout dit.",
 ];
-const END_CREDITS = 'Legend of Agarica — un jeu créé avec amour pour Agarica, druidesse du Cercle de la Lune';
+const END_CREDITS = 'Legend of Agarica — fait main pour Agarica, druidesse du Cercle de la Lune';
 const END_SIGNOFF = 'Joyeux anniversaire, Agarica.';
 
 class EndScreenScene extends Phaser.Scene {
@@ -70,7 +70,7 @@ class EndScreenScene extends Phaser.Scene {
     });
     this.tweens.add({ targets: title, y: title.y - 4, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
-    const prompt = this.add.text(width / 2, height - 26, "Appuie sur une touche pour revenir à l'écran-titre", {
+    const prompt = this.add.text(width / 2, height - 26, 'Une touche : retour au titre', {
       fontFamily: 'sans-serif', fontSize: '14px', color: STORY_UI.textSoft,
       backgroundColor: '#15101fcc', padding: { x: 10, y: 4 },
     }).setOrigin(0.5).setDepth(1100);

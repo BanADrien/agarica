@@ -249,68 +249,55 @@ function arbreDropRock(scene, x, surfaceY, telegraph = 1000) {
 // ---------------------------------------------------------------------------
 CUTSCENES.racines_intro = [
   // Arrivée au grand arbre (révélation) : court, avec la caméra qui monte.
+  // (L'émerveillement devant l'arbre est déjà dit en forêt sombre 2.)
   { say: [
-    { who: 'agarica', text: 'Oh… Je n\'avais jamais vu un arbre pareil. La piste du loup grimpe tout droit dans ses racines.' },
-    { who: 'xara', text: 'Alors grimpons. Doucement : cet arbre a un roi, et il n\'aime pas qu\'on monte sans y être invitée.' },
+    { who: 'xara', text: "On grimpe. Doucement : cet arbre a un roi, et il n'aime pas les visiteurs." },
   ] },
   { camera: { x: 1800, y: -160, ms: 1600 } },
   { wait: 700 },
   { cameraFollow: true },
-  { toast: 'Le grand arbre se gravit : de racine en branche, jusqu\'à la cime.' },
 ];
 
-CUTSCENES.racines_tunnel = cutsceneBulles([
-  'Tu sens ? La mousse remonte les racines, vers le cœur de l\'arbre.',
-  { who: 'agarica', text: 'Et ces griffures dans l\'écorce… De petites mains.' },
-  'Des singes. D\'habitude, ils sont plus… accueillants.',
-]);
+// (Ancien commentaire d'ambiance sur les griffures : le déclencheur reste, sans texte.)
+CUTSCENES.racines_tunnel = () => [];
 
 CUTSCENES.racines_lianes = cutsceneBulles([
-  'Regarde, à gauche : des lianes au-dessus du vide. Elles mènent à une fente dans l\'écorce.',
-  { who: 'agarica', text: 'Elles pendent bien trop loin du bord… Je ne pourrais jamais m\'y accrocher.' },
-  'Pas avec des mains de druidesse. Il faudrait celles d\'un singe. Garde cet endroit en tête.',
+  "Ces lianes mènent à une fente dans l'écorce. Il te faudrait des mains de singe.",
 ]);
 
 CUTSCENES.racines_lianes_singe = cutsceneBulles([
-  'Les lianes de tout à l\'heure… Cette fois, elles te porteront.',
-  'Par là, à gauche. L\'épreuve de son peuple t\'attend, si tu le veux.',
+  "Les lianes de tout à l'heure ! L'épreuve du peuple singe est par là.",
 ]);
 
 CUTSCENES.racines_pierres = cutsceneBulles((scene) => {
   // Une première pierre, pour montrer l'ombre qui l'annonce (sans rien geler).
   arbreDropRock(scene, scene.player.x + 120, GRAND_ARBRE_RACINES_DATA.rockfall.surfaceY, 900);
   return [
-    'Attention ! Ça tombe de là-haut. Regarde l\'ombre grandir : ne reste pas dessous.',
-    { who: 'agarica', text: 'Quelqu\'un nous les lance… Les singes ?' },
+    "Attention, ça tombe ! Ne reste pas sous l'ombre.",
   ];
 });
 
 // Bout de la grande branche, sans la forme singe : le vide de la cime, ses
 // lianes hors d'atteinte… et le totem.
 CUTSCENES.racines_cime = cutsceneBulles([
-  'La cime est de l\'autre côté de ce vide. Il n\'y a que ces lianes pour y aller.',
-  { who: 'agarica', text: 'Bien trop loin pour mes mains. Et ce totem… un singe sculpté.' },
-  'Il dort. Pose ta main dessus : ce bois-là a une âme.',
-], 'Le totem du singe : approche-toi et appuie sur E.');
+  'Seules les lianes mènent à la cime. Et ce totem du singe… touche-le.',
+], '[E] devant le totem');
 
 // Forme singe déjà en main en arrivant au bout de la branche (ancienne
 // sauvegarde : forme reçue au monde spirituel, avant la décision du
 // 2026-10-25) : rappel des lianes de la cime. Le totem allumé pendant la
 // visite joue `racines_singe_eveil` à la place (et coche ce déclencheur).
 CUTSCENES.racines_cime_singe = cutsceneBulles([
-  'Tes mains de singe, maintenant. Saute, puis saute encore : une fois singe, tu saisis les lianes jusqu\'à la cime.',
-  { who: 'agarica', text: 'Et là-haut, le roi des singes. Je ne veux pas me battre contre lui.' },
-  'Prends de l\'élan, lâche quand la liane remonte.',
-], 'Lianes : double saut pour devenir singe et s\'y accrocher\n← → pour se balancer · Espace pour lâcher · Z/S pour monter/descendre');
+  'Prends de l\'élan, et lâche quand la liane remonte.',
+], { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 });
 
 // Totem du singe allumé (E, clé de zone `totems` -> addAbilityShrine, comme
 // le loup et l'aigle) : la forme est donnée sur-le-champ, avec l'éclat et la
 // bannière du totem. Ensuite, une seule bulle de Xara et le rappel des
 // lianes, APRÈS la bannière (~2,6 s, même délai que le loup en forêt
 // sombre 2) : la route des lianes de la cime mène à l'arène.
-CUTSCENES.racines_singe_eveil = cutsceneBulles([
-  'Les mains du peuple singe ! Saute, puis saute encore près d\'une liane : une fois singe, tu la saisis.',
-], { text: 'Lianes : double saut pour devenir singe et s\'y accrocher\n← → se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5600 }, 2600);
+// La bannière « Forme Singe » vient de s'afficher : seule l'aide des lianes suit.
+CUTSCENES.racines_singe_eveil = cutsceneBulles([], { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 }, 2600);
 
 // Le totem lui-même est une donnée de zone (`totems`, grand_arbre_racines_data.js) :
 // art `totem_monkey_lit` tant que la forme attend, puis `totem_monkey_dim` une
@@ -446,31 +433,23 @@ ZONE_SCRIPTS.grand_arbre_racines = {
 // il y voit un vol. Épargné, il reconnaît son combat et lui ouvre la route
 // des hauteurs.
 DIALOGUES.kainati_intro = [
-  { who: 'kainati', text: 'Halte, enfant d\'en bas ! Qui t\'a appris à courir sur mes lianes ?' },
-  { who: 'agarica', text: 'Le totem de ton peuple, au bout de la grande branche. Il s\'est allumé sous ma main.' },
-  { who: 'kainati', text: 'Mensonge ! Tu portes l\'odeur de la mousse… Elle grimpe le long de mon arbre depuis des lunes, et voilà qu\'elle t\'envoie.' },
-  { who: 'xara', text: 'Agarica, regarde ses yeux. Ce n\'est pas lui qui parle : c\'est la mousse.' },
-  { who: 'kainati', text: 'Assez ! Ma colère va secouer cet arbre jusqu\'aux racines. Reste au sol, si tu l\'oses !' },
+  { who: 'kainati', text: "Halte ! Tu grimpes sur mes lianes et tu sens la mousse. C'est elle qui t'envoie !" },
+  { who: 'xara', text: "Regarde ses yeux. C'est la mousse qui parle, pas lui." },
+  { who: 'kainati', text: 'Assez ! Hors de mon arbre !' },
 ];
 
 DIALOGUES.kainati_victoire = [
-  { who: 'kainati', text: '…' },
-  { who: 'kainati', text: 'Le bourdonnement… s\'est tu. La brume quitte mes yeux.' },
-  { who: 'kainati', text: 'Tu aurais pu me jeter au bas de mon arbre. Tu ne l\'as pas fait.' },
-  { who: 'agarica', text: 'Ce n\'était pas toi, c\'était la mousse. Je la combats : elle ronge toute la forêt.' },
-  { who: 'kainati', text: 'Alors nous avons le même ennemi. Elle s\'était glissée en moi comme la sève dans le bois… et j\'ai pris une enfant des bois pour une ennemie.' },
-  { who: 'kainati', text: 'Tu portes bien les mains de mon peuple. Pardonne au vieux roi.' },
-  { who: 'kainati', text: 'La route des hauteurs continue vers l\'est, au-delà de ma cime. Elle est à toi.' },
-  { who: 'xara', text: 'Il est à bout de forces. Laissons-le se reposer.' },
+  { who: 'kainati', text: "Le bourdonnement s'est tu… Tu aurais pu me jeter en bas. Pourquoi ?" },
+  { who: 'agarica', text: "Ce n'était pas toi, c'était la mousse. Je la combats." },
+  { who: 'kainati', text: "Alors pardonne au vieux roi. La route des hauteurs, à l'est, est à toi." },
 ];
 
 // Filet (ancienne sauvegarde ou démarrage de test sans la forme singe) : la
 // route des hauteurs l'exige -- Xara renvoie vers le totem des racines.
 CUTSCENES.arene_sans_singe = [
   { call: (scene) => storyBulles(scene, [
-    'Attends. Là-haut, les branches s\'écartent de trois bonnes longueurs… Tes jambes n\'y suffiront pas.',
-    'Le totem du singe, au bout de la grande branche des racines : pose ta main dessus.',
-  ], 'Le totem du singe : dans les racines, au bout de la grande branche.') },
+    "Sans les mains du singe, tu n'iras pas plus haut. Va voir le totem de la grande branche.",
+  ]) },
   { playerFace: 'left' },
   { playerMove: { toX: 1640 } },
 ];
@@ -480,20 +459,16 @@ CUTSCENES.arene_sans_singe = [
 CUTSCENES.kainati_calme = () => {
   if (!storyGet('talismanSinge')) {
     return [{ say: [
-      { who: 'kainati', text: 'Mes jambes ne me portent plus… La mousse m\'a pris toutes mes forces en partant.' },
-      { who: 'kainati', text: 'Les lianes de mes racines mènent à l\'épreuve de mon peuple. Termine-la, et notre talisman sera tien.' },
-      { who: 'kainati', text: 'Ou continue vers l\'est, par la route des hauteurs. L\'épreuve t\'attendra : les arbres sont patients.' },
+      { who: 'kainati', text: "L'épreuve de mon peuple est au bout des lianes des racines. Le talisman t'attend en haut." },
     ] }];
   }
   return [{ say: [
-    { who: 'kainati', text: 'Le talisman de mon peuple te va bien, petite druidesse.' },
-    { who: 'kainati', text: 'Que les lianes te portent. À l\'est, la route des hauteurs t\'attend.' },
+    { who: 'kainati', text: "Notre talisman te va bien. La route des hauteurs est à l'est." },
   ] }];
 };
 // Repli si un jour CUTSCENES n'était pas consulté en premier.
 DIALOGUES.kainati_calme = [
-  { who: 'kainati', text: 'Plus haut, à l\'est, la route mène vers les hauteurs.' },
-  { who: 'kainati', text: 'Que les lianes te portent, petite druidesse.' },
+  { who: 'kainati', text: "La route des hauteurs est à l'est, petite druidesse." },
 ];
 
 // ---------------------------------------------------------------------------
@@ -518,45 +493,36 @@ const espritDit = (text) => ({ who: 'kainati_esprit', name: ESPRIT_NOM, text });
 CUTSCENES.esprit_arrivee = [
   { wait: 400 },
   { say: [
-    espritDit('Bienvenue dans l\'arbre d\'avant, enfant des bois. Ici, rien ne pourrit.'),
-    { who: 'agarica', text: 'Tu… tu brilles. Qui es-tu ?' },
-    espritDit('Le premier de mon peuple. Mon descendant, Kainati, règne sur la cime de ton arbre… et la mousse lui ronge l\'esprit.'),
-    { ...espritDit('Dis-moi. Pourquoi veux-tu atteindre sa cime ?'), choices: [
-      { text: 'Pour arrêter la mousse qui ronge la forêt.' },
-      { text: 'Pour parler à votre roi, pas pour le combattre.' },
+    { ...espritDit('Je suis le premier du peuple de Kainati. Pourquoi veux-tu atteindre sa cime ?'), choices: [
+      { text: 'Pour arrêter la mousse.' },
+      { text: 'Pour parler à votre roi.' },
     ] },
-    espritDit('Ta réponse a le goût de la sève, pas de la mousse. Ton cœur est droit.'),
-    espritDit('Reçois nos mains. Et si Kainati se dresse contre toi… ne le tue pas. Rends-lui ses yeux.'),
+    espritDit('Bonne réponse. Reçois nos mains. Et épargne Kainati : la mousse le rend fou.'),
   ] },
   { call: (scene) => (scene.__esprit ? scene.__esprit.bless(1200) : null) },
   { flash: { ms: 500, color: 0xbfe8a0 } },
   { form: 'hasMonkeyForm' },
   { wait: 900 },
   { say: [
-    espritDit('Mais des mains ne suffisent pas. Montre-moi qu\'elles ont compris.'),
-    espritDit('Saute, puis saute encore : devenue singe, tes mains saisiront la liane. Balance-toi, puis lâche avec l\'élan. Suis mes mouvements.'),
+    espritDit('Suis-moi, de liane en liane.'),
   ] },
-  { toast: { text: 'Forme du singe : double saut pour devenir singe et s\'accrocher aux lianes.\n← → : se balancer · Espace : lâcher · Z/S : monter/descendre', ms: 5600 } },
+  { toast: { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
 ];
 
 CUTSCENES.esprit_fin = [
   { playerFace: 'right' },
   { say: [
-    espritDit('Tu as gardé l\'élan jusqu\'au bout. L\'épreuve est réussie : les branches te reconnaissent.'),
-    espritDit('Un jour, d\'autres esprits t\'offriront peut-être des ailes. Près d\'un feu, tu choisiras : nos mains ou leurs ailes, une seule à la fois.'),
-    { who: 'agarica', text: 'Merci. Je ferai honneur à ton peuple.' },
-    espritDit('Retourne au totem. Au-delà, les lianes de la cime te mèneront jusqu\'à Kainati. Et les lianes de la branche d\'élan, à l\'épreuve de mon peuple.'),
+    espritDit('Bien. Retourne au totem : les lianes de la cime mènent à Kainati.'),
   ] },
   { set: { mondeSpirituelFini: true } },
-  { toast: { text: 'Le passage derrière l\'arbre spirituel ramène au totem des racines.', ms: 3200 } },
+  { toast: { text: 'Le passage derrière l\'arbre ramène aux racines →', ms: 3200 } },
 ];
 
 DIALOGUES.esprit_guide = [
-  espritDit('Ne regarde pas le vide. Regarde la liane suivante.'),
+  espritDit('Regarde la liane suivante, pas le vide.'),
 ];
 DIALOGUES.esprit_revisite = [
-  espritDit('Tu reviens t\'exercer ? L\'arbre d\'avant est patient.'),
-  espritDit('Souviens-toi : on lâche la liane quand elle monte, jamais quand elle retombe.'),
+  espritDit('Lâche la liane quand elle monte, jamais quand elle retombe.'),
 ];
 
 // Le monde spirituel n'est plus sur le chemin de l'histoire (décision du
@@ -628,61 +594,49 @@ ZONE_SCRIPTS.monde_spirituel = {
 // est ouverte avant comme après le combat contre Kainati.
 CUTSCENES.epreuve_intro = [
   { say: [
-    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Tu es venue. Bien. Ici, mon peuple ne touche jamais le sol.' },
-    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Cinq passages, chacun plus rude. En bas, la mousse attend ceux qui tombent. Au sommet, notre talisman.' },
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Ici, on ne touche jamais le sol. Si tu tombes, tu repars de la dernière lanterne.' },
   ] },
   { camera: { x: 1250, y: 120, ms: 1700 } },
   { wait: 900 },
   { cameraFollow: true },
-  { toast: { text: 'Double saut : devenue singe, tu saisis la 1re liane.\n← → : prendre de l\'élan · Espace : lâcher quand la liane monte · Z/S : monter/descendre\nUne chute ramène à la dernière lanterne allumée.', ms: 6000 } },
+  { toast: { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
 ];
 
-CUTSCENES.epreuve_s2 = cutsceneBulles([
-  'Des pierres, encore… Elles tombent en rythme. Regarde l\'ombre.',
-  { who: 'agarica', text: 'J\'attends qu\'elle tombe, je saute, et je grimpe vite.' },
-]);
+// (Les pierres et leur ombre ont déjà été apprises dans les racines.)
+CUTSCENES.epreuve_s2 = () => [];
 
 CUTSCENES.epreuve_s3 = cutsceneBulles([
-  'Les lianes s\'écartent. Prends tout ton élan avant de lâcher.',
-  'Et méfie-toi d\'en bas : un singe nous guette.',
+  'Prends tout ton élan. Et méfie-toi du singe, en bas.',
 ]);
 
 CUTSCENES.epreuve_s4 = cutsceneBulles([
-  'La mousse monte et descend, là, en bas… comme une respiration.',
-  { who: 'agarica', text: 'Quand elle reflue, je fonce et je grimpe.' },
+  'La mousse monte et descend. Passe quand elle reflue.',
 ]);
 
 CUTSCENES.epreuve_s5 = cutsceneBulles([
-  'Plus de repos, maintenant. Et cette branche, en bas, ne tiendra pas.',
-  { who: 'agarica', text: 'Je vois la lumière, tout en haut. J\'y suis presque.' },
+  'Plus de repos. Et la branche du bas ne tiendra pas.',
 ]);
 
 CUTSCENES.epreuve_sans_singe = cutsceneBulles([
-  'Ces lianes filent jusqu\'au bout des branches… mais sans la forme du singe, elles ne te porteront pas.',
-  'Le totem du singe, au bout de la grande branche des racines : pose ta main dessus, il te donnera les mains de son peuple.',
+  'Sans les mains du singe, ces lianes ne te porteront pas. Va voir le totem des racines.',
 ]);
 
 CUTSCENES.epreuve_forme_aigle = [
-  { toast: { text: 'Ici, ce sont les mains du singe qu\'il te faut : choisis-le au feu de camp.', ms: 3200 } },
+  { toast: { text: 'Ici, il te faut le singe : change de forme à un feu de camp.', ms: 3200 } },
 ];
 
 CUTSCENES.epreuve_talisman = [
   { flash: { ms: 450, color: 0xbfe8a0 } },
   { set: { talismanSinge: true } },
   { say: [
-    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Tu n\'as pas touché le sol. Mon peuple te salue, Agarica.' },
-    { who: 'kainati_esprit', name: 'Voix ancestrale', text: 'Ce talisman garde notre plus vieux savoir : la pierre lancée juste, de loin, sans se mettre en danger.' },
+    { who: 'kainati_esprit', name: 'Voix ancestrale', text: "Tu n'as pas touché le sol. Prends notre talisman : la pierre, lancée de loin." },
   ] },
   { playerPose: 'cast' },
   { skill: 'pierre' },
   { wait: 1200 },
   { playerPose: null },
-  { say: [
-    { who: 'xara', text: 'Une pierre bien lancée vaut mieux qu\'une lame trop près des crocs. Ces vieux singes sont sages.' },
-    { who: 'agarica', text: 'Merci, esprits du peuple singe.' },
-  ] },
   { call: (scene) => epreuveOuvrirSommet(scene, false) },
-  { toast: { text: 'Lancer de pierre : il coûte un peu d\'énergie. La fente, au bout du sommet, redescend vers les racines.', ms: 4000 } },
+  { toast: { text: 'La fente au bout du sommet redescend aux racines →', ms: 3600 } },
 ];
 
 // La fente du sommet (raccourci vers les racines, bord droit du sommet) ne

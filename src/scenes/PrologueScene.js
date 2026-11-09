@@ -1,12 +1,12 @@
 // Prologue de la démo (Nouvelle partie) : le bosquet d'Émeraude face à la
 // mousse toxique, puis BosquetScene. Les lignes apparaissent une à une ;
 // une touche affiche la suivante, puis lance la partie. Texte ajustable.
+// Retour des joueurs : « juste le début, il y a pas mal de texte ». Trois
+// lignes courtes au plus, le reste se joue (cf. STYLE_DIALOGUES.md).
 const PROLOGUE_LINES = [
-  "Au cœur de la forêt d'Émeraude, un bosquet de druides veille sur les arbres depuis des générations.",
-  'Agarica, jeune druidesse du Cercle de la Lune, y a grandi auprès de son père, le chef du bosquet.',
-  'Mais depuis quelques lunes, une mousse toxique ronge la forêt. On la gratte, on la brûle… elle revient toujours.',
-  'Et les bêtes, autrefois paisibles, deviennent agressives.',
-  'Cette nuit encore, tout le bosquet lutte contre la mousse…',
+  'Agarica est druidesse au bosquet d\'Émeraude. Son père en est le chef.',
+  'Une mousse ronge la forêt et rend les bêtes folles.',
+  'Cette nuit encore, tout le bosquet la gratte.',
 ];
 
 class PrologueScene extends Phaser.Scene {

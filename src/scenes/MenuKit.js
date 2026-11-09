@@ -32,16 +32,17 @@ const CONTROLS_GROUPS = [
       { keys: ['←', '→'], alt: ['Q', 'D'], text: 'Marcher' },
       // Le papillon n'est plus une forme aérienne, seulement une compétence.
       // Seul le singe s'accroche aux lianes : il faut donc le 2e saut.
-      { keys: ['Espace'], text: 'Sauter (2e saut : Singe, qui s\'accroche aux lianes, ou Aigle)' },
-      { keys: ['Shift'], text: 'Courir — forme du Loup (ou double appui ← / →)' },
+      { keys: ['Espace'], text: "Sauter (2e appui en l'air : Singe ou Aigle)" },
+      // « Maj » partout dans les aides (STYLE_DIALOGUES.md), plus « Shift ».
+      { keys: ['Maj'], text: 'Courir en Loup (ou double appui ← / →)' },
       { keys: ['Z', '↑'], text: 'Viser vers le haut' },
-      { keys: ['S', '↓'], text: "Viser en bas (en l'air, rebond) · piqué de l'Aigle · lâcher une liane" },
+      { keys: ['S', '↓'], text: "Viser en bas (en l'air : rebond) · piqué de l'Aigle · lâcher une liane" },
     ],
   },
   {
     title: 'Agir',
     rows: [
-      { keys: ['K'], alt: ['Clic'], text: "Attaquer là où l'on vise (sinon devant) · en Loup : coup de croc" },
+      { keys: ['K'], alt: ['Clic'], text: "Attaquer où l'on vise · en Loup : coup de croc" },
       { keys: ['E'], text: 'Parler, examiner, interagir' },
       { keys: ['A', 'F', 'R'], text: 'Compétences (coûtent de l\'énergie)' },
     ],
@@ -57,11 +58,11 @@ const CONTROLS_GROUPS = [
 ];
 // Règle du 2e saut (Player.js, décision du 2026-11-05) : même en tombant d'un
 // rebord, le 1er appui est un saut, le 2e la transformation (singe et aigle).
-const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e saut = Singe ou Aigle '
-  + '(en tombant d\'un rebord aussi : 1er appui = saut, 2e = la forme ; sans forme aérienne, un seul saut), '
-  + 'eau = Pieuvre. Au feu de camp : E pour t\'asseoir (soin, sauvegarde, carte), puis E pour son menu.';
+const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e appui sur Espace en l\'air = Singe ou Aigle '
+  + '(même en tombant d\'un rebord ; sans forme aérienne, un seul saut), eau = Pieuvre. '
+  + 'Feu de camp : E pour t\'asseoir (soin, sauvegarde), E encore pour son menu.';
 // Rappel discret affiché en jeu si l'option est activée.
-const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Shift courir · E agir · A F R compétences · I sac · Échap pause';
+const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Maj courir · E agir · A F R compétences · I sac · Échap pause';
 
 // ---------------------------------------------------------------------------
 // Chapitres : point de départ de chaque grande région, avec l'état cohérent
@@ -71,7 +72,7 @@ const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K 
 const MENU_CHAPTERS = [
   {
     id: 'bosquet', act: 'Acte I', name: "Le bosquet d'Émeraude",
-    desc: 'La mousse toxique ronge la forêt, et le bosquet lutte comme il peut…',
+    desc: 'Une mousse ronge la forêt. Au bosquet, on la gratte chaque nuit.',
     scene: 'PrologueScene', zones: ['bosquet'], color: 0x2f5d3a, bg: 'fond_bosquet',
     gives: {
       flags: { visited_bosquet: true, aideFaite: true, talismanOurs: true, amaniteCouverte: true, idoleVolee: true, banished: true },
@@ -80,7 +81,7 @@ const MENU_CHAPTERS = [
   },
   {
     id: 'foret_sombre', act: 'Acte I', name: 'La forêt sombre',
-    desc: 'Bannie, Agarica s\'enfonce seule dans les bois… mais quelqu\'un l\'observe.',
+    desc: 'Bannie, Agarica part seule dans les bois. Enfin, presque seule.',
     scene: 'ForetSombre1Scene', enterId: 'from_bosquet', zones: ['foret_sombre_1', 'foret_sombre_2', 'grotte_lisiere', 'cercle_lune'], color: 0x1d2a4a, bg: 'fond_foret_sombre',
     gives: {
       flags: {
@@ -92,7 +93,7 @@ const MENU_CHAPTERS = [
   },
   {
     id: 'grand_arbre', act: 'Acte I', name: 'Le grand arbre',
-    desc: 'Des racines immenses, un totem du singe endormi… et un roi furieux au sommet.',
+    desc: 'Un arbre géant, et un roi des singes très en colère au sommet.',
     scene: 'GrandArbreRacinesScene', enterId: 'from_foret_sombre', zones: ['grand_arbre_racines', 'grand_arbre_arene', 'epreuve_singe', 'galeries_racines', 'cime_cachee'], color: 0x4a3420, bg: 'fond_grand_arbre',
     // Ordre (décision du 2026-10-25) : totem du singe allumé au bout de la
     // grande branche (forme singe, directement) → lianes de la cime →
@@ -108,7 +109,7 @@ const MENU_CHAPTERS = [
   },
   {
     id: 'foret_flottante', act: 'Acte II', name: 'La forêt flottante',
-    desc: 'Des îles suspendues, un cartographe douteux et son crabe… et une fleur rare.',
+    desc: 'Des îles dans le ciel, un ranger douteux, son crabe et une fleur rare.',
     scene: 'ForetFlottante1Scene', enterId: 'from_arbre', zones: ['foret_flottante_1', 'foret_flottante_2', 'clairiere_plante', 'hutte_morgat', 'ile_du_gardien', 'ile_des_vents', 'racines_suspendues', 'marais_brumes'], color: 0x2a4470, bg: 'fond_foret_flottante',
     gives: {
       flags: {

@@ -24,7 +24,7 @@ const SHOPS = {
   // Boutique d'essai (banc d'essai de zonetest, PNJ `marchand`).
   marchand_lune: {
     name: 'Marchand de lune',
-    greet: 'Des baies, de la sève… tout se paie en éclats de lune, petite druidesse.',
+    greet: 'Baies et sève, contre des éclats de lune.',
     articles: [
       { id: 'baie_soin', price: 15, give: { consommable: 'baie_soin', n: 1 } },
       { id: 'seve_energie', price: 20, give: { consommable: 'seve_energie', n: 1 } },

@@ -40,14 +40,12 @@ const KAINATI_BOSS_NAME = 'Kainati, Roi des Simiens';
 // --- Textes par défaut (remplacés par acte1_arbre.js) ---
 if (!DIALOGUES.kainati_intro) {
   DIALOGUES.kainati_intro = [
-    { who: 'kainati', text: "Encore une créature d'en bas qui grimpe vers ma cime..." },
-    { who: 'kainati', text: 'Assez ! Les branches jugeront pour moi.' },
+    { who: 'kainati', text: "Hors de mon arbre, créature d'en bas !" },
   ];
 }
 if (!DIALOGUES.kainati_victoire) {
   DIALOGUES.kainati_victoire = [
-    { who: 'kainati', text: 'La brume se dissipe... Tu... combats la mousse ?' },
-    { who: 'kainati', text: 'Va. La route des hauteurs est à toi.' },
+    { who: 'kainati', text: 'La brume se dissipe… Va. La route des hauteurs est à toi.' },
   ];
 }
 if (!DIALOGUES.kainati_calme) {
@@ -125,8 +123,8 @@ function kainatiNeedMonkey(scene, st, state) {
   st.toldMonkey = true;
   st.boss.face(scene.player.x > st.boss.x ? 1 : -1);
   const text = state === 'other'
-    ? 'Ses lianes ne portent que la forme du singe ! Choisis-la au feu de camp, juste derrière nous.'
-    : 'Sans la forme du singe, ses coups balaieront tout le sol… Redescendons aux racines : le totem du singe nous attend.';
+    ? 'Ici, il te faut le singe. Change de forme au feu, juste derrière.'
+    : 'Sans le singe, ses coups vont balayer tout le sol. Le totem est en bas, dans les racines.';
   kainatiBubble(scene, 'xara', text, 4200);
 }
 
@@ -381,10 +379,10 @@ function kainatiOnAttack(scene, st, ev) {
   const told = st.told;
   if (['slam', 'roar', 'sweep'].includes(ev.kind) && !told.full) {
     told.full = true;
-    kainatiBubble(scene, 'xara', 'Tout le sol va y passer ! Accroche-toi à une liane, vite !', 2600);
+    kainatiBubble(scene, 'xara', 'Tout le sol va y passer ! Une liane, vite !', 2600);
   } else if (ev.kind === 'charge' && !told.charge) {
     told.charge = true;
-    kainatiBubble(scene, 'xara', 'Il va charger ! Accroche-toi à une liane !', 2400);
+    kainatiBubble(scene, 'xara', 'Il charge ! Sur une liane !', 2400);
   }
 }
 
@@ -413,7 +411,7 @@ async function kainatiStartFight(scene, st) {
   if (firstTime) {
     // Règle des lianes (Player.js) : seule Agarica devenue singe, donc après le
     // double saut, s'accroche ; un saut simple passe à travers.
-    kainatiToast(scene, 'Ses grandes attaques couvrent tout le sol : double saut sous une liane, devenue singe tu t\'y accroches (Z/S : monter, descendre).\nFrappe-le quand tu peux ; après une charge, il est sonné : coups doublés !', 5200);
+    kainatiToast(scene, "Ses grosses attaques balaient le sol : [Espace] deux fois sous une liane, et accroche-toi", 5200);
   }
 }
 
@@ -482,7 +480,7 @@ async function kainatiVictory(scene, st) {
   if (st.disposed) return;
   boss.makeCalm(boss.x);
   kainatiRevealPassage(scene, st, false);
-  kainatiToast(scene, 'La route des hauteurs s\'est ouverte, à l\'est →', 3200);
+  kainatiToast(scene, 'La route des hauteurs est ouverte →', 3200);
 }
 
 ZONE_SCRIPTS.kainati_arene = {
@@ -563,11 +561,11 @@ ZONE_SCRIPTS.kainati_arene = {
     st.onStunned = () => {
       if (st.told.stun || !st.fightActive) return;
       st.told.stun = true;
-      kainatiToast(scene, 'Kainati est sonné : fonce (Maj) et frappe, chaque coup compte double !', 2600);
+      kainatiToast(scene, 'Kainati est sonné : fonce [Maj] et frappe [K], coups doublés !', 2600);
     };
     scene.events.on('kainati-stunned', st.onStunned);
     st.onPhase2 = () => {
-      kainatiBubble(scene, 'xara', 'Il enrage ! Des pierres tombent de là-haut : bouge sur ta liane !', 3000);
+      kainatiBubble(scene, 'xara', 'Il enrage ! Des pierres tombent : bouge sur ta liane !', 3000);
       // Changement de phase : une baie si elle est blessée (cf. kainatiDropBerry).
       scene.time.delayedCall(900, () => kainatiDropBerry(scene, st, 'phase'));
     };

@@ -893,7 +893,7 @@ function secretBreakableRefuse(scene, b, x, y) {
   if (st.refuseToastShown.has(b.id)) return;
   st.refuseToastShown.add(b.id);
   const floor = b.hintSpot && b.hintSpot.side === 'top';
-  showToast(scene, floor ? 'Le sol sonne creux… Il faudrait frapper bien plus fort.' : 'Ça sonne creux… Il faudrait frapper bien plus fort.', 2400);
+  showToast(scene, floor ? 'Le sol sonne creux. Il faudrait frapper bien plus fort.' : 'Ça sonne creux. Il faudrait frapper bien plus fort.', 2400);
 }
 
 // Éclats d'une case : ses images découpées en quatre, qui volent et tombent.

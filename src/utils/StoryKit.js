@@ -608,15 +608,15 @@ function storyOnZoneEnter(scene, data, sceneData) {
 // Inventaire (objets-clés de l'histoire)
 // ---------------------------------------------------------------------------
 const ITEM_INFO = {
-  talisman_ours: { name: "Talisman de l'ours", desc: "Confié par ton père avant ton départ. Il semble endormi… mais il pulse parfois d'une chaleur sourde." },
-  idole: { name: 'Idole du bosquet', desc: "L'idole sacrée du bosquet d'Émeraude, sculptée dans une pierre verte. Elle n'aurait jamais dû quitter son autel." },
-  talisman_singe: { name: 'Talisman du singe', desc: "Récompense de l'épreuve des lianes. Il renferme une compétence : lancer des pierres en cloche." },
-  carte_geralt: { name: 'Carte de Geralt', desc: 'Incomplète, couverte de flèches contradictoires et de traces de pinces. Touche M pour la consulter.' },
-  totem_poche_casse: { name: 'Totem de poche cassé', desc: 'Trouvé dans la hutte de Morgat. Fendu, éteint… À quoi peut-il bien servir ?' },
-  totem_poche_actif: { name: 'Totem de poche', desc: "Ravivé par l'antidote. Il donne accès à la compétence du papillon : soigner au lieu de détruire." },
-  fleur_resistante: { name: 'Fleur résistante', desc: 'Une fleur autour de laquelle la mousse refuse de pousser. Une guérisseuse saurait quoi en faire.' },
-  repulsif: { name: 'Répulsif à mousse', desc: 'Préparé par Morgat. Quelques gouttes suffisent à dissoudre un mur de mousse (E devant le mur).' },
-  bocal_antidote: { name: "Bocal d'antidote", desc: 'Apporté par les papillons dans le noir. Le liquide brille doucement.' },
+  talisman_ours: { name: "Talisman de l'ours", desc: "Le talisman des chefs du bosquet. Ton père te l'a confié." },
+  idole: { name: 'Idole du bosquet', desc: "L'idole sacrée du bosquet. Elle n'aurait jamais dû quitter son autel." },
+  talisman_singe: { name: 'Talisman du singe', desc: "Gagné à l'épreuve du singe. Donne le lancer de pierre." },
+  carte_geralt: { name: 'Carte de Geralt', desc: 'Pleine de flèches qui se contredisent et de traces de pinces. [M] pour l\'ouvrir.' },
+  totem_poche_casse: { name: 'Totem de poche cassé', desc: 'Un petit totem fendu, trouvé sur une île flottante. Il est froid.' },
+  totem_poche_actif: { name: 'Totem de poche', desc: "Ravivé par l'antidote. Donne la compétence du papillon : soigner." },
+  fleur_resistante: { name: 'Fleur résistante', desc: 'La mousse ne pousse pas autour d\'elle. Une guérisseuse saurait quoi en faire.' },
+  repulsif: { name: 'Répulsif à mousse', desc: 'De Morgat. Quelques gouttes font fondre un mur de mousse ([E] devant le mur).' },
+  bocal_antidote: { name: "Bocal d'antidote", desc: 'Apporté par les papillons de Morgat. Il brille un peu.' },
   note_geralt: { name: 'Note de Geralt', desc: "« Si tu lis ceci, c'est que je suis passé par là. Ou que je l'ai perdue. Clak, rends-moi ce crayon. »" },
 };
 
@@ -662,8 +662,8 @@ function inventoryRemove(id) {
 // `effect` : 'heart' (+1 cœur, plafonné) ou 'energy' (énergie pleine).
 // ---------------------------------------------------------------------------
 const CONSUMABLE_INFO = {
-  baie_soin: { name: 'Baie de soin', desc: 'Une baie rouge, sucrée et tiède. La croquer rend un cœur.', effect: 'heart' },
-  seve_energie: { name: "Sève d'énergie", desc: "Quelques gouttes de sève qui brillent dans le noir. Remplit toute l'énergie.", effect: 'energy' },
+  baie_soin: { name: 'Baie de soin', desc: 'Rouge et sucrée. Rend un cœur.', effect: 'heart' },
+  seve_energie: { name: "Sève d'énergie", desc: "De la sève qui brille. Remplit l'énergie.", effect: 'energy' },
 };
 const CONSUMABLE_IDS = Object.keys(CONSUMABLE_INFO);
 
@@ -996,8 +996,8 @@ const CAMPFIRE_FLIGHT_RULES = [
   // Forêt corrompue (après le crash, la mousse se referme derrière elle) : les
   // vents de la corruption ont déjà jeté l'aigle au sol ; plus de vol, ni pour
   // en partir ni pour y revenir, tant que Ghil't n'est pas soigné.
-  { at: 'from', why: (c) => (c.from.region === 'foret_corrompue' && !storyGet('ghiltHealed') ? 'Les vents de la corruption plaquent tes ailes au sol.' : null) },
-  { at: 'to', why: (c) => (c.to.region === 'foret_corrompue' && !storyGet('ghiltHealed') ? 'Les vents de la corruption t\'en empêchent.' : null) },
+  { at: 'from', why: (c) => (c.from.region === 'foret_corrompue' && !storyGet('ghiltHealed') ? 'Trop de vent ici : impossible de t\'envoler.' : null) },
+  { at: 'to', why: (c) => (c.to.region === 'foret_corrompue' && !storyGet('ghiltHealed') ? 'Trop de vent là-bas : impossible d\'y aller.' : null) },
   // Cime du grand arbre : Kainati la garde tant qu'il n'est pas apaisé.
   { at: 'to', why: (c) => (c.to.zone === 'grand_arbre_arene' && !storyGet('kainatiDefeated') ? 'Kainati garde encore la cime du grand arbre.' : null) },
 ];
@@ -1098,12 +1098,12 @@ function unlockSkillFromStory(scene, skillId, { silent = false } = {}) {
 }
 
 const STORY_FORM_INFO = {
-  hasWolfForm: { type: 'wolf', name: 'Forme du loup', desc: 'Sprint (Shift ou double appui) : cours, franchis les ravins, suis les pistes. K : coup de croc.' },
+  hasWolfForm: { type: 'wolf', name: 'Forme du loup', desc: '[Maj] ou double appui [←] [→] : courir, franchir les ravins, voir les pistes. [K] : croc.' },
   // Sans forme aérienne, Agarica n'a qu'un saut : c'est la forme qui donne le double saut.
-  hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: 'Donne le double saut (plus haut) et le plané.' },
+  hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: '[Espace] deux fois : plus haut, puis tu planes.' },
   // Lianes : seule Agarica devenue singe s'y accroche (cf. Player.js).
-  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: 'Donne le double saut ; devenue singe, accroche aux lianes et balancement.' },
-  hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Nage automatique.' },
+  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: '[Espace] deux fois près d\'une liane : tu deviens singe et tu t\'y accroches.' },
+  hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Tu nages dans l\'eau.' },
 };
 
 // Débloque une forme comme un totem (flag + équipement + popup). Si Player
@@ -3983,7 +3983,7 @@ function updateStoryInteractables(scene) {
     if (it.data.cutscene) runCutscene(scene, it.data.cutscene);
   } else if (it.kind === 'mossWall') {
     if (inventoryHas('repulsif')) openMossWall(scene, it.wall);
-    else showToast(scene, "Un mur de mousse épaisse et visqueuse. Impossible de passer…\nIl faudrait quelque chose pour la dissoudre.");
+    else showToast(scene, "Un mur de mousse. Il faudrait de quoi le dissoudre.");
   }
 }
 
@@ -4075,7 +4075,7 @@ function openMossWall(scene, wall) {
     targets: v, alpha: 0, scaleY: 0.1, y: v.y + (v.originY === 1 ? 0 : wall.h / 2), duration: 1100, ease: 'Sine.easeIn',
     onComplete: () => v.destroy(),
   });
-  showToast(scene, 'La mousse se dissout en sifflant…', 1800);
+  showToast(scene, 'La mousse fond en sifflant.', 1800);
 }
 
 // Anti-traversée des murs/amas de mousse (agent Histoire, 2026-10-06) : en

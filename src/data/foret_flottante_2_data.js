@@ -105,7 +105,7 @@ const FORET_FLOTTANTE_2_DATA = {
     { type: 'bosquet_antler_totem', x: 3390, y: 192, scale: 0.28 },
   ],
   totems: [
-    { x: 2400, y: 192, flag: 'hasEagleForm', message: "L'aigle t'a choisie.\nEspace en l'air : tu planes. S : piqué." },
+    { x: 2400, y: 192, flag: 'hasEagleForm', message: "Forme de l'aigle !" },
   ],
   pickups: [
     { item: 'totem_poche_casse', x: 1216, cutscene: 'ff2_totem_poche' },

@@ -338,7 +338,7 @@ class InventoryScene extends Phaser.Scene {
       this.add.text(lx + lw / 2, top + 70, 'Aucune quête pour l\'instant.', {
         fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'italic', color: '#8f86a8',
       }).setOrigin(0.5);
-      this.questDesc.setText('Les habitants de la forêt te confieront peut-être leurs soucis…').setY(descTop + 20);
+      this.questDesc.setText('Les habitants te demanderont peut-être un coup de main.').setY(descTop + 20);
       return;
     }
     this.selectQuest(0);

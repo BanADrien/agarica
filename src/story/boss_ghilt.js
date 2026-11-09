@@ -13,66 +13,19 @@
 // ---------------------------------------------------------------------------
 // Dialogues
 // ---------------------------------------------------------------------------
+// Repli minimal : src/story/acte2.js (chargé après ce fichier) remplace
+// toutes ces répliques par les vraies (cf. STYLE_DIALOGUES.md).
 Object.assign(DIALOGUES, {
-  ghilt_intro: [
-    { who: 'xara', text: "Agarica… le sol vibre. Quelque chose d'énorme respire sous la mousse." },
-    { who: 'ghilt', text: 'GRRRROOOOAAAAH !' },
-    { who: 'agarica', text: "C'est… un tapir ? Il est gigantesque… et il dégouline de mousse." },
-    { who: 'xara', text: "C'est Ghil't, le Fléau de la Forêt. Méfie-toi de ses charges, de son souffle… et ne marche pas dans ce qu'il crache !" },
-    { who: 'agarica', text: 'Je ne fuirai pas. Pas cette fois.' },
-  ],
-  ghilt_chute: [
-    { who: 'xara', text: "Il aspire toute la mousse de l'arène… Agarica, recule !" },
-    { who: 'agarica', text: "Le sol… il tremble, je n'arrive plus à —" },
-    { who: 'ghilt', text: 'HHHHHHHHHH…' },
-  ],
-  ghilt_retour: [
-    { who: 'agarica', text: "Ghil't ! Je suis revenue." },
-    { who: 'xara', text: "Affaiblis-le, mais ne l'achève pas. Quand il vacillera, laisse les papillons faire le reste." },
-    { who: 'agarica', text: 'Cette fois, je ne viens pas pour te détruire. Je viens te soigner.' },
-  ],
-  trou_reveil: [
-    { who: 'agarica', text: '… Où… où suis-je ? Il fait si noir…' },
-    { who: 'xara', text: "Agarica ! Tu m'entends ? Ne bouge pas trop vite… tu as fait une sacrée chute." },
-    { who: 'agarica', text: "Ghil't… il était trop fort. Je n'ai rien pu faire." },
-    { who: 'xara', text: 'Chut. Regarde, là-haut… Tu vois ces petites lumières ?' },
-  ],
-  trou_papillons: [
-    { who: 'agarica', text: 'Des papillons… ce sont ceux de Morgat !' },
-    { who: 'xara', text: 'Ils t\'ont suivie depuis la hutte. Et ils portent quelque chose… tout doucement.' },
-    { who: 'agarica', text: "Un bocal… l'antidote ! Morgat a réussi à le terminer." },
-  ],
-  trou_totem: [
-    { who: 'agarica', text: "Il y en a si peu… Je devrais le boire ? Ou le lancer sur Ghil't ?" },
-    { who: 'xara', text: 'Surtout pas. Bu, il ne soignera que toi. Lancé, il se perdra dans la mousse.' },
-    { who: 'xara', text: 'Ton totem de poche, celui qui était cassé… il brille depuis que les papillons sont là. Verse l\'antidote dedans.' },
-    { who: 'agarica', text: "D'accord… goutte à goutte." },
-  ],
-  trou_sortie: [
-    { who: 'agarica', text: 'Le totem est tout chaud… Je sens les papillons, comme s\'ils faisaient partie de moi.' },
-    { who: 'xara', text: "Alors ils te prêtent leur force : soigner au lieu de détruire. Affaiblis Ghil't, puis laisse-les faire." },
-    { who: 'agarica', text: 'Ils montent vers la lumière… ils nous montrent le chemin.' },
-  ],
-  ghilt_soin: [
-    { who: 'agarica', text: 'Regarde, Xara… la mousse se retire !' },
-    { who: 'xara', text: "Il respire… doucement. Il n'a plus rien d'un fléau." },
-    { who: 'ghilt', text: '… Mmmh…' },
-    { who: 'agarica', text: "Tu n'étais pas un monstre. Tu étais malade, comme la forêt." },
-  ],
-  ghilt_amanite: [
-    { who: 'agarica', text: 'Amanite ?! NON !' },
-    { who: 'amanite', text: 'Recule, Agarica. C\'est fini. Le Fléau ne fera plus de mal à personne.' },
-    { who: 'agarica', text: "Il était guéri ! Tu ne l'as pas vu ? La mousse était partie, il respirait !" },
-    { who: 'amanite', text: "Une bête pareille ne guérit pas. Elle attend. Et la forêt n'a plus le temps d'attendre." },
-    { who: 'agarica', text: 'Tu viens de détruire la seule preuve qu\'on pouvait les sauver…' },
-    { who: 'amanite', text: "J'ai sauvé le bosquet. Toi, tu jouais avec des papillons. Je rentre leur annoncer la nouvelle." },
-  ],
-  ghilt_geralt: [
-    { who: 'geralt', text: "Par toutes les racines… j'arrive trop tard, hein ?" },
-    { who: 'agarica', text: "Geralt… je l'avais soigné. Amanite l'a achevé sous mes yeux." },
-    { who: 'geralt', text: "J'ai vu les papillons de loin. Et j'ai vu la mousse reculer. Ça, petite, personne ne l'avait jamais fait." },
-    { who: 'geralt', text: 'Viens. On rentre au bosquet. Ton père doit entendre la vérité… de ma bouche, s\'il le faut.' },
-  ],
+  ghilt_intro: [{ who: 'ghilt', text: 'GRRRROOOOAAAAH !' }],
+  ghilt_chute: [{ who: 'ghilt', text: 'HHHHHHHHHH…' }],
+  ghilt_retour: [{ who: 'agarica', text: "Ghil't ! Cette fois, je viens te soigner." }],
+  trou_reveil: [{ who: 'xara', text: 'Chut. Regarde là-haut, ces petites lumières.' }],
+  trou_papillons: [{ who: 'agarica', text: "Les papillons de Morgat ! Ils portent l'antidote !" }],
+  trou_totem: [{ who: 'xara', text: 'Verse-le dans ton totem de poche.' }],
+  trou_sortie: [{ who: 'xara', text: "Affaiblis Ghil't, puis laisse faire les papillons." }],
+  ghilt_soin: [{ who: 'agarica', text: "Tu n'étais pas un monstre. Juste malade." }],
+  ghilt_amanite: [{ who: 'amanite', text: "Recule. C'est fini." }],
+  ghilt_geralt: [{ who: 'geralt', text: 'Viens. On rentre au bosquet.' }],
 });
 
 // ---------------------------------------------------------------------------
@@ -447,7 +400,7 @@ ZONE_SCRIPTS.ghilt_arene = {
       const now = scene.time.now;
       if (now < st.toastAt) return;
       st.toastAt = now + 3000;
-      ghToast(scene, 'La mousse résiste… Affaiblis-le d\'abord !');
+      ghToast(scene, "Affaiblis-le d'abord !");
     });
     ghOn(scene, 'ghilt-healed', () => ghRun(scene, () => ghiltSoin(scene, st), 'ghilt soin'));
     ghOn(scene, 'ghilt-player-down', () => ghRun(scene, () => ghiltPlayerDown(scene, st), 'ghilt reprise'));
@@ -674,12 +627,12 @@ async function ghiltChute(scene, st) {
 // Phase 2 : Ghil't affaibli, invite à utiliser la compétence du papillon.
 function ghiltWeakenedHint(scene, st) {
   const boss = st.boss;
-  ghToast(scene, 'Utilise la compétence du papillon !', 3000);
+  ghToast(scene, "Il vacille : la compétence du papillon, vite !", 3000);
   const loop = scene.time.addEvent({
     delay: 6000, loop: true,
     callback: () => {
       if (!boss.active || boss.healed || st.busy) { loop.remove(); return; }
-      ghToast(scene, 'Utilise la compétence du papillon !', 2500);
+      ghToast(scene, "Il vacille : la compétence du papillon, vite !", 2500);
     },
   });
 }
@@ -1235,5 +1188,5 @@ async function trouSequence(scene, exits) {
   paps.forEach((p, i) => ghPapillonMove(scene, p, TROU_PATH[i].x, TROU_PATH[i].y, 1600, i * 220));
   scene.__exits = exits;
   ghLock(scene, false);
-  ghToast(scene, 'Suis les papillons vers la lumière.', 3200);
+  ghToast(scene, 'Suis les papillons.', 3200);
 }

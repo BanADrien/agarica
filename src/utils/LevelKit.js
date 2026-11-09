@@ -1492,10 +1492,10 @@ const UNLOCK_POPUP_TEXT_OFFSET_Y = 600 - 1086 / 2;
 // que les commentaires de Player.js (sprint/double-saut/nage auto).
 // Singe : seule Agarica devenue singe (2e saut) s'accroche aux lianes.
 const FORM_UNLOCK_LABEL = {
-  monkey: 'Forme Singe\n2e saut, puis lianes',
-  wolf: 'Forme Loup\nSprint (Shift) · croc (K)',
-  eagle: 'Forme Aigle\nDouble-saut',
-  octopus: 'Forme Pieuvre\nNage automatique',
+  monkey: 'Forme Singe\n2e saut : lianes',
+  wolf: 'Forme Loup\nCourir (Maj) · croc (K)',
+  eagle: 'Forme Aigle\n2e saut : planer',
+  octopus: 'Forme Pieuvre\nNager',
 };
 
 function ensureUnlockPopupAnimation(scene) {

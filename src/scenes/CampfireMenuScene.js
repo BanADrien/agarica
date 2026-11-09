@@ -49,10 +49,10 @@ const CAMPFIRE_TOTEMS_LOCKED = typeof DEMO_TOTEMS_LOCKED !== 'undefined' ? DEMO_
 const CAMPFIRE_SHOW_TOTEMS = false;
 
 const FORM_INFO = {
-  wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : course rapide (Maj / double-tap), coup de croc (K), perçoit les pistes cachées.' },
+  wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : court vite (Maj ou double appui ← / →), mord (K), voit les pistes cachées.' },
   // Lianes : seule Agarica devenue singe s'y accroche, donc après le double saut.
-  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : donne le double saut (court) ; après lui, s\'accroche aux lianes (gauche/droite pour se balancer, Espace pour lâcher, S pour tomber).' },
-  eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : donne le double saut (plus haut) puis le plané, porté par les courants d\'air (S = piqué).' },
+  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : 2e appui sur Espace en l\'air. S\'accroche aux lianes (← → : se balancer, Espace : lâcher).' },
+  eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : 2e appui sur Espace en l\'air, plus haut, puis plané. Les courants d\'air le portent (S : piqué).' },
   octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
 };
 const FORM_IDS = Object.keys(FORM_INFO);
@@ -416,7 +416,7 @@ class CampfireMenuScene extends Phaser.Scene {
     const R = CAMPFIRE_LAYOUT.rows;
     const L = CAMPFIRE_FLIGHT_LIST;
     this.addPanelText(480, R.title, 'Vol de l\'aigle', { size: 20, color: STORY_UI.title, bold: true, serif: true, stroke: 4 });
-    this.addPanelText(480, R.title + 28, 'Rejoins un feu où tu t\'es déjà assise. Tu t\'y poseras assise.', { size: 11, color: '#d8ccf5' });
+    this.addPanelText(480, R.title + 28, 'Rejoins un feu où tu t\'es déjà assise.', { size: 11, color: '#d8ccf5' });
     const scene = this.player.scene;
     const fromId = this.fire ? this.fire.id : null;
     this.flightBlock = campfireFlightDepartureBlock(scene, fromId);
