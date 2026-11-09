@@ -32,11 +32,13 @@ const CONTROLS_GROUPS = [
       { keys: ['←', '→'], alt: ['Q', 'D'], text: 'Marcher' },
       // Le papillon n'est plus une forme aérienne, seulement une compétence.
       // Seul le singe s'accroche aux lianes : il faut donc le 2e saut.
-      { keys: ['Espace'], text: "Sauter (2e appui en l'air : Singe ou Aigle)" },
+      // Saut à hauteur variable (2026-11-09) : relâcher tôt = petit saut.
+      { keys: ['Espace'], text: "Sauter (bref : petit saut ; 2e appui en l'air : Singe ou Aigle)" },
       // « Maj » partout dans les aides (STYLE_DIALOGUES.md), plus « Shift ».
-      { keys: ['Maj'], text: 'Courir en Loup (ou double appui ← / →)' },
-      { keys: ['Z', '↑'], text: 'Viser vers le haut' },
-      { keys: ['S', '↓'], text: "Viser en bas (en l'air : rebond) · piqué de l'Aigle · lâcher une liane" },
+      // Maj tenue = Loup même à l'arrêt ; ↑ = prise de liane (2026-11-09).
+      { keys: ['Maj'], text: 'Loup tant que tu tiens, même à l\'arrêt (double appui ← / → : courir)' },
+      { keys: ['Z', '↑'], text: 'Viser vers le haut · Singe : s\'accrocher à une liane' },
+      { keys: ['S', '↓'], text: "Viser en bas (en l'air : rebond ; Loup : coup de patte) · piqué de l'Aigle · lâcher une liane" },
     ],
   },
   {
@@ -58,11 +60,11 @@ const CONTROLS_GROUPS = [
 ];
 // Règle du 2e saut (Player.js, décision du 2026-11-05) : même en tombant d'un
 // rebord, le 1er appui est un saut, le 2e la transformation (singe et aigle).
-const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : courir = Loup, 2e appui sur Espace en l\'air = Singe ou Aigle '
+const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : Maj = Loup, 2e appui sur Espace en l\'air = Singe ou Aigle '
   + '(même en tombant d\'un rebord ; sans forme aérienne, un seul saut), eau = Pieuvre. '
   + 'Feu de camp : E pour t\'asseoir (soin, sauvegarde), E encore pour son menu.';
 // Rappel discret affiché en jeu si l'option est activée.
-const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Maj courir · E agir · A F R compétences · I sac · Échap pause';
+const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Maj loup · E agir · A F R compétences · I sac · Échap pause';
 
 // ---------------------------------------------------------------------------
 // Chapitres : point de départ de chaque grande région, avec l'état cohérent

@@ -537,6 +537,33 @@ const EDITOR_STORY_KINDS = {
     anchor: (ed, e) => ({ x: e.x, y: e.y != null ? e.y : ed.groundYOr(e.x, 400) - 34 }),
     move(ed, e, x, y) { e.x = Math.round(x); e.y = Math.round(y); },
   },
+  // Papillon prisonnier (clé `butterflies`, SecretKit.js, 2026-11-09) : toile
+  // (x, y = centre) ou cocon suspendu (x, y = centre ; `fil` = fil au-dessus).
+  // Un coup le libère ; tous les 3, la compétence papillon coûte moins cher.
+  butterfly: {
+    key: 'butterflies', shape: 'point', label: 'Papillon prisonnier',
+    create(ed, g) {
+      const n = (ed.data.butterflies || []).length + 1;
+      const id = window.prompt('Identifiant du papillon (sauvegardé « zone:id ») :', `papillon${n}`);
+      if (id === null) return null;
+      const prison = window.prompt('Prison : toile ou cocon', 'toile');
+      if (prison === null) return null;
+      return { id: id.trim() || `papillon${n}`, x: Math.round(g.x), y: Math.round(g.y), prison: prison.trim() === 'cocon' ? 'cocon' : 'toile' };
+    },
+    draw(ed, e) {
+      const cocoon = e.prison === 'cocon';
+      const parts = [];
+      if (cocoon) parts.push(ed.add.line(0, 0, e.x, e.y - 23 - (e.fil != null ? e.fil : 40), e.x, e.y - 23, 0xe8f6ff, 0.7).setOrigin(0, 0));
+      parts.push(cocoon
+        ? ed.add.ellipse(e.x, e.y, 30, 46, 0xd9cfe8, 0.85).setStrokeStyle(2, 0x1a1030)
+        : ed.add.circle(e.x, e.y, 28, 0xe8f6ff, 0.12).setStrokeStyle(1, 0xe8f6ff, 0.8));
+      parts.push(ed.add.circle(e.x, e.y, 5, 0xff9fc9, 0.95));
+      parts.push(ed.markerLabel(e.x, e.y - 40, `Papillon ${e.id || ''} (${cocoon ? 'cocon' : 'toile'})`, '#ffd6f2'));
+      return parts;
+    },
+    anchor: (ed, e) => ({ x: e.x, y: e.y }),
+    move(ed, e, x, y) { e.x = Math.round(x); e.y = Math.round(y); },
+  },
 };
 const EDITOR_STORY_KIND_BY_KEY = Object.fromEntries(Object.entries(EDITOR_STORY_KINDS).map(([k, d]) => [d.key, k]));
 
@@ -2598,6 +2625,8 @@ class EditorScene extends Phaser.Scene {
         'Grand arbre': ['branche', 'tronc'],
         'Formes (singe, loup, aigle)': ['vine', 'track', 'hiddenPlatform', 'windCurrent'],
         Faune: ['animal'],
+        // Vague 3 (SecretKit.js) : secrets et récompenses, papillons prisonniers.
+        Secrets: ['breakable', 'chest', 'treasure', 'butterfly'],
       };
       for (const [label, kinds] of Object.entries(groups)) {
         const g = document.createElement('optgroup');

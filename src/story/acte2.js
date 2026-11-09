@@ -1848,6 +1848,7 @@ function a2Fc1CloseBehind(scene, animate) {
   }
 }
 
+const ACTE2_FC1_ARRIVAL_CALM_MS = 2500;
 ZONE_SCRIPTS.acte2_fc1 = {
   create(scene, data) {
     a2Ceiling(scene);
@@ -1867,6 +1868,11 @@ ZONE_SCRIPTS.acte2_fc1 = {
     if (storyGet('trig_foret_corrompue_1_papillons')) a2Fc1Butterflies(scene, false);
     if (a2EnterId(scene) === 'from_crash' && !storyGet('fc1Reveil')) {
       runCutscene(scene, 'fc1_reveil');
+    }
+    // Retombée de la canopée sur la branche haute : le singe de la branche
+    // basse voisine ne lance rien tout de suite (retour du 2026-11-09).
+    if (a2EnterId(scene) === 'from_canopee' && typeof calmSingesCorrompus === 'function') {
+      calmSingesCorrompus(scene, null, ACTE2_FC1_ARRIVAL_CALM_MS);
     }
   },
   update(scene, time) {

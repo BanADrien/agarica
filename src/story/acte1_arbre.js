@@ -26,38 +26,46 @@
 // ---------------------------------------------------------------------------
 // Petits utilitaires
 // ---------------------------------------------------------------------------
-// Fente lumineuse dans l'écorce (passage vers l'épreuve, raccourci du
-// sommet, retour du monde spirituel). Contrat PLAN_INTEGRATION_LOT_8 §3.3 :
+// Passage dans l'écorce (vers l'épreuve, raccourci du sommet, retour du monde
+// spirituel). Contrat PLAN_INTEGRATION_LOT_8 §3.3 :
 //   arbreGlowPassage(scene, x, y, h = 120, color, open = true)
 //     → { glow, core, art, setOpen(v) }
-// `y` = centre de l'ancienne amande dessinée ; avec l'art Codex
-// (`decor_fente_ouverte` / `_fermee`, 440 px source), l'écorce est POSÉE sur
-// la surface sous ce centre (bas en storyStandY + 2 : on la voit sortir du
-// bois, pas flotter), `h` px de haut, devant un halo doux `fx_halo_doux`
-// teinté `color` qui respire. `glow` et `core` portent `__sx` / `__sy`
-// (échelles de repos) : les appelants tweenent scaleX / scaleY, jamais
-// `scale` (l'image est à h / 440 : `scale: 1` la gonflerait à 440 px).
-// Le cœur n'est jamais teinté (R11 : au monde spirituel, seul le halo est
-// cyan, l'écorce garde sa couleur). Sans l'art : les ellipses d'avant
-// (rien pour une fente fermée) et un setOpen() sans effet.
+// ARCHE DE RACINES plus large que haute (2026-11-09) : l'ancienne « fente »
+// ovale verticale (`decor_fente_*`) se lisait comme une vulve. Art
+// `decor_arche_ouverte` / `_fermee` (440 x 300, fabriqué par
+// tools/arche_racines.py à partir de l'écorce de la fente), POSÉ sur la
+// surface sous `y` (bas en storyStandY + 2), haut de h x ARBRE_ARCHE_HEIGHT_K
+// px (l'ouverture doit être à la taille d'Agarica), toujours entière dans la
+// zone (les passages sont au ras d'un bord). Devant un halo doux couché
+// `fx_halo_doux` teinté `color` qui respire. `glow` et `core` portent `__sx` /
+// `__sy` (échelles de repos) : les appelants tweenent scaleX / scaleY, jamais
+// `scale`. Sans l'art : un halo couché seul (rien pour un passage fermé).
+const ARBRE_ARCHE_SRC = { w: 440, h: 300 };
+const ARBRE_ARCHE_HEIGHT_K = 1.25;
 function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true) {
-  const key = open ? 'item-decor_fente_ouverte' : 'item-decor_fente_fermee';
+  const key = open ? 'item-decor_arche_ouverte' : 'item-decor_arche_fermee';
+  const ah = h * ARBRE_ARCHE_HEIGHT_K;
+  const scale = ah / ARBRE_ARCHE_SRC.h;
+  const aw = ARBRE_ARCHE_SRC.w * scale;
+  const lw = scene.levelWidth || (scene.physics && scene.physics.world && scene.physics.world.bounds.width) || 0;
+  const cx = lw > aw ? Phaser.Math.Clamp(x, aw / 2, lw - aw / 2) : x;
   if (scene.textures.exists(key)) {
-    const by = storyStandY(scene, x, y + h / 2) + 2;
+    const by = storyStandY(scene, cx, y + h / 2) + 2;
     const ht = typeof juiceTexture === 'function' ? juiceTexture(scene, 'fx_halo_doux', 'juice-glow') : null;
     let glow = null;
     if (ht) {
       // Halo peint (réimport M04) : ~25 % de lumière en moins qu'un disque
       // plein à taille égale -- même compensation que les halos de LevelKit.
+      // Couché, centré sur l'ouverture.
       const boost = ht.art && typeof JUICE_HALO_ART_BOOST === 'number' ? JUICE_HALO_ART_BOOST : 1;
-      glow = scene.add.image(x, by - h / 2, ht.key).setBlendMode(Phaser.BlendModes.ADD)
-        .setTint(color).setDisplaySize(h * 0.9 * boost, h * 1.1 * boost).setAlpha(0.3);
+      glow = scene.add.image(cx, by - ah * 0.32, ht.key).setBlendMode(Phaser.BlendModes.ADD)
+        .setTint(color).setDisplaySize(aw * 0.8 * boost, ah * 0.7 * boost).setAlpha(open ? 0.3 : 0.12);
       glow.__sx = glow.scaleX;
       glow.__sy = glow.scaleY;
       storyPutBehindPlayer(scene, glow);
-      scene.tweens.add({ targets: glow, alpha: 0.65, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      scene.tweens.add({ targets: glow, alpha: open ? 0.65 : 0.22, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     }
-    const core = scene.add.image(x, by, key).setOrigin(0.5, 1).setScale(h / 440);
+    const core = scene.add.image(cx, by, key).setOrigin(0.5, 1).setScale(scale);
     core.__sx = core.scaleX;
     core.__sy = core.scaleY;
     // Après le halo : le cœur passe devant lui (et toujours sous Agarica).
@@ -65,19 +73,17 @@ function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true) {
     return {
       glow, core, art: true,
       setOpen(v) {
-        const k = v ? 'item-decor_fente_ouverte' : 'item-decor_fente_fermee';
+        const k = v ? 'item-decor_arche_ouverte' : 'item-decor_arche_fermee';
         if (core.active && scene.textures.exists(k)) core.setTexture(k);
       },
     };
   }
   if (!open) return { glow: null, core: null, art: false, setOpen() {} };
-  const glow = scene.add.ellipse(x, y, 70, h, color, 0.3);
-  const core = scene.add.ellipse(x, y, 40, h - 24, 0x1a1428, 0.9);
-  glow.__sx = 1; glow.__sy = 1; core.__sx = 1; core.__sy = 1;
+  const glow = scene.add.ellipse(cx, y, aw * 0.8, ah * 0.6, color, 0.3);
+  glow.__sx = 1; glow.__sy = 1;
   storyPutBehindPlayer(scene, glow);
-  storyPutBehindPlayer(scene, core);
   scene.tweens.add({ targets: glow, alpha: 0.65, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-  return { glow, core, art: false, setOpen() {} };
+  return { glow, core: null, art: false, setOpen() {} };
 }
 
 // Lucioles / poussières de lumière qui montent lentement (décor, en boucle).
@@ -262,7 +268,7 @@ CUTSCENES.racines_intro = [
 CUTSCENES.racines_tunnel = () => [];
 
 CUTSCENES.racines_lianes = cutsceneBulles([
-  "Ces lianes mènent à une fente dans l'écorce. Il te faudrait des mains de singe.",
+  "Ces lianes mènent à une arche dans les racines. Il te faudrait des mains de singe.",
 ]);
 
 CUTSCENES.racines_lianes_singe = cutsceneBulles([
@@ -289,7 +295,7 @@ CUTSCENES.racines_cime = cutsceneBulles([
 // visite joue `racines_singe_eveil` à la place (et coche ce déclencheur).
 CUTSCENES.racines_cime_singe = cutsceneBulles([
   'Prends de l\'élan, et lâche quand la liane remonte.',
-], { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 });
+], { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 });
 
 // Totem du singe allumé (E, clé de zone `totems` -> addAbilityShrine, comme
 // le loup et l'aigle) : la forme est donnée sur-le-champ, avec l'éclat et la
@@ -297,7 +303,7 @@ CUTSCENES.racines_cime_singe = cutsceneBulles([
 // lianes, APRÈS la bannière (~2,6 s, même délai que le loup en forêt
 // sombre 2) : la route des lianes de la cime mène à l'arène.
 // La bannière « Forme Singe » vient de s'afficher : seule l'aide des lianes suit.
-CUTSCENES.racines_singe_eveil = cutsceneBulles([], { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 }, 2600);
+CUTSCENES.racines_singe_eveil = cutsceneBulles([], { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 }, 2600);
 
 // Le totem lui-même est une donnée de zone (`totems`, grand_arbre_racines_data.js) :
 // art `totem_monkey_lit` tant que la forme attend, puis `totem_monkey_dim` une
@@ -506,7 +512,7 @@ CUTSCENES.esprit_arrivee = [
   { say: [
     espritDit('Suis-moi, de liane en liane.'),
   ] },
-  { toast: { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
+  { toast: { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
 ];
 
 CUTSCENES.esprit_fin = [
@@ -599,7 +605,7 @@ CUTSCENES.epreuve_intro = [
   { camera: { x: 1250, y: 120, ms: 1700 } },
   { wait: 900 },
   { cameraFollow: true },
-  { toast: { text: "[Espace] deux fois près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
+  { toast: { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
 ];
 
 // (Les pierres et leur ombre ont déjà été apprises dans les racines.)
@@ -636,7 +642,7 @@ CUTSCENES.epreuve_talisman = [
   { wait: 1200 },
   { playerPose: null },
   { call: (scene) => epreuveOuvrirSommet(scene, false) },
-  { toast: { text: 'La fente au bout du sommet redescend aux racines →', ms: 3600 } },
+  { toast: { text: "L'arche au bout du sommet redescend aux racines →", ms: 3600 } },
 ];
 
 // La fente du sommet (raccourci vers les racines, bord droit du sommet) ne
@@ -665,7 +671,8 @@ function epreuveOuvrirSommet(scene, instant) {
   if (closed && closed.art && closed.core && closed.core.active) {
     closed.setOpen(true);
     if (!instant) {
-      const cy = closed.core.y - f.h / 2;
+      // Centre de l'ouverture de l'arche (cf. arbreGlowPassage).
+      const cy = closed.core.y - f.h * ARBRE_ARCHE_HEIGHT_K * 0.32;
       juiceFlash(closed.core, 0xffffff, 160);
       juiceBurstImage(scene, 'glow', f.x, cy, { size: f.h * 2, from: 0.3, to: 1.1, ms: 520, color: 0xe8fff2, alpha: 0.85 });
       spawnFx(scene, 'motes', f.x, cy, { count: 16, spread: 22, power: 2, color: [0xbfe8a0, 0xe8fff2, 0xff9fc9] });

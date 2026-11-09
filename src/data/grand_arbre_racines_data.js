@@ -184,6 +184,9 @@ const GRAND_ARBRE_RACINES_DATA = {
     // il ne mord pas pendant le combat contre la mousse (bornes 560-1080).
     { type: 'crapaud_piege', x: 1300, y: 400, facing: 'left', reach: 200 },
   ],
+  // Papillon prisonnier (SecretKit.js, clé `butterflies`, 2026-11-09) : une
+  // toile sur le toit du tunnel de racines (surface y 192), le chemin du haut.
+  butterflies: [{ id: 'toit_tunnel', x: 560, y: 160, prison: 'toile' }],
   campfires: [{ x: 1600, y: 64 }],
   // Décors du grand arbre (`grand_arbre`). Petits décors dans le tunnel (144 px libres).
   props: [

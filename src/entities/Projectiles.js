@@ -53,6 +53,14 @@ class PierreProjectile extends Phaser.Physics.Arcade.Sprite {
     if (scene.enemies) {
       scene.physics.add.overlap(this, scene.enemies, (stone, enemy) => {
         if (this.done || enemy.defeated) return;
+        // Coup paré (crapaud-piège enfoui, cf. damageEnemy dans LevelKit) :
+        // la pierre se brise sur lui, sans dégât ni énergie.
+        if (typeof enemy.blocksHit === 'function' && enemy.blocksHit(this)) {
+          if (typeof juiceOnBlockedHit === 'function') juiceOnBlockedHit(scene, enemy, this);
+          if (typeof enemy.onBlockedHit === 'function') enemy.onBlockedHit(this);
+          this.shatter();
+          return;
+        }
         if (typeof enemy.takeHit === 'function') enemy.takeHit(this);
         else if (typeof enemy.defeat === 'function') enemy.defeat();
         // Juice (LevelKit) : micro-pause, étincelles, flash, poof si vaincu.
@@ -357,7 +365,9 @@ class PapillonSwarm {
 SKILL_DEFS.papillon = {
   label: 'Papillons — Soin',
   hudColor: 0x7fe0f0,
-  cost: 40,
+  // Coût selon le niveau gagné en libérant des papillons prisonniers (clé de
+  // zone `butterflies`, SecretKit.js) : 40, puis 32, 26 et 20.
+  get cost() { return typeof papillonSkillCost === 'function' ? papillonSkillCost() : 40; },
   cooldownMs: PAPILLON_DURATION_MS,
   onActivate(player, now) {
     if (player.papillonSwarm) player.papillonSwarm.destroy();

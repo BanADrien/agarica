@@ -56,10 +56,19 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   bosquet → écran de fin. Le monde spirituel n'est plus sur le chemin (décision du
   2026-10-25 : pas de phase avec l'esprit simien) ; ses fichiers restent. Anciennes zones de
   test (Zone1-5, SousGrotte, ZoneAquatique, Zonetest) intactes, via le titre « Zones de test ».
-- Contrôles : flèches / QD, saut **Espace seul** (un seul saut sans forme aérienne), Z/↑ viser en
-  haut, S/↓ viser en bas en l'air (coup vers le bas = rebond), Shift sprint (loup), K ou clic
-  attaque en arc dans la direction visée, E interagir, A/F/R compétences, I inventaire, M carte,
-  Échap/P pause.
+- Contrôles :
+  - flèches / QD pour se déplacer ;
+  - saut **Espace seul**, à hauteur variable (relâcher tôt = petit saut ; un seul saut sans
+    forme aérienne) ;
+  - Z/↑ vise en haut ; en singe, près d'une liane, cette touche sert à **s'accrocher** (la prise
+    n'est plus automatique) ;
+  - S/↓ vise en bas en l'air : le coup vers le bas fait rebondir, et en loup c'est un coup de
+    patte ;
+  - **[Maj] tenue = loup**, même à l'arrêt ; en avançant, le loup sprinte ;
+  - K ou clic : attaque en arc dans la direction visée ;
+  - E interagir, A/F/R compétences, I inventaire, M carte, Échap/P pause.
+- **Priorités** : chaque demande est classée P1-P4 dans `docs/production/PRIORITES.md` ; petits
+  paquets, version testable donnée vite avec la liste des modifications.
 - **Formes** débloquées par l'histoire, automatiques (jamais un bouton) : sol = **Loup**
   (sprint, pistes, plateformes cachées), aérien = **Singe** (lianes) OU **Aigle** (plané,
   courants d'air) au choix, eau = **Pieuvre**. **Compétences** (énergie) : ours, pierre,

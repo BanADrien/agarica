@@ -47,8 +47,8 @@ const FORET_CORROMPUE_1_DATA = {
     ...groundRow(14, 20, [3]),          // voûte de la galerie de mousse
     ...groundRow(27, 30, [0, 1, 2, 3]), // tronc tombé au-dessus de l'amas (on ne saute pas par-dessus)
     ...groundRow(33, 36, [5]),          // carrefour : branche basse
-    ...groundRow(38, 41, [3]),          // carrefour : branche haute (singe corrompu)
-    ...groundRow(43, 46, [5]),          // carrefour : branche basse
+    ...groundRow(38, 41, [3]),          // carrefour : branche haute (arrivée de la canopée)
+    ...groundRow(43, 46, [5]),          // carrefour : branche basse (singe corrompu)
   ],
   playerSpawn: { x: 160, y: 412 },
   campfires: [
@@ -106,9 +106,14 @@ const FORET_CORROMPUE_1_DATA = {
     { type: 'mousse_creature', x: 1100, y: 400, patrolMinX: 900, patrolMaxX: 1300 },
     // Crapaud sauteur au sol, sous la branche basse (x 2112-2304, y 320) : ses
     // langues butent sur la branche, il se combat au sol ; bornes resserrées
-    // pour ne pas déborder sur la zone du singe (x 2440-2620).
+    // pour ne pas déborder sous les branches du carrefour.
     { type: 'crapaud_sauteur', x: 2250, y: 400, patrolMinX: 2120, patrolMaxX: 2420 },
-    { type: 'singe_corrompu', x: 2560, y: 150, patrolMinX: 2440, patrolMaxX: 2620 },
+    // Singe corrompu sur la branche basse de DROITE (x 2752-2944, y 320).
+    // Retour des joueuses (2026-11-09) : sur la branche haute (x 2440-2620), il
+    // frappait aussitôt qui retombait de la canopée (arrivée x 2432-2624) ; il
+    // y garde la branche haute à distance de jet, et il est calmé 2,5 s à cette
+    // arrivée (acte2_fc1, ACTE2_FC1_ARRIVAL_CALM_MS).
+    { type: 'singe_corrompu', x: 2870, y: 280, patrolMinX: 2790, patrolMaxX: 2930 },
     // Vague 3 : bornée à droite du sol creux (x 2688-2816), qui peut être ouvert.
     { type: 'mousse_creature', x: 2950, y: 400, patrolMinX: 2860, patrolMaxX: 3050 },
     { type: 'mousse_creature', x: 3450, y: 400, patrolMinX: 3300, patrolMaxX: 3600 },

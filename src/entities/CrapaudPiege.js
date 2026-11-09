@@ -9,9 +9,12 @@
 // fenêtre pour le frapper) puis se renfonce, et se réarme 0,9 s plus tard.
 // Il ne blesse JAMAIS au contact (`harmless`, comme l'araignée) : sa seule
 // attaque est la langue, télégraphiée -- foncer dessus coûtait sinon un 2e
-// cœur en traversant son corps juste après la langue (vérifié au banc). Caché,
-// il reste frappable (le dos visible) : le repérer et le frapper le premier le
-// fait sortir.
+// cœur en traversant son corps juste après la langue (vérifié au banc).
+// Enfoui, il est INVULNÉRABLE (retour des joueuses du 2026-11-09 : « qu'elle
+// ne prenne pas de dégâts une fois dans le sol ») : le coup est paré (« tink »,
+// cf. blocksHit / juiceOnBlockedHit dans LevelKit) et le réveille -- il sort
+// et attaque. Vulnérable dès la 2e moitié de sa sortie, puis tant qu'il est
+// dehors. On peut toujours rebondir sur son dos (pogo).
 // Corrompu comme le sauteur (cf. CrapaudCorrompu.js) : le papillon le soigne,
 // même caché, et dégage le passage sans le tuer.
 //
@@ -32,6 +35,11 @@ const CRAPAUD_PIEGE_REVEAL_MS = 220;
 const CRAPAUD_PIEGE_EXPOSED_MS = 900;
 const CRAPAUD_PIEGE_HIDE_MS = 320;
 const CRAPAUD_PIEGE_REARM_MS = 900;
+// Sortie déclenchée par un coup paré : un court instant d'abord, le temps
+// que l'étincelle se lise.
+const CRAPAUD_PIEGE_WAKE_MS = 200;
+// Fraction de la sortie (0 -> 1) à partir de laquelle il peut être blessé.
+const CRAPAUD_PIEGE_VULNERABLE_AT = 0.5;
 // Teintes (multiplication) : pierre moussue sombre caché, plus claire sorti --
 // il garde l'air d'un rocher, ce qui le distingue du sauteur vert toxique.
 const CRAPAUD_PIEGE_TINT_HIDDEN = 0x6f7a66;
@@ -251,7 +259,31 @@ class CrapaudPiege extends CrapaudCorrompu {
     this.stateEnd = now + CRAPAUD_PIEGE_EXPOSED_MS;
   }
 
-  // Frappé caché (ou en train de se cacher) : il est découvert et sort.
+  // Enfoui (caché, en train de se cacher, ou dans la 1re moitié de sa sortie) :
+  // aucun dégât. Contrat LevelKit (damageEnemy) : vrai = coup paré.
+  blocksHit() {
+    if (this.defeated || this.healed) return false;
+    if (this.state === 'hidden' || this.state === 'hide') return true;
+    if (this.state === 'reveal') {
+      const now = this.scene.time.now;
+      return (now - this.stateAt) / CRAPAUD_PIEGE_REVEAL_MS < CRAPAUD_PIEGE_VULNERABLE_AT;
+    }
+    return false;
+  }
+
+  // Coup paré : le « rocher » se réveille et sort vers Agarica.
+  onBlockedHit() {
+    if (this.state !== 'hidden' && this.state !== 'hide') return;
+    const now = this.scene.time.now;
+    const p = this.scene.player;
+    const dir = p ? Math.sign(p.x - this.x) || this.facing : this.facing;
+    this.startReveal(dir, now);
+    this.stateAt = now + CRAPAUD_PIEGE_WAKE_MS;
+    this.stateEnd = this.stateAt + CRAPAUD_PIEGE_REVEAL_MS;
+  }
+
+  // Frappé caché (appel direct de takeHit, hors damageEnemy) : il est
+  // découvert et sort.
   onHurt(now) {
     if (this.state === 'hidden' || this.state === 'hide') {
       const p = this.scene.player;

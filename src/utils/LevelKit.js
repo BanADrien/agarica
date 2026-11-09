@@ -1492,8 +1492,8 @@ const UNLOCK_POPUP_TEXT_OFFSET_Y = 600 - 1086 / 2;
 // que les commentaires de Player.js (sprint/double-saut/nage auto).
 // Singe : seule Agarica devenue singe (2e saut) s'accroche aux lianes.
 const FORM_UNLOCK_LABEL = {
-  monkey: 'Forme Singe\n2e saut : lianes',
-  wolf: 'Forme Loup\nCourir (Maj) · croc (K)',
+  monkey: 'Forme Singe\n2e saut, puis ↑ : lianes',
+  wolf: 'Forme Loup\nMaj tenue · croc (K)',
   eagle: 'Forme Aigle\n2e saut : planer',
   octopus: 'Forme Pieuvre\nNager',
 };
@@ -5314,6 +5314,14 @@ function damageEnemy(scene, enemy, source = {}) {
     if (enemy.__lastHitToken === source.token) return false;
     enemy.__lastHitToken = source.token;
   }
+  // Coup paré (2026-11-09, crapaud-piège enfoui) : `enemy.blocksHit(source)`
+  // vrai -> aucun dégât, étincelle « tink » au point d'impact, ni énergie
+  // gagnée ni hit-stop. L'ennemi peut réagir dans `onBlockedHit(source)`.
+  if (typeof enemy.blocksHit === 'function' && enemy.blocksHit(source)) {
+    juiceOnBlockedHit(scene, enemy, source);
+    if (typeof enemy.onBlockedHit === 'function') enemy.onBlockedHit(source);
+    return false;
+  }
   if (typeof enemy.takeHit === 'function') enemy.takeHit(source);
   else enemy.defeat();
   // Retour visuel du coup (hit-stop, étincelles, flash, poof) : cf. Juice.
@@ -6376,6 +6384,13 @@ function spawnFx(scene, kind, x, y, opts = {}) {
     case 'glint':
       juiceParticles(scene, 'star', x, y, { count: 1, speed: [0, 8], lifespan: [380, 520], tint: opts.tint ?? 0xffffff });
       break;
+    case 'tink':
+      // Coup paré (cf. juiceOnBlockedHit) : étincelles jaunes qui rebondissent
+      // vers le haut, petit éclat blanc net (pas de halo mou : c'est dur).
+      juiceParticles(scene, 'spark', x, y, { count: 7, angle: [200, 340], power: 1.1, tint: [0xfff3c4, 0xffffff, 0xffd27a] });
+      juiceParticles(scene, 'star', x, y, { count: 2, speed: [0, 20], lifespan: [200, 320], tint: 0xffffff });
+      juiceBurstImage(scene, 'glow', x, y, { size: 34, from: 0.5, to: 1, ms: 120, color: 0xfff3c4, alpha: 0.9 });
+      break;
     case 'motes':
       juiceParticles(scene, 'mote', x, y, { count: opts.count ?? 3, spread: opts.spread ?? 12, tint: opts.color, power });
       break;
@@ -6443,6 +6458,31 @@ function juiceOnEnemyHit(scene, enemy, source = {}) {
     const size = b ? Phaser.Math.Clamp(Math.max(b.width, b.height) / 60, 0.7, 2) : 1;
     scene.time.delayedCall(110, () => spawnFx(scene, 'poof', cx, cy, { size }));
   }
+}
+
+// Coup paré (cf. damageEnemy, `enemy.blocksHit`) : pas de hit-stop ni de
+// flash de dégâts -- quelques étincelles dures, un éclat en étoile et un petit
+// « tink » écrit qui saute, pour qu'on comprenne tout de suite que ça ne passe pas.
+function juiceOnBlockedHit(scene, enemy, source = {}) {
+  if (!scene || !enemy || !scene.sys || !scene.sys.isActive()) return;
+  let b = null;
+  try { b = typeof enemy.getMeleeBounds === 'function' ? enemy.getMeleeBounds() : enemy.getBounds(); } catch (e) { b = null; }
+  const player = source.player || scene.player;
+  let ix = b ? b.centerX : enemy.x;
+  let iy = b ? b.y + Math.min(10, b.height / 2) : enemy.y;
+  const hitRect = player && player.getAttackHitbox ? player.getAttackHitbox() : null;
+  if (b && hitRect) {
+    const r = Phaser.Geom.Rectangle.Intersection(hitRect, b);
+    if (r.width > 0 && r.height > 0) { ix = r.centerX; iy = r.y + Math.min(8, r.height / 2); }
+  }
+  if (typeof source.x === 'number' && source.kind !== 'melee') { ix = source.x; iy = source.y; }
+  spawnFx(scene, 'tink', ix, iy);
+  juiceShake(scene, 'tiny');
+  playSfx('hit_blocked');
+  const label = scene.add.text(ix, iy - 8, 'tink', {
+    fontFamily: 'sans-serif', fontSize: '13px', fontStyle: 'bold italic', color: '#fff3c4', stroke: '#15101f', strokeThickness: 3,
+  }).setOrigin(0.5, 1).setDepth(CHARACTER_DEPTH + 3);
+  scene.tweens.add({ targets: label, y: iy - 30, alpha: 0, duration: 520, ease: 'Cubic.easeOut', onComplete: () => label.destroy() });
 }
 
 // --- Caméra : regard en avant dans le sens de la course ---------------------

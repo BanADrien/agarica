@@ -107,7 +107,7 @@ function secretState(scene) {
   if (!scene.__secret || scene.__secret.visit !== scene.__storyVisit) {
     scene.__secret = {
       visit: scene.__storyVisit,
-      breakables: [], chests: [], treasures: [], shards: [], shardGroup: null,
+      breakables: [], chests: [], treasures: [], shards: [], shardGroup: null, butterflies: [],
       hud: null, refuseToastShown: new Set(),
     };
   }
@@ -1146,6 +1146,228 @@ function openShop(scene, shopId) {
   });
 }
 
+
+// ---------------------------------------------------------------------------
+// 7. Papillons prisonniers (clé `butterflies`, 2026-11-09, idée validée par
+//    l'utilisateur : ils RENFORCENT la compétence papillon).
+// ---------------------------------------------------------------------------
+//   butterflies: [{ id, x, y, prison: 'toile' | 'cocon', fil? }]
+// Un papillon pris dans une toile (x, y = centre de la toile) ou un cocon
+// suspendu (x, y = centre du cocon ; `fil` = longueur du fil au-dessus, 40 px
+// par défaut). Un coup d'épée, de croc ou de patte (zone de la mêlée,
+// player.getAttackHitbox) le libère : la prison se déchire, le papillon vole
+// jusqu'à Agarica, puis le compteur monte (« Papillon libéré n/N »).
+// Sauvegardé : registre `papillonsLiberes` = liste de 'zone:id' (absent =
+// aucun). Tous les PAPILLON_PALIER papillons, la compétence papillon gagne un
+// niveau (PAPILLON_NIVEAU_MAX au plus) : elle coûte MOINS D'ÉNERGIE
+// (PAPILLON_COUTS, lus par SKILL_DEFS.papillon.cost dans Projectiles.js) ;
+// toast au passage de niveau, niveau dans le menu des compétences du feu et
+// compteur dans le sac. Libérés avant d'avoir la compétence, ils comptent
+// quand même : le niveau s'applique dès qu'elle est débloquée.
+const PAPILLON_LIBERES_KEY = 'papillonsLiberes';
+const PAPILLON_PALIER = 3;
+const PAPILLON_NIVEAU_MAX = 3;
+// Coût en énergie du soin par niveau (0 à 3) : 40 au départ (inchangé).
+const PAPILLON_COUTS = [40, 32, 26, 20];
+// Zone frappable de chaque prison (px, centrée sur x, y).
+const PAPILLON_PRISON_RECT = { toile: [60, 60], cocon: [34, 50] };
+const PAPILLON_COCON_KEY = 'papillon-cocon';
+const PAPILLON_TOILE_KEY = 'papillon-toile';
+const PAPILLON_VOL_MS = 900;
+
+function papillonsLiberes() {
+  const v = storyGet(PAPILLON_LIBERES_KEY);
+  return Array.isArray(v) ? v : [];
+}
+
+function papillonsCount() {
+  return papillonsLiberes().length;
+}
+
+// Nombre total de papillons posés dans les zones de la démo (données écrites
+// à la main, lues par leur nom de globale comme la carte du monde).
+let PAPILLONS_TOTAL_CACHE = null;
+function papillonsTotal() {
+  if (PAPILLONS_TOTAL_CACHE != null) return PAPILLONS_TOTAL_CACHE;
+  let n = 0;
+  for (const z of (typeof DEMO_ZONES !== 'undefined' ? DEMO_ZONES : [])) {
+    const name = `${z.zone.toUpperCase()}_DATA`;
+    if (!/^[A-Z0-9_]+$/.test(name)) continue;
+    let data = null;
+    try { data = (new Function(`return typeof ${name} !== 'undefined' ? ${name} : null;`))(); } catch (e) { data = null; }
+    if (data && Array.isArray(data.butterflies)) n += data.butterflies.filter((b) => b && b.x != null).length;
+  }
+  PAPILLONS_TOTAL_CACHE = Math.max(n, papillonsCount());
+  return PAPILLONS_TOTAL_CACHE;
+}
+
+function papillonSkillLevel(count = papillonsCount()) {
+  return Math.min(PAPILLON_NIVEAU_MAX, Math.floor(count / PAPILLON_PALIER));
+}
+
+function papillonSkillCost(level = papillonSkillLevel()) {
+  return PAPILLON_COUTS[Math.max(0, Math.min(PAPILLON_COUTS.length - 1, level))];
+}
+
+// Texte du menu des compétences (feu de camp).
+function papillonSkillLevelText() {
+  const lvl = papillonSkillLevel();
+  const cost = papillonSkillCost(lvl);
+  const n = papillonsCount();
+  let t = `Niveau ${lvl} : ${cost} d'énergie.`;
+  if (lvl < PAPILLON_NIVEAU_MAX) {
+    const need = (lvl + 1) * PAPILLON_PALIER - n;
+    t += ` Encore ${need} papillon${need > 1 ? 's' : ''} à libérer pour le niveau ${lvl + 1}.`;
+  }
+  return t;
+}
+
+// Prisons dessinées par code (pas d'art prévu) : toile ronde tendue entre
+// deux brindilles, et cocon de soie suspendu (lueur rose à l'intérieur).
+function papillonEnsureTextures(scene) {
+  if (!scene.textures.exists(PAPILLON_TOILE_KEY)) {
+    const S = 64;
+    const g = scene.add.graphics();
+    const c = S / 2;
+    g.lineStyle(1.2, 0xe8f6ff, 0.75);
+    const spokes = 10;
+    for (let i = 0; i < spokes; i++) {
+      const a = (i / spokes) * Math.PI * 2 + 0.15;
+      g.lineBetween(c, c, c + Math.cos(a) * (c - 2), c + Math.sin(a) * (c - 2));
+    }
+    for (let r = 6; r < c - 2; r += 5) {
+      g.beginPath();
+      for (let i = 0; i <= spokes; i++) {
+        const a = (i / spokes) * Math.PI * 2 + 0.15;
+        // Fils un peu affaissés entre deux rayons.
+        const rr = r * (i % 2 ? 0.93 : 1);
+        const x = c + Math.cos(a) * rr;
+        const y = c + Math.sin(a) * rr;
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.strokePath();
+    }
+    g.fillStyle(0xbfe8ff, 0.9);
+    for (const [dx, dy] of [[-14, -8], [10, 12], [18, -16], [-6, 20]]) g.fillCircle(c + dx, c + dy, 1.4);
+    g.generateTexture(PAPILLON_TOILE_KEY, S, S);
+    g.destroy();
+  }
+  if (!scene.textures.exists(PAPILLON_COCON_KEY)) {
+    const w = 30;
+    const h = 46;
+    const g = scene.add.graphics();
+    g.fillStyle(0x1a1030, 1).fillEllipse(w / 2, h / 2, w, h);
+    g.fillStyle(0xd9cfe8, 1).fillEllipse(w / 2, h / 2, w - 4, h - 4);
+    g.fillStyle(0xf2ecfa, 1).fillEllipse(w / 2 - 3, h / 2 - 5, w - 14, h - 16);
+    // Fils de soie enroulés (diagonales).
+    g.lineStyle(1, 0x9d8fb8, 0.8);
+    for (let y = 8; y < h - 4; y += 6) g.lineBetween(4, y, w - 4, y + 5);
+    // Lueur rose du papillon dedans.
+    g.fillStyle(0xff9fc9, 0.55).fillCircle(w / 2, h / 2 + 2, 6);
+    g.fillStyle(0xffd6f2, 0.8).fillCircle(w / 2, h / 2 + 2, 3);
+    g.generateTexture(PAPILLON_COCON_KEY, w, h);
+    g.destroy();
+  }
+}
+
+LEVEL_DATA_HANDLERS.butterflies = (scene, list) => {
+  const zone = storyZoneId(scene);
+  const st = secretState(scene);
+  const freed = new Set(papillonsLiberes());
+  papillonEnsureTextures(scene);
+  (list || []).forEach((b, i) => {
+    if (!b || b.x == null || b.y == null) return;
+    const id = b.id || `papillon${i}`;
+    const key = `${zone}:${id}`;
+    if (freed.has(key)) return;
+    const prison = b.prison === 'cocon' ? 'cocon' : 'toile';
+    const parts = [];
+    let thread = null;
+    if (prison === 'cocon') {
+      const fil = b.fil != null ? b.fil : 40;
+      thread = scene.add.graphics();
+      thread.lineStyle(1, 0xe8f6ff, 0.7).lineBetween(b.x, b.y - 23 - fil, b.x, b.y - 20);
+      parts.push(thread);
+    }
+    const img = scene.add.image(b.x, b.y, prison === 'cocon' ? PAPILLON_COCON_KEY : PAPILLON_TOILE_KEY);
+    img.lookRole = 'prop';
+    parts.push(img);
+    // Le prisonnier : un papillon de la faune (Animaux.js) qui bat à peine des
+    // ailes au centre de la toile ; dans le cocon, seule sa lueur se voit.
+    const fly = typeof spawnButterflies === 'function' && prison === 'toile'
+      ? spawnButterflies(scene, b.x, b.y, 1, { radius: 3, scale: 0.9 }) : [];
+    for (const o of parts) storyPutBehindPlayer(scene, o);
+    // Le cocon se balance doucement au bout de son fil.
+    if (prison === 'cocon') {
+      img.setOrigin(0.5, 0).setY(b.y - 23);
+      scene.tweens.add({ targets: img, angle: { from: -6, to: 6 }, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+    const [rw, rh] = PAPILLON_PRISON_RECT[prison];
+    st.butterflies.push({
+      id, key, prison, data: b, img, thread, fly, x: b.x, y: b.y, freed: false, glintAt: 0,
+      rect: new Phaser.Geom.Rectangle(b.x - rw / 2, b.y - rh / 2, rw, rh),
+    });
+  });
+};
+
+function butterfliesUpdate(scene) {
+  const st = secretState(scene);
+  if (!st.butterflies.length) return;
+  const p = scene.player;
+  const hit = p && typeof p.getAttackHitbox === 'function' ? p.getAttackHitbox() : null;
+  for (const b of st.butterflies) {
+    if (b.freed) continue;
+    // Un scintillement de temps en temps : ils se devinent sans se crier.
+    if (scene.time.now >= b.glintAt) {
+      b.glintAt = scene.time.now + Phaser.Math.Between(1200, 2400);
+      spawnFx(scene, 'glint', b.x + Phaser.Math.Between(-10, 10), b.y + Phaser.Math.Between(-10, 10), { tint: 0xffd6f2 });
+    }
+    if (hit && Phaser.Geom.Intersects.RectangleToRectangle(hit, b.rect)) butterflyFree(scene, b);
+  }
+}
+
+// Libère le papillon : enregistré tout de suite (une zone quittée pendant son
+// vol ne le perd pas), compté à l'écran quand il a rejoint Agarica.
+function butterflyFree(scene, b) {
+  b.freed = true;
+  const before = papillonsCount();
+  const list = papillonsLiberes();
+  if (!list.includes(b.key)) storySet(PAPILLON_LIBERES_KEY, [...list, b.key]);
+  const after = papillonsCount();
+  playSfx('papillon_libere');
+  // La prison cède.
+  spawnFx(scene, 'wingDust', b.x, b.y, { count: 8, spread: 14, power: 1.2 });
+  if (b.thread) b.thread.destroy();
+  if (b.prison === 'cocon') {
+    scene.tweens.killTweensOf(b.img);
+    scene.tweens.add({ targets: b.img, y: b.img.y + 40, alpha: 0, angle: 30, duration: 500, ease: 'Quad.easeIn', onComplete: () => b.img.destroy() });
+  } else {
+    scene.tweens.add({ targets: b.img, scale: 1.3, alpha: 0, duration: 380, ease: 'Sine.easeOut', onComplete: () => b.img.destroy() });
+  }
+  // Le papillon vole jusqu'à Agarica (le cocon en relâche un).
+  let fly = b.fly;
+  if ((!fly || !fly.length) && typeof spawnButterflies === 'function') fly = spawnButterflies(scene, b.x, b.y, 1, { radius: 3, scale: 0.9 });
+  if (fly && fly.length && typeof butterfliesFollow === 'function') {
+    for (const c of fly) if (c.butterfly) { c.butterfly.rx = 6; c.butterfly.ry = 4; }
+    butterfliesFollow(fly, scene.player, { offsetY: -70, radius: 12 });
+  }
+  scene.time.delayedCall(PAPILLON_VOL_MS, () => {
+    if (!scene.sys || !scene.sys.isActive()) return;
+    if (fly && fly.length && typeof butterfliesDisperse === 'function') butterfliesDisperse(fly, 1200);
+    const p = scene.player;
+    if (p && p.active) spawnFx(scene, 'heal', p.x, p.y - 60, { count: 6 });
+    const total = papillonsTotal();
+    const lvlBefore = papillonSkillLevel(before);
+    const lvl = papillonSkillLevel(after);
+    if (lvl > lvlBefore) {
+      showToast(scene, `Papillons niveau ${lvl} : le soin coûte ${papillonSkillCost(lvl)} d'énergie.`, 3400);
+    } else {
+      showToast(scene, `Papillon libéré ${after}/${total}`, 2200);
+    }
+    scene.events.emit('butterfly-freed', b);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Boucle (monde non gelé) : butin, éclats, trésors, cassables.
 // ---------------------------------------------------------------------------
@@ -1156,5 +1378,6 @@ function secretUpdateHook(scene, time, delta) {
   eclatsUpdate(scene, delta);
   treasuresUpdate(scene);
   breakablesUpdate(scene);
+  butterfliesUpdate(scene);
 }
 LEVEL_UPDATE_HOOKS.push(secretUpdateHook);

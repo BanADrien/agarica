@@ -49,9 +49,10 @@ const CAMPFIRE_TOTEMS_LOCKED = typeof DEMO_TOTEMS_LOCKED !== 'undefined' ? DEMO_
 const CAMPFIRE_SHOW_TOTEMS = false;
 
 const FORM_INFO = {
-  wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : court vite (Maj ou double appui ← / →), mord (K), voit les pistes cachées.' },
-  // Lianes : seule Agarica devenue singe s'y accroche, donc après le double saut.
-  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : 2e appui sur Espace en l\'air. S\'accroche aux lianes (← → : se balancer, Espace : lâcher).' },
+  // Maj tenue = loup, même à l'arrêt (2026-11-09) ; en l'air, S/↓ + K : coup de patte.
+  wolf: { flag: 'hasWolfForm', label: 'Loup', slot: 'ground', icon: ['form-icon-wolf'], desc: 'Loup (sol) : Maj tenue, même à l\'arrêt. Court vite, voit les pistes cachées, mord (K) ; en l\'air, ↓ + K : coup de patte.' },
+  // Lianes : seule Agarica devenue singe (double saut) s'y accroche, sur appui de ↑.
+  monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : 2e appui sur Espace en l\'air. ↑ près d\'une liane : s\'accrocher (← → : se balancer, Espace : lâcher).' },
   eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : 2e appui sur Espace en l\'air, plus haut, puis plané. Les courants d\'air le portent (S : piqué).' },
   octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
 };
@@ -808,10 +809,16 @@ class CampfireMenuScene extends Phaser.Scene {
     // nom seul sur la carte (« Ours », pas « Ours — Fracas au sol ») : même
     // aspect équipée ou en réserve, une ligne en 11 px ; l'effet se lit
     // dans la description au survol.
-    const skillName = (id) => SKILL_DEFS[id].label.split(' — ')[0];
+    // Papillons : niveau gagné en libérant des papillons prisonniers (SecretKit).
+    const butterflyLvl = typeof papillonSkillLevel === 'function' ? papillonSkillLevel() : 0;
+    const skillName = (id) => {
+      const name = SKILL_DEFS[id].label.split(' — ')[0];
+      return id === 'papillon' && butterflyLvl > 0 ? `${name} ${butterflyLvl}` : name;
+    };
     const skillOpts = (id) => ({
       iconKeys: [`item-${SKILL_ICON_ITEM[id] || `skill_icone_${id}`}`], iconColor: SKILL_DEFS[id].hudColor || CARD_COLORS.skill,
-      desc: SKILL_INFO_DESC[id] || SKILL_DEFS[id].label,
+      desc: (SKILL_INFO_DESC[id] || SKILL_DEFS[id].label)
+        + (id === 'papillon' && typeof papillonSkillLevelText === 'function' ? ` ${papillonSkillLevelText()}` : ''),
     });
     const skillCards = [];
     player.skillSlots.forEach((id, slotIdx) => {

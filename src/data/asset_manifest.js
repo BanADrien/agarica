@@ -1325,6 +1325,15 @@ const ITEM_MANIFEST = {
     src: { file: "assets/_codex_src/portrait_kainati.png" },
     norm: { mode: "square", value: 512 },
   },
+  // Kainati épargné (`kainatiDefeated`, cf. SPEAKERS.kainati.portraitByFlag) :
+  // le même portrait aux yeux ambrés, sans la lueur verte. FABRIQUÉ par
+  // tools/kainati_portrait_calme.py (pas par Codex) : sa source est lui-même.
+  portrait_kainati_calme: {
+    path: "assets/ui/portraits/kainati_calme.png", scale: 0.25,
+    placeholder: { w: 128, h: 128, color: 0x2a1e14, label: "kainati" },
+    src: { file: "assets/ui/portraits/kainati_calme.png" },
+    norm: { mode: "square", value: 512 },
+  },
   // [P1] Portrait ghilt
   portrait_ghilt: {
     path: "assets/ui/portraits/ghilt.png", scale: 0.25,
@@ -1519,8 +1528,8 @@ const ITEM_MANIFEST = {
   },
   // [P1] Lanternes de reprise (éteinte / allumée, même cadrage ; halo =
   // fx_halo_doux ; centre du globe à 63 % de la hauteur depuis le bas ;
-  // 0,15 = 30x51 px, à 0,09 le globe était illisible), fente lumineuse dans
-  // l'écorce (fermée / ouverte, même cadrage ; échelle = hauteur / 440),
+  // 0,15 = 30x51 px, à 0,09 le globe était illisible), arche de racines
+  // (fermée / ouverte, plus bas ; ancienne fente lumineuse retirée),
   // spirale gravée (arbre malade, forêt corrompue 1), contour fantôme d'une
   // plateforme cachée (forme loup) : contour des tirets en x 1-378, y 26-132
   // du PNG, calé par le code sur la case pleine (pas d'échelle fixe).
@@ -1536,17 +1545,24 @@ const ITEM_MANIFEST = {
     src: { planche: "assets/_codex_src/decor_lumineux.png", grid: [3, 2], cell: 1, cut: "grid" },
     norm: { mode: "fit", value: 512 },
   },
-  decor_fente_fermee: {
-    path: "assets/decors/elements/decor_fente_fermee.png", scale: 0.27,
-    placeholder: { w: 70, h: 120, color: 0x1a1428, label: "Fente" },
-    src: { planche: "assets/_codex_src/decor_lumineux.png", grid: [3, 2], cell: 2, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+  // (decor_fente_fermee / decor_fente_ouverte : retirées du manifeste le
+  // 2026-11-09, remplacées par l'arche de racines ci-dessous ; leurs PNG
+  // restent dans assets/decors/elements/, source de tools/arche_racines.py.)
+  // Arche de racines (fermée / ouverte, 440 x 300, pieds en bas) : remplace la
+  // fente ovale ci-dessus depuis le 2026-11-09 (elle se lisait comme une
+  // vulve). FABRIQUÉE par tools/arche_racines.py à partir de l'écorce de la
+  // fente (pas par Codex) : sa source est elle-même. Cf. arbreGlowPassage.
+  decor_arche_fermee: {
+    path: "assets/decors/elements/decor_arche_fermee.png", scale: 0.4,
+    placeholder: { w: 176, h: 120, color: 0x1a1428, label: "Arche" },
+    src: { file: "assets/decors/elements/decor_arche_fermee.png" },
+    norm: { mode: "fit", value: 440 },
   },
-  decor_fente_ouverte: {
-    path: "assets/decors/elements/decor_fente_ouverte.png", scale: 0.27,
-    placeholder: { w: 70, h: 120, color: 0xbfe8a0, label: "Portail" },
-    src: { planche: "assets/_codex_src/decor_lumineux.png", grid: [3, 2], cell: 3, cut: "grid" },
-    norm: { mode: "fit", value: 512 },
+  decor_arche_ouverte: {
+    path: "assets/decors/elements/decor_arche_ouverte.png", scale: 0.4,
+    placeholder: { w: 176, h: 120, color: 0xbfe8a0, label: "Arche" },
+    src: { file: "assets/decors/elements/decor_arche_ouverte.png" },
+    norm: { mode: "fit", value: 440 },
   },
   decor_spirale_gravee: {
     path: "assets/decors/elements/decor_spirale_gravee.png", scale: 0.15,

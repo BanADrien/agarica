@@ -200,6 +200,10 @@ const ANIM_WOLF_ATTACK_KEY = 'loup-attack';
 const WOLF_JUMP_RISE_TEXTURE = 'loup-jump-1';
 const WOLF_JUMP_FALL_TEXTURE = 'loup-jump-2';
 const WOLF_LANDING_TEXTURE = 'loup-jump-3';
+// Loup à l'arrêt (Maj tenue sans avancer, 2026-11-09) : pas d'idle dessiné,
+// la 1re image de la course (la plus « debout ») figée, sous cette vitesse.
+const WOLF_STAND_TEXTURE = 'loup-run-0';
+const WOLF_STAND_SPEED = 40;
 // Canvas partagé par TOUTES les frames Loup (course/saut ET attaque) —
 // ré-uniformisé après coup (cf. tools/unify_wolf_frames usage ponctuel) car
 // la feuille d'attaque, traitée séparément, avait généré un canvas
@@ -409,6 +413,10 @@ const SLASH_ARCS = {
   // des pieds) : à (76, -42), réglage d'avant à l'échelle 0,4, les crocs
   // flottaient devant elle une fois le loup ramené à sa taille de course.
   bite: { cx: 60, cy: -32, w: 64, h: 52 },
+  // Coup de patte du Loup vers le bas (slashDir = 'paw', en l'air + S/↓) :
+  // sous ses pattes, à peine en avant ; griffes dessinées par code dans ce
+  // rectangle (cf. drawPawClaws), qui est aussi la zone qui touche.
+  paw: { cx: 6, cy: 16, w: 92, h: 68 },
 };
 // Échelle de l'art `agarica_slash`/`vfx_slash` au moment où SLASH_ARCS a été
 // réglé : les positions d'arc suivent l'échelle calibrée de la pose (cf.
@@ -550,6 +558,39 @@ function drawBiteJaws(g, r, facing, close, alpha) {
     for (const a of [-0.55, 0, 0.55]) {
       g.lineBetween(x0, cy + a * 7, x0 + facing * Math.cos(a) * 10, cy + a * 7 + Math.sin(a) * 10);
     }
+  }
+}
+
+// Griffes du coup de patte du Loup (pas d'art : dessinées par code) : trois
+// entailles qui ratissent `r` de haut en bas, penchées vers l'avant, effilées
+// aux deux bouts ; halo vert lunaire, cœur clair, liseré rose (palette des
+// arcs). `reach` 0 -> 1 : longueur déjà tracée (le geste se lit de haut en bas).
+function drawPawClaws(g, r, facing, reach, alpha) {
+  const N = 12;
+  const lean = 16;
+  for (const k of [-1, 0, 1]) {
+    const x0 = r.centerX + k * r.width * 0.24 - facing * lean * 0.5;
+    const top = r.y + 4 + Math.abs(k) * 6;
+    const len = (r.height - 8 - Math.abs(k) * 10) * reach;
+    if (len < 2) continue;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      pts.push({ x: x0 + facing * lean * Math.sin(t * Math.PI / 2), y: top + t * len, w: 5.5 * Math.sin(Math.PI * Math.min(1, t * 1.05)) + 0.6 });
+    }
+    const band = (scale) => {
+      const left = pts.map((p) => ({ x: p.x - p.w * scale, y: p.y }));
+      const right = pts.map((p) => ({ x: p.x + p.w * scale, y: p.y })).reverse();
+      return left.concat(right);
+    };
+    g.fillStyle(SLASH_COLORS.glow, 0.3 * alpha);
+    g.fillPoints(band(2.2), true);
+    g.fillStyle(SLASH_COLORS.body, 0.85 * alpha);
+    g.fillPoints(band(1), true);
+    g.fillStyle(SLASH_COLORS.core, alpha);
+    g.fillPoints(band(0.45), true);
+    g.lineStyle(1.5, SLASH_COLORS.edge, 0.85 * alpha);
+    g.strokePoints(pts.map((p) => ({ x: p.x + facing * p.w * 1.1, y: p.y })), false);
   }
 }
 
@@ -907,6 +948,20 @@ const JUMP_COYOTE_MS = 140;
 // sol s'il arrive dans les 120 ms avant l'atterrissage -- sinon l'appui
 // fait juste avant de toucher le sol était perdu.
 const JUMP_BUFFER_MS = 120;
+// Saut à hauteur variable (retour des joueuses du 2026-11-09 : « un petit
+// saut, comme Hollow Knight/Ori, ça fluidifie le déplacement ») : relâcher
+// Espace pendant la montée d'un saut lancé par Espace (au sol, ou 2e saut du
+// singe / de l'aigle) ramène la vitesse de montée à JUMP_CUT_VY. Tenu
+// jusqu'au sommet, rien ne change : même hauteur qu'avant (~178 px au sol),
+// les niveaux sont calés dessus. Appui bref (~100 ms) : ~85 px, soit plus
+// d'une case ; le plus court (une image) : ~35 px. Le lâcher de liane, le
+// rebond (pogo) et les courants d'air ne sont jamais coupés.
+const JUMP_CUT_VY = 240;
+// Lianes (retour du 2026-11-09 : « le singe s'accroche tout seul, ça m'a
+// gênée contre le boss ») : on s'accroche en appuyant sur Z/↑ près d'une
+// liane, ou en le tenant en passant. Un appui fait jusqu'à ce délai AVANT
+// d'arriver à portée compte encore (appui un poil trop tôt).
+const VINE_GRAB_BUFFER_MS = 200;
 // Juice (visuel seul) : couleurs des éclats de transformation par forme.
 const FORM_FX_COLORS = {
   agarica: 0xff9fc9, wolf: 0x7dfcd8, eagle: 0xfff1c0, monkey: 0xa8e07a, octopus: 0x9fe3ff,
@@ -1749,6 +1804,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     });
     this.jumpsUsed = 0;
     this.justJumped = false;
+    // Saut en cours lancé par Espace et encore « coupable » (cf. JUMP_CUT_VY).
+    this.jumpCutArmed = false;
+    // Dernier appui sur Z/↑ (prise de liane, cf. VINE_GRAB_BUFFER_MS) ; Z/↑
+    // tenu au moment de la prise ne fait pas grimper tant qu'il n'a pas été
+    // relâché (sinon tenir ↑ pour s'accrocher hissait aussitôt Agarica).
+    this.upPressedAt = -Infinity;
+    this.vineClimbLatch = false;
     // Tampon de saut (cf. JUMP_BUFFER_MS) et état du juice (visuel seul).
     this.jumpBufferedAt = -Infinity;
     this.juicePrevVy = 0;
@@ -1843,6 +1905,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const downHeld = this.cursors.down.isDown || this.keys.down.isDown;
 
     const now = this.scene.time.now;
+    // Prise de liane sur appui (cf. VINE_GRAB_BUFFER_MS) : `|` (pas `||`) pour
+    // consommer les deux JustDown, comme pour la marche.
+    const upJustPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up) | Phaser.Input.Keyboard.JustDown(this.keys.up);
+    if (upJustPressed) this.upPressedAt = now;
+    if (!upHeld) this.vineClimbLatch = false;
     // Pas d'entrée après un passage par un bord (cf. applyEdgeArrivalState,
     // LevelKit) : direction tenue pour elle, le temps de quelques pas. La
     // moindre touche de direction ou de saut rend la main aussitôt.
@@ -1953,8 +2020,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // = état de l'image précédente (le sol n'est relu que plus bas).
       // Loup : coup de croc, toujours devant lui, sans propulsion (l'ancienne
       // ruée à 780 px/s, retirée à la demande de l'utilisateur, était trop puissante).
+      // Loup en l'air + S/↓ : coup de patte vers le bas ('paw', retour du
+      // 2026-11-09 : « que le loup puisse taper en dessous aussi ») -- même
+      // rebond que la dague vers le bas (cf. pogo plus bas).
       const bite = this.form === 'wolf';
-      this.slashDir = bite ? 'bite' : (upHeld ? 'up' : (downHeld && !this.onGround ? 'down' : 'side'));
+      const paw = bite && downHeld && !this.onGround;
+      this.slashDir = paw ? 'paw' : bite ? 'bite' : (upHeld ? 'up' : (downHeld && !this.onGround ? 'down' : 'side'));
       // Sens : la direction tenue à cet instant (sinon le sens courant) --
       // `facingDir` n'est mis à jour que plus bas dans update().
       const heldDir = left && !right ? -1 : right && !left ? 1 : 0;
@@ -1970,9 +2041,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // La transfo d'entrée (267 ms) masquerait la morsure alors que la zone
         // touche déjà : le coup la coupe, comme la prise d'une liane.
         this.formTransitionActive = false;
-        this.biteAnimPending = true;
-        juiceSquash(this, 1.08, 0.94, 140);
-        playSfx('wolf_bite');
+        this.biteAnimPending = !paw;
+        juiceSquash(this, paw ? 0.94 : 1.08, paw ? 1.08 : 0.94, 140);
+        playSfx(paw ? 'wolf_paw' : 'wolf_bite');
       } else {
         juiceSquash(this, 1.05, 0.96, 140);
         playSfx('slash', { dir: this.slashDir });
@@ -2023,7 +2094,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // `wolfSprintActive` qui ne dépend plus que des touches une fois lancé,
     // `sprinting` retombait à faux à chaque rebond, clignotant Loup/Agarica
     // et rejouant l'anim de transfo en boucle.
-    const sprintInputHeld = (left || right) && (shiftHeld || this.tapSprintDirection !== null);
+    // Maj TENUE = forme loup, même à l'arrêt (retour des joueuses du
+    // 2026-11-09 : « rester transformé en appuyant sur Maj sans courir », pour
+    // chercher pistes et plateformes cachées). En avançant, le loup garde sa
+    // vitesse de sprint. Le double appui ← / → reste un sprint : il n'existe
+    // qu'avec la direction tenue.
+    const sprintInputHeld = shiftHeld || ((left || right) && this.tapSprintDirection !== null);
     if (swimming) {
       // La Pieuvre a la priorité absolue dans l'eau (cf. commentaire sur
       // `swimming` plus haut) : un sprint entamé juste avant d'entrer dans
@@ -2088,14 +2164,23 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // stepVinePhysics) : ici on ne fait que transmettre la direction et
         // la montée (-1) / descente (+1).
         this.vineDir = dir;
-        this.vineClimb = upHeld && !downHeld ? -1 : downHeld && !upHeld ? 1 : 0;
+        // Z/↑ encore tenu depuis la prise : pas de grimpe avant de le relâcher.
+        const climbUp = upHeld && !this.vineClimbLatch;
+        this.vineClimb = climbUp && !downHeld ? -1 : downHeld && !upHeld ? 1 : 0;
         this.setAcceleration(0, 0);
         this.setDrag(0, 0);
         this.body.maxVelocity.set(VINE_BODY_MAX_SPEED, VINE_BODY_MAX_SPEED);
       }
-    } else if (monkeyActive && !onGround && this.airJumpForm === 'monkey' && typeof findGrabbableVine === 'function') {
+    } else if (monkeyActive && !onGround && this.airJumpForm === 'monkey' && typeof findGrabbableVine === 'function'
+      && (upHeld || now - this.upPressedAt <= VINE_GRAB_BUFFER_MS)) {
+      // Prise SUR APPUI de Z/↑ (ou tenu en passant), plus automatique : un
+      // singe qui passe près d'une liane sans rien demander la traverse.
       const vine = findGrabbableVine(this.scene, this, now);
-      if (vine) this.grabVine(vine, now);
+      if (vine) {
+        this.grabVine(vine, now);
+        this.vineClimbLatch = upHeld;
+        this.upPressedAt = -Infinity;
+      }
     }
     // Élan conservé après un lâcher de liane : vitesse max relevée et frein
     // aérien réduit jusqu'à l'atterrissage (ou la prochaine liane).
@@ -2130,6 +2215,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.wolfJumpCarry = sprinting;
         juiceJump = 'ground';
         jumpActed = true;
+        this.jumpCutArmed = true;
         this.jumpBufferedAt = -Infinity;
       } else if (!swimming && airForm === 'monkey' && this.jumpsUsed < 2) {
         // Saut court du singe = LE double saut : transforme en singe (cf.
@@ -2140,6 +2226,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.jumpsUsed += 1;
         jumpActed = true;
         juiceJump = 'air';
+        this.jumpCutArmed = true;
         if (this.jumpsUsed === 2) {
           this.airJumpForm = 'monkey';
           this.setVelocityY(this.monkeyJumpVelocity);
@@ -2150,6 +2237,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       } else if (!swimming && airForm === 'eagle' && this.jumpsUsed < 2) {
         jumpActed = true;
         juiceJump = 'air';
+        this.jumpCutArmed = true;
         // Pose actuelle (montée ou descente du 1er saut) au moment précis
         // du double-saut : décide quelle des deux séquences de
         // transformation jouer (cf. TRANSFO_RISE/FALL_START_KEY).
@@ -2181,19 +2269,35 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Rebond (pogo) : coup vers le bas qui touche quelque chose de frappable,
     // une fois par coup. Testé AVANT LevelKit (qui applique les dégâts juste
     // après Player.update) : l'ennemi touché est donc encore vivant ici.
-    if (this.isAttacking && this.slashDir === 'down' && !this.pogoDone && !onGround && !this.vine
+    if (this.isAttacking && (this.slashDir === 'down' || this.slashDir === 'paw') && !this.pogoDone && !onGround && !this.vine
       && this.isSlashActive(now) && this.pogoTargetHit(this.getSlashRect())) {
       this.pogoDone = true;
       this.setVelocityY(POGO_VELOCITY);
+      // Le rebond n'est jamais raccourci en relâchant Espace (cf. JUMP_CUT_VY).
+      this.jumpCutArmed = false;
       // Rend l'éventuel saut aérien (singe/aigle), comme dans Hollow Knight ;
       // sans forme aérienne, jumpsUsed >= 1 : toujours aucun saut en l'air.
       this.jumpsUsed = 1;
-      this.wolfJumpCarry = false;
+      // Coup de patte du loup : il reste loup pendant le rebond.
+      this.wolfJumpCarry = this.slashDir === 'paw';
       // Juice : rebond étiré + éclat sous les pieds.
       juiceSquash(this, 0.86, 1.16, 200);
       spawnFx(this.scene, 'star', this.x, this.y + 8, { count: 5, angle: [20, 160], power: 1.2 });
       playSfx('pogo');
       this.scene.events.emit('player-pogo', this);
+    }
+
+    // Saut à hauteur variable (cf. JUMP_CUT_VY) : Espace relâché pendant la
+    // montée d'un saut lancé par Espace -> montée ramenée à JUMP_CUT_VY, une
+    // seule fois. Le saut tenu jusqu'au sommet n'est jamais touché.
+    if (this.jumpCutArmed) {
+      const vy = this.body.velocity.y;
+      if (vy >= 0 || this.vine || swimming) {
+        this.jumpCutArmed = false;
+      } else if (!this.keys.jump.isDown) {
+        if (vy < -JUMP_CUT_VY) this.setVelocityY(-JUMP_CUT_VY);
+        this.jumpCutArmed = false;
+      }
     }
 
     // Vol de liane en liane (lâcher avec Espace, cf. releaseVine) : chute à la
@@ -2243,7 +2347,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setForm('eagle');
     } else if (!onGround && this.airJumpForm === 'monkey') {
       this.setForm('monkey');
-    } else if (this.slashDir === 'bite' || sprinting || (this.wolfJumpCarry && this.jumpsUsed < 2)) {
+    } else if (this.slashDir === 'bite' || this.slashDir === 'paw' || sprinting || (this.wolfJumpCarry && this.jumpsUsed < 2)) {
       // 'bite' : le Loup reste jusqu'au bout du coup, même Maj relâchée
       // (sinon Agarica apparaîtrait à la place du loup, crocs encore affichés).
       this.setForm('wolf');
@@ -2251,7 +2355,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setForm('agarica');
     }
     // Morsure coupée par une autre forme (double saut, eau) : plus de crocs.
-    if (this.slashDir === 'bite' && this.form !== 'wolf') {
+    if ((this.slashDir === 'bite' || this.slashDir === 'paw') && this.form !== 'wolf') {
       this.isAttacking = false;
       this.slashDir = null;
     }
@@ -2506,10 +2610,21 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           this.applyBodyForScale(WOLF_BITE_SCALE, WOLF_BITE_BODY);
           // Sens figé à l'appui, comme les crocs (loup de face à droite).
           this.setFlipX(this.slashFacing < 0);
+        } else if (this.slashDir === 'paw') {
+          // Coup de patte vers le bas : pose de réception (pattes avant
+          // tendues vers le sol), griffes dessinées dessous (cf. drawPawFx).
+          this.anims.stop();
+          this.setTexture(WOLF_LANDING_TEXTURE);
+          this.applyBodyForScale(WOLF_JUMP_SCALE, FORMS.wolf.body);
+          this.setFlipX(this.slashFacing < 0);
         } else if (onGround && now < (this.wolfLandPoseUntil || 0)) {
           // Réception tenue WOLF_LAND_POSE_MS (une seule image : un flash).
           this.anims.stop();
           this.setTexture(WOLF_LANDING_TEXTURE);
+        } else if (onGround && dir === 0 && Math.abs(this.body.velocity.x) < WOLF_STAND_SPEED) {
+          // Loup tenu à l'arrêt (Maj seule) : debout, sans courir sur place.
+          this.anims.stop();
+          this.setTexture(WOLF_STAND_TEXTURE);
         } else if (onGround) {
           this.anims.play(ANIM_WOLF_RUN_KEY, true);
         } else {
@@ -3797,6 +3912,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const now = this.scene.time.now;
     const t = now - this.slashStart;
     const after = t - SLASH_WINDUP_MS - SLASH_ACTIVE_MS;
+    // Coup de patte du loup : griffes tracées dès l'élan, de haut en bas,
+    // complètes à mi-phase active (zone qui touche = phase active seulement).
+    if (this.isAttacking && this.slashDir === 'paw' && after < SLASH_FADE_MS) {
+      if (spr) spr.setVisible(false);
+      const reach = Phaser.Math.Clamp(t / (SLASH_WINDUP_MS + SLASH_ACTIVE_MS / 2), 0, 1);
+      const a = after < 0 ? (t < SLASH_WINDUP_MS ? 0.8 : 1) : 0.7 * (1 - after / SLASH_FADE_MS);
+      drawPawClaws(g, this.getSlashRect('paw'), this.slashFacing, 1 - (1 - reach) * (1 - reach), a);
+      return;
+    }
     // Crocs visibles dès l'élan : c'est le geste de se refermer qui se lit
     // (ils ne touchent qu'aux images actives, cf. isSlashActive).
     const bite = this.slashDir === 'bite';

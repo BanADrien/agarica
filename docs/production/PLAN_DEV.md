@@ -111,7 +111,8 @@ Tu peux lire le screenshot avec l'outil Read pour vérifier visuellement.
 - **Bulles de parole NON bloquantes** (2026-10-23) : `showSpeechBubble(scene, cible, texte,
   { ms, who, replace }) → Promise` (résolue quand la bulle a disparu). Bulle de BD au-dessus
   du personnage (fond sombre, liseré vert lunaire, pointe vers lui, ≤ 220 px de large,
-  retour à la ligne) qui le SUIT (course, saut), ne gèle rien et ne prend aucune touche ;
+  retour à la ligne) qui le SUIT (course, saut), ne gèle rien et ne prend aucune touche
+  (**depuis le 2026-11-09 : à place fixe en haut à droite, cf. « Retours de Light et Marie »**) ;
   fondu après `ms` (défaut 2,5-5 s selon la longueur). `cible` : objet de jeu, ou
   `'agarica'`/`'player'`, `'xara'` (compagnon `scene.xara`, sinon PNJ), clé de `scene.npcs`
   ou id de manifest d'un PNJ ; introuvable → toast « Nom : texte ». Une bulle à la fois par
@@ -241,7 +242,8 @@ Formes (Player.js) — état & API :
   `storySet('airForm', 'monkey')` est aussi suivi en direct.
 - `player.getActiveAirForm()`, `player.equipForm(id)`, `player.unequipForm(id)`,
   `player.vine` (liane tenue ou null), `player.form` ∈ agarica/wolf/eagle/monkey/octopus.
-- Saut = **Espace seul** (-680, ~172 px ; tolérance de bord 110 ms). **Sans forme aérienne :
+- Saut = **Espace seul** (-680, ~172 px TENU ; hauteur variable depuis le 2026-11-09, cf. « Retours
+  de Light et Marie » ; tolérance de bord 110 ms). **Sans forme aérienne :
   UN SEUL saut** (plus de double saut de base). 2e appui en l'air : singe = -500 + forme singe
   (qui seule s'accroche aux lianes) ; aigle = -550 + plané (inchangé) — un par saut.
   **Règle à deux appuis, la même pour le singe et l'aigle** (décision de l'utilisateur du
@@ -255,7 +257,8 @@ Formes (Player.js) — état & API :
   CampfireMenuScene ; plus de cadenas ni de chaînes) ; code et sauvegarde (`equippedTotem`,
   `TOTEM_HEADS`/`TOTEM_BODIES`) intacts. Tout rouvrir : `DEMO_TOTEMS_LOCKED = false` ET
   `CAMPFIRE_SHOW_TOTEMS = true`. Les totems du monde qui donnent une forme ne changent pas.
-- Lianes : seule Agarica **devenue singe** s'y accroche (`airJumpForm === 'monkey'`) : après le
+- Lianes (**depuis le 2026-11-09 : prise sur appui de Z/↑**, cf. « Retours de Light et Marie ») :
+  seule Agarica **devenue singe** s'y accroche (`airJumpForm === 'monkey'`) : après le
   double saut qui la transforme, ou après un lâcher de liane (il compte comme ce double saut :
   on enchaîne les lianes). Un saut simple sous une liane passe au travers, même au sommet de
   l'arc. En forme humaine/aigle/loup elles sont ignorées partout (plus de lianes-tremplins,
@@ -327,7 +330,7 @@ Types d'ennemis enregistrés (agent **Ennemis**), entrée `enemies: [{type, x, y
 | `mousse_creature` | MousseCreature | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit, ne les dépasse pas), `hp` (déf. 1) | corrompu ; rampe vers le joueur (<260 px), se tasse 0,4 s puis bondit. Art `mousse_creature` (idle/attack/death) |
 | `singe_corrompu` | SingeCorrompu | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit), `hp` (déf. 2) | corrompu ; garde ses distances (170-360 px), lève une pierre 0,5 s puis la lance en cloche (`player.hitByEnemy()`, brisée au sol). Art `singe_corrompu` (idle/run/throw) |
 | `crapaud_sauteur` | CrapaudSauteur (CrapaudCorrompu.js) | `patrolMinX`/`patrolMaxX` (déf. x±150 via LevelKit), `hp` (déf. 2), `facing` (`'left'` déf. / `'right'`), `reach` (portée de langue, déf. 220) | corrompu ; échelle 0,24. Se tourne vers Agarica (aggro 380 px, 240 au-dessus) ; petite machine à états : langue (télégraphe 0,42 s : gorge gonflée, lueur, 3 points de visée ; visée figée ; langue 0,45 s, de -75° à +25°, bloquée par les solides ; puis 0,65 s bouche ouverte) OU saut (accroupi 0,32 s puis bond ≤ 200 px : se rapproche, recule si < 70 px, saute sur elle entre 90 et 210 px). Alterne langue / saut. Reste dans ses bornes ET sur un sol continu au même niveau (± 24 px, sondé sous tout le trajet) : jamais dans un trou ni sur une marche |
-| `crapaud_piege` | CrapaudPiege (CrapaudPiege.js) | `hp` (déf. 2), `facing`, `reach` (déf. 220) | corrompu ; échelle 0,30, teinte pierre + coussin de mousse dessiné par code. Caché (enfoncé, rogné sous le sol) ; sort (0,22 s) quand la langue peut atteindre Agarica, vise (0,36 s), langue, exposé 0,9 s, se recache (0,32 s), réarmé 0,9 s après. `harmless` (ne blesse qu'avec la langue) ; frappable caché (dos + mousse) : frappé, il sort |
+| `crapaud_piege` | CrapaudPiege (CrapaudPiege.js) | `hp` (déf. 2), `facing`, `reach` (déf. 220) | corrompu ; échelle 0,30, teinte pierre + coussin de mousse dessiné par code. Caché (enfoncé, rogné sous le sol) ; sort (0,22 s) quand la langue peut atteindre Agarica, vise (0,36 s), langue, exposé 0,9 s, se recache (0,32 s), réarmé 0,9 s après. `harmless` (ne blesse qu'avec la langue) ; **enfoui (caché, en train de se cacher, 1re moitié de sa sortie) : invulnérable** (`blocksHit`, coup paré « tink » qui le réveille : il sort) ; rebond (pogo) toujours possible sur son dos |
 | `crapaud_corrompu` | alias de `crapaud_sauteur` (depuis le 2026-11-08) | idem | l'ancien crapaud fixe à langue droite ; ses placements utilisent les bornes par défaut x±150 |
 
 Crapauds corrompus (CrapaudCorrompu.js, base commune) : corps et langue SÉPARÉS. Le corps est
@@ -841,7 +844,8 @@ hitbox, aucun timing ni aucune durée de cinématique n'a changé. Détail du pl
   devant les décors de la zone, derrière les personnages (`storyPutBehindPlayer` le mettait
   derrière TOUS les décors : bête d'Amanite cachée par l'arbre, plaque du bosquet par la hutte).
 - `arbreGlowPassage(scene, x, y, h = 120, color, open = true)` → `{ glow, core, setOpen(v), art }`
-  (acte1_arbre.js) : fente `decor_fente_ouverte` / `_fermee` posée au sol + halo ; `glow` et
+  (acte1_arbre.js) : fente `decor_fente_ouverte` / `_fermee` (**remplacée le 2026-11-09 par l'arche de
+  racines `decor_arche_ouverte` / `_fermee`**, cf. « Retours de Light et Marie ») posée au sol + halo ; `glow` et
   `core` portent `__sx` / `__sy` (tweener `scaleX` / `scaleY`, jamais `scale`).
 - `CLAIRIERE_MOUSSE_VARIANTE` (acte2.js) = `'touffes'` (autres : `'lisere'`, `'aucune'`) :
   mousse de la clairière en touffes et plaques du lot 8 teintées presque noires, absentes à
@@ -859,6 +863,90 @@ hitbox, aucun timing ni aucune durée de cinématique n'a changé. Détail du pl
 - Interface : découpes `nineSlice` et échelles de `ui_bulle`, `ui_bulle_pointe`, `ui_invite`,
   `ui_banniere` (128 px), `ui_touche`, `ui_ornement_titre`, barres (énergie 150x22, rainure
   114x7 ; boss 448x32, rainure 378x8) ; lanternes à 0,15 ; vignette non teintée.
+
+### Retours de Light et Marie (2026-11-09, rétro-compatible)
+Treize retours de deux joueuses, corrigés ensemble. Sauvegarde : une seule clé nouvelle,
+`papillonsLiberes` (absente = aucun papillon libéré) ; rien d'autre ne change de format.
+
+- **Saut à hauteur variable** (Player.js, `JUMP_CUT_VY` = 240) : Espace relâché pendant la montée
+  d'un saut lancé par Espace (au sol, tolérance de bord, saut tamponné, 1er saut en l'air, 2e saut du
+  singe ou de l'aigle) ramène la montée à 240 px/s, une seule fois (`player.jumpCutArmed`). Tenu
+  jusqu'au sommet : rien ne change (même hauteur qu'avant, les niveaux sont calés dessus). Mesuré :
+  tenu 172 px, appui de 100 ms 81 px, de 60 ms 52 px, d'une image 31 px ; singe (2e appui à 320 ms)
+  236 px tenu, 202 px bref. Jamais coupés : lâcher de liane, rebond, courants d'air, recul d'un coup.
+  Pilotes de test : Espace tenu jusqu'au sommet (PathBot, VineBot, HumanBot de Kainati).
+- **Maj tenue = loup, même à l'arrêt** : `sprintInputHeld = Maj || (direction + double appui)`. À
+  l'arrêt, le loup est debout (`WOLF_STAND_TEXTURE` = `loup-run-0` figée sous `WOLF_STAND_SPEED`
+  40 px/s) ; en avançant, vitesse de sprint (396). Pistes et plateformes cachées se révèlent donc sans
+  courir (elles ne lisent que `player.form === 'wolf'`). Le double appui ← / → reste un sprint.
+- **Coup de patte du loup vers le bas** : loup en l'air + S/↓ + K → `slashDir = 'paw'`, zone
+  `SLASH_ARCS.paw` (sous les pattes, 92 x 68), mêmes phases et jetons que la dague, même rebond
+  (`POGO_VELOCITY`, événement `'player-pogo'`) ; le loup reste loup pendant le coup et le rebond
+  (`wolfJumpCarry`). Pose : `loup-jump-3` (pattes avant tendues) ; trois griffes dessinées par code
+  (`drawPawClaws` : halo vert lunaire, cœur clair, liseré rose), tracées de haut en bas.
+- **Lianes sur appui** : en singe et en l'air, la prise demande Z/↑ (tenu en passant, ou appuyé au
+  plus `VINE_GRAB_BUFFER_MS` = 200 ms avant d'arriver à portée). Inchangés : la règle du double saut,
+  le lâcher, l'enchaînement (tenir ↑ pendant le vol suffit). Z/↑ encore tenu au moment de la prise ne
+  fait pas grimper tant qu'il n'est pas relâché (`player.vineClimbLatch`). Aides alignées : écran
+  Contrôles, menu du feu, popups de forme, épreuve du singe, combat de Kainati. VineBot tient ↑ en vol
+  quand sa cible est une liane (et ignore les lianes vers un appui).
+- **PNJ pendant un dialogue** (StoryKit, `storyStageDialogueLine`, appelée à chaque réplique de la
+  boîte) : un PNJ immobile qui jouait une anim de déplacement (`STORY_NPC_LOCO_RE` : walk, run,
+  run_idol, walk_angry…) passe au repos (son idle, ou une image figée de la même anim :
+  `STORY_NPC_LOCO_HOLD`, Amanite qui serre l'idole) ; celui qui parle se tourne vers son
+  interlocuteur (Agarica, ou `line.to` = clé d'un PNJ) ; les autres PNJ à moins de 480 px se tournent
+  vers celui qui parle ; Xara compagnon s'arrête. Laissés tels quels : PNJ déplacé par la cinématique
+  (`__scripted`, tween), sens fixé par `npcFace` gauche/droite (`__faceLocked` jusqu'à la fin de la
+  cinématique), PNJ `lookAtPlayer: false` qui ne parle pas, sprite `noDialogueStage` (Kainati boss).
+  `npcMove` rejoue l'anim de déplacement mise au repos (`__locoAnim`) et finit au repos.
+- **Coup paré** (contrat ennemi facultatif, LevelKit `damageEnemy` + pierre de Projectiles.js) :
+  `enemy.blocksHit(source)` vrai → aucun dégât, ni énergie ni hit-stop, retour « tink »
+  (`juiceOnBlockedHit` : étincelles, éclat, mot « tink »), puis `enemy.onBlockedHit(source)` s'il
+  existe. Utilisé par le crapaud-piège enfoui (cf. tableau des ennemis).
+- **Portrait selon l'histoire** : `SPEAKERS[who].portraitByFlag = { flag: portraitId }`, lu par
+  `storySpeakerPortraitId(who, line)` (boîte de dialogue et bulles). Kainati épargné
+  (`kainatiDefeated`) : `portrait_kainati_calme` (yeux ambrés), fabriqué par
+  `tools/kainati_portrait_calme.py` à partir de `portrait_kainati`.
+- **Bulles non bloquantes à place fixe** (`SPEECH_BUBBLE_FIXED` = true ; false = bulles au-dessus
+  des personnages comme avant) : en haut à droite de la vue, empilées dans l'ordre d'apparition, avec
+  le visage rond du portrait (sinon pastille couleur + initiale) et le nom de qui parle, sans pointe ;
+  elles évitent HUD et toast (`worldUiHudRects`), glissent à leur nouvelle place quand une bulle du
+  dessus s'en va, 3 au plus (`SPEECH_BUBBLE_FIXED_MAX`, les plus anciennes s'effacent). API inchangée
+  (`showSpeechBubble`, `clearSpeechBubbles`, étape `bubble`, `storyBulles`). Boîte de dialogue inchangée.
+- **Arche de racines** à la place de la fente ovale (`arbreGlowPassage`, même contrat) :
+  `decor_arche_ouverte` / `_fermee` (440 x 300, `tools/arche_racines.py`, à partir de l'écorce de la
+  fente), haute de h x 1,25 (`ARBRE_ARCHE_HEIGHT_K`), toujours entière dans la zone, halo couché.
+  Les PNG de la fente restent sur disque (source de l'outil), retirés du manifeste.
+- **Forêt flottante 2** : les deux grands vides se passaient au saut du loup lancé (mesuré : posé
+  jusqu'à 30 px au-delà du bord d'en face). T2 = x 3008-3200, surface 128 (deux cases plus loin, une
+  rangée plus haut, collée à T3) ; I5 = x 3968-4096 ; courant d'air du filet en x 2850, jusqu'à y 20 ;
+  corbeau de T2 suivi. Mesuré au pilote : loup 9/9 et 11/11 échecs (même au bout de la tolérance de
+  bord), aigle 3/3 réussites, remontée du filet par le courant d'air réussie.
+- **Arrivées** : crapaud sauteur du surplomb de la forêt sombre 2 en x 4280 (bornes 4180-4340, à plus
+  de 380 px de la trouée du cercle de lune) ; singe corrompu de la forêt corrompue sur la branche
+  basse de droite (x 2870), calmé 2,5 s à l'arrivée de la canopée (`ACTE2_FC1_ARRIVAL_CALM_MS`).
+- **Carte** (MapScene `placeLabels`) : un nom ne se pose ni sur un autre nom ni sur le dessin d'une
+  autre zone ; places essayées : au-dessus de sa zone, dans son haut, dans son bas, dessous, toujours
+  dans sa largeur ; sinon, 2e passage (au-dessus, seulement sans toucher un nom).
+- **Papillons prisonniers** — clé de zone `butterflies` (SecretKit.js, section 7) :
+  ```
+  butterflies: [{ id: 'branche_haute', x: 2300, y: 222, prison: 'toile' },
+                { id: 'sous_branche', x: 2240, y: 362, prison: 'cocon', fil: 19 }]
+  ```
+  Toile (x, y = centre) ou cocon pendu (x, y = centre, `fil` = fil au-dessus, 40 par défaut), dessinés
+  par code. Un coup de mêlée (dague, croc, patte : `player.getAttackHitbox`) le libère : la prison
+  cède, le papillon (faune d'Animaux.js) vole jusqu'à Agarica, puis toast « Papillon libéré n/N ».
+  Sauvegarde : `papillonsLiberes` = liste de `'zone:id'` (enregistré dès le coup). N = total des
+  zones de la démo (`papillonsTotal`, lu dans les données). Tous les 3 (`PAPILLON_PALIER`), la
+  compétence papillon gagne un niveau (3 au plus) : **elle coûte moins d'énergie**, 40 → 32 → 26 → 20
+  (`PAPILLON_COUTS`, `SKILL_DEFS.papillon.cost` est un accesseur). Visible : toast au passage de
+  niveau, « Papillons n » et texte du niveau dans le menu des compétences du feu, compteur sous la
+  bourse dans le sac. Libérés avant d'avoir la compétence, ils comptent quand même. API :
+  `papillonsCount()`, `papillonsTotal()`, `papillonSkillLevel()`, `papillonSkillCost()`,
+  `papillonSkillLevelText()` ; événement scène `'butterfly-freed'`. Éditeur : outil « Papillon
+  prisonnier » (menu Plus d'outils, groupe Secrets, avec cassable, coffre et trésor). Posés : forêt
+  sombre 1 (toile sur la branche haute du sous-bois), forêt sombre 2 (cocon sous la branche haute),
+  racines (toile sur le toit du tunnel).
 
 ### Rendu de cohésion (LookKit) (`src/utils/LookKit.js`, décision du 2026-10-28, rétro-compatible)
 Reprise de la variante C du prototype (`prototype/coherence.html`, `src/proto/`, laissés tels quels).

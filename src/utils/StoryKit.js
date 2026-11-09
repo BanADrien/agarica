@@ -215,8 +215,9 @@ function attachPlayManifest(sprite, id) {
       this.__sheetFactor = f;
     }
     this.currentManifestAnim = anim;
-    // Sortie d'une pose de repos figée (cf. storyNpcRest).
+    // Sortie d'une pose de repos figée (cf. storyNpcRest, storyStageDialogueLine).
     this.__restPaused = false;
+    this.__holdPose = null;
     if (this.anims && this.anims.isPaused) this.anims.resume();
     return this.play(key, ignoreIfPlaying);
   };
@@ -1098,11 +1099,13 @@ function unlockSkillFromStory(scene, skillId, { silent = false } = {}) {
 }
 
 const STORY_FORM_INFO = {
-  hasWolfForm: { type: 'wolf', name: 'Forme du loup', desc: '[Maj] ou double appui [←] [→] : courir, franchir les ravins, voir les pistes. [K] : croc.' },
+  // Maj tenue = loup même à l'arrêt (2026-11-09).
+  hasWolfForm: { type: 'wolf', name: 'Forme du loup', desc: '[Maj] tenue : loup, même à l\'arrêt. Il court, voit les pistes cachées et mord [K].' },
   // Sans forme aérienne, Agarica n'a qu'un saut : c'est la forme qui donne le double saut.
   hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: '[Espace] deux fois : plus haut, puis tu planes.' },
   // Lianes : seule Agarica devenue singe s'y accroche (cf. Player.js).
-  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: '[Espace] deux fois près d\'une liane : tu deviens singe et tu t\'y accroches.' },
+  // Prise sur appui de Z/↑ depuis le 2026-11-09 (plus d'accroche automatique).
+  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: '[Espace] deux fois : tu deviens singe. [↑] près d\'une liane : tu t\'y accroches.' },
   hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Tu nages dans l\'eau.' },
 };
 
@@ -1726,6 +1729,20 @@ const SPEECH_BUBBLE_GAP = 4; // entre la pointe et le haut visible du personnage
 // (DECOR_FOREGROUND_DEPTH), sous les invites « Appuie sur E ».
 const SPEECH_BUBBLE_DEPTH = 1040;
 const SPEECH_BUBBLE_FADE_MS = 220;
+// Place FIXE (retour des joueuses du 2026-11-09 : « le truc vraiment chiant,
+// c'est l'araignée et les dialogues : mets un endroit fixe ») : les bulles ne
+// suivent plus le personnage, elles s'empilent en haut à droite de l'écran
+// (les cœurs sont en haut à gauche), avec le visage et le nom de qui parle,
+// sans pointe. Elles évitent le HUD et le toast d'aide (worldUiHudRects) et
+// glissent d'une place à l'autre quand une bulle du dessus s'en va.
+// `false` : bulles de BD au-dessus des personnages, comme avant.
+const SPEECH_BUBBLE_FIXED = true;
+const SPEECH_BUBBLE_FIXED_MAX_W = 260;
+const SPEECH_BUBBLE_FIXED_PAD = { x: 10, y: 7 };
+const SPEECH_BUBBLE_FIXED_FACE = 30; // diamètre du médaillon
+const SPEECH_BUBBLE_FIXED_GAP = 6; // entre deux bulles empilées
+const SPEECH_BUBBLE_FIXED_EASE = 0.3; // glissement vers la nouvelle place, par image
+const SPEECH_BUBBLE_FIXED_MAX = 3; // au-delà, les plus anciennes s'effacent
 
 function speechBubbleDuration(text) {
   return Phaser.Math.Clamp(1400 + String(text).length * 45, 2500, 5000);
@@ -1794,7 +1811,105 @@ const SPEECH_BUBBLE_ART = {
   tailInset: 7, tailInsetSide: 5, tailMargin: { x: 21, y: 21 },
 };
 
-function buildSpeechBubble(scene, text) {
+// Qui parle dans une bulle : id (SPEAKERS ou manifeste), nom et couleur.
+function speechBubbleSpeaker(scene, target, who, targetOrNpcId) {
+  let id = who || (typeof targetOrNpcId === 'string' ? targetOrNpcId : null);
+  if (!id && target) {
+    if (target === scene.player) id = 'agarica';
+    else if (target === scene.xara) id = 'xara';
+    else id = target.manifestId || target.npcKey || null;
+  }
+  if (id === 'player') id = 'agarica';
+  const sp = (id && SPEAKERS[id]) || null;
+  const name = (sp && sp.name) || (target && target.npcName) || (id ? id.charAt(0).toUpperCase() + id.slice(1).replace(/_/g, ' ') : '');
+  return { id, name, color: sp ? sp.color : 0xa99bd6, initial: (sp && sp.initial) || (name ? name.charAt(0) : '?') };
+}
+
+// Visage rond du médaillon : portrait Codex recadré sur le visage (même
+// repère que la boîte de dialogue, DIALOGUE_PORTRAIT_FOCUS) dans une petite
+// texture ronde, faite une fois par portrait. null sans portrait.
+function speechBubbleFaceKey(scene, speakerId) {
+  const pid = speakerId ? storySpeakerPortraitId(speakerId) : null;
+  const src = pid ? `item-portrait_${pid}` : null;
+  if (!src || !scene.textures.exists(src)) return null;
+  const key = `bulle-visage-${pid}`;
+  if (scene.textures.exists(key)) return key;
+  const img = scene.textures.get(src).getSourceImage();
+  if (!img || !img.width) return null;
+  const S = 64;
+  const tex = scene.textures.createCanvas(key, S, S);
+  const ctx = tex.getContext();
+  const focus = (typeof DIALOGUE_PORTRAIT_FOCUS !== 'undefined' && DIALOGUE_PORTRAIT_FOCUS[pid]) || [0.5, 0.45];
+  // ~45 % de l'image autour du visage (la boîte de dialogue en montre ~75 %).
+  const span = Math.min(img.width, img.height) * 0.45;
+  const sx = Phaser.Math.Clamp(focus[0] * img.width - span / 2, 0, img.width - span);
+  const sy = Phaser.Math.Clamp(focus[1] * img.height - span / 2, 0, img.height - span);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = '#2a1f45';
+  ctx.fillRect(0, 0, S, S);
+  ctx.drawImage(img, sx, sy, span, span, 0, 0, S, S);
+  ctx.restore();
+  tex.refresh();
+  return key;
+}
+
+// Bulle à place fixe : médaillon (visage, sinon pastille couleur + initiale)
+// à gauche, nom de qui parle au-dessus du texte.
+function buildFixedSpeechBubble(scene, text, speaker) {
+  const P = SPEECH_BUBBLE_FIXED_PAD;
+  const D = SPEECH_BUBBLE_FIXED_FACE;
+  const art = scene.textures.exists('item-ui_bulle');
+  const sp = speaker || { name: '', color: 0xa99bd6, initial: '?' };
+  const colorHex = `#${(sp.color >>> 0).toString(16).padStart(6, '0')}`;
+  const textX = D + 8;
+  const wrap = SPEECH_BUBBLE_FIXED_MAX_W - P.x * 2 - textX;
+  const nameT = scene.add.text(0, 0, sp.name || '', {
+    fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'bold', color: colorHex, stroke: '#15101f', strokeThickness: 2,
+  }).setOrigin(0, 0);
+  const label = scene.add.text(0, 0, text, {
+    fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.text, lineSpacing: 1,
+    wordWrap: { width: wrap, useAdvancedWrap: true },
+  }).setOrigin(0, 0);
+  const nameH = sp.name ? nameT.height : 0;
+  const innerW = textX + Math.max(nameT.width, label.width);
+  const innerH = Math.max(D, nameH + label.height);
+  const w = Math.ceil(innerW + P.x * 2);
+  const h = Math.ceil(innerH + P.y * 2);
+  const x0 = -w / 2 + P.x;
+  const y0 = -h / 2 + P.y;
+  nameT.setPosition(x0 + textX, y0);
+  label.setPosition(x0 + textX, y0 + nameH);
+  const g = scene.add.graphics();
+  const bg = art ? addUiSliced(scene, 'ui_bulle', -w / 2, -h / 2, w, h, { scale: storyUiScale('ui_bulle', SPEECH_BUBBLE_ART.scale) }) : null;
+  // Médaillon : visage du portrait, sinon disque couleur + initiale ; liseré
+  // de la couleur de qui parle.
+  const fx = x0 + D / 2;
+  const fy = y0 + D / 2;
+  const faceKey = speechBubbleFaceKey(scene, sp.id);
+  const face = [];
+  if (faceKey) {
+    face.push(scene.add.image(fx, fy, faceKey).setDisplaySize(D, D));
+  } else {
+    const disc = scene.add.graphics();
+    disc.fillStyle(sp.color, 0.9).fillCircle(fx, fy, D / 2);
+    const ini = scene.add.text(fx, fy, sp.initial || '?', {
+      fontFamily: 'sans-serif', fontSize: '15px', fontStyle: 'bold', color: '#15101f',
+    }).setOrigin(0.5);
+    face.push(disc, ini);
+  }
+  const ring = scene.add.graphics();
+  ring.lineStyle(2, sp.color, 1).strokeCircle(fx, fy, D / 2);
+  const parts = [bg, g, ...face, ring, nameT, label].filter(Boolean);
+  const c = scene.add.container(0, 0, parts).setDepth(SPEECH_BUBBLE_DEPTH).setAlpha(0);
+  c.lookRole = 'ui';
+  return { container: c, g, label, w, h, bg, tail: null, fixed: true };
+}
+
+function buildSpeechBubble(scene, text, speaker = null) {
+  if (SPEECH_BUBBLE_FIXED) return buildFixedSpeechBubble(scene, text, speaker);
   const A = SPEECH_BUBBLE_ART;
   const art = scene.textures.exists('item-ui_bulle');
   const pad = art ? A.pad : SPEECH_BUBBLE_PAD;
@@ -2087,6 +2202,7 @@ function layoutAllSpeechBubbles(scene, view, ctx = {}) {
   const st = scene.__speechBubbles;
   if (!st || !st.byTarget.size || !view) return [];
   const hud = ctx.hud || (typeof worldUiHudRects === 'function' ? worldUiHudRects(scene) : []);
+  if (SPEECH_BUBBLE_FIXED) return layoutFixedSpeechBubbles(scene, view, hud);
   const characters = ctx.characters || speechBubbleCharacters(scene, view);
   const placed = [];
   const laid = [];
@@ -2101,6 +2217,55 @@ function layoutAllSpeechBubbles(scene, view, ctx = {}) {
   }
   const blockers = [...placed, ...hud];
   for (const b of laid) drawSpeechBubble(b, b.tip && speechBubbleTailClear(b, blockers) ? b.tip : null);
+  return laid.filter((b) => b.container.alpha > 0).map((b) => b.rect);
+}
+
+// Bulles à place fixe (SPEECH_BUBBLE_FIXED) : colonne en haut à droite de la
+// vue, dans l'ordre d'apparition, chacune sous la précédente et sous tout
+// obstacle de la règle commune qu'elle chevaucherait (HUD, toast d'aide).
+// Place visée en coordonnées ÉCRAN, rejointe en glissant une fois par image
+// (une bulle qui s'en va laisse monter les suivantes) ; la colonne suit la
+// caméra. Au-delà de SPEECH_BUBBLE_FIXED_MAX bulles, les plus anciennes
+// s'effacent.
+function layoutFixedSpeechBubbles(scene, view, hud) {
+  const st = scene.__speechBubbles;
+  const live = [];
+  for (const [target, slot] of st.byTarget) {
+    const b = slot.current;
+    if (b && target.active && b.container.active) live.push({ b, target, slot });
+  }
+  const extra = live.filter((e) => !e.b.ending).length - SPEECH_BUBBLE_FIXED_MAX;
+  for (let i = 0, n = 0; i < live.length && n < extra; i++) {
+    if (live[i].b.ending) continue;
+    n += 1;
+    finishSpeechBubble(scene, live[i].target, live[i].slot);
+  }
+  const meet = (a, r) => a.left < r.right && a.right > r.left && a.top < r.bottom && a.bottom > r.top;
+  const frame = scene.game.loop.frame;
+  const laid = [];
+  let y = view.top;
+  for (const { b } of live) {
+    let rect = { left: view.right - b.w, right: view.right, top: y, bottom: y + b.h };
+    for (let guard = 0; guard < 6; guard++) {
+      const hit = hud.find((r) => meet(rect, r));
+      if (!hit) break;
+      rect = { left: rect.left, right: rect.right, top: hit.bottom + SPEECH_BUBBLE_FIXED_GAP, bottom: hit.bottom + SPEECH_BUBBLE_FIXED_GAP + b.h };
+    }
+    const goal = rect.top - view.top;
+    if (b.fixedFrame !== frame) {
+      b.fixedFrame = frame;
+      b.fixedY = b.fixedY == null ? goal : b.fixedY + (goal - b.fixedY) * SPEECH_BUBBLE_FIXED_EASE;
+      if (Math.abs(goal - b.fixedY) < 0.5) b.fixedY = goal;
+    }
+    const top = view.top + b.fixedY;
+    b.rect = { left: rect.left, right: rect.right, top, bottom: top + b.h };
+    b.tip = null;
+    b.container.setPosition((rect.left + rect.right) / 2, top + b.h / 2);
+    drawSpeechBubble(b, null);
+    laid.push(b);
+    // La suivante se range sous la place VISÉE (pas sous la place glissée).
+    y = rect.bottom + SPEECH_BUBBLE_FIXED_GAP;
+  }
   return laid.filter((b) => b.container.alpha > 0).map((b) => b.rect);
 }
 
@@ -2154,7 +2319,7 @@ function finishSpeechBubble(scene, target, slot, instant = false) {
 }
 
 function startSpeechBubble(scene, target, slot, req) {
-  const b = buildSpeechBubble(scene, req.text);
+  const b = buildSpeechBubble(scene, req.text, req.speaker);
   Object.assign(b, { target, resolve: req.resolve, tipY: null, shift: null, side: 0 });
   slot.current = b;
   // Toutes les bulles remises en page : la nouvelle prend d'emblée une place
@@ -2182,7 +2347,7 @@ function showSpeechBubble(scene, targetOrNpcId, text, { ms, who, replace = false
     st.byTarget.set(target, slot);
   }
   return new Promise((resolve) => {
-    const req = { text: String(text), ms: dur, resolve };
+    const req = { text: String(text), ms: dur, resolve, speaker: speechBubbleSpeaker(scene, target, who, targetOrNpcId) };
     if (replace) {
       for (const q of slot.queue) q.resolve();
       slot.queue = [req];
@@ -2644,7 +2809,9 @@ const SPEAKERS = {
   geralt: { name: 'Geralt', color: 0xd9a441 },
   clak: { name: 'Clak', color: 0xff7f50 },
   morgat: { name: 'Morgat', color: 0x9ad1ff },
-  kainati: { name: 'Kainati', color: 0xc08a4a },
+  // Épargné (`kainatiDefeated`) : portrait aux yeux calmes, sans la lueur
+  // verte de la corruption (retour du 2026-11-09, cf. storySpeakerPortraitId).
+  kainati: { name: 'Kainati', color: 0xc08a4a, portraitByFlag: { kainatiDefeated: 'kainati_calme' } },
   kainati_esprit: { name: 'Esprit de Kainati', color: 0x7fffd4, portrait: 'kainati', portraitTint: 0x9ffff0 },
   ghilt: { name: "Ghil't", color: 0x7bd35a },
   habitant: { name: 'Habitant', color: 0xa99bd6 },
@@ -2653,6 +2820,19 @@ const SPEAKERS = {
   marchand: { name: 'Marchand', color: 0xd9c27a },
   narrateur: { name: '', color: 0xe8d9ff },
 };
+
+// Portrait d'un personnage (id de la texture `item-portrait_<id>`) : celui de
+// la réplique (`line.portrait`), sinon le premier `portraitByFlag` dont le
+// drapeau est vrai, sinon `portrait` de SPEAKERS, sinon sa clé. Utilisé par la
+// boîte de dialogue et les bulles.
+function storySpeakerPortraitId(who, line = null) {
+  if (line && line.portrait) return line.portrait;
+  const sp = SPEAKERS[who] || {};
+  if (sp.portraitByFlag) {
+    for (const [flag, id] of Object.entries(sp.portraitByFlag)) if (storyGet(flag)) return id;
+  }
+  return sp.portrait || who;
+}
 
 // Normalise `linesOrId` (id de DIALOGUES, tableau, fonction, chaîne seule).
 function resolveDialogueLines(scene, linesOrId) {
@@ -2692,6 +2872,7 @@ function setPlayerStoryPose(scene, anim) {
 function storyDialogueLinePose(scene, line) {
   const p = scene && scene.player;
   if (!p || !line) return;
+  storyStageDialogueLine(scene, line);
   storySpeakerTalkAnim(scene, line);
   if (line.pose !== undefined) setPlayerStoryPose(scene, line.pose);
   else if (line.who === 'agarica' && (!p.storyPose || p.storyPose === 'talk')) setPlayerStoryPose(scene, 'talk');
@@ -2782,6 +2963,77 @@ function storySpeakerTalkAnim(scene, line) {
   companion.setVisible(false);
   companion.__autoTalk = true;
   companion.__autoTalkAnim = xAnim;
+}
+
+// PNJ pendant un dialogue (retour des joueuses du 2026-11-09 : « Amanite court
+// sur place pendant qu'on parle »). À chaque réplique de la boîte :
+// - un PNJ immobile qui jouait une anim de déplacement (`walk`, `run`,
+//   `run_idol`, `walk_angry`… cf. STORY_NPC_LOCO_RE) passe au repos : son
+//   `idle`, ou une image figée de la même anim (STORY_NPC_LOCO_HOLD : Amanite
+//   qui serre l'idole volée). L'anim est retenue (`__locoAnim`) pour le
+//   prochain `npcMove`, qui la rejoue en marchant ;
+// - celui qui parle se tourne vers son interlocuteur (Agarica, ou `line.to` :
+//   clé d'un PNJ) ; les autres PNJ à moins de STORY_DIALOGUE_STAGE_RANGE se
+//   tournent vers celui qui parle (Agarica, Xara ou un PNJ) ;
+// - Xara compagnon (monde gelé, elle marchait sur place) s'arrête.
+// Laissés tels quels : un PNJ que la cinématique déplace (`__scripted`, tween),
+// un PNJ dont elle a fixé le sens (`npcFace` gauche/droite : `__faceLocked`,
+// jusqu'à la fin de la cinématique), un PNJ `lookAtPlayer: false` qui ne parle
+// pas (il regarde ailleurs exprès), un sprite `noDialogueStage` (boss).
+const STORY_NPC_LOCO_RE = /(^|_)(walk|run)(_|$)/;
+const STORY_NPC_LOCO_HOLD = { run_idol: 4 };
+const STORY_DIALOGUE_STAGE_RANGE = 480;
+
+function storyNpcIsMoving(npc) {
+  return !!npc.__scripted || !!(npc.scene && npc.scene.tweens && npc.scene.tweens.isTweening(npc));
+}
+
+function storyNpcRestFromLoco(npc) {
+  const anim = npc.currentManifestAnim;
+  if (!anim || npc.__holdPose || !STORY_NPC_LOCO_RE.test(anim) || !npc.anims || !npc.anims.currentAnim) return;
+  if (!npc.anims.isPlaying && !npc.anims.isPaused) return;
+  npc.__locoAnim = anim;
+  const hold = STORY_NPC_LOCO_HOLD[anim];
+  const frames = npc.anims.currentAnim.frames;
+  if (hold != null && frames && frames.length) {
+    npc.anims.pause(frames[Math.min(hold, frames.length - 1)]);
+    npc.__holdPose = anim;
+    return;
+  }
+  storyNpcRest(npc);
+  // Pas d'idle dans le manifeste : la 1re image de l'anim, figée.
+  if (npc.currentManifestAnim === anim && npc.anims.isPlaying) {
+    npc.anims.pause(frames[0]);
+    npc.__holdPose = anim;
+  }
+}
+
+function storyStageDialogueLine(scene, line) {
+  if (!scene || !line || !scene.npcs) return;
+  const p = scene.player;
+  const speaker = line.who && line.who !== 'agarica' && line.who !== 'narrateur' ? storyFindSpeakerNpc(scene, line) : null;
+  const companion = scene.xara && scene.xara.active ? scene.xara : null;
+  let talker = speaker;
+  if (!talker && line.who === 'agarica') talker = p;
+  if (!talker && line.who === 'xara') talker = companion;
+  let listener = p;
+  if (line.to && line.to !== 'agarica' && scene.npcs[line.to] && scene.npcs[line.to].active) listener = scene.npcs[line.to];
+  for (const npc of Object.values(scene.npcs)) {
+    if (!npc || !npc.active || !npc.playManifest || npc.noDialogueStage || storyNpcIsMoving(npc)) continue;
+    storyNpcRestFromLoco(npc);
+    if (npc.__faceLocked) continue;
+    let look = null;
+    if (npc === speaker) look = listener;
+    else if (npc.lookAtPlayer !== false && talker && talker !== npc && Math.abs(talker.x - npc.x) < STORY_DIALOGUE_STAGE_RANGE) look = talker;
+    if (look && look !== npc && Math.abs(look.x - npc.x) > 4) setNpcFacing(npc, look.x >= npc.x ? 1 : -1);
+  }
+  const walkKey = typeof ANIM_XARA_WALK_KEY !== 'undefined' ? ANIM_XARA_WALK_KEY : 'xara-walk';
+  if (companion && companion.anims && companion.anims.isPlaying && companion.anims.currentAnim
+    && companion.anims.currentAnim.key === walkKey) {
+    companion.anims.stop();
+    const first = typeof XARA_WALK_FRAME_INDICES !== 'undefined' ? XARA_WALK_FRAME_INDICES[0] : 0;
+    if (scene.textures.exists(`xara-walk-${first}`)) companion.setTexture(`xara-walk-${first}`);
+  }
 }
 
 let storyDialogueChain = Promise.resolve();
@@ -2915,6 +3167,7 @@ function runCutscene(scene, idOrSteps) {
     if (scene.__cutsceneLock === 0) {
       scene.__playerScripted = false;
       setPlayerStoryPose(scene, null);
+      for (const n of Object.values(scene.npcs || {})) if (n) n.__faceLocked = false;
       // Caméra déplacée par la cinématique et jamais rendue : on la rend.
       if (scene.__cameraDetached && scene.player && scene.player.active) storyCameraFollow(scene);
       releaseStoryInput(scene);
@@ -3061,8 +3314,14 @@ function cutsceneNpcMove(scene, { npc: key, toX, speed = 120 }) {
     npc.__scripted = true;
     setNpcFacing(npc, dx > 0 ? 1 : -1);
     const def = getAssetManifest()[npc.manifestId] || {};
-    const walkAnim = ['walk', 'run'].find((a) => def.anims && def.anims[a]);
-    const before = npc.currentManifestAnim || 'idle';
+    // Anim de marche : `walk`/`run` du manifeste, sinon l'anim de déplacement
+    // posée par la cinématique (en cours, ou mise au repos pendant un
+    // dialogue, cf. storyStageDialogueLine : `run_idol`, `walk_angry`…).
+    const cur = npc.currentManifestAnim;
+    const walkAnim = ['walk', 'run'].find((a) => def.anims && def.anims[a])
+      || (cur && STORY_NPC_LOCO_RE.test(cur) ? cur : null) || npc.__locoAnim || null;
+    npc.__locoAnim = null;
+    const before = cur || 'idle';
     if (walkAnim) npc.playManifest(walkAnim);
     const dir = dx > 0 ? 1 : -1;
     scene.tweens.add({
@@ -3109,6 +3368,9 @@ const CUTSCENE_STEP_HANDLERS = {
     if (!npc) return;
     if (dir === 'player' && scene.player) setNpcFacing(npc, scene.player.x >= npc.x ? 1 : -1);
     else setNpcFacing(npc, dir === 'left' ? -1 : 1);
+    // Sens choisi par la cinématique : gardé pendant ses dialogues (cf.
+    // storyStageDialogueLine), jusqu'à sa fin.
+    npc.__faceLocked = dir !== 'player';
   },
   npcRemove: (scene, key) => {
     const npc = storyNpc(scene, key);

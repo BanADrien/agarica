@@ -20,7 +20,7 @@ const DIALOGUE_MEDALLION_R = 48;
 const DIALOGUE_PORTRAIT_ZOOM = 1.3;
 const DIALOGUE_PORTRAIT_FOCUS = {
   agarica: [0.52, 0.42], xara: [0.62, 0.5], amanite: [0.62, 0.42], pere_chef: [0.56, 0.36],
-  geralt: [0.6, 0.45], morgat: [0.58, 0.42], kainati: [0.55, 0.45], ghilt: [0.48, 0.42],
+  geralt: [0.6, 0.45], morgat: [0.58, 0.42], kainati: [0.55, 0.45], kainati_calme: [0.55, 0.45], ghilt: [0.48, 0.42],
 };
 const DIALOGUE_CHOICE_ROW_H = 34;
 // Ignore les appuis juste après l'ouverture (touche encore enfoncée).
@@ -152,7 +152,8 @@ class DialogueScene extends Phaser.Scene {
 
     const R = DIALOGUE_MEDALLION_R;
     const medallionX = I.x + 16 + R;
-    this.drawPortrait(narrator ? null : (line.portrait || speaker.portrait || who), speaker, name, medallionX, I.y + I.h / 2);
+    // Portrait selon l'état de l'histoire (Kainati épargné : yeux calmes).
+    this.drawPortrait(narrator ? null : storySpeakerPortraitId(who, line), speaker, name, medallionX, I.y + I.h / 2);
     const textX = narrator ? I.x + 40 : medallionX + R + 26;
     this.drawNamePlate(narrator ? '' : name, speaker.color, textX - 12);
 

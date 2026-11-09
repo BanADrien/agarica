@@ -438,8 +438,13 @@ class MapScene extends Phaser.Scene {
     this.drawPin();
   }
 
-  // Noms des zones : seulement s'ils tiennent au-dessus de leur zone, sans en
-  // chevaucher un autre (zone d'Agarica d'abord, puis les plus larges).
+  // Noms des zones (zone d'Agarica d'abord, puis les plus larges) : jamais sur
+  // un autre nom NI sur le dessin d'une autre zone. Retour des joueuses du
+  // 2026-11-09 : posés toujours au-dessus de leur zone, des noms mordaient sur
+  // la zone voisine du dessus (« Grotte de la lisière » sous la forêt sombre,
+  // « Forêt sombre — les ravins » sous le cercle de lune) et se chevauchaient.
+  // Places essayées dans l'ordre : au-dessus de la zone, dans son haut, dans son
+  // bas, sous elle ; aucune de libre : le nom attend un zoom plus fort.
   placeLabels(shown) {
     const here = this.here && this.here.zone;
     shown.sort((a, b) => (b.zone === here) - (a.zone === here) || b.box.w - a.box.w);
@@ -450,22 +455,52 @@ class MapScene extends Phaser.Scene {
       taken.push(new Phaser.Geom.Rectangle(p.x - 10, p.y - 44, 46, 46));
     }
     const V = MAP_VIEW;
+    const zoneRects = shown.map((s) => ({ s, r: new Phaser.Geom.Rectangle(s.box.x, s.box.y, s.box.w, s.box.h) }));
     const rectOf = (l) => new Phaser.Geom.Rectangle(l.x - l.width / 2 - 4, l.y - l.height, l.width + 8, l.height);
-    const free = (r) => !taken.some((t) => Phaser.Geom.Intersects.RectangleToRectangle(t, r));
+    // 1er passage : ni sur un nom, ni sur une autre zone. 2e passage (noms
+    // restés sans place, petites zones serrées) : seulement pas sur un nom,
+    // posés au-dessus de leur zone comme avant.
+    let strict = true;
+    const free = (r, s) => !taken.some((t) => Phaser.Geom.Intersects.RectangleToRectangle(t, r))
+      && (!strict || !zoneRects.some((z) => z.s !== s && Phaser.Geom.Intersects.RectangleToRectangle(z.r, r)));
+    const inView = (r) => r.y >= V.y + 2 && r.bottom <= V.y + V.h - 2;
+    const pending = [];
     for (const s of shown) {
       const l = s.label;
       if (s.box.w < l.width * 0.7 && s.zone !== here) continue;
-      let r = rectOf(l);
+      const b = s.box;
+      const ys = [b.y - 3];
+      if (b.h >= l.height + 8) ys.push(b.y + l.height + 3, b.y + b.h - 3);
+      ys.push(b.y + b.h + l.height + 3);
+      const xs = [l.x];
       // Nom de la zone d'Agarica sous l'épingle : glissé à côté d'elle.
-      if (!free(r) && s.zone === here) {
+      if (s.zone === here) {
         const p = this.toScreen(this.here.x, this.here.y);
-        for (const x of [p.x - l.width / 2 - 16, p.x + l.width / 2 + 40]) {
-          l.setX(Phaser.Math.Clamp(x, V.x + l.width / 2 + 4, V.x + V.w - l.width / 2 - 4));
-          r = rectOf(l);
-          if (free(r)) break;
-        }
+        xs.push(p.x - l.width / 2 - 16, p.x + l.width / 2 + 40);
       }
-      if (!free(r)) continue;
+      // Toujours au-dessus (ou dans) SA zone : jamais glissé au-dessus de la voisine.
+      const half = l.width / 2;
+      const lo = Math.max(V.x + half + 4, b.w > l.width ? b.x + half : b.x + b.w / 2);
+      const hi = Math.min(V.x + V.w - half - 4, b.w > l.width ? b.x + b.w - half : b.x + b.w / 2);
+      let ok = false;
+      for (const y of ys) {
+        for (const x of xs) {
+          l.setPosition(lo <= hi ? Phaser.Math.Clamp(x, lo, hi) : Phaser.Math.Clamp(x, V.x + half + 4, V.x + V.w - half - 4), y);
+          const r = rectOf(l);
+          if (inView(r) && free(r, s)) { ok = true; break; }
+        }
+        if (ok) break;
+      }
+      if (!ok) { pending.push(s); continue; }
+      taken.push(rectOf(l));
+      l.setVisible(true);
+    }
+    strict = false;
+    for (const s of pending) {
+      const l = s.label;
+      l.setPosition(Phaser.Math.Clamp(s.box.x + s.box.w / 2, V.x + l.width / 2 + 4, V.x + V.w - l.width / 2 - 4), Math.max(V.y + 16, s.box.y - 3));
+      const r = rectOf(l);
+      if (!inView(r) || !free(r, s)) continue;
       taken.push(r);
       l.setVisible(true);
     }

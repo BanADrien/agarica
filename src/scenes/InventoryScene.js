@@ -100,6 +100,14 @@ class InventoryScene extends Phaser.Scene {
       icon.setScale(18 / icon.height);
     }
     this.purseText = t;
+    // Papillons libérés (clé de zone `butterflies`, SecretKit.js) : sous la
+    // bourse, avec le niveau de la compétence papillon qu'ils donnent.
+    if (typeof papillonsCount === 'function') {
+      const lvl = papillonSkillLevel();
+      this.butterflyText = this.add.text(right, y + 16, `Papillons libérés ${papillonsCount()}/${papillonsTotal()}${lvl ? ` · niveau ${lvl}` : ''}`, {
+        fontFamily: 'sans-serif', fontSize: '11px', fontStyle: 'bold', color: '#ffd6f2', stroke: '#15101f', strokeThickness: 3,
+      }).setOrigin(1, 0.5);
+    }
   }
 
   switchTab(tab) {

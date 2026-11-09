@@ -9,11 +9,19 @@
 //   T1     x 2240-2496  totem de l'aigle, +3 rangées depuis I4 : atteignable
 //                       au bond du singe (seule forme aérienne avant l'aigle ;
 //                       saut simple 172 px < 192)
-//   T1→T2  x 2496-2880  6 cases de vide : impossible sans planer. Filet de
-//                       sécurité N (gy 8) dessous + courant d'air qui remonte
-//                       l'aigle au niveau de T2 ; marche S1 pour remonter à pied
-//   T3     x 3200-3456  rampe d'envol ; 9 cases de vide puis la sortie (bord
-//                       droit, toute hauteur) : long plané vers la clairière.
+//   T1→T2  x 2496-3008  8 cases de vide, T2 une rangée plus haut (surface 128,
+//                       x 3008-3200, collée à T3) : impossible sans planer.
+//                       Filet de sécurité N (gy 8) dessous + courant d'air qui
+//                       remonte l'aigle au-dessus de T2 ; marche S1 pour
+//                       remonter à pied
+//   T3     x 3200-3456  rampe d'envol ; 8 cases de vide jusqu'à l'île I5
+//                       (x 3968), puis la sortie (bord droit, toute hauteur) :
+//                       long plané vers la clairière.
+// Retour des joueuses (2026-11-09) : les deux grands vides (6 cases) se
+// passaient au saut du loup lancé (mesuré : le loup se posait jusqu'à 30 px
+// AU-DELÀ du bord d'en face). T2 commence deux cases plus loin et une rangée
+// plus haut, I5 deux cases plus loin : le loup retombe court (mesuré au
+// pilote, même en sautant au tout dernier moment), l'aigle passe en planant.
 const FORET_FLOTTANTE_2_DATA = {
   zoneName: 'Les îles flottantes',
   zoneSub: 'Forêt flottante',
@@ -79,12 +87,13 @@ const FORET_FLOTTANTE_2_DATA = {
     ...groundRow(35, 39, [3]),      // T1 totem de l'aigle (surface 192)
     ...groundRow(39, 41, [5]),      // S1 marche de retour (surface 320)
     ...groundRow(37, 48, [8]),      // N filet de sécurité (surface 512)
-    ...groundRow(45, 49, [3]),      // T2 (surface 192)
+    ...groundRow(47, 50, [2]),      // T2 (surface 128), collée à T3 (marche de 64 px)
     ...groundRow(50, 54, [3]),      // T3 rampe d'envol (surface 192)
     // I5 : île du bord droit (surface 192), là où l'on atterrit en revenant de la
     // clairière : le bord droit donnait sinon sur 640 px de vide, et l'arrivée
-    // par ce bord aurait été un trou mortel.
-    ...groundRow(60, 64, [3]),
+    // par ce bord aurait été un trou mortel. Deux cases (x 3968-4096) : plus
+    // large, le loup lancé depuis T3 l'atteignait.
+    ...groundRow(62, 64, [3]),
   ],
   avoidRanges: [[0, 4096]],
   playerSpawn: { x: 120, y: 280 },
@@ -101,7 +110,7 @@ const FORET_FLOTTANTE_2_DATA = {
     { type: 'bosquet_standing_stone', x: 1370, y: 320, scale: 0.22 },   // ruine du gardien
     { type: 'foret_flottante_arbre_jeune', x: 2090, y: 384, scale: 0.42 },
     { type: 'foret_flottante_fleurs_hautes', x: 1700, y: 384, scale: 0.26 },
-    { type: 'foret_flottante_arbre_jeune', x: 3010, y: 192, scale: 0.36 },
+    { type: 'foret_flottante_arbre_jeune', x: 3100, y: 128, scale: 0.36 },   // sur T2 (surface 128)
     { type: 'bosquet_antler_totem', x: 3390, y: 192, scale: 0.28 },
   ],
   totems: [
@@ -119,11 +128,11 @@ const FORET_FLOTTANTE_2_DATA = {
     { id: 'envol', x: 3330, w: 64, cutscene: 'ff2_envol', requires: { hasEagleForm: true } },
     // Vague 3 : le vent du début, revu avec l'aigle (bulle de Xara, sur I1).
     { id: 'v3_vent', x: 610, y: 340, w: 180, h: 140, requires: { hasEagleForm: true }, cutscene: 'v3_ff2_vent' },
-    // Retour des joueurs (2026-11-08) : le vide de 384 px entre la rampe T3 et
-    // l'île I5 (x 3456-3840) ne se passe qu'en planant. Rappel court de Xara au
+    // Retour des joueurs (2026-11-08) : le vide de 512 px entre la rampe T3 et
+    // l'île I5 (x 3456-3968) ne se passe qu'en planant. Rappel court de Xara au
     // bord, des deux côtés, à chaque fois qu'on s'en approche.
     { id: 'v3_trou', x: 3420, y: 150, w: 72, h: 100, once: false, cutscene: 'v3_ff2_trou' },
-    { id: 'v3_trou_retour', x: 3876, y: 150, w: 72, h: 100, once: false, cutscene: 'v3_ff2_trou' },
+    { id: 'v3_trou_retour', x: 4004, y: 150, w: 72, h: 100, once: false, cutscene: 'v3_ff2_trou' },
   ],
   // Corbeaux adoucis comme ceux de la forêt flottante 1 (revue du 2026-11-05) :
   // piqué sur une Agarica posée seulement, plus lent, plus rare, et patrouille
@@ -146,7 +155,9 @@ const FORET_FLOTTANTE_2_DATA = {
     { type: 'mousse_creature', x: 1290, y: 260, patrolMinX: 1150, patrolMaxX: 1340 },
     // Côté gauche de T2 : un saut vers T3 pris sous son piqué (bord droit de la
     // patrouille à 3053) le prenait encore en plein vide, 1 fois sur 12.
-    { type: 'corbeau', x: 2975, y: -30, patrolMinX: 2935, patrolMaxX: 3015, diveDepth: 180, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
+    // 2026-11-09 : suit T2 (deux cases plus à droite, une rangée plus haut),
+    // même hauteur au-dessus d'elle (222 px).
+    { type: 'corbeau', x: 3100, y: -94, patrolMinX: 3060, patrolMaxX: 3140, diveDepth: 180, diveSpeed: 240, diveCooldown: 3600, diveGroundedOnly: true },
   ],
   windCurrents: [
     // Entre I1 et I2 : on voit le vent monter avant l'aigle. Vague 3 : prolongé
@@ -156,8 +167,9 @@ const FORET_FLOTTANTE_2_DATA = {
     // îles, l'aigle le traversait sans monter. Il mord de 16 px sur I1 : on
     // s'envole d'un saut depuis son bord, sans élan.
     { x: 688, y: -560, w: 104, h: 1040, force: 330 },
-    // Sur le filet N : ramène l'aigle au niveau de T2.
-    { x: 2690, y: 90, w: 120, h: 422, force: 330 },
+    // Sur le filet N : ramène l'aigle au-dessus de T2 (surface 128 depuis le
+    // 2026-11-09 : colonne plus haute et plus près d'elle).
+    { x: 2850, y: 20, w: 120, h: 492, force: 330 },
   ],
   entries: [
     { id: 'from_ff1', x: 110, y: 250, height: 120, edge: 'left', from: -400, to: 320 },

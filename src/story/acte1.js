@@ -910,10 +910,11 @@ CUTSCENES.fs2_ravin = cutsceneBulles([
 // Juste après le totem (sa bannière occupe l'écran ~2,6 s) : bulles ensuite.
 CUTSCENES.fs2_loup = cutsceneBulles([
   'Cours, et saute au tout dernier moment.',
-], { text: '[Maj] ou double appui [←] [→] : courir en loup', ms: 4200 }, 2600);
+// Maj tenue = loup, même à l'arrêt (2026-11-09) : de quoi chercher les pistes.
+], { text: "[Maj] tenue : loup, même à l'arrêt · avance pour courir", ms: 4200 }, 2600);
 
 CUTSCENES.fs2_ravin_large = cutsceneBulles([
-  'Trop grand ? Approche en loup : tu verras des pistes que personne ne voit.',
+  'Trop grand ? Tiens [Maj] : en loup, tu verras des pistes que personne ne voit.',
 ]);
 
 CUTSCENES.fs2_plante = [

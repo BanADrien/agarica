@@ -134,6 +134,10 @@ const FORET_SOMBRE_1_DATA = {
     { type: 'foret_sombre_toile_araignee', x: 4270, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.3 },
     { type: 'foret_sombre_champignons_lumineux', x: 4330, y: FORET_SOMBRE_1_SURFACE_Y, scale: 0.24 },
   ],
+  // Papillon prisonnier (SecretKit.js, clé `butterflies`, 2026-11-09) : une
+  // toile sur la branche haute du sous-bois (x 2176-2368, surface 256), au-dessus
+  // du chemin ; on y monte par le rocher en escalier.
+  butterflies: [{ id: 'branche_haute', x: 2300, y: 222, prison: 'toile' }],
   campfires: [{ x: 1640, y: FORET_SOMBRE_1_SURFACE_Y }],
   npcs: [
     // Xara attend sur sa souche ; remplacée par le vrai compagnon ({xaraJoin}).

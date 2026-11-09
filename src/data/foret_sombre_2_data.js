@@ -18,7 +18,7 @@
 //                bois), plante résistante sur une haute branche
 //                (gx 55-57, y=64 : hors d'atteinte), crapaud-piège (x 3850)
 //   x 3968-5248  surplomb (gx 65-81, gy 3, surface y=192) : le chemin passe DESSUS,
-//                gardé par un crapaud sauteur (x 4700) ;
+//                gardé par un crapaud sauteur (x 4280, bord gauche) ;
 //                dessous, la poche fermée par le mur de mousse
 //                `mur_repulsif_foret_sombre` (répulsif, acte 2) → cœur secret
 //                + vieux sentier vers la hutte de Morgat
@@ -107,6 +107,10 @@ const FORET_SOMBRE_2_DATA = {
     { x: 3400, y: FORET_SOMBRE_2_SURFACE_Y, w: 240 },
   ],
   // Feu de camp à la sortie du grand ravin : soin et sauvegarde après les chutes.
+  // Papillon prisonnier (SecretKit.js, clé `butterflies`, 2026-11-09) : un
+  // cocon pendu SOUS la branche haute du sous-bois (dessous à y 320) : coup vers
+  // le haut ([Z] + [K]) depuis le sol.
+  butterflies: [{ id: 'sous_branche', x: 2240, y: 362, prison: 'cocon', fil: 19 }],
   campfires: [{ x: 3430, y: FORET_SOMBRE_2_SURFACE_Y }],
   totems: [
     { x: 896, y: 320, flag: 'hasWolfForm', message: 'Forme du loup !' },
@@ -145,9 +149,11 @@ const FORET_SOMBRE_2_DATA = {
     // x 3850 : en 3880, l'avant de son corps mordait sur le marchepied.
     { type: 'crapaud_piege', x: 3850, y: 400, facing: 'left' },
     // Duel sur le surplomb (x 4160-5248, surface y 192), le chemin principal :
-    // réveillé (380 px) après le dialogue du mur (x 4250), à plus de 380 px de
-    // la cinématique du grand arbre (x 5320) ; bornes dans le surplomb.
-    { type: 'crapaud_sauteur', x: 4700, y: 150, patrolMinX: 4350, patrolMaxX: 5150 },
+    // réveillé au bord gauche du surplomb, là où l'on y monte. Retour des
+    // joueuses (2026-11-09) : en x 4700 (bornes 4350-5150), il frappait aussitôt
+    // qui retombait de la trouée du cercle de lune (x 4736-4864). Bornes
+    // 4180-4340 : toujours à plus de 380 px (sa portée de réveil) de l'arrivée.
+    { type: 'crapaud_sauteur', x: 4280, y: 150, patrolMinX: 4180, patrolMaxX: 4340 },
   ],
   // Mur de mousse vivante à l'entrée de la poche, sous le surplomb : s'ouvre
   // avec le répulsif de Morgat (acte 2). Id cité dans PLAN_DEV.md.

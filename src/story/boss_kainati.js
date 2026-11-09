@@ -379,10 +379,10 @@ function kainatiOnAttack(scene, st, ev) {
   const told = st.told;
   if (['slam', 'roar', 'sweep'].includes(ev.kind) && !told.full) {
     told.full = true;
-    kainatiBubble(scene, 'xara', 'Tout le sol va y passer ! Une liane, vite !', 2600);
+    kainatiBubble(scene, 'xara', 'Tout le sol va y passer ! Une liane, vite : [↑] !', 2600);
   } else if (ev.kind === 'charge' && !told.charge) {
     told.charge = true;
-    kainatiBubble(scene, 'xara', 'Il charge ! Sur une liane !', 2400);
+    kainatiBubble(scene, 'xara', 'Il charge ! [↑] sur une liane !', 2400);
   }
 }
 
@@ -409,9 +409,9 @@ async function kainatiStartFight(scene, st) {
   st.fightActive = true;
   st.starting = false;
   if (firstTime) {
-    // Règle des lianes (Player.js) : seule Agarica devenue singe, donc après le
-    // double saut, s'accroche ; un saut simple passe à travers.
-    kainatiToast(scene, "Ses grosses attaques balaient le sol : [Espace] deux fois sous une liane, et accroche-toi", 5200);
+    // Règle des lianes (Player.js, 2026-11-09) : singe (double saut), puis
+    // Z/↑ pour s'accrocher ; sans ↑, on passe au travers.
+    kainatiToast(scene, "Ses grosses attaques balaient le sol : [Espace] deux fois sous une liane, puis [↑]", 5200);
   }
 }
 
@@ -509,6 +509,9 @@ ZONE_SCRIPTS.kainati_arene = {
     // PNJ « kainati » pour les étapes npcAnim/npcFace/npcMove de runCutscene.
     scene.npcs = scene.npcs || {};
     scene.npcs.kainati = st.boss.sprite;
+    // Son anim et son sens sont pilotés par le combat : pas de mise au repos
+    // automatique pendant les dialogues (cf. storyStageDialogueLine, StoryKit).
+    st.boss.sprite.noDialogueStage = true;
     st.leftCurtain = kainatiMakeCurtain(scene, cfg.minX, cfg.floorY, cfg.ceilingY + 64);
     st.rightCurtain = kainatiMakeCurtain(scene, cfg.maxX, cfg.floorY, cfg.ceilingY + 64);
     kainatiSetCurtain(scene, st.leftCurtain, false, true);
