@@ -26,7 +26,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
-SKIP_ASSET_DIRS = {'_codex_src', '_codex_ref'}
+# _pixelfix_originals : originaux IA mis de côté par tools/pixelfix.js.
+SKIP_ASSET_DIRS = {'_codex_src', '_codex_ref', '_pixelfix_originals'}
 
 HEADERS = """/*.html
   Cache-Control: public, max-age=0, must-revalidate

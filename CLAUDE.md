@@ -86,6 +86,16 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   xaraMet=true --keys "ArrowRight:1500" --js "…" --shot x.png` (Edge headless, code de
   sortie 1 si erreur JS). Ne pas utiliser `tools/dev_server.py` pour tester : son Save
   réécrit les fichiers de zone.
+- **Pixel art (pixel-fixer)** : `tools/pixel-fixer` est un sous-module git (dépôt
+  BanADrien/pixel-fixer, `git submodule update --init` puis `npm install` dedans ; mise à
+  jour : `git submodule update --remote tools/pixel-fixer`). `node tools/pixelfix.js anim
+  <id>` / `item <id>` / `files <dossier> --height 32` refait des images IA en pixel art
+  SANS changer leur fichier, leur canvas ni l'alignement des frames (blocs de pixels ;
+  originaux dans `assets/_pixelfix_originals/`, `restore <id>` pour revenir).
+  Toujours regarder d'abord avec `--preview x.png` (n'écrit rien d'autre). Registre :
+  `src/data/pixel_fixed.js` (filtre net en jeu, protégé de `import_codex_assets.py`).
+  **Ne refaire aucune image du jeu sans l'accord de l'utilisateur** (décision du
+  2026-11-10 : l'outil a encore des défauts qu'il corrige d'abord).
 
 ## Direction artistique
 

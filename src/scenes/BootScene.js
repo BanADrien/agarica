@@ -17,6 +17,7 @@ class BootScene extends Phaser.Scene {
 
   preload() {
     this.createLoadingScreen();
+    BootScene.watchPixelFixed(this);
     // Sprites forme humaine : fichiers individuels (un par frame), générés
     // à partir de assets/sprites/agarica.png via tools/split_spritesheet.py
     // (voir AGARICA_ANIM_ROWS dans Player.js pour le mapping ligne -> anim).
@@ -463,8 +464,28 @@ class BootScene extends Phaser.Scene {
     }
   }
 
+  // Images refaites par tools/pixelfix.js (registre PIXEL_FIXED,
+  // src/data/pixel_fixed.js) : blocs de pixels nets, comme les tuiles. En
+  // filtrage linéaire, ces blocs réduits à ~2,7 px d'écran redevenaient flous.
+  // Le registre parle en fichiers, Phaser en clés : on relève la clé de
+  // chaque fichier au moment où il se charge.
+  static watchPixelFixed(scene) {
+    scene.__pixelFixedKeys = [];
+    if (typeof PIXEL_FIXED === 'undefined' || !Object.keys(PIXEL_FIXED).length) return;
+    scene.load.on(Phaser.Loader.Events.FILE_LOAD, (file) => {
+      if (file && file.type === 'image' && PIXEL_FIXED[file.url]) scene.__pixelFixedKeys.push(file.key);
+    });
+  }
+
+  static applyPixelFixedFilter(scene) {
+    for (const key of scene.__pixelFixedKeys || []) {
+      if (scene.textures.exists(key)) scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+  }
+
   create() {
     BootScene.applyTilesetFilter(this);
+    BootScene.applyPixelFixedFilter(this);
     const params = new URLSearchParams(window.location.search);
 
     // Mode édition (index.html?editor, cf. main.js) : les assets sont

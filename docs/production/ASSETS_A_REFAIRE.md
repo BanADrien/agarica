@@ -40,6 +40,14 @@ reste.
 
 Envoie-moi chaque feuille dès qu'elle est finie : l'intégration est rapide.
 
+**Ou en partant de l'image IA** (pixel-fixer, `tools/pixelfix.js`) : l'outil réduit
+l'image IA en vrai pixel art à la densité des tuiles, puis la remet dans son fichier
+d'origine, même taille et mêmes frames. Aucun code à changer, retour arrière avec
+`restore`. Exemples : `node tools/pixelfix.js anim agarica_slash --preview apercu.png`
+(regarder), puis sans `--preview` (écrire) ; `node tools/pixelfix.js files
+assets/sprites/agarica_frames --height 32`. Une base à retoucher à la main plutôt qu'un
+résultat final. En attente : corrections de l'outil (2026-11-10).
+
 ---
 
 ## Lot 1 : ce qu'on voit tout le temps (≈ 75 images + 3 jeux de tuiles)

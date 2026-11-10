@@ -135,6 +135,27 @@ def warn(msg):
     print('  AVERTISSEMENT:', msg)
 
 
+# Images refaites en pixel art par tools/pixelfix.js (registre
+# src/data/pixel_fixed.js) : jamais réécrites ici, même avec --force -- le
+# découpage repartirait de la planche IA et effacerait le travail. Pour
+# réimporter : `node tools/pixelfix.js restore <id>` d'abord.
+def pixel_fixed_paths():
+    reg = ROOT / 'src' / 'data' / 'pixel_fixed.js'
+    if not reg.exists():
+        return set()
+    return set(re.findall(r'"(assets/[^"]+)"', reg.read_text(encoding='utf-8')))
+
+
+PIXEL_FIXED = pixel_fixed_paths()
+
+
+def pixel_fixed_guard(iid, paths):
+    hit = [rel(p) for p in paths if rel(p) in PIXEL_FIXED]
+    if hit:
+        warn(f'{iid} : {len(hit)} image(s) refaite(s) par pixelfix, ignoré (node tools/pixelfix.js restore {iid} pour réimporter)')
+    return bool(hit)
+
+
 # --------------------------------------------------------------------------- manifest parsing
 def _extract_object(src, name):
     m = re.search(r'const\s+' + name + r'\s*=\s*\{', src)
@@ -435,6 +456,8 @@ def import_anim(aid, e, force, dry):
     needs = force or any(not f.exists() for s in present_sheets for r in s['rows'] for f in expected[r])
     if not needs:
         return 'ok', missing_sheets
+    if pixel_fixed_guard(aid, [f for fs in expected.values() for f in fs]):
+        return 'ok', missing_sheets
     if dry:
         return 'would_cut', missing_sheets
     print(f'[{aid}] découpe de {len(present_sheets)} image(s)')
@@ -611,6 +634,8 @@ def import_item(iid, e, force, dry):
     if not srcpath.exists():
         return 'missing', [rel(srcpath)]
     if out.exists() and not force:
+        return 'ok', []
+    if pixel_fixed_guard(iid, [out]):
         return 'ok', []
     if dry:
         return 'would_cut', []

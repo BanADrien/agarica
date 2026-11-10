@@ -8,3 +8,6 @@ src/data/_backup/
 # Version a mettre en ligne (python tools/build_netlify.py)
 dist/
 dist.zip
+
+# pixel-fixer (sous-module tools/pixel-fixer) : etat de sa vue web
+.unslop-status.json

@@ -1,0 +1,3 @@
+[submodule "tools/pixel-fixer"]
+	path = tools/pixel-fixer
+	url = https://github.com/BanADrien/pixel-fixer.git
