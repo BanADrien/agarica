@@ -889,6 +889,8 @@ def import_tileset(tid, e, force, dry):
     names = list(TILE_GRID.values()) + PLATFORM_NAMES + SPECIAL_NAMES
     if not force and all((out_dir / f'{n}.png').exists() for n in names):
         return 'ok', missing
+    if pixel_fixed_guard(tid, [out_dir / f'{n}.png' for n in names]):
+        return 'ok', missing
     if dry:
         return 'would_cut', missing
     print(f'[{tid}]')

@@ -98,6 +98,9 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   dessinés** de haut (64 validé d'abord ; 1 pixel ≈ 0,9 px du canevas 960x540), même taille de pixel à l'écran pour
   toutes les feuilles (facteur = densité / échelle réelle d'affichage de la feuille),
   20 couleurs par feuille, lignes pixel-perfect, contours d'après l'encre de l'original.
+  **Tuiles des biomes** (écorce, flottantes, corrompues) refaites le 2026-11-10 : 24 pixels
+  dessinés par case, comme `tuiles.png`, 20 couleurs, raccords gardés (mode tuile) :
+  `node tools/pixelfix.js tiles tuiles_ecorce tuiles_flottantes tuiles_corrompues --colors 20`.
   Référence : `node tools/pixelfix.js agarica --height 92`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 

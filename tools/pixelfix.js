@@ -9,6 +9,8 @@
  * Usage (depuis la racine du jeu ; une fois : `npm install` dans tools/pixel-fixer) :
  *   node tools/pixelfix.js anim <id>...     entrée(s) d'ASSET_MANIFEST (toutes leurs frames)
  *   node tools/pixelfix.js item <id>...     entrée(s) d'ITEM_MANIFEST
+ *   node tools/pixelfix.js tiles <id>...    jeu(x) de tuiles de TILESET_MANIFEST (raccords
+ *                    gardés ; --tile-px 24 = pixels dessinés par case, comme tuiles.png)
  *   node tools/pixelfix.js files <png|dossier>... --height 32   images hors manifest
  *   node tools/pixelfix.js agarica [--height 64] --variant   toutes les feuilles d'Agarica,
  *                    même taille de pixel à l'écran (hauteur de l'idle en pixels dessinés)
@@ -53,6 +55,9 @@ const REGISTRY = path.join(ROOT, 'src', 'data', 'pixel_fixed.js');
 const MANIFEST = path.join(ROOT, 'src', 'data', 'asset_manifest.js');
 // Densité des tuiles (24 px dessinés affichés en 64) : 1 pixel dessiné = 2,67 px à l'écran.
 const SCREEN_PX_PER_ART_PX = 64 / 24;
+// Une case de tuile des biomes : 256 px dans l'image, 64 à l'écran.
+const TILE_SOURCE_PX = 256;
+let tilePx = 24;
 
 let sharp;
 let PC;
@@ -91,6 +96,7 @@ function parseArgs(argv) {
     else if (t === '--write') a.o.write = true;
     else if (t === '--dry') a.o.dry = true;
     else if (t === '--variant') a.o.variant = true;
+    else if (t === '--tile-px') tilePx = Math.round(num(next(), t));
     else if (t.startsWith('--')) throw new Error(`option inconnue : ${t}`);
     else a.inputs.push(t);
   }
@@ -105,7 +111,7 @@ function loadManifests() {
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(`${fs.readFileSync(MANIFEST, 'utf8')}
-;this.__m = { ASSET_MANIFEST, ITEM_MANIFEST };`, ctx, { filename: MANIFEST });
+;this.__m = { ASSET_MANIFEST, ITEM_MANIFEST, TILESET_MANIFEST };`, ctx, { filename: MANIFEST });
   return ctx.__m;
 }
 
@@ -194,6 +200,18 @@ function resolveSets(cmd, inputs, manifests) {
         : [];
       if (!files.length) throw new Error(`${id} : aucune frame dans ${e.dir}`);
       return { name: `anim:${id}`, files, scale: e.scale };
+    });
+  }
+  if (cmd === 'tiles') {
+    // Jeux de tuiles des biomes (TILESET_MANIFEST) : 21 cases de 256 px,
+    // affichées en 64. Densité des tuiles dessinées main (tuiles.png : 24 px
+    // par case) : `--tile-px` pixels dessinés par case, 24 par défaut.
+    return inputs.map((id) => {
+      const e = manifests.TILESET_MANIFEST[id];
+      if (!e) throw new Error(`jeu de tuiles inconnu dans TILESET_MANIFEST : ${id}`);
+      const dir = path.join(ROOT, e.dir);
+      const files = fs.readdirSync(dir).filter((n) => n.endsWith('.png')).sort().map((n) => path.join(dir, n));
+      return { name: `tiles:${id}`, files, tileable: true, factor: TILE_SOURCE_PX / (tilePx || 24) };
     });
   }
   if (cmd === 'item') {
@@ -305,6 +323,28 @@ function placeOnCanvas(small, bbox, W, H, f) {
   return { width: W, height: H, data: out };
 }
 
+// Tuile : chaque pixel dessiné reprend exactement la case analysée (bords
+// des cases = bords de la tuile), pour que deux tuiles voisines se raccordent.
+function placeOnGrid(small, grid, W, H) {
+  const out = new Uint8ClampedArray(W * H * 4);
+  const xs = grid.displayXs, ys = grid.displayYs, s = small.data;
+  for (let j = 0; j < small.height; j++) {
+    const ya = Math.max(0, Math.round(ys[j])), yb = Math.min(H, Math.round(ys[j + 1]));
+    for (let i = 0; i < small.width; i++) {
+      const p = (j * small.width + i) * 4;
+      if (s[p + 3] === 0) continue;
+      const xa = Math.max(0, Math.round(xs[i])), xb = Math.min(W, Math.round(xs[i + 1]));
+      for (let y = ya; y < yb; y++) {
+        for (let x = xa; x < xb; x++) {
+          const q = (y * W + x) * 4;
+          out[q] = s[p]; out[q + 1] = s[p + 1]; out[q + 2] = s[p + 2]; out[q + 3] = s[p + 3];
+        }
+      }
+    }
+  }
+  return { width: W, height: H, data: out };
+}
+
 async function loadPalette(file) {
   if (!file) return null;
   const pal = /\.png$/i.test(file) ? PC.paletteFromImage(await readImage(file)) : PC.parsePaletteText(fs.readFileSync(file, 'utf8'));
@@ -326,6 +366,7 @@ async function processSet(set, o, reg) {
     background: 'keep',
     cleanOutline: !!o.outline, outlineMode: o.outline || 'darkest',
     pixelPerfect: !!o.pixelPerfect,
+    tileable: !!set.tileable,
   };
   if (o.colors) core.colors = o.colors;
   if (palette) core.palette = palette;
@@ -337,7 +378,8 @@ async function processSet(set, o, reg) {
     if (!bbox) throw new Error(`${relOf(set.files[i])} : pas de boîte du sujet (image vide ?)`);
     out.push({
       file: set.files[i], before: imgs[i], small: r.image,
-      after: placeOnCanvas(r.image, bbox, imgs[i].width, imgs[i].height, factor),
+      after: set.tileable ? placeOnGrid(r.image, r.analysis.grid, imgs[i].width, imgs[i].height)
+        : placeOnCanvas(r.image, bbox, imgs[i].width, imgs[i].height, factor),
       colors: r.palette.size,
     });
   }
@@ -449,6 +491,7 @@ function restore(args) {
   const targets = [];
   for (const inp of args.inputs) {
     if (inp === 'agarica') targets.push(...AGARICA_SETS.flatMap((s) => walkPngs(path.join(ROOT, s.dir), [])));
+    else if (manifests.TILESET_MANIFEST[inp]) walkPngs(path.join(ROOT, manifests.TILESET_MANIFEST[inp].dir), targets);
     else if (manifests.ASSET_MANIFEST[inp]) targets.push(...resolveSets('anim', [inp], manifests)[0].files);
     else if (manifests.ITEM_MANIFEST[inp]) targets.push(path.join(ROOT, manifests.ITEM_MANIFEST[inp].path));
     else if (fs.existsSync(inp)) walkPngs(path.resolve(inp), targets);
