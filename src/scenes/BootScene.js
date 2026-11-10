@@ -469,11 +469,28 @@ class BootScene extends Phaser.Scene {
   // filtrage linéaire, ces blocs réduits à ~2,7 px d'écran redevenaient flous.
   // Le registre parle en fichiers, Phaser en clés : on relève la clé de
   // chaque fichier au moment où il se charge.
+  // Variantes de test (`v: 1`, écrites par `pixelfix.js --variant` dans
+  // assets/_pixel/) : chargées À LA PLACE de l'image du jeu seulement avec
+  // `?pixel` dans l'adresse ; sans lui, rien ne change (même clé de texture,
+  // donc aucun autre code à toucher).
   static watchPixelFixed(scene) {
     scene.__pixelFixedKeys = [];
     if (typeof PIXEL_FIXED === 'undefined' || !Object.keys(PIXEL_FIXED).length) return;
+    const variants = new URLSearchParams(window.location.search).has('pixel');
+    const urls = new Set();
+    for (const [url, e] of Object.entries(PIXEL_FIXED)) {
+      if (!e.v) urls.add(url);
+      else if (variants) urls.add(`assets/_pixel/${url.slice('assets/'.length)}`);
+    }
+    if (variants) {
+      const image = scene.load.image.bind(scene.load);
+      scene.load.image = (key, url, ...rest) => {
+        const e = typeof url === 'string' && PIXEL_FIXED[url];
+        return image(key, e && e.v ? `assets/_pixel/${url.slice('assets/'.length)}` : url, ...rest);
+      };
+    }
     scene.load.on(Phaser.Loader.Events.FILE_LOAD, (file) => {
-      if (file && file.type === 'image' && PIXEL_FIXED[file.url]) scene.__pixelFixedKeys.push(file.key);
+      if (file && file.type === 'image' && urls.has(file.url)) scene.__pixelFixedKeys.push(file.key);
     });
   }
 
