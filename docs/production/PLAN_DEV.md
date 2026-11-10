@@ -166,6 +166,9 @@ Clés gérées par la **Fondation** :
   - Sortie : `{ edge: 'left'|'right'|'top'|'bottom', from, to, targetScene, data: { enterId }, hint, panneau, panneauX }`.
     `from`/`to` bornent le passage le long du bord : altitude des PIEDS pour `left`/`right` (`to` = le
     sol du passage), x pour `top`/`bottom`. Sans eux, tout le bord.
+  - `frameFeetY` (facultatif, bords `left`/`right`, caméra centrée seulement) : hauteur des pieds à l'écran
+    voulue au bord, pour coller au cadrage de la zone d'arrivée. La caméra y glisse sur les 480 derniers px
+    (`updateEdgeFraming`), et le prend tout de suite quand on arrive par ce bord. Racines → arène : 448.
   - Le changement part quand le CORPS a entièrement franchi le bord : `body.right <= 0`, `body.left >=
     levelWidth`, `body.bottom <=` haut, `body.top >=` bas. Haut et bas = ce que la caméra peut montrer
     (`scene.__edgeLimits` : `levelTop` et `levelHeight` en zone verticale, sinon 0 et 540), pas le monde

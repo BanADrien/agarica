@@ -248,8 +248,10 @@ const GRAND_ARBRE_RACINES_DATA = {
     // … et la fente de l'épreuve, sur la corniche. Même côté à l'arrivée : l'épreuve
     // part de son bord gauche (cf. PLAN_DEV : passage à revoir, une porte conviendrait).
     { edge: 'left', from: -576, to: -128, targetScene: 'EpreuveSingeScene', data: { enterId: 'from_racines' } },
-    // Au bout de la corniche de la cime : l'arène de Kainati.
-    { edge: 'right', from: -576, to: -192, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_racines' } },
+    // Au bout de la corniche de la cime : l'arène de Kainati. `frameFeetY` :
+    // l'arène (un écran de haut) la montre pieds à 448 ; la caméra s'en
+    // approche ici avant le bord (cf. updateEdgeFraming, LevelKit).
+    { edge: 'right', from: -576, to: -192, targetScene: 'GrandArbreAreneScene', data: { enterId: 'from_racines' }, frameFeetY: 448 },
     // Vague 3 : le trou entre les racines -> les galeries (on tombe sur leur corniche).
     { edge: 'bottom', from: 1664, to: 1792, targetScene: 'GaleriesRacinesScene', data: { enterId: 'from_racines' } },
   ],

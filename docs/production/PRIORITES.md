@@ -16,6 +16,8 @@ d'autre. Un point terminé et commité sort de la liste ; l'historique Git le ga
 - Un seul agent avec navigateur à la fois : au-delà, le PC sature.
 
 État au 2026-11-09, après le paquet « retours de Light et Marie » : 13 points faits.
+2026-11-10 : cadrage racines ↔ arène, écrans 120/144 Hz (à vérifier), entrée « Objets »
+du feu de camp retirée (doublon de l'inventaire).
 
 ## P1 : gêne tous les joueurs
 
@@ -26,8 +28,13 @@ la règle est dans PLAN_DEV.md.
 
 | Point | Pourquoi |
 |---|---|
-| Transition racines → arène de Kainati : 0,6 s d'écran noir, et un cadrage décalé de 178 px | le passage donne l'impression d'une téléportation |
-| Saccades de la caméra sur les écrans à 120 ou 144 Hz | gênant selon l'écran ; à confirmer sur le tien |
+| **À vérifier par toi** : saccades de la caméra sur les écrans à 120 ou 144 Hz | corrigé le 2026-11-10 : la physique prend un pas par image au-delà de 90 Hz (`applyDisplayPhysicsFps`, LevelKit) ; saut +3 px à 144 Hz. Impossible à voir en test sans fenêtre (60 Hz) : à confirmer sur ton écran |
+| Arène → racines : ~0,5 s de noir pendant que les racines se construisent | mesuré le 2026-11-10 (racines → arène : ~0,2 s) ; le cadrage, lui, est corrigé (voir plus bas) |
+
+Fait le 2026-11-10 : cadrage racines ↔ arène de Kainati. Agarica passait de y 270 à
+l'écran (corniche, caméra centrée) à y 448 (arène) ; la caméra glisse maintenant avant le
+bord (clé de sortie `frameFeetY`, `updateEdgeFraming`) : 447 → 447 à l'aller, 64 px d'écart
+au retour (la caméra des racines ne monte pas plus haut).
 
 ## P3 : contenu nouveau
 
@@ -46,7 +53,6 @@ la règle est dans PLAN_DEV.md.
 | Loup debout : une vraie image de repos | aujourd'hui, image de course figée ; art Codex à prévoir |
 | Papillons : un soin moins cher (actuel), ou plutôt une nuée plus grande ? | à décider avec toi |
 | Portrait de Kainati calmé : sa tête porte encore de la mousse verte | les yeux sont passés à l'ambre |
-| Entrée « Objets » du menu du feu de camp | affiche encore « bientôt » |
 | Mise à jour de COMPTE_RENDU.md | |
 | Totems à équiper (tête + corps) | mis de côté tant qu'il y a peu de formes |
 

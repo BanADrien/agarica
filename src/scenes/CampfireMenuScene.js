@@ -143,8 +143,9 @@ const CAMPFIRE_HUB_ENTRIES = [
     desc: 'Rejoins d\'un coup d\'aile un feu où tu t\'es déjà assise.' },
   { id: 'inventory', label: 'Inventaire', icon: ['item-talisman_ours'], color: 0x3f7a52,
     desc: 'Tes objets de quête et tes consommables.' },
-  { id: 'items', label: 'Objets', icon: [], color: 0x4a4258, soon: true,
-    desc: 'Bientôt.' },
+  // Plus d'entrée « Objets » (affichait « bientôt ») : l'inventaire ci-dessus
+  // montre déjà objets de quête et consommables. `soon: true` reste lu pour
+  // une future entrée pas encore prête.
 ];
 // Liste du hub : centrée, une entrée tous les 38 px sous le titre et sa
 // ligne d'état (jusqu'à y 340, au-dessus de la description).

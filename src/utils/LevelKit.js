@@ -4183,6 +4183,52 @@ function edgeExitCrossed(scene, exit, player) {
   return b.top >= lim.bottom;
 }
 
+// Cadrage près d'un bord latéral (clé de sortie `frameFeetY` = hauteur des
+// pieds à l'écran, en px). Retour joueurs du 2026-11-09 (racines -> arène de
+// Kainati, « on dirait une téléportation ») : la caméra centrée montrait
+// Agarica au milieu de l'écran (y 270) sur la corniche, puis l'arène, haute
+// d'un seul écran, la montre au sol (y 448) -- 178 px de saut à l'arrivée.
+// En approchant du bord, la caméra glisse pour poser ses pieds à `frameFeetY`
+// comme de l'autre côté ; même cadrage dès l'arrivée quand on revient par ce
+// bord. Les bornes de la caméra gardent le dernier mot (racines : pieds à 384
+// au mieux, 64 px d'écart au lieu de 178). Caméra centrée seulement : une
+// caméra `camera.vertical` a sa propre zone morte.
+const EDGE_FRAMING_RANGE = 480;
+// Marge autour du passage (`from`/`to`) : au bout de la corniche des racines,
+// elle tombe déjà pendant le fondu ; sans marge, le cadrage repartait (-60 px).
+const EDGE_FRAMING_SLACK = 160;
+
+function edgeFramingTarget(scene, player) {
+  const lim = scene.__edgeLimits;
+  if (!lim) return 0;
+  const half = scene.cameras.main.height / 2;
+  let best = 0;
+  for (const exit of scene.__exits || []) {
+    if (!exit || exit.frameFeetY == null || !edgeExitIsLateral(exit.edge)) continue;
+    if (player.y < (exit.from ?? -Infinity) - EDGE_FRAMING_SLACK || player.y > (exit.to ?? Infinity) + EDGE_FRAMING_SLACK) continue;
+    const dist = exit.edge === 'right' ? lim.right - player.x : player.x - lim.left;
+    const t = Phaser.Math.Clamp(1 - dist / EDGE_FRAMING_RANGE, 0, 1);
+    const off = (exit.frameFeetY - half) * t * t * (3 - 2 * t);
+    if (Math.abs(off) > Math.abs(best)) best = off;
+  }
+  return best;
+}
+
+// Appelée à chaque image (postupdate) ; `snap` à l'arrivée dans la zone.
+// Lissée : un saut hors du passage (`from`/`to`) ne fait pas sauter l'écran.
+function updateEdgeFraming(scene, dt, { snap = false } = {}) {
+  const cam = scene.cameras.main;
+  const p = scene.player;
+  if (!p || !p.body || (scene.__zoneCamera && scene.__zoneCamera.cfg)) return;
+  if (cam._follow !== p || scene.__cameraDetached) return;
+  const want = edgeFramingTarget(scene, p);
+  const cur = scene.__edgeFraming || 0;
+  if (want === 0 && cur === 0) return;
+  const next = snap ? want : cur + (want - cur) * (1 - Math.exp(-dt * 5));
+  scene.__edgeFraming = Math.abs(next - want) < 0.5 ? want : next;
+  cam.followOffset.y = scene.__edgeFraming;
+}
+
 // Vrai si elle tombe dans le passage d'une sortie basse : la règle `fall` ne
 // s'applique pas (cf. updateStoryFall), ce trou-là mène ailleurs.
 function edgeExitBelowPlayer(scene, player) {
@@ -4757,6 +4803,8 @@ function buildLevelFromData(scene, data, sceneData) {
   scene.__juiceZooming = false;
   // Arrivée par un bord : fondu court, sans zoom (cf. EDGE_FADE_MS).
   fadeInScene(scene, sceneData && sceneData.edgeArrival ? { ms: EDGE_FADE_MS } : { zoom: 1.03 });
+  // Un pas de physique par image sur les écrans rapides (cf. applyDisplayPhysicsFps).
+  applyDisplayPhysicsFps(scene);
   // Retour utilisateur : "je ne peux plus retourner a la zone1, ça me met
   // un écran vide" -- `goToScene` pose `__transitioningAway = true` sur LA
   // SCÈNE (cf. son commentaire) pour ignorer les frames suivantes tant que
@@ -5167,6 +5215,17 @@ function buildLevelFromData(scene, data, sceneData) {
   if (arrivalInfo) campfireArrive(scene, arrivalInfo, { flight: !!(sceneData && sceneData.flight) });
   // Juice : temps (hit-stop), regard caméra, lucioles/papillons d'ambiance.
   juiceSetupLevel(scene, data);
+  // Cadrage près des bords (clé de sortie `frameFeetY`, cf. updateEdgeFraming) :
+  // posé tout de suite, la première image montre déjà le bon cadrage.
+  scene.__edgeFraming = 0;
+  updateEdgeFraming(scene, 0, { snap: true });
+  if (!scene.__edgeFramingHook) {
+    scene.__edgeFramingHook = true;
+    scene.events.on('postupdate', (time, delta) => {
+      if (scene !== currentLevelScene || !scene.player) return;
+      updateEdgeFraming(scene, Math.min(delta || 16, 50) / 1000);
+    });
+  }
   // Rendu de cohésion (clé `look`, cf. LookKit.js) : posé en dernier, quand
   // tous les objets de la zone existent (ceux créés plus tard sont rangés à
   // leur première image). Sans clé `look` ou option « Effets visuels »
@@ -5216,6 +5275,41 @@ function bagHintUpdate(scene) {
   if (typeof storyGet === 'function' && storyGet(BAG_HINT_FLAG)) return;
   if (typeof storySet === 'function') storySet(BAG_HINT_FLAG, true);
   if (typeof showToast === 'function') showToast(scene, BAG_HINT_TEXT, BAG_HINT_MS);
+}
+
+// --- Écrans 120/144 Hz (PRIORITES.md, P2) ------------------------------------
+// Arcade Physics avance par pas fixes de 1/60 s : sur un écran à 144 Hz, une
+// image sur deux ou trois n'a aucun pas de physique, Agarica (et la caméra qui
+// la suit) avance par à-coups 0/1/0/1/1… -- tout le décor saccade. On mesure la
+// fréquence de l'écran au chargement (médiane de 40 images) et, au-delà de
+// 90 Hz, la physique prend un pas par image (setFPS). Hauteurs de saut : +3 px
+// au plus à 144 (intégration plus fine), mesuré en ?physfps=144. `?physfps=N`
+// force la valeur (tests sur un écran à 60 Hz).
+let displayPhysicsFps = null;
+
+(function measureDisplayRate() {
+  if (typeof window === 'undefined' || typeof requestAnimationFrame !== 'function') return;
+  const forced = Number(new URLSearchParams(window.location.search).get('physfps'));
+  if (forced > 0) { displayPhysicsFps = Math.round(forced); return; }
+  const deltas = [];
+  let last = null;
+  const tick = (t) => {
+    if (last != null) deltas.push(t - last);
+    last = t;
+    if (deltas.length < 40) { requestAnimationFrame(tick); return; }
+    deltas.sort((a, b) => a - b);
+    const hz = 1000 / deltas[deltas.length >> 1];
+    if (hz < 90) return;
+    displayPhysicsFps = Math.min(240, Math.round(hz));
+    // Zone déjà lancée pendant la mesure : on la règle aussi.
+    if (currentLevelScene) applyDisplayPhysicsFps(currentLevelScene);
+  };
+  requestAnimationFrame(tick);
+})();
+
+function applyDisplayPhysicsFps(scene) {
+  if (!displayPhysicsFps || !scene.physics || !scene.physics.world) return;
+  scene.physics.world.setFPS(displayPhysicsFps);
 }
 
 // --- Rendu sans tremblement (retour joueurs 2026-11-08) ------------------------
