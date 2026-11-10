@@ -2585,7 +2585,10 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
 // flamme, ce qui ferait exploser tools/split_spritesheet.py habituel en
 // dizaines de micro-frames). Purement décoratif (pas de collision, pas de
 // lumière/chaleur), juste une boucle d'anim en continu.
-const CAMPFIRE_FRAME_COUNT = 4;
+// 2026-11-11 : feu refait avec pixelfx (fire/campfire, E:\projet\pixelfx) : 36 images,
+// 3 s en boucle à 12 i/s (avant : 4 flambées IA à 8 i/s, gardées dans
+// assets/_pixelfix_originals/items/feu_de_camp_frames/).
+const CAMPFIRE_FRAME_COUNT = 36;
 const CAMPFIRE_TEXTURE_PREFIX = 'decor-campfire-';
 const ANIM_CAMPFIRE_BURN_KEY = 'campfire-burn';
 const CAMPFIRE_SCALE = 0.15;
@@ -2596,7 +2599,7 @@ function ensureCampfireAnimation(scene) {
   scene.anims.create({
     key: ANIM_CAMPFIRE_BURN_KEY,
     frames: Array.from({ length: CAMPFIRE_FRAME_COUNT }, (_, i) => ({ key: `${CAMPFIRE_TEXTURE_PREFIX}${i}` })),
-    frameRate: 8,
+    frameRate: 12,
     repeat: -1,
   });
 }
@@ -2639,9 +2642,9 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE, { index = 0 } = {}) {
   fire.y = footY + GROUND_CONTACT_SINK;
   // Juice : halo chaud qui respire derrière la flamme, braises qui montent et
   // petites gerbes d'étincelles au hasard (cf. l'update plus bas).
-  const flameY = footY - fire.displayHeight * 0.42;
+  const flameY = footY - fire.displayHeight * 0.28;
   const glowTex = juiceTexture(scene, 'fx_halo_doux', 'juice-glow');
-  const glowScale = (fire.displayWidth * 3.4 * (glowTex.art ? JUICE_HALO_ART_BOOST : 1)) / glowTex.size;
+  const glowScale = (fire.displayWidth * 2.4 * (glowTex.art ? JUICE_HALO_ART_BOOST : 1)) / glowTex.size;
   const halo = scene.add.image(x, flameY, glowTex.key).setBlendMode(Phaser.BlendModes.ADD)
     .setTint(0xffa860).setAlpha(0.3).setScale(glowScale);
   scene.children.moveBelow(halo, fire);
@@ -2655,7 +2658,7 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE, { index = 0 } = {}) {
   // rythme). Purement décorative ; sans l'image, rien (le halo suffit).
   if (scene.textures.exists('item-fx_lueur_sol')) {
     const pool = scene.add.image(x, footY - 2, 'item-fx_lueur_sol').setBlendMode(Phaser.BlendModes.ADD)
-      .setTint(0xffa860).setDisplaySize(fire.displayWidth * 3, 30).setAlpha(0.3);
+      .setTint(0xffa860).setDisplaySize(fire.displayWidth * 2, 30).setAlpha(0.3);
     scene.children.moveBelow(pool, fire);
     scene.tweens.add({ targets: pool, alpha: { from: 0.25, to: 0.4 }, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
