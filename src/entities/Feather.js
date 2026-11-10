@@ -61,18 +61,20 @@ class Feather extends Phaser.Physics.Arcade.Sprite {
 
     // Défait un ennemi au contact, comme n'importe quelle attaque (cf. les
     // overlaps joueur/ennemis dans chaque Zone*Scene) — auto-suffisant ici
-    // plutôt que de faire câbler cet overlap par chaque scène. `takeHit()`
-    // en priorité : le Loup Alpha (boss, 3 PV) s'en sert au lieu de
-    // `defeat()` direct pour ne pas mourir en un seul coup (cf. LoupAlpha.js).
+    // plutôt que de faire câbler cet overlap par chaque scène. Les boss à
+    // plusieurs PV (cf. LoupAlpha.js, BossGorille.js) encaissent au lieu de
+    // mourir d'un coup -- règle commune, cf. damageEnemy dans LevelKit.js.
     if (scene.enemies) {
       scene.physics.add.overlap(this, scene.enemies, (feather, enemy) => {
         if (enemy.defeated) return;
-        if (typeof enemy.takeHit === 'function') enemy.takeHit();
-        else enemy.defeat();
+        // `damageEnemy` (LevelKit.js) applique la même règle partout :
+        // `takeHit()` pour les boss à plusieurs PV, `defeat()` sinon.
+        const landed = damageEnemy(enemy);
         // Même petite portion d'énergie que l'attaque au sol (cf.
         // ENERGY_PER_HIT dans Player.js) — un tir de plume compte comme un
-        // coup porté au même titre qu'un coup de dague.
-        if (scene.player) scene.player.gainEnergy(ENERGY_PER_HIT);
+        // coup porté au même titre qu'un coup de dague, à condition qu'il
+        // ait vraiment été encaissé (cf. damageEnemy).
+        if (landed && scene.player) scene.player.gainEnergy(ENERGY_PER_HIT);
         feather.destroy();
       });
     }

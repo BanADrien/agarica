@@ -141,6 +141,21 @@ class BootScene extends Phaser.Scene {
       const col = i < 4 ? i : 0;
       this.load.image(`crapaud-${i}`, `assets/sprites/crapaud_frames/crapaud_row${row}_${col}.png`);
     }
+    // Boss Gorille (voir BossGorille.js) : SEUL art du projet chargé comme de
+    // vraies `spritesheet` Phaser et non frame par frame -- la livraison
+    // fournit déjà des planches à cellules parfaitement régulières
+    // (sheets_ready/, 384x512, une ligne par animation, cf.
+    // assets/sprites/boss_gorille/animations.json), donc aucune découpe
+    // préalable n'est nécessaire, contrairement à tout le reste du bestiaire
+    // (cf. les scripts tools/crop_*.py et le long commentaire en tête de
+    // BossGorille.js).
+    for (const { name } of GORILLE_ANIMS) {
+      this.load.spritesheet(
+        `${GORILLE_TEXTURE_PREFIX}${name}`,
+        `assets/sprites/boss_gorille/sheets_ready/gorille_${name}.png`,
+        { frameWidth: GORILLE_FRAME_WIDTH, frameHeight: GORILLE_FRAME_HEIGHT },
+      );
+    }
     // Totems de capacité (voir TOTEM_TYPE_BY_FLAG dans LevelKit.js), généré
     // depuis assets/items/totems.png. Une paire lit/dim par forme.
     for (const type of ['wolf', 'eagle', 'octopus']) {
@@ -270,6 +285,23 @@ class BootScene extends Phaser.Scene {
     if (new URLSearchParams(window.location.search).has('editor')) {
       this.scene.start('EditorScene');
       return;
+    }
+
+    // Raccourci de test (index.html?zone=<nom>) : démarre directement dans une
+    // zone, sans passer par l'écran-titre ni le prologue ni tout le parcours.
+    // Indispensable pour itérer sur une zone de fin de parcours (arène de
+    // boss...) sans la rejouer en entier à chaque essai. `zone` accepte le nom
+    // court d'un fichier de données (boss_gorille, zone1...) comme la clé de
+    // scène Phaser (BossGorilleScene) -- normalisé ici, la clé exacte étant
+    // rarement celle qu'on a en tête.
+    const zoneParam = new URLSearchParams(window.location.search).get('zone');
+    if (zoneParam) {
+      const key = resolveSceneKey(this, zoneParam);
+      if (key) {
+        goToScene(this, key);
+        return;
+      }
+      console.warn(`BootScene: aucune scène trouvée pour ?zone=${zoneParam}`);
     }
 
     // Fond dégradé violet nuit -> vert lunaire, en attendant la vraie DA.

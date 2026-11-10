@@ -449,6 +449,19 @@ function drawCombatDebugOverlays(scene) {
       attackGraphic.lineStyle(2, 0xffaa00, 1);
       attackGraphic.strokeRectShape(skillHitbox);
     }
+    // Zones de dégât des ENNEMIS qui en exposent une (aujourd'hui le seul
+    // boss Gorille, cf. BossGorille.getAttackHitbox) : leurs patterns se
+    // règlent à l'œil, autant voir la fenêtre dangereuse comme on voit celle
+    // du joueur. Les autres ennemis blessent au simple contact, leur zone de
+    // dégât EST leur corps physique (déjà tracé par Shift+J plus bas).
+    if (scene.enemies) {
+      attackGraphic.lineStyle(2, 0xff8800, 1);
+      scene.enemies.children.iterate((enemy) => {
+        if (!enemy || typeof enemy.getAttackHitbox !== 'function') return;
+        const rect = enemy.getAttackHitbox();
+        if (rect) attackGraphic.strokeRectShape(rect);
+      });
+    }
   }
 
   entityGraphic.clear();
@@ -565,6 +578,30 @@ const FADE_COLOR = [13, 11, 26]; // #0d0b1a, fond du jeu
 
 function fadeInScene(scene) {
   scene.cameras.main.fadeIn(FADE_DURATION, ...FADE_COLOR);
+}
+
+// Nom "humain" de zone -> clé de scène Phaser réellement enregistrée (cf.
+// la liste `scene` dans main.js). Sert au raccourci de test
+// `index.html?zone=<nom>` (cf. BootScene.js) : on tape le nom du fichier de
+// données qu'on a sous les yeux (`boss_gorille`, `zone_aquatique`) plutôt que
+// la clé exacte (`BossGorilleScene`, `ZoneAquatiqueScene`). Renvoie null si
+// rien ne correspond -- l'appelant décide quoi en faire.
+function resolveSceneKey(scene, name) {
+  const pascal = String(name).split(/[^a-zA-Z0-9]+/).filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('');
+  for (const candidate of [name, pascal, `${pascal}Scene`]) {
+    if (candidate && scene.scene.get(candidate)) return candidate;
+  }
+  // Dernier recours : comparaison insensible à la casse sur toutes les clés
+  // enregistrées (une clé écrite autrement que PascalCase resterait sinon
+  // introuvable).
+  const wanted = pascal.toLowerCase();
+  for (const registered of scene.game.scene.scenes.map((s) => s.scene.key)) {
+    const low = registered.toLowerCase();
+    if (low === wanted || low === `${wanted}scene`) return registered;
+  }
+  return null;
 }
 
 function goToScene(scene, key, data) {
@@ -1431,6 +1468,28 @@ async function resolveZoneData(name, fallbackData) {
 // avec le pas de la grille.
 const EXIT_TRIGGER_WIDTH = GROUND_TILE_SIZE;
 
+// Un coup porté à un ennemi. La règle du GDD reste "1 PV, meurt en un coup"
+// (`defeat()`), mais les BOSS encaissent plusieurs coups et exposent pour ça
+// un `takeHit()` (cf. LoupAlpha.js et BossGorille.js) -- même contrat que
+// Feather.js, qui faisait déjà ce choix pour la plume tirée en forme Aigle
+// alors que les deux chemins de dégât d'ici (coup de dague au contact,
+// compétence) appelaient `defeat()` en dur : un boss à 3 ou 6 PV mourait
+// donc du premier coup de dague, en contradiction avec son propre code.
+// Chaque `takeHit()` gère lui-même son anti-rebond (les deux chemins de
+// dégât sont testés à CHAQUE frame tant que la fenêtre d'attaque est
+// ouverte, cf. leur `hitCooldownUntil`) et renvoie `false` quand le coup
+// N'A PAS été encaissé pour cette raison -- d'où la valeur de retour ici :
+// sans elle, l'énergie gagnée par coup porté (ENERGY_PER_HIT) serait
+// créditée à chaque frame de contact avec un boss, remplissant la barre
+// d'un coup. Un ennemi à 1 PV (pas de `takeHit`) meurt toujours du premier
+// coup, et ses appels suivants sont déjà filtrés par `enemy.defeated` chez
+// les appelants.
+function damageEnemy(enemy) {
+  if (typeof enemy.takeHit === 'function') return enemy.takeHit() !== false;
+  enemy.defeat();
+  return true;
+}
+
 function getExitTriggerRect(exit) {
   const height = exit.height != null ? exit.height : Number.POSITIVE_INFINITY;
   const y = height === Number.POSITIVE_INFINITY ? -1e6 : exit.y - height / 2;
@@ -1630,6 +1689,17 @@ function buildLevelFromData(scene, data, sceneData) {
     else if (e.type === 'loupAlpha') enemy = new LoupAlpha(scene, e.x, e.y, patrolMinX, patrolMaxX);
     else if (e.type === 'corbeau') enemy = new Corbeau(scene, e.x, e.y, patrolMinX, patrolMaxX, e.diveDepth ?? 220);
     else if (e.type === 'crapaud') enemy = new Crapaud(scene, e.x, e.y);
+    // Boss Gorille (cf. BossGorille.js) : les bornes de patrouille servent
+    // ici de MURS D'ARÈNE (il ne patrouille pas -- il charge, saute et
+    // frappe entre ces deux bornes), d'où des bornes bien plus larges que
+    // les 150px par défaut des autres ennemis quand la zone n'en donne pas.
+    else if (e.type === 'gorille') {
+      enemy = new BossGorille(
+        scene, e.x, e.y,
+        e.patrolMinX ?? e.x - 600,
+        e.patrolMaxX ?? e.x + 600,
+      );
+    }
     if (enemy) {
       // `group.add()` réinitialise `body.allowGravity` à `true`, écrasant le
       // `setAllowGravity(false)` posé dans le constructeur de ces deux
@@ -1649,11 +1719,11 @@ function buildLevelFromData(scene, data, sceneData) {
     if (player.isInvulnerable || enemy.defeated) return;
     const hitbox = player.getAttackHitbox();
     if (hitbox && Phaser.Geom.Intersects.RectangleToRectangle(hitbox, enemy.getBounds())) {
-      enemy.defeat();
       // Petite portion d'énergie par coup porté (cf. ENERGY_PER_HIT dans
       // Player.js) — même règle que le tir de plume (cf. Feather.js), donc
-      // factorisée dans gainEnergy() plutôt que dupliquée ici et là.
-      player.gainEnergy(ENERGY_PER_HIT);
+      // factorisée dans gainEnergy() plutôt que dupliquée ici et là. Créditée
+      // seulement si le coup a vraiment été encaissé (cf. damageEnemy).
+      if (damageEnemy(enemy)) player.gainEnergy(ENERGY_PER_HIT);
     } else if (!enemy.harmless) {
       player.hitByEnemy();
     }
@@ -1718,6 +1788,13 @@ const HUD_SKILL_SIZE = 34;
 const HUD_SKILL_GAP = 8;
 const HUD_SKILL_LABELS = ['A', 'F', 'R'];
 const HUD_SKILL_EMPTY_COLOR = 0x241c3d;
+// Barre de vie de boss (cf. `isBoss`/`maxHp` dans LoupAlpha.js et
+// BossGorille.js) : en haut au CENTRE, loin des cœurs/de l'énergie du joueur
+// en haut à gauche. N'apparaît que si un boss vivant est présent dans la
+// zone, donc rien à désactiver dans les zones normales.
+const HUD_BOSS_BAR_WIDTH = 340;
+const HUD_BOSS_BAR_HEIGHT = 14;
+const HUD_BOSS_BAR_Y = 18;
 const HUD_SKILL_UNAVAILABLE_ALPHA = 0.45;
 
 function drawHeartIcon(g, cx, cy, size, color, alpha) {
@@ -1746,6 +1823,44 @@ function createHud(scene) {
   scene.hudSkillTexts = HUD_SKILL_LABELS.map(() => scene.add.text(0, 0, '', {
     fontFamily: 'sans-serif', fontSize: '14px', color: '#ffe9f5', fontStyle: 'bold',
   }).setOrigin(0.5).setScrollFactor(0).setDepth(1001));
+  // Nom du boss au-dessus de sa barre de vie (cf. HUD_BOSS_BAR_*) : créé une
+  // fois ici comme les lettres de compétence, juste vidé quand aucun boss
+  // n'est présent.
+  scene.hudBossText = scene.add.text(0, 0, '', {
+    fontFamily: 'sans-serif', fontSize: '13px', color: '#ffd7e6', fontStyle: 'bold',
+  }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(1001);
+}
+
+// Boss vivant de la zone, s'il y en a un (cf. `isBoss`). Le groupe
+// `scene.enemies` est générique : pas de référence nommée à maintenir.
+function findBoss(scene) {
+  if (!scene.enemies) return null;
+  return scene.enemies.getChildren().find((e) => e && e.isBoss && !e.defeated) || null;
+}
+
+function drawBossBar(scene, g) {
+  const boss = findBoss(scene);
+  const text = scene.hudBossText;
+  if (!boss) {
+    text.setText('');
+    return;
+  }
+  const x = scene.scale.width / 2 - HUD_BOSS_BAR_WIDTH / 2;
+  const y = HUD_BOSS_BAR_Y;
+  g.fillStyle(0x2a1f45, 0.9);
+  g.fillRoundedRect(x, y, HUD_BOSS_BAR_WIDTH, HUD_BOSS_BAR_HEIGHT, 4);
+  const ratio = Phaser.Math.Clamp(boss.hp / boss.maxHp, 0, 1);
+  if (ratio > 0) {
+    // Vert lunaire tant que le boss est au-dessus de la moitié de sa vie,
+    // rose/rouge ensuite -- la phase 2 du Gorille se déclenche pile à ce
+    // seuil (cf. GORILLE_PHASE2_HP), la barre l'annonce donc au passage.
+    g.fillStyle(ratio > 0.5 ? 0x8fe3b8 : 0xff4d6d, 1);
+    g.fillRoundedRect(x, y, HUD_BOSS_BAR_WIDTH * ratio, HUD_BOSS_BAR_HEIGHT, 4);
+  }
+  g.lineStyle(2, 0xcbb6ff, 0.9);
+  g.strokeRoundedRect(x, y, HUD_BOSS_BAR_WIDTH, HUD_BOSS_BAR_HEIGHT, 4);
+  text.setText(boss.bossName || 'Boss');
+  text.setPosition(scene.scale.width / 2, y - 3);
 }
 
 // Appelée depuis updateLevelFromData -- redessine tout depuis zéro chaque
@@ -1767,6 +1882,7 @@ function drawHud(scene) {
     const filled = i < scene.player.hearts;
     drawHeartIcon(g, cx, cy, HUD_HEART_SIZE, filled ? 0xff4d6d : 0x4a3d63, filled ? 1 : 0.6);
   }
+  drawBossBar(scene, g);
   const barX = HUD_MARGIN;
   g.fillStyle(0x2a1f45, 1);
   g.fillRoundedRect(barX, barY, HUD_ENERGY_BAR_WIDTH, HUD_ENERGY_BAR_HEIGHT, 4);
@@ -1842,8 +1958,7 @@ function updateLevelFromData(scene, time, delta) {
       scene.enemies.children.iterate((enemy) => {
         if (!enemy || enemy.defeated) return;
         if (Phaser.Geom.Intersects.RectangleToRectangle(skillHitbox, enemy.getBounds())) {
-          enemy.defeat();
-          scene.player.gainEnergy(ENERGY_PER_HIT);
+          if (damageEnemy(enemy)) scene.player.gainEnergy(ENERGY_PER_HIT);
         }
       });
     }

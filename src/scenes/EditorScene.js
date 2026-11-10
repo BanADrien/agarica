@@ -52,9 +52,22 @@ const EDITOR_ENEMY_TYPES = [
   { value: 'araignee', label: 'Araignée (fixe)' },
   { value: 'loup', label: 'Loup sanguinaire (patrouille)' },
   { value: 'corbeau', label: 'Corbeau (patrouille + piqué)' },
+  { value: 'crapaud', label: 'Crapaud (fixe, langue)' },
+  { value: 'gorille', label: 'Boss Gorille (patterns)' },
 ];
 const EDITOR_DEFAULT_TOTEM_MESSAGE = "Une nouvelle capacité s'éveille en toi.";
 const EDITOR_ENEMY_PATROL_HALF_WIDTH = 150;
+// Ennemis FIXES (cf. Araignee.js/Crapaud.js) : aucune bande de patrouille à
+// poser, ils ne se déplacent jamais.
+const EDITOR_STATIONARY_ENEMY_TYPES = new Set(['araignee', 'crapaud']);
+// Demi-largeur par type quand elle diffère du défaut : pour le boss Gorille
+// ces bornes ne sont pas une patrouille mais les MURS DE SON ARÈNE (il
+// charge/saute entre elles, cf. BossGorille.js) -- 150px l'enfermeraient dans
+// une boîte plus petite que lui.
+const EDITOR_ENEMY_PATROL_HALF_WIDTH_BY_TYPE = { gorille: 600 };
+function editorEnemyPatrolHalfWidth(type) {
+  return EDITOR_ENEMY_PATROL_HALF_WIDTH_BY_TYPE[type] ?? EDITOR_ENEMY_PATROL_HALF_WIDTH;
+}
 const EDITOR_MARKER_HIT_RADIUS = 26;
 // Cf. pushUndo/undo plus bas.
 const EDITOR_UNDO_MAX = 50;
@@ -68,8 +81,12 @@ const EDITOR_GROUND_SNAPPED_KINDS = new Set(['totem', 'campfire', 'prop']);
 const EDITOR_SCALE_STEP = 0.03;
 const EDITOR_MIN_SCALE = 0.08;
 const EDITOR_MAX_SCALE = 2.5;
-const EDITOR_ENEMY_MARKER_COLORS = { araignee: 0xcc4477, loup: 0x8888ff, corbeau: 0x6644aa };
-const EDITOR_ENEMY_MARKER_LABELS = { araignee: 'A', loup: 'L', corbeau: 'C' };
+const EDITOR_ENEMY_MARKER_COLORS = {
+  araignee: 0xcc4477, loup: 0x8888ff, corbeau: 0x6644aa, crapaud: 0x8c6a3a, gorille: 0x8fe3b8,
+};
+const EDITOR_ENEMY_MARKER_LABELS = {
+  araignee: 'A', loup: 'L', corbeau: 'C', crapaud: 'K', gorille: 'G',
+};
 
 // Outils qui posent un point d'un coup de clic (pas de peinture/glisser).
 // 'portal' (cf. plus bas, outil clic-glisser -- pose une ligne verticale
@@ -689,16 +706,17 @@ class EditorScene extends Phaser.Scene {
     if (this.tool === 'enemy') {
       const type = this.subtype;
       const entry = { type, x: worldX, y: worldY };
-      if (type !== 'araignee') {
-        entry.patrolMinX = worldX - EDITOR_ENEMY_PATROL_HALF_WIDTH;
-        entry.patrolMaxX = worldX + EDITOR_ENEMY_PATROL_HALF_WIDTH;
+      if (!EDITOR_STATIONARY_ENEMY_TYPES.has(type)) {
+        const half = editorEnemyPatrolHalfWidth(type);
+        entry.patrolMinX = worldX - half;
+        entry.patrolMaxX = worldX + half;
       }
       this.data.enemies.push(entry);
       const color = EDITOR_ENEMY_MARKER_COLORS[type] || 0xffffff;
       const obj = this.addMarkerVisual(worldX, worldY, color, EDITOR_ENEMY_MARKER_LABELS[type] || '?');
       const extras = [obj];
       if (entry.patrolMinX !== undefined) {
-        extras.push(this.add.rectangle(worldX, worldY, EDITOR_ENEMY_PATROL_HALF_WIDTH * 2, 4, color, 0.35));
+        extras.push(this.add.rectangle(worldX, worldY, editorEnemyPatrolHalfWidth(type) * 2, 4, color, 0.35));
       }
       this.markers.push({ kind: 'enemy', entry, obj: extras, sourceArray: this.data.enemies });
       return;
@@ -823,8 +841,9 @@ class EditorScene extends Phaser.Scene {
       // obj[1] (s'il existe) : bande de patrouille, recentrée avec lui pour
       // rester cohérente avec patrolMinX/patrolMaxX (cf. placeAt).
       if (entry.patrolMinX !== undefined) {
-        entry.patrolMinX = entry.x - EDITOR_ENEMY_PATROL_HALF_WIDTH;
-        entry.patrolMaxX = entry.x + EDITOR_ENEMY_PATROL_HALF_WIDTH;
+        const half = editorEnemyPatrolHalfWidth(entry.type);
+        entry.patrolMinX = entry.x - half;
+        entry.patrolMaxX = entry.x + half;
         if (m.obj[1]) m.obj[1].setPosition(entry.x, entry.y);
       }
     } else {
@@ -1221,7 +1240,12 @@ class EditorScene extends Phaser.Scene {
       const obj = this.addMarkerVisual(entry.x, entry.y, color, EDITOR_ENEMY_MARKER_LABELS[entry.type] || '?');
       const extras = [obj];
       if (entry.patrolMinX !== undefined) {
-        extras.push(this.add.rectangle(entry.x, entry.y, EDITOR_ENEMY_PATROL_HALF_WIDTH * 2, 4, color, 0.35));
+        // Bande tracée depuis les bornes RÉELLEMENT stockées (pas la largeur
+        // par défaut du type) : une zone peut très bien avoir été écrite à la
+        // main avec des bornes sur mesure, cf. boss_gorille_data.js.
+        const width = Math.max(4, (entry.patrolMaxX ?? entry.x) - entry.patrolMinX);
+        const center = entry.patrolMinX + width / 2;
+        extras.push(this.add.rectangle(center, entry.y, width, 4, color, 0.35));
       }
       this.markers.push({ kind: 'enemy', entry, obj: extras, sourceArray: this.data.enemies });
     }

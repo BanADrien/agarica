@@ -62,8 +62,20 @@ séparées — c'est exactement le cas qui a demandé un script dédié pour l'O
 (`tools/crop_ours_skill.py`). Concerne surtout `attaque_saut` : prévoir un
 script dédié ou coller les débris au corps du gorille dans la planche.
 
-## Chargement en jeu (pas encore fait)
+## Chargement en jeu (fait)
 
-À brancher plus tard dans `src/scenes/BootScene.js` (chargement des textures)
-et dans une entité `src/entities/BossGorille.js` (animations + IA), sur le
-modèle de `src/entities/Crapaud.js`.
+Branché dans `src/scenes/BootScene.js` (chargement des textures) et dans
+`src/entities/BossGorille.js` (animations + patterns + phases).
+
+Particularité : ce sont les planches **`sheets_ready/`** qui sont chargées, en
+`load.spritesheet` Phaser (cellules régulières 384x512), et non les frames
+individuelles des dossiers `gorille_*_frames/` comme pour le reste du
+bestiaire. Deux raisons : ces planches-là sont déjà à cellules régulières
+(aucune découpe nécessaire), et les dossiers `gorille_marche_frames/` /
+`gorille_charge_frames/` sont restés vides — leur planche source `sheets/`
+n'existe plus, donc `tools/prepare_gorille.py` ne peut plus les regénérer,
+alors que leur planche `sheets_ready/` est bien là.
+
+Le boss se pose comme n'importe quel ennemi depuis l'éditeur (outil "Ennemi"
+-> "Boss Gorille (patterns)"), et son arène de test se lance directement avec
+`index.html?zone=boss_gorille`.

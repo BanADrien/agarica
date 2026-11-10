@@ -1,0 +1,150 @@
+{
+  "frameWidth": 384,
+  "frameHeight": 512,
+  "origin": [
+    0.5,
+    0.921875
+  ],
+  "animations": {
+    "idle": {
+      "frames": [
+        "gorille_idle_frames/gorille_idle_row0_0.png",
+        "gorille_idle_frames/gorille_idle_row0_1.png",
+        "gorille_idle_frames/gorille_idle_row0_2.png",
+        "gorille_idle_frames/gorille_idle_row0_3.png"
+      ],
+      "durationsMs": [
+        220,
+        220,
+        220,
+        220
+      ],
+      "loop": true,
+      "sheet": "sheets_ready/gorille_idle.png"
+    },
+    "marche": {
+      "frames": [
+        "gorille_marche_frames/gorille_marche_row0_0.png",
+        "gorille_marche_frames/gorille_marche_row0_1.png",
+        "gorille_marche_frames/gorille_marche_row0_2.png",
+        "gorille_marche_frames/gorille_marche_row0_3.png",
+        "gorille_marche_frames/gorille_marche_row0_4.png",
+        "gorille_marche_frames/gorille_marche_row0_5.png"
+      ],
+      "durationsMs": [
+        110,
+        110,
+        110,
+        110,
+        110,
+        110
+      ],
+      "loop": true,
+      "sheet": "sheets_ready/gorille_marche.png"
+    },
+    "charge": {
+      "frames": [
+        "gorille_charge_frames/gorille_charge_row0_0.png",
+        "gorille_charge_frames/gorille_charge_row0_1.png",
+        "gorille_charge_frames/gorille_charge_row0_2.png",
+        "gorille_charge_frames/gorille_charge_row0_3.png",
+        "gorille_charge_frames/gorille_charge_row0_4.png",
+        "gorille_charge_frames/gorille_charge_row0_5.png"
+      ],
+      "durationsMs": [
+        75,
+        75,
+        75,
+        75,
+        75,
+        75
+      ],
+      "loop": true,
+      "sheet": "sheets_ready/gorille_charge.png"
+    },
+    "attaque_frappe": {
+      "frames": [
+        "gorille_attaque_frappe_frames/gorille_attaque_frappe_row0_0.png",
+        "gorille_attaque_frappe_frames/gorille_attaque_frappe_row0_1.png",
+        "gorille_attaque_frappe_frames/gorille_attaque_frappe_row0_2.png",
+        "gorille_attaque_frappe_frames/gorille_attaque_frappe_row0_3.png",
+        "gorille_attaque_frappe_frames/gorille_attaque_frappe_row0_4.png"
+      ],
+      "durationsMs": [
+        120,
+        180,
+        65,
+        130,
+        180
+      ],
+      "loop": false,
+      "sheet": "sheets_ready/gorille_attaque_frappe.png"
+    },
+    "attaque_saut": {
+      "frames": [
+        "gorille_attaque_saut_frames/gorille_attaque_saut_row0_0.png",
+        "gorille_attaque_saut_frames/gorille_attaque_saut_row0_1.png",
+        "gorille_attaque_saut_frames/gorille_attaque_saut_row0_2.png",
+        "gorille_attaque_saut_frames/gorille_attaque_saut_row0_3.png",
+        "gorille_attaque_saut_frames/gorille_attaque_saut_row0_4.png",
+        "gorille_attaque_saut_frames/gorille_attaque_saut_row0_5.png"
+      ],
+      "durationsMs": [
+        160,
+        90,
+        140,
+        75,
+        160,
+        180
+      ],
+      "loop": false,
+      "sheet": "sheets_ready/gorille_attaque_saut.png"
+    },
+    "cri": {
+      "frames": [
+        "gorille_cri_frames/gorille_cri_row0_0.png",
+        "gorille_cri_frames/gorille_cri_row0_1.png",
+        "gorille_cri_frames/gorille_cri_row0_2.png",
+        "gorille_cri_frames/gorille_cri_row0_3.png"
+      ],
+      "durationsMs": [
+        140,
+        150,
+        350,
+        180
+      ],
+      "loop": false,
+      "sheet": "sheets_ready/gorille_cri.png"
+    },
+    "degat": {
+      "frames": [
+        "gorille_degat_frames/gorille_degat_row0_0.png",
+        "gorille_degat_frames/gorille_degat_row0_1.png"
+      ],
+      "durationsMs": [
+        100,
+        160
+      ],
+      "loop": false,
+      "sheet": "sheets_ready/gorille_degat.png"
+    },
+    "mort": {
+      "frames": [
+        "gorille_mort_frames/gorille_mort_row0_0.png",
+        "gorille_mort_frames/gorille_mort_row0_1.png",
+        "gorille_mort_frames/gorille_mort_row0_2.png",
+        "gorille_mort_frames/gorille_mort_row0_3.png",
+        "gorille_mort_frames/gorille_mort_row0_4.png"
+      ],
+      "durationsMs": [
+        180,
+        160,
+        140,
+        180,
+        800
+      ],
+      "loop": false,
+      "sheet": "sheets_ready/gorille_mort.png"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr"><meta charset="utf-8"><title>Animations du gorille</title>
+<style>
+body{margin:24px;background:#20252b;color:#eee;font:16px system-ui}h1{font-size:24px}button,input{margin:8px}main{display:flex;flex-wrap:wrap;gap:16px}article{background:#303940;border:1px solid #59616a;border-radius:8px;padding:12px}h2{font-size:16px;margin:0}canvas{width:288px;height:384px;image-rendering:pixelated;background:repeating-conic-gradient(#34434b 0% 25%,#3d4c54 0% 50%) 0/24px 24px}p{max-width:850px}
+</style>
+<h1>Boss gorille — aperçu des huit animations</h1>
+<p>Les actions sont rejouées avec une pause pour faciliter la vérification. Le trait représente le sol commun. Les frames et les planches prêtes à charger ont un format de 384 × 512 pixels.</p>
+<button id="pause">Pause</button><button id="restart">Rejouer</button><label>Vitesse <input id="speed" type="range" min="0.25" max="2" value="1" step="0.25"><span id="rate">1×</span></label>
+<main></main>
+<script>
+const specs={idle:[220,220,220,220],marche:Array(6).fill(110),charge:Array(6).fill(75),attaque_frappe:[120,180,65,130,180],attaque_saut:[160,90,140,75,160,180],cri:[140,150,350,180],degat:[100,160],mort:[180,160,140,180,800]};
+let paused=false,time=0,last=0;const items=[];
+for(const [name,durations] of Object.entries(specs)){
+ const card=document.createElement('article');const title=document.createElement('h2');title.textContent=name.replaceAll('_',' ');const canvas=document.createElement('canvas');canvas.width=384;canvas.height=512;card.append(title,canvas);document.querySelector('main').append(card);
+ const img=new Image();img.src=`sheets_ready/gorille_${name}.png`;items.push({name,durations,img,ctx:canvas.getContext('2d')});
+}
+document.querySelector('#pause').onclick=e=>{paused=!paused;e.target.textContent=paused?'Lecture':'Pause'};
+document.querySelector('#restart').onclick=()=>{time=0};
+function draw(now){const speed=+document.querySelector('#speed').value;document.querySelector('#rate').textContent=speed+'×';if(last&&!paused)time+=(now-last)*speed;last=now;
+for(const {name,durations,img,ctx} of items){if(!img.complete||!img.naturalWidth)continue;const total=durations.reduce((a,b)=>a+b,0);const loop=['idle','marche','charge'].includes(name);let t=time%(total+(loop?0:700));let frame=durations.length-1;for(let i=0;i<durations.length;i++){if(t<durations[i]){frame=i;break}t-=durations[i]}
+ctx.clearRect(0,0,384,512);ctx.strokeStyle='#a3b5a2';ctx.beginPath();ctx.moveTo(0,472.5);ctx.lineTo(384,472.5);ctx.stroke();ctx.drawImage(img,frame*384,0,384,512,0,0,384,512);}
+requestAnimationFrame(draw)}requestAnimationFrame(draw);
+</script></html>

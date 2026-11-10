@@ -7,6 +7,7 @@
 // cf. Zone5Scene, pas d'une entité fusionnée).
 const LOUP_ALPHA_SCALE = 0.6;
 const LOUP_ALPHA_TINT = 0x8b1a2b;
+const LOUP_ALPHA_HIT_COOLDOWN = 380;
 
 class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, patrolMinX, patrolMaxX) {
@@ -39,6 +40,12 @@ class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
     this.direction = 1;
     this.isCharging = false;
     this.hp = 3;
+    // Lus par la barre de vie de boss du HUD (cf. drawHud dans LevelKit.js),
+    // partagés avec BossGorille.js -- un ennemi sans `isBoss` n'affiche rien.
+    this.isBoss = true;
+    this.bossName = 'Loup Alpha';
+    this.maxHp = this.hp;
+    this.hitCooldownUntil = 0;
     this.defeated = false;
   }
 
@@ -70,17 +77,27 @@ class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
   }
 
   // 3 PV (dérogation assumée à la règle "1 PV" du GDD, cf. section 11).
+  // Anti-rebond obligatoire : les chemins de dégât de LevelKit.js testent la
+  // zone d'attaque à CHAQUE frame tant qu'elle est ouverte (~200ms), donc
+  // sans ce verrou les 3 PV tombaient en 3 frames, soit un seul coup de
+  // dague -- exactement ce que ce takeHit() cherche à éviter. Renvoie
+  // `false` quand le coup est ignoré pour cette raison (cf. damageEnemy dans
+  // LevelKit.js, qui ne crédite l'énergie du joueur que sur un vrai coup).
   takeHit() {
-    if (this.defeated) return;
+    if (this.defeated) return false;
+    const now = this.scene.time.now;
+    if (now < this.hitCooldownUntil) return false;
+    this.hitCooldownUntil = now + LOUP_ALPHA_HIT_COOLDOWN;
     this.hp -= 1;
     if (this.hp <= 0) {
       this.defeat();
-      return;
+      return true;
     }
     this.setTintFill(0xffffff);
     this.scene.time.delayedCall(120, () => {
       if (!this.defeated) this.setTint(LOUP_ALPHA_TINT);
     });
+    return true;
   }
 
   defeat() {
