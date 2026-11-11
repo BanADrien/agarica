@@ -412,7 +412,9 @@ const SLASH_ARCS = {
   // du loup à WOLF_BITE_SCALE (bout du museau ~ +54 px, gueule ~ 28 px au-dessus
   // des pieds) : à (76, -42), réglage d'avant à l'échelle 0,4, les crocs
   // flottaient devant elle une fois le loup ramené à sa taille de course.
-  bite: { cx: 60, cy: -32, w: 64, h: 52 },
+  // 2026-11-11 : crocs retournés (charnière côté loup, cf. drawBiteFx) et avancés de 60 à 76 :
+  // la charnière tombait sinon sur la tête du loup et la cachait.
+  bite: { cx: 76, cy: -32, w: 64, h: 52 },
   // Coup de patte du Loup vers le bas (slashDir = 'paw', en l'air + S/↓) :
   // sous ses pattes, à peine en avant ; griffes dessinées par code dans ce
   // rectangle (cf. drawPawClaws), qui est aussi la zone qui touche.
@@ -3962,7 +3964,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // Alpha 1 : l'apparition et l'effacement sont peints dans les images.
       spr.setVisible(true).setScale(this.biteArtScale())
         .setPosition(this.x + facing * a.cx, this.y + a.cy)
-        .setFlipX(facing < 0).setAlpha(1);
+        // L'art a sa charnière à DROITE et s'ouvre vers la gauche : non retourné
+        // devant un loup tourné à droite, la gueule lumineuse s'ouvrait vers le
+        // loup (retour utilisateur du 2026-11-11 : « pas dans le bon sens »). On
+        // le retourne donc quand il regarde à droite : charnière côté loup,
+        // crocs ouverts vers la cible.
+        .setFlipX(facing > 0).setAlpha(1);
       return;
     }
     if (spr) spr.setVisible(false);

@@ -24,6 +24,8 @@
  *   --density <d>    anim / item : px d'ÉCRAN par pixel dessiné (0,65 = grain d'Agarica à 128 px) ;
  *                    le facteur de chaque lot = d / son `scale` du manifest
  *   --colors <n>     nombre de couleurs du lot (défaut : auto)
+ *   --accents        garde les petits détails vifs (un œil lumineux) que la réduction efface :
+ *                    toute case couverte à 20 % par une couleur vive et rare la reprend
  *   --palette <f>    palette imposée (.hex, .gpl, .png)
  *   --outline darkest|selective   contour propre ; --pixel-perfect
  *   --preview <png>  planche avant / après (sans --write, rien d'autre n'est écrit)
@@ -105,6 +107,7 @@ function parseArgs(argv) {
     else if (t === '--tile-px') tilePx = Math.round(num(next(), t));
     else if (t === '--tileable') filesTileable = true;
     else if (t === '--from') sourceDir = path.resolve(next());
+    else if (t === '--accents') a.o.accents = true;
     else if (t === '--density') a.o.density = num(next(), t);
     else if (t.startsWith('--')) throw new Error(`option inconnue : ${t}`);
     else a.inputs.push(t);
@@ -362,6 +365,36 @@ async function loadPalette(file) {
   return pal;
 }
 
+// Petits détails vifs (œil vert du loup...) : à gros grain, le vote par case les noie dans la couleur
+// voisine. On repère dans l'original les pixels très saturés et clairs ; s'ils sont RARES (< 2 % du sujet :
+// un vrai détail, pas une grande zone), chaque case qu'ils couvrent à 20 % reprend leur couleur moyenne.
+function keepAccents(img, small, grid) {
+  const { width: W, height: H, data: d } = img;
+  const xs = grid.displayXs, ys = grid.displayYs;
+  let opaque = 0, vivid = 0;
+  const isVivid = (p) => {
+    const r = d[p], g = d[p + 1], b = d[p + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    return d[p + 3] >= 128 && mx >= 150 && mx - mn >= 100;
+  };
+  for (let p = 0; p < W * H * 4; p += 4) { if (d[p + 3] >= 128) opaque++; if (isVivid(p)) vivid++; }
+  if (!vivid || vivid > opaque * 0.02) return;
+  for (let j = 0; j < small.height; j++) {
+    for (let i = 0; i < small.width; i++) {
+      const x0 = Math.max(0, Math.round(xs[i])), x1 = Math.min(W, Math.round(xs[i + 1]));
+      const y0 = Math.max(0, Math.round(ys[j])), y1 = Math.min(H, Math.round(ys[j + 1]));
+      let n = 0, c = 0, r = 0, g = 0, b = 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const p = (y * W + x) * 4;
+        n++;
+        if (isVivid(p)) { c++; r += d[p]; g += d[p + 1]; b += d[p + 2]; }
+      }
+      if (!n || c < n * 0.2) continue;
+      const q = (j * small.width + i) * 4;
+      small.data[q] = r / c; small.data[q + 1] = g / c; small.data[q + 2] = b / c; small.data[q + 3] = 255;
+    }
+  }
+}
+
 async function processSet(set, o, reg) {
   const imgs = [];
   for (const f of set.files) imgs.push(await readImage(sourceOf(f)));
@@ -386,6 +419,7 @@ async function processSet(set, o, reg) {
     const r = results[i];
     const bbox = r.analysis.grid && r.analysis.grid.bbox;
     if (!bbox) throw new Error(`${relOf(set.files[i])} : pas de boîte du sujet (image vide ?)`);
+    if (o.accents) keepAccents(imgs[i], r.image, r.analysis.grid);
     out.push({
       file: set.files[i], before: imgs[i], small: r.image,
       after: set.tileable ? placeOnGrid(r.image, r.analysis.grid, imgs[i].width, imgs[i].height)
