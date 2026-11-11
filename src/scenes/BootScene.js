@@ -18,6 +18,11 @@ class BootScene extends Phaser.Scene {
   preload() {
     this.createLoadingScreen();
     BootScene.watchPixelFixed(this);
+    // Îles lointaines découpées une à une (tools/cut_iles.py) : chacune flotte
+    // à son rythme dans le ciel (cf. addFarLayers, option `floating`).
+    if (typeof ILES_LOINTAINES !== 'undefined') {
+      ILES_LOINTAINES.iles.forEach((ile, i) => this.load.image(`ile-lointaine-${i}`, ile.file));
+    }
     // Branches et troncs en pixel art, images toutes faites (cf. BrancheKit,
     // tools/bake_branches.py). Pas pendant leur fabrication (`?bake`).
     this.__branchPixelKeys = [];
@@ -500,6 +505,12 @@ class BootScene extends Phaser.Scene {
   }
 
   static applyPixelFixedFilter(scene) {
+    if (typeof ILES_LOINTAINES !== 'undefined') {
+      ILES_LOINTAINES.iles.forEach((ile, i) => {
+        const key = `ile-lointaine-${i}`;
+        if (scene.textures.exists(key)) scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      });
+    }
     for (const key of scene.__branchPixelKeys || []) {
       if (scene.textures.exists(key)) scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }

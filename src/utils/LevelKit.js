@@ -461,6 +461,11 @@ function addFarLayers(scene, layers, { levelWidth, width }) {
     const sy = L.scrollY ?? 0.3;
     const alpha = L.alpha ?? 1;
     const h = src.height * k;
+    // Îles qui flottent une à une (`floating: true`, retour utilisateur du
+    // 2026-11-11) : au lieu d'une bande figée, chaque île est sa propre image
+    // (tools/cut_iles.py), monte et descend à son rythme, et passe DERRIÈRE
+    // les nuages du ciel. Images absentes : la bande d'origine, plus bas.
+    if (L.floating && addFloatingIslands(scene, L, { k, sx, sy, alpha, span: levelWidth * sx + width + 200 })) continue;
     const t = scene.add.tileSprite(-100, L.y, levelWidth * sx + width + 200, h, key)
       .setOrigin(0, 0).setTileScale(k, k).setScrollFactor(sx, sy).setAlpha(alpha);
     if (L.tint != null) t.setTint(L.tint);
@@ -482,6 +487,45 @@ function addFarLayers(scene, layers, { levelWidth, width }) {
   }
   scene.__farLayers = list.length ? list : null;
   updateFarLayers(scene);
+}
+
+// Îles lointaines flottantes (cf. `floating` dans addFarLayers). Le motif de
+// l'image d'origine (ILES_LOINTAINES) est répété sur toute la largeur du
+// lointain ; chaque île reçoit son propre balancement (amplitude, durée et
+// départ tirés d'une graine fixe : même danse à chaque visite), vertical
+// surtout, avec une légère dérive de côté sur un autre rythme.
+function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
+  if (typeof ILES_LOINTAINES === 'undefined' || !ILES_LOINTAINES.iles.length) return false;
+  if (!ILES_LOINTAINES.iles.every((ile, i) => scene.textures.exists(`ile-lointaine-${i}`))) return false;
+  const rnd = new Phaser.Math.RandomDataGenerator([`iles-${L.id}`]);
+  const period = ILES_LOINTAINES.w * k;
+  const sky = scene.__sky;
+  // Derrière les nuages (créés avant les nappes) ; sans nuages, derrière les nappes.
+  const front = sky && ((sky.clouds && sky.clouds[0]) || (sky.nappes && sky.nappes[0]));
+  for (let x0 = -100; x0 < span; x0 += period) {
+    ILES_LOINTAINES.iles.forEach((ile, i) => {
+      const x = x0 + ile.x * k;
+      const y = L.y + ile.y * k;
+      const img = scene.add.image(x, y, `ile-lointaine-${i}`).setOrigin(0, 0).setScale(k)
+        .setScrollFactor(sx, sy).setAlpha(alpha);
+      if (L.tint != null) img.setTint(L.tint);
+      img.lookRole = 'back';
+      if (front) scene.children.moveBelow(img, front);
+      // Les grosses îles bougent moins et plus lentement que les petites.
+      const big = Phaser.Math.Clamp((ile.w * ile.h) / 120000, 0.2, 1);
+      scene.tweens.add({
+        targets: img, y: y + rnd.realInRange(5, 9) * (1.4 - 0.7 * big),
+        duration: rnd.between(3600, 5200) * (0.8 + 0.6 * big), yoyo: true, repeat: -1,
+        ease: 'Sine.easeInOut', delay: rnd.between(0, 4000),
+      });
+      scene.tweens.add({
+        targets: img, x: x + rnd.realInRange(-7, 7),
+        duration: rnd.between(7000, 11000), yoyo: true, repeat: -1,
+        ease: 'Sine.easeInOut', delay: rnd.between(0, 5000),
+      });
+    });
+  }
+  return true;
 }
 
 // Fondus `withSky` / `fadeInX`, recalculés à chaque image (appelée par
