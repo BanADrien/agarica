@@ -118,6 +118,13 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   de pose habituelle du décor), `--outline darkest --pixel-perfect`. Les **tuiles d'écorce**
   sont passées à `--tile-px 32` (2 px d'écran) pour aller avec ; flottantes et corrompues
   restent à 48.
+  **Tous les décors** (2026-11-11, 179 images) : `python tools/pixelfix_decors.py` refait les
+  décors posés de tous les biomes, les éléments de `assets/decors/elements/`, les plantes, le
+  sous-bois et les arbres, même recette que le grand arbre (une image par lot, grain de 2 px
+  d'écran selon l'échelle d'affichage, 24 couleurs, contour propre). Non faits : fonds de zone,
+  formes d'Agarica (loup, singe, aigle, pieuvre, ours, papillon), effets, objets, interface.
+  **Êtres vivants** (PNJ, ennemis, boss, animaux, Xara, crapaud, corbeau) : au grain d'Agarica,
+  `node tools/pixelfix.js anim <ids> --density 0.65 --colors 20 --pixel-perfect`.
   Référence : `node tools/pixelfix.js agarica --height 128`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 
