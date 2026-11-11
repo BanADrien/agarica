@@ -21,6 +21,8 @@
  *                    cf. le tableau d'échelle de docs/production/ASSETS_A_REFAIRE.md
  *   --factor <n>     ou : n px de l'image source = 1 pixel dessiné
  *                    (défaut pour le manifest : 2,67 / scale, la densité des tuiles)
+ *   --density <d>    anim / item : px d'ÉCRAN par pixel dessiné (0,65 = grain d'Agarica à 128 px) ;
+ *                    le facteur de chaque lot = d / son `scale` du manifest
  *   --colors <n>     nombre de couleurs du lot (défaut : auto)
  *   --palette <f>    palette imposée (.hex, .gpl, .png)
  *   --outline darkest|selective   contour propre ; --pixel-perfect
@@ -100,6 +102,7 @@ function parseArgs(argv) {
     else if (t === '--variant') a.o.variant = true;
     else if (t === '--tile-px') tilePx = Math.round(num(next(), t));
     else if (t === '--tileable') filesTileable = true;
+    else if (t === '--density') a.o.density = num(next(), t);
     else if (t.startsWith('--')) throw new Error(`option inconnue : ${t}`);
     else a.inputs.push(t);
   }
