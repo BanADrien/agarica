@@ -58,6 +58,8 @@ const SCREEN_PX_PER_ART_PX = 64 / 24;
 // Une case de tuile des biomes : 256 px dans l'image, 64 à l'écran.
 const TILE_SOURCE_PX = 256;
 let tilePx = 24;
+// `files --tileable` : pièces qui se répètent ou se raccordent (branches, troncs), grille calée sur l'image.
+let filesTileable = false;
 
 let sharp;
 let PC;
@@ -97,6 +99,7 @@ function parseArgs(argv) {
     else if (t === '--dry') a.o.dry = true;
     else if (t === '--variant') a.o.variant = true;
     else if (t === '--tile-px') tilePx = Math.round(num(next(), t));
+    else if (t === '--tileable') filesTileable = true;
     else if (t.startsWith('--')) throw new Error(`option inconnue : ${t}`);
     else a.inputs.push(t);
   }
@@ -231,7 +234,7 @@ function resolveSets(cmd, inputs, manifests) {
       walkPngs(abs, files);
     }
     if (!files.length) throw new Error('aucune image PNG trouvée');
-    return [{ name: `files:${relOf(path.resolve(inputs[0]))}`, files, scale: null }];
+    return [{ name: `files:${relOf(path.resolve(inputs[0]))}`, files, scale: null, tileable: filesTileable }];
   }
   throw new Error(`commande inconnue : ${cmd}`);
 }

@@ -103,6 +103,11 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   manquait de détails pour l'utilisateur), 20 couleurs, raccords gardés (mode tuile) :
   `node tools/pixelfix.js tiles tuiles_ecorce tuiles_flottantes tuiles_corrompues --colors 20 --tile-px 48`.
   Comparaison 24/32/48/64 : `docs/production/apercus/tuiles_24_32_48_64.png`.
+  **Troncs et branches du grand arbre** (6 pièces de `assets/decors/elements/` : branche_milieu,
+  _base, _bout, _fourche, tronc_segment, tronc_base) refaits le 2026-11-11, même densité que
+  les tuiles (5,33 px par pixel), 24 couleurs, mode `--tileable` (pièces qui se raccordent) ;
+  BrancheKit les compose sans lissage quand elles sont dans le registre :
+  `node tools/pixelfix.js files <les 6 png> --tileable --factor 5.33 --colors 24`.
   Référence : `node tools/pixelfix.js agarica --height 92`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 

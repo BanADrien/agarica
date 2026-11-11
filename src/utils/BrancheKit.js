@@ -47,9 +47,14 @@ function brancheCanvas(w, h) {
   return c;
 }
 
+// Pièces refaites en pixel art (tools/pixelfix.js, registre PIXEL_FIXED) : on les
+// réduit SANS lissage, sinon leurs blocs de pixels redeviennent flous une fois
+// ramenés à l'échelle du monde. Art IA d'origine ou dessin par code : lissé.
+const BRANCHE_PIXEL_ART = typeof PIXEL_FIXED !== 'undefined' && !!PIXEL_FIXED['assets/decors/elements/branche_milieu.png'];
+
 function brancheCtx(c) {
   const ctx = c.getContext('2d');
-  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingEnabled = !BRANCHE_PIXEL_ART;
   ctx.imageSmoothingQuality = 'high';
   return ctx;
 }
