@@ -60,14 +60,13 @@ function brancheCtx(c) {
 // 4 px selon la branche) et les branches courbes les découpent en tranches
 // tournées (grille cassée). On assemble donc avec l'art d'origine, lissé, puis
 // on pixelise l'image FINALE : cases de BRANCHE_PIXEL px du monde, couleur =
-// moyenne de la case ramenée à la palette de l'écorce (24 couleurs tirées des
+// moyenne de la case ramenée à la palette de l'écorce (14 couleurs tirées des
 // pièces par pixel-fixer, `make-palette`), bord net (case pleine ou vide).
 // 0 = désactivé (art lissé d'origine).
-const BRANCHE_PIXEL = 2;
+const BRANCHE_PIXEL = 3;
 const BRANCHE_PALETTE = [
-  0x040509, 0x120d17, 0x1e1420, 0x2c1922, 0x1a2317, 0x291c34, 0x381f25, 0x352246,
-  0x442326, 0x28361c, 0x4f2927, 0x5b2e29, 0x36461a, 0x67352b, 0x753c2e, 0x485714,
-  0x864733, 0x5d690f, 0xa05b3d, 0x6f7a0d, 0x828c14, 0x94a323, 0xdd8c88, 0xaac359,
+  0x0b0910, 0x1d141f, 0x2d1b24, 0x2e1f3b, 0x402225, 0x2d3c1b, 0x512a27,
+  0x64332a, 0x495814, 0x7a3f2f, 0x68730d, 0x9d583f, 0x838e14, 0xa4b244,
 ].map((c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255]);
 
 function branchePixelate(canvas) {
