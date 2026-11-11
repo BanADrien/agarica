@@ -27,10 +27,11 @@ const D = meta.duration, NL = noiseFor(D), SMOKE1 = hex("#5b5566"), ASH = [hex("
 // flammes. Quatre bûches en éventail, toutes vues par leur bout coupé, côté spectateur ; leur autre bout se perd
 // dans le feu. Les deux du dehors d'abord, les deux du milieu par-dessus.
 const LOGS = [
-  [-19, 2, -2, -6, 3.4],
-  [19, 2, 2, -6, 3.4],
-  [-8, 3, -1, -5, 3.2],
-  [8, 3, 1, -5, 3.2],
+  // À plat (demande du 2026-11-11) : bûches couchées sur le sol, presque horizontales, bout coupé vers le dehors.
+  [-21, 0.5, -2, -0.5, 3.4],
+  [21, 0.5, 2, -0.5, 3.4],
+  [-14, 3, -1, 2.6, 3],
+  [14, 3, 1, 2.6, 3],
 ];
 const CROSS = 0.56;
 // big tongues keep more orange and a smaller white heart, so the light doesn't wash them out
