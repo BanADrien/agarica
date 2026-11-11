@@ -61,7 +61,7 @@ function log(p, L, W, H, u0, u1, t, S) {
   p.shade(Math.min(x0, x1) - r - 1, Math.min(y0, y1) - r - 1, Math.max(x0, x1) + r + 1, Math.max(y0, y1) + r + 1, (x, y, out) => {
     const along = (x - x0) * ax + (y - y0) * ay, u = along / len, s = ((x - x0) * nx + (y - y0) * ny) / r;
     if (u < u0 || u > u1 || Math.abs(s) > 1) return;
-    const burn = clamp(1.2 - Math.abs(x) / 8), lane = Math.round(s * r * 0.85), run = rand(Math.floor(along / 3), lane, S);
+    const burn = clamp(1.2 - Math.abs(x) / 8) * clamp((u - 0.72) / 0.2), lane = Math.round(s * r * 0.85), run = rand(Math.floor(along / 3), lane, S);
     if (Math.abs(s) > rim || along > len - 1) return s < 0 && burn > 0.4 ? H[7] : W[0];
     if (burn > 0.35 && lane < 2) {
       // charred: black, with embers breathing in the cracks along the grain
@@ -83,7 +83,7 @@ function log(p, L, W, H, u0, u1, t, S) {
 
 // the bed of coals under the logs: coals that breathe in the heat, grey ash round the rim
 function coals(p, W, H, t, S) {
-  p.shade(-15, -3, 15, 2, (x, y, out) => {
+  p.shade(-15, -3, 15, -1, (x, y, out) => {
     const dx = x / 14, dy = (y + 0.3) / 2.2, d = dx * dx + dy * dy;
     if (d > 1) return;
     const h = rand(Math.floor(x / 2), Math.floor(y), S + 20);
