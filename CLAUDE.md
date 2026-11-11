@@ -94,8 +94,8 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   originaux dans `assets/_pixelfix_originals/`, `restore <id>` pour revenir).
   Toujours regarder d'abord avec `--preview x.png` (n'écrit rien d'autre). Registre :
   `src/data/pixel_fixed.js` (filtre net en jeu, protégé de `import_codex_assets.py`).
-  **Format retenu (2026-11-10, Agarica refaite dans le jeu)** : idle d'Agarica = **92 pixels
-  dessinés** de haut (64 validé d'abord ; 1 pixel ≈ 0,9 px du canevas 960x540), même taille de pixel à l'écran pour
+  **Format retenu (2026-11-10, Agarica refaite dans le jeu)** : idle d'Agarica = **128 pixels
+  dessinés** de haut (64 puis 92 essayés avant ; 1 pixel ≈ 0,65 px du canevas 960x540), même taille de pixel à l'écran pour
   toutes les feuilles (facteur = densité / échelle réelle d'affichage de la feuille),
   20 couleurs par feuille, lignes pixel-perfect, contours d'après l'encre de l'original.
   **Tuiles des biomes** (écorce, flottantes, corrompues) refaites le 2026-11-11 : **48 pixels
@@ -118,7 +118,7 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   de pose habituelle du décor), `--outline darkest --pixel-perfect`. Les **tuiles d'écorce**
   sont passées à `--tile-px 32` (2 px d'écran) pour aller avec ; flottantes et corrompues
   restent à 48.
-  Référence : `node tools/pixelfix.js agarica --height 92`. Les autres personnages se
+  Référence : `node tools/pixelfix.js agarica --height 128`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 
 ## Direction artistique
