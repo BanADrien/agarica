@@ -18,6 +18,15 @@ class BootScene extends Phaser.Scene {
   preload() {
     this.createLoadingScreen();
     BootScene.watchPixelFixed(this);
+    // Branches et troncs en pixel art, images toutes faites (cf. BrancheKit,
+    // tools/bake_branches.py). Pas pendant leur fabrication (`?bake`).
+    this.__branchPixelKeys = [];
+    if (typeof BRANCHES_PIXEL !== 'undefined' && !new URLSearchParams(window.location.search).has('bake')) {
+      for (const [key, file] of Object.entries(BRANCHES_PIXEL.files)) {
+        this.load.image(key, file);
+        this.__branchPixelKeys.push(key);
+      }
+    }
     // Sprites forme humaine : fichiers individuels (un par frame), générés
     // à partir de assets/sprites/agarica.png via tools/split_spritesheet.py
     // (voir AGARICA_ANIM_ROWS dans Player.js pour le mapping ligne -> anim).
@@ -495,6 +504,9 @@ class BootScene extends Phaser.Scene {
   }
 
   static applyPixelFixedFilter(scene) {
+    for (const key of scene.__branchPixelKeys || []) {
+      if (scene.textures.exists(key)) scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
     for (const key of scene.__pixelFixedKeys || []) {
       if (scene.textures.exists(key)) scene.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }

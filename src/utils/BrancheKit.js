@@ -54,15 +54,20 @@ function brancheCtx(c) {
   return ctx;
 }
 
-// Pixel art à grain UNIQUE (retour utilisateur du 2026-11-11 : « les éléments
-// ne sont pas tous au même niveau de pixel »). Pixeliser les six pièces ne
-// suffisait pas : chaque branche les étire selon son épaisseur (pixels de 2 à
-// 4 px selon la branche) et les branches courbes les découpent en tranches
-// tournées (grille cassée). On assemble donc avec l'art d'origine, lissé, puis
-// on pixelise l'image FINALE : cases de BRANCHE_PIXEL px du monde, couleur =
-// moyenne de la case ramenée à la palette de l'écorce (14 couleurs tirées des
-// pièces par pixel-fixer, `make-palette`), bord net (case pleine ou vide).
-// 0 = désactivé (art lissé d'origine).
+// Pixel art des branches et des troncs : des IMAGES TOUTES FAITES, pas un filtre
+// en jeu (demande utilisateur du 2026-11-11). `python tools/bake_branches.py`
+// lance le jeu sans fenêtre, laisse BrancheKit assembler chaque branche et
+// chaque tronc avec l'art d'origine, pixelise l'image FINALE avec pixel-fixer
+// (cases de BRANCHE_PIXEL px du monde, palette d'écorce, contour propre) et
+// l'enregistre dans assets/decors/branches_pixel/ ; la liste est dans
+// src/data/branches_pixel.js (BRANCHES_PIXEL), chargée par BootScene. En jeu :
+// l'image existe déjà sous la clé de la branche, rien n'est calculé.
+// Pixeliser les six pièces une à une ne marchait pas : chaque branche les
+// étire selon son épaisseur (grain inégal) et les courbes cassent la grille.
+// Branche modifiée ou ajoutée dans une zone : RELANCER l'outil (sinon elle
+// s'affiche avec l'art d'origine, lissé).
+// Le code ci-dessous ne tourne que pendant cette fabrication (`?bake`).
+const BRANCHE_BAKING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('bake');
 const BRANCHE_PIXEL = 4;
 const BRANCHE_PALETTE = [
   0x0b0910, 0x1d141f, 0x2d1b24, 0x2e1f3b, 0x402225, 0x2d3c1b, 0x512a27,
@@ -103,7 +108,7 @@ function branchePixelFixer(canvas) {
 
 function branchePixelate(canvas) {
   const G = BRANCHE_PIXEL;
-  if (!G) return canvas;
+  if (!G || !BRANCHE_BAKING) return canvas;
   if (branchePixelFixer(canvas)) return canvas;
   const w = canvas.width, h = canvas.height;
   const ctx = canvas.getContext('2d');
@@ -431,7 +436,8 @@ function brancheTextureKey(scene, b) {
 function addBranchImage(scene, b) {
   const pts = branchePoints(b);
   const key = brancheTextureKey(scene, b);
-  let meta = BRANCHE_META.get(key);
+  // Image toute faite (cf. BRANCHES_PIXEL) : placement lu dans la liste.
+  let meta = BRANCHE_META.get(key) || brancheBakedMeta(scene, key);
   if (!meta || !scene.textures.exists(`${key}-0`)) {
     const { canvas, dx, dy } = brancheCompose(scene, b);
     branchePixelate(canvas);
@@ -442,12 +448,11 @@ function addBranchImage(scene, b) {
       part.getContext('2d').drawImage(canvas, x, 0, w, canvas.height, 0, 0, w, canvas.height);
       const k = `${key}-${i}`;
       if (scene.textures.exists(k)) scene.textures.remove(k);
-      const tex = scene.textures.addCanvas(k, part);
-      if (BRANCHE_PIXEL && tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+      scene.textures.addCanvas(k, part);
       chunks.push({ key: k, x });
     }
     // Pixel art : image posée sur un px entier, la grille ne bave pas.
-    meta = BRANCHE_PIXEL ? { dx: Math.round(dx), dy: Math.round(dy), chunks } : { dx, dy, chunks };
+    meta = BRANCHE_BAKING ? { dx: Math.round(dx), dy: Math.round(dy), chunks } : { dx, dy, chunks };
     BRANCHE_META.set(key, meta);
   }
   return meta.chunks.map((c) => {
@@ -459,6 +464,13 @@ function addBranchImage(scene, b) {
   });
 }
 const BRANCHE_META = new Map();
+
+function brancheBakedMeta(scene, key) {
+  const baked = !BRANCHE_BAKING && typeof BRANCHES_PIXEL !== 'undefined' && BRANCHES_PIXEL.branches[key];
+  if (!baked || !baked.chunks.every((c) => scene.textures.exists(c.key))) return null;
+  BRANCHE_META.set(key, baked);
+  return baked;
+}
 
 // Branches de la zone, dans l'ordre de la donnée (la dernière passe devant).
 function addZoneBranches(scene, data) {
@@ -497,8 +509,7 @@ function addTrunkImage(scene, t, data) {
     const dx = Math.round((w - segW) / 2);
     for (let y = hasBase ? footTop : h; y > 0; y -= tileH) ctx.drawImage(seg, dx, y - tileH, segW, tileH);
     if (hasBase) ctx.drawImage(branchePiece(scene, 'tronc_base'), 0, footTop, baseW, baseH);
-    const tex = scene.textures.addCanvas(key, branchePixelate(canvas));
-    if (BRANCHE_PIXEL && tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    scene.textures.addCanvas(key, branchePixelate(canvas));
   }
   const img = scene.add.image(Math.round(t.x - w / 2), top, key).setOrigin(0, 0);
   if (t.flipX) img.setFlipX(true);
