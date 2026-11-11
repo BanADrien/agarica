@@ -413,16 +413,12 @@ class BootScene extends Phaser.Scene {
       fill.fillRoundedRect(barX, barY, w, 12, 6);
       fill.fillStyle(ui.vineLight, 0.45);
       fill.fillRoundedRect(barX + 2, barY + 2, Math.max(2, w - 4), 4, 2);
-      // Fleurs roses aux quarts déjà atteints, petite feuille en tête.
-      for (let q = 1; q <= 3; q++) {
-        if (v < q / 4) continue;
-        fill.fillStyle(ui.pink, 1);
-        fill.fillCircle(barX + barW * q / 4, barY + 6, 5);
-        fill.fillStyle(0xffe9f5, 1);
-        fill.fillCircle(barX + barW * q / 4, barY + 6, 1.8);
-      }
+      // Tête de la barre : bout plus clair sur TOUTE la hauteur (retour
+      // utilisateur du 2026-11-11 : l'ancienne petite feuille dépassait en haut
+      // sans couvrir la barre, et les fleurs roses aux quarts sont retirées).
+      const cap = Math.min(10, w);
       fill.fillStyle(ui.vineLight, 1);
-      fill.fillEllipse(barX + w + 2, barY + 2, 12, 6);
+      fill.fillRoundedRect(barX + w - cap, barY, cap, 12, { tl: cap < w ? 0 : 6, bl: cap < w ? 0 : 6, tr: 6, br: 6 });
       pct.setText(`${Math.round(v * 100)} %`);
       flavor.setText(lines[Math.min(lines.length - 1, Math.floor(v * lines.length))]);
     };
