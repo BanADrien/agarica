@@ -27,13 +27,12 @@ const D = meta.duration, NL = noiseFor(D), SMOKE1 = hex("#5b5566"), ASH = [hex("
 // flammes. Quatre bûches en éventail, toutes vues par leur bout coupé, côté spectateur ; leur autre bout se perd
 // dans le feu. Les deux du dehors d'abord, les deux du milieu par-dessus.
 const LOGS = [
-  // À plat (demande du 2026-11-11) : bûches couchées sur le sol, presque horizontales, bout coupé vers le dehors.
-  [-21, 0.5, -2, -0.5, 3.4],
-  [21, 0.5, 2, -0.5, 3.4],
-  // Les deux petites, tournées vers nous (raccourcies par la perspective) : on voit bien leur bout coupé,
-  // presque rond (6e valeur = largeur de la coupe, en part du rayon ; 0,62 par défaut = bûche de profil).
-  [-8, 3.2, -4.5, 0.8, 3.6, 1],
-  [8, 3.2, 4.5, 0.8, 3.6, 1],
+  // Demande du 2026-11-11 (croquis de l'utilisateur) : les quatre bûches au même niveau, posées par leur bout
+  // extérieur et légèrement relevées vers le feu (même pente pour toutes, ~18°), bout coupé visible.
+  [-22, 2.5, -4, -3.5, 3.4, 0.8],
+  [22, 2.5, 4, -3.5, 3.4, 0.8],
+  [-11, 2.5, -1, -0.8, 3.4, 0.8],
+  [11, 2.5, 1, -0.8, 3.4, 0.8],
 ];
 const CROSS = 0.56;
 // big tongues keep more orange and a smaller white heart, so the light doesn't wash them out

@@ -2592,6 +2592,7 @@ const CAMPFIRE_FRAME_COUNT = 36;
 const CAMPFIRE_TEXTURE_PREFIX = 'decor-campfire-';
 const ANIM_CAMPFIRE_BURN_KEY = 'campfire-burn';
 const CAMPFIRE_SCALE = 0.15;
+const CAMPFIRE_EXTRA_SINK = 5;
 
 function ensureCampfireAnimation(scene) {
   if (scene.anims.exists(ANIM_CAMPFIRE_BURN_KEY)) return;
@@ -2639,7 +2640,9 @@ function addCampfire(scene, x, y, scale = CAMPFIRE_SCALE, { index = 0 } = {}) {
   // c'est aussi une source de lumière (règle 'feu').
   fire.lookRole = 'prop';
   anchorVisibleFeet(fire);
-  fire.y = footY + GROUND_CONTACT_SINK;
+  // + CAMPFIRE_EXTRA_SINK : le feu pixelfx paraissait posé un peu haut sur
+  // l'herbe (demande utilisateur du 2026-11-11), bûches enfoncées de 5 px.
+  fire.y = footY + GROUND_CONTACT_SINK + CAMPFIRE_EXTRA_SINK;
   // Juice : halo chaud qui respire derrière la flamme, braises qui montent et
   // petites gerbes d'étincelles au hasard (cf. l'update plus bas).
   const flameY = footY - fire.displayHeight * 0.28;
