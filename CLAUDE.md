@@ -137,6 +137,12 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   **Îles du ciel** (forêt flottante 2) : opaques, deux jeux (`lointaines`, et `proches` = refaites en plus grand au même grain, `couche_iles_proches.png`, `--factor 4.8`), découpées une à une par
   `python tools/cut_iles.py` (à relancer si `couche_iles_lointaines.png` est refaite) ; option
   `floating: true` d'un `farLayers` : chaque île flotte à son rythme, derrière les nuages.
+  **Reste du jeu** (2026-11-11) : `bash tools/pixelfix_reste.sh` refait les formes d'Agarica
+  (singe, loup, ours, pieuvre, papillon) et leurs transformations au grain d'Agarica, les
+  totems, les objets (petits : ~30 pixels de haut ; GRANDS objets du décor comme le mur de
+  mousse : facteur = 2 / échelle, sinon gros carrés), les icônes, les portraits (64 px) et les
+  effets animés. `python tools/pixel_restant.py` liste ce qui n'est pas pixelisé. Laissés
+  exprès : interface (cadres de texte), particules et lueurs, brumes, eau, tuiles faites main.
   Référence : `node tools/pixelfix.js agarica --height 128`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 
