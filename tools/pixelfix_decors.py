@@ -28,7 +28,8 @@ FIXED = [  # (motif, échelle d'affichage)
     ('assets/decors/plantes_frames/bplante_*.png', 0.3),
     ('assets/decors/plantes_frames/hplante_*.png', 0.6),
     ('assets/decors/sous_bois_frames/*.png', 0.45),
-    ('assets/decors/arbres_frames/*.png', 1.35),
+    # gros arbres du fond : pixels plus gros, 4 px d'écran (demande du 2026-11-11) -> échelle comptée à moitié
+    ('assets/decors/arbres_frames/*.png', 1.35 / 2),
 ]
 
 

@@ -30,8 +30,10 @@ const LOGS = [
   // À plat (demande du 2026-11-11) : bûches couchées sur le sol, presque horizontales, bout coupé vers le dehors.
   [-21, 0.5, -2, -0.5, 3.4],
   [21, 0.5, 2, -0.5, 3.4],
-  [-14, 3, -1, 2.6, 3],
-  [14, 3, 1, 2.6, 3],
+  // Les deux petites, tournées vers nous (raccourcies par la perspective) : on voit bien leur bout coupé,
+  // presque rond (6e valeur = largeur de la coupe, en part du rayon ; 0,62 par défaut = bûche de profil).
+  [-8, 3.2, -4.5, 0.8, 3.6, 1],
+  [8, 3.2, 4.5, 0.8, 3.6, 1],
 ];
 const CROSS = 0.56;
 // big tongues keep more orange and a smaller white heart, so the light doesn't wash them out
@@ -55,7 +57,7 @@ const TONGUES = [
 // a log from its near end (x0, y0) to its far end, radius r, drawn between u0 and u1 along it: a 1 px dark rim,
 // a lit top, grooves running along the grain, a shadowed underside; charred with glowing cracks in the fire
 function log(p, L, W, H, u0, u1, t, S) {
-  const [x0, y0, x1, y1, r] = L, dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy), ax = dx / len, ay = dy / len;
+  const [x0, y0, x1, y1, r, face = 0.62] = L, dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy), ax = dx / len, ay = dy / len;
   let nx = -ay, ny = ax;
   if (ny < 0) (nx = -nx), (ny = -ny);
   const rim = 1 - 1.05 / r;
@@ -79,7 +81,7 @@ function log(p, L, W, H, u0, u1, t, S) {
     return run < 0.4 ? W[0] : W[1];
   });
   // the near end's cut face: a dark rim, pale sapwood, growth rings round a dark heart
-  if (u0 <= 0) p.ellipse(x0, y0, r * 0.62, r + 0.2, (d) => (d > 0.78 ? W[0] : d > 0.56 ? W[5] : d > 0.32 ? W[4] : W[3]));
+  if (u0 <= 0) p.ellipse(x0, y0, r * face, r + 0.2, (d) => (d > 0.78 ? W[0] : d > 0.56 ? W[5] : d > 0.32 ? W[4] : W[3]));
 }
 
 // the bed of coals under the logs: coals that breathe in the heat, grey ash round the rim
