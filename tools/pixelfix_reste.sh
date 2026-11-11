@@ -13,9 +13,12 @@ run() { "$@" | grep -E "ECHEC|Erreur" ; }
 run $P anim singe singe_extra transfo_singe forme_papillon forme_papillon_extra transfo_papillon --density 0.65 --colors 20 --pixel-perfect
 
 # Formes et transformations hors manifest : facteur = 0,65 / échelle (Player.js).
-# Loup : pixels deux fois plus gros que le reste (1,3 px d'écran), demandé le 2026-11-11.
-run $P files $S/loup_frames --factor 3.25 --colors 16 --outline darkest --pixel-perfect --accents            # WOLF_SCALE 0,4
-run $P files $S/loup_attaque_frames --factor 4.28 --colors 16 --outline darkest --pixel-perfect --accents    # WOLF_BITE_SCALE 0,304
+# Loup : 1 pixel dessiné = exactement 1 px d'écran, pour CHAQUE échelle d'affichage (course 0,4 ; saut
+# 0,46 ; morsure 0,304). À 1,3 px (essai du 2026-11-11), les pixels tombaient à cheval sur ceux de l'écran :
+# contour d'épaisseur irrégulière, « bizarre ». Contour propre + œil gardé (--accents).
+run $P files $S/loup_frames/loup_row0_*.png --factor 2.5 --colors 16 --outline darkest --pixel-perfect --accents
+run $P files $S/loup_frames/loup_row1_*.png --factor 2.17 --colors 16 --outline darkest --pixel-perfect --accents
+run $P files $S/loup_attaque_frames --factor 3.29 --colors 16 --outline darkest --pixel-perfect --accents
 run $P files $S/ours_frames --factor 1.91 --colors 20 --pixel-perfect            # OURS_SCALE 0,34
 run $P files $S/pieuvre_frames --factor 2.71 --colors 20 --pixel-perfect         # PIEUVRE_SCALE 0,24
 run $P files $S/transformation/transfo_frames --factor 2.17 --colors 20 --pixel-perfect           # TRANSFO_SCALE 0,3
