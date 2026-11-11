@@ -453,6 +453,12 @@ function addFarLayers(scene, layers, { levelWidth, width }) {
   const manifest = typeof getItemManifest === 'function' ? getItemManifest() : {};
   for (const L of layers) {
     if (!L || !L.id || L.y == null) continue;
+    // Jeu d'îles sans image de bande (`floating` + `set`, ex. les îles proches).
+    if (L.floating && L.set && !scene.textures.exists(`item-${L.id}`)) {
+      addFloatingIslands(scene, L, { k: L.scale ?? 1, sx: L.scrollX ?? 0.25, sy: L.scrollY ?? 0.3, alpha: L.alpha ?? 1,
+        span: levelWidth * (L.scrollX ?? 0.25) + width + 200 });
+      continue;
+    }
     const key = `item-${L.id}`;
     if (!scene.textures.exists(key)) continue;
     const src = scene.textures.get(key).getSourceImage();
@@ -495,15 +501,22 @@ function addFarLayers(scene, layers, { levelWidth, width }) {
 // départ tirés d'une graine fixe : même danse à chaque visite), vertical
 // surtout, avec une légère dérive de côté sur un autre rythme.
 function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
-  if (typeof ILES_LOINTAINES === 'undefined' || !ILES_LOINTAINES.iles.length) return false;
-  if (!ILES_LOINTAINES.iles.every((ile, i) => scene.textures.exists(`ile-lointaine-${i}`))) return false;
-  const rnd = new Phaser.Math.RandomDataGenerator([`iles-${L.id}`]);
-  const period = ILES_LOINTAINES.w * k;
+  // `set` : jeu d'îles (ILES_SETS, cf. tools/cut_iles.py) -- 'lointaines' par
+  // défaut, 'proches' = les mêmes refaites pour être affichées plus grandes au
+  // même grain de pixel. `only` : indices des îles gardées ; `every` : une
+  // répétition du motif sur N (îles plus rares).
+  const setName = L.set || 'lointaines';
+  const SET = typeof ILES_SETS !== 'undefined' ? ILES_SETS[setName] : null;
+  if (!SET || !SET.iles.length) return false;
+  if (!SET.iles.every((ile, i) => scene.textures.exists(`ile-${setName}-${i}`))) return false;
+  const rnd = new Phaser.Math.RandomDataGenerator([`iles-${L.id}-${setName}`]);
+  const period = SET.w * k * (L.every || 1);
   const sky = scene.__sky;
   // Derrière les nuages (créés avant les nappes) ; sans nuages, derrière les nappes.
   const front = sky && ((sky.clouds && sky.clouds[0]) || (sky.nappes && sky.nappes[0]));
-  for (let x0 = -100; x0 < span; x0 += period) {
-    ILES_LOINTAINES.iles.forEach((ile, i) => {
+  for (let x0 = -100 + (L.offsetX || 0); x0 < span; x0 += period) {
+    SET.iles.forEach((ile, i) => {
+      if (L.only && !L.only.includes(i)) return;
       const x = x0 + ile.x * k;
       // `maxBottom` (px, repère de la bande) : les îles sont réparties à des
       // hauteurs différentes, du haut du ciel jusqu'à cette ligne au plus bas
@@ -514,7 +527,7 @@ function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
         const room = L.maxBottom - ile.h * k - L.y;
         if (room > 0) y = L.y + rnd.realInRange(0, room);
       }
-      const img = scene.add.image(x, y, `ile-lointaine-${i}`).setOrigin(0, 0).setScale(k)
+      const img = scene.add.image(x, y, `ile-${setName}-${i}`).setOrigin(0, 0).setScale(k)
         .setScrollFactor(sx, sy).setAlpha(alpha);
       if (L.tint != null) img.setTint(L.tint);
       img.lookRole = 'back';

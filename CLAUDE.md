@@ -134,7 +134,7 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   formes d'Agarica (loup, singe, aigle, pieuvre, ours, papillon), effets, objets, interface.
   **Êtres vivants** (PNJ, ennemis, boss, animaux, Xara, crapaud, corbeau) : au grain d'Agarica,
   `node tools/pixelfix.js anim <ids> --density 0.65 --colors 20 --pixel-perfect`.
-  **Îles lointaines** (forêt flottante 2) : opaques, découpées une à une par
+  **Îles du ciel** (forêt flottante 2) : opaques, deux jeux (`lointaines`, et `proches` = refaites en plus grand au même grain, `couche_iles_proches.png`, `--factor 4.8`), découpées une à une par
   `python tools/cut_iles.py` (à relancer si `couche_iles_lointaines.png` est refaite) ; option
   `floating: true` d'un `farLayers` : chaque île flotte à son rythme, derrière les nuages.
   Référence : `node tools/pixelfix.js agarica --height 128`. Les autres personnages se

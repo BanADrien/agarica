@@ -142,6 +142,7 @@ const PIXEL_FIXED = {
   "assets/decors/elements/decor_trou_effondre.png": {"f":14.29,"set":"files:assets/decors/elements/decor_trou_effondre.png"},
   "assets/decors/fonds/couche_ciel_jour.png": {"f":8.4,"set":"files:assets/decors/fonds/couche_ciel_jour.png"},
   "assets/decors/fonds/couche_iles_lointaines.png": {"f":8.4,"set":"files:assets/decors/fonds/couche_iles_lointaines.png"},
+  "assets/decors/fonds/couche_iles_proches.png": {"f":4.8,"set":"files:assets/decors/fonds/couche_iles_proches.png"},
   "assets/decors/fonds/couche_nuage_0.png": {"f":8.4,"set":"files:assets/decors/fonds/couche_nuage_0.png"},
   "assets/decors/fonds/couche_nuage_1.png": {"f":8.4,"set":"files:assets/decors/fonds/couche_nuage_1.png"},
   "assets/decors/fonds/couche_nuage_2.png": {"f":8.4,"set":"files:assets/decors/fonds/couche_nuage_2.png"},
