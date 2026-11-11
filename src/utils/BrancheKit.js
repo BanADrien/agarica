@@ -47,16 +47,70 @@ function brancheCanvas(w, h) {
   return c;
 }
 
-// Pièces refaites en pixel art (tools/pixelfix.js, registre PIXEL_FIXED) : on les
-// réduit SANS lissage, sinon leurs blocs de pixels redeviennent flous une fois
-// ramenés à l'échelle du monde. Art IA d'origine ou dessin par code : lissé.
-const BRANCHE_PIXEL_ART = typeof PIXEL_FIXED !== 'undefined' && !!PIXEL_FIXED['assets/decors/elements/branche_milieu.png'];
-
 function brancheCtx(c) {
   const ctx = c.getContext('2d');
-  ctx.imageSmoothingEnabled = !BRANCHE_PIXEL_ART;
+  ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   return ctx;
+}
+
+// Pixel art à grain UNIQUE (retour utilisateur du 2026-11-11 : « les éléments
+// ne sont pas tous au même niveau de pixel »). Pixeliser les six pièces ne
+// suffisait pas : chaque branche les étire selon son épaisseur (pixels de 2 à
+// 4 px selon la branche) et les branches courbes les découpent en tranches
+// tournées (grille cassée). On assemble donc avec l'art d'origine, lissé, puis
+// on pixelise l'image FINALE : cases de BRANCHE_PIXEL px du monde, couleur =
+// moyenne de la case ramenée à la palette de l'écorce (24 couleurs tirées des
+// pièces par pixel-fixer, `make-palette`), bord net (case pleine ou vide).
+// 0 = désactivé (art lissé d'origine).
+const BRANCHE_PIXEL = 2;
+const BRANCHE_PALETTE = [
+  0x040509, 0x120d17, 0x1e1420, 0x2c1922, 0x1a2317, 0x291c34, 0x381f25, 0x352246,
+  0x442326, 0x28361c, 0x4f2927, 0x5b2e29, 0x36461a, 0x67352b, 0x753c2e, 0x485714,
+  0x864733, 0x5d690f, 0xa05b3d, 0x6f7a0d, 0x828c14, 0x94a323, 0xdd8c88, 0xaac359,
+].map((c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255]);
+
+function branchePixelate(canvas) {
+  const G = BRANCHE_PIXEL;
+  if (!G) return canvas;
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const cache = new Map();
+  for (let cy = 0; cy < h; cy += G) {
+    for (let cx = 0; cx < w; cx += G) {
+      let r = 0, g = 0, b = 0, a = 0, n = 0;
+      for (let y = cy; y < Math.min(h, cy + G); y++) {
+        for (let x = cx; x < Math.min(w, cx + G); x++) {
+          const i = (y * w + x) * 4, al = d[i + 3];
+          r += d[i] * al; g += d[i + 1] * al; b += d[i + 2] * al; a += al; n++;
+        }
+      }
+      let out = null;
+      if (a / n >= 128) {
+        r /= a; g /= a; b /= a;
+        const key = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
+        out = cache.get(key);
+        if (!out) {
+          let best = Infinity;
+          for (const c of BRANCHE_PALETTE) {
+            const dr = c[0] - r, dg = c[1] - g, db = c[2] - b, dist = dr * dr * 0.3 + dg * dg * 0.59 + db * db * 0.11;
+            if (dist < best) { best = dist; out = c; }
+          }
+          cache.set(key, out);
+        }
+      }
+      for (let y = cy; y < Math.min(h, cy + G); y++) {
+        for (let x = cx; x < Math.min(w, cx + G); x++) {
+          const i = (y * w + x) * 4;
+          if (out) { d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2]; d[i + 3] = 255; } else d[i + 3] = 0;
+        }
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
 }
 
 // Image source d'une pièce : l'art s'il est chargé, sinon le dessin par code.
@@ -348,6 +402,7 @@ function addBranchImage(scene, b) {
   let meta = BRANCHE_META.get(key);
   if (!meta || !scene.textures.exists(`${key}-0`)) {
     const { canvas, dx, dy } = brancheCompose(scene, b);
+    branchePixelate(canvas);
     const chunks = [];
     for (let i = 0, x = 0; x < canvas.width; i++, x += BRANCHE_MAX_TEXTURE) {
       const w = Math.min(BRANCHE_MAX_TEXTURE, canvas.width - x);
@@ -355,10 +410,12 @@ function addBranchImage(scene, b) {
       part.getContext('2d').drawImage(canvas, x, 0, w, canvas.height, 0, 0, w, canvas.height);
       const k = `${key}-${i}`;
       if (scene.textures.exists(k)) scene.textures.remove(k);
-      scene.textures.addCanvas(k, part);
+      const tex = scene.textures.addCanvas(k, part);
+      if (BRANCHE_PIXEL && tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
       chunks.push({ key: k, x });
     }
-    meta = { dx, dy, chunks };
+    // Pixel art : image posée sur un px entier, la grille ne bave pas.
+    meta = BRANCHE_PIXEL ? { dx: Math.round(dx), dy: Math.round(dy), chunks } : { dx, dy, chunks };
     BRANCHE_META.set(key, meta);
   }
   return meta.chunks.map((c) => {
@@ -408,9 +465,10 @@ function addTrunkImage(scene, t, data) {
     const dx = Math.round((w - segW) / 2);
     for (let y = hasBase ? footTop : h; y > 0; y -= tileH) ctx.drawImage(seg, dx, y - tileH, segW, tileH);
     if (hasBase) ctx.drawImage(branchePiece(scene, 'tronc_base'), 0, footTop, baseW, baseH);
-    scene.textures.addCanvas(key, canvas);
+    const tex = scene.textures.addCanvas(key, branchePixelate(canvas));
+    if (BRANCHE_PIXEL && tex) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
   }
-  const img = scene.add.image(t.x - w / 2, top, key).setOrigin(0, 0);
+  const img = scene.add.image(Math.round(t.x - w / 2), top, key).setOrigin(0, 0);
   if (t.flipX) img.setFlipX(true);
   if (t.tint != null) img.setTint(t.tint);
   img.lookRole = 'world';

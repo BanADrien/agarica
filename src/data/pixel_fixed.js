@@ -3,12 +3,6 @@
 // BootScene les affiche sans lissage (NEAREST) ; import_codex_assets.py ne
 // les réécrit pas. `f` : px de l'image = 1 pixel dessiné ; `set` : le lot.
 const PIXEL_FIXED = {
-  "assets/decors/elements/branche_base.png": {"f":8,"set":"files:assets/decors/elements/branche_milieu.png"},
-  "assets/decors/elements/branche_bout.png": {"f":8,"set":"files:assets/decors/elements/branche_milieu.png"},
-  "assets/decors/elements/branche_fourche.png": {"f":8,"set":"files:assets/decors/elements/branche_milieu.png"},
-  "assets/decors/elements/branche_milieu.png": {"f":8,"set":"files:assets/decors/elements/branche_milieu.png"},
-  "assets/decors/elements/tronc_base.png": {"f":8,"set":"files:assets/decors/elements/branche_milieu.png"},
-  "assets/decors/elements/tronc_segment.png": {"f":8,"set":"files:assets/decors/elements/branche_milieu.png"},
   "assets/decors/tuiles_corrompues_frames/coin.png": {"f":5.33,"set":"tiles:tuiles_corrompues"},
   "assets/decors/tuiles_corrompues_frames/dirt_angle.png": {"f":5.33,"set":"tiles:tuiles_corrompues"},
   "assets/decors/tuiles_corrompues_frames/dirt_b.png": {"f":5.33,"set":"tiles:tuiles_corrompues"},
