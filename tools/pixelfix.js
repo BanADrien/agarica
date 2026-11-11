@@ -62,6 +62,8 @@ const TILE_SOURCE_PX = 256;
 let tilePx = 24;
 // `files --tileable` : pièces qui se répètent ou se raccordent (branches, troncs), grille calée sur l'image.
 let filesTileable = false;
+// `--from <dossier>` : images de départ lues là (même nom de fichier), ex. tuiles aplanies par flatten_tiles.py.
+let sourceDir = null;
 
 let sharp;
 let PC;
@@ -102,6 +104,7 @@ function parseArgs(argv) {
     else if (t === '--variant') a.o.variant = true;
     else if (t === '--tile-px') tilePx = Math.round(num(next(), t));
     else if (t === '--tileable') filesTileable = true;
+    else if (t === '--from') sourceDir = path.resolve(next());
     else if (t === '--density') a.o.density = num(next(), t);
     else if (t.startsWith('--')) throw new Error(`option inconnue : ${t}`);
     else a.inputs.push(t);
@@ -266,6 +269,7 @@ function variantOf(abs) {
 
 // Image de départ : toujours l'original IA s'il a déjà été mis de côté.
 function sourceOf(abs) {
+  if (sourceDir && fs.existsSync(path.join(sourceDir, path.basename(abs)))) return path.join(sourceDir, path.basename(abs));
   const orig = originalOf(abs);
   return fs.existsSync(orig) ? orig : abs;
 }

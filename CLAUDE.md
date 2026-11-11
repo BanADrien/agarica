@@ -118,6 +118,11 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   de pose habituelle du décor), `--outline darkest --pixel-perfect`. Les **tuiles d'écorce**
   sont passées à `--tile-px 32` (2 px d'écran) pour aller avec ; flottantes et corrompues
   restent à 48.
+  **Tuiles des îles flottantes** (2026-11-11) : 32 pixels par case aussi, et raccords propres :
+  `python tools/flatten_tiles.py tuiles_flottantes <tmp>` ramène la terre de chaque tuile à la
+  même teinte (chaque tuile IA avait son dégradé, d'où une ligne à chaque raccord), puis
+  `node tools/pixelfix.js tiles tuiles_flottantes --from <tmp> --colors 20 --tile-px 32`.
+  Corrompues : encore à 48, non aplanies.
   **Tous les décors** (2026-11-11, 179 images) : `python tools/pixelfix_decors.py` refait les
   décors posés de tous les biomes, les éléments de `assets/decors/elements/`, les plantes, le
   sous-bois et les arbres, même recette que le grand arbre (une image par lot, grain de 2 px
