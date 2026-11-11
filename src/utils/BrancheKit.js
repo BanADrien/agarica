@@ -39,6 +39,7 @@ const TRONC_SEGMENT_ROWS = 1536;
 const TRONC_BASE_COLS = 1400;
 const TRONC_BASE_ROWS = 1024;
 const TRONC_BASE_GROUND_ROW = 960;   // ligne de sol du pied
+const TRONC_BASE_SINK_ROWS = 64;      // rangées du pied enfoncées sous la ligne de sol
 
 function brancheCanvas(w, h) {
   const c = document.createElement('canvas');
@@ -511,7 +512,12 @@ function addTrunkImage(scene, t, data) {
     if (hasBase) ctx.drawImage(branchePiece(scene, 'tronc_base'), 0, footTop, baseW, baseH);
     scene.textures.addCanvas(key, branchePixelate(canvas));
   }
-  const img = scene.add.image(Math.round(t.x - w / 2), top, key).setOrigin(0, 0);
+  // Pied enfoncé dans le sol (retour utilisateur du 2026-11-11) : posé pile sur
+  // la ligne de sol, on voyait le décor par les creux entre ses racines. Toute
+  // l'image descend (même texture, rien à refabriquer) ; `sink: 0` sur le tronc
+  // pour l'annuler.
+  const sink = hasBase ? Math.round((t.sink ?? TRONC_BASE_SINK_ROWS) * k) : 0;
+  const img = scene.add.image(Math.round(t.x - w / 2), top + sink, key).setOrigin(0, 0);
   if (t.flipX) img.setFlipX(true);
   if (t.tint != null) img.setTint(t.tint);
   img.lookRole = 'world';
