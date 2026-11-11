@@ -261,7 +261,7 @@ const EPREUVE_SINGE_DATA = {
     { id: 's5', x: 9440, w: 240, y: -170, h: 460, cutscene: 'epreuve_s5' },
   ],
   exits: [
-    { edge: 'left', to: 448, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } },
+    // (Retour aux racines : par l'arche du départ, avec E -- plus par le bord gauche, 2026-11-11.)
     // (La fente du sommet, bord droit du parcours, qui redescend vers les
     // racines, est ajoutée par le script une fois le talisman pris :
     // EPREUVE_SINGE_SORTIE_SOMMET.)

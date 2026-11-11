@@ -47,7 +47,31 @@ const ARBRE_ARCHE_SRC = { w: 440, h: 300 };
 const ARCHE_PORTAIL_FRAMES = 24;
 const ANIM_ARCHE_PORTAIL_KEY = 'arche-portail';
 const ARBRE_ARCHE_HEIGHT_K = 1.25;
-function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true) {
+// `enter` : { targetScene, data } -- on ENTRE par l'arche en appuyant sur E
+// devant elle (retour utilisateur du 2026-11-11 : « il faudrait interagir avec
+// le portail plutôt que de passer à côté »). Avant, l'arche n'était qu'un
+// décor et le changement de zone se faisait en sortant par le bord de l'écran.
+// Le bord est donc un mur : la sortie de bord correspondante est retirée des
+// données. Arche fermée : pas d'invite.
+function arbrePassageEnter(scene, passage, cx, by, ah, aw) {
+  if (!scene.__story || !scene.__story.interactables) return;
+  scene.__story.interactables.push({
+    kind: 'arche',
+    probe(sc, player) {
+      const enter = passage.enter;
+      if (!enter || !passage.isOpen()) return null;
+      // Portée : toute la largeur de l'arche (elle est collée au bord de la zone, on s'y adosse).
+      if (Math.abs(player.x - cx) > aw / 2 + 10 || player.y < by - ah - 20 || player.y > by + 40) return null;
+      // `x` suit Agarica sous la voûte : la portée générique (70 px autour de x) ne doit pas l'écarter.
+      return { x: Phaser.Math.Clamp(player.x, cx - 40, cx + 40), topY: by - ah - 6, label: 'E : entrer' };
+    },
+    activate(sc) {
+      if (passage.enter) goToScene(sc, passage.enter.targetScene, passage.enter.data);
+    },
+  });
+}
+
+function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true, enter = null) {
   const key = open ? 'item-decor_arche_ouverte' : 'item-decor_arche_fermee';
   const ah = h * ARBRE_ARCHE_HEIGHT_K;
   const scale = ah / ARBRE_ARCHE_SRC.h;
@@ -98,21 +122,28 @@ function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true) {
       scene.events.on('postupdate', follow);
       scene.events.once('shutdown', () => scene.events.off('postupdate', follow));
     }
-    return {
-      glow, core, art: true, vortex,
+    let isOpen = open;
+    const passage = {
+      glow, core, art: true, vortex, enter,
+      isOpen: () => isOpen,
       setOpen(v) {
+        isOpen = !!v;
         const k = v ? 'item-decor_arche_ouverte' : 'item-decor_arche_fermee';
         if (core.active && scene.textures.exists(k)) core.setTexture(k);
         if (vortex) vortex.__open = !!v;
       },
     };
+    arbrePassageEnter(scene, passage, cx, by, ah, aw);
+    return passage;
   }
-  if (!open) return { glow: null, core: null, art: false, setOpen() {} };
+  if (!open) return { glow: null, core: null, art: false, enter, isOpen: () => false, setOpen() {} };
   const glow = scene.add.ellipse(cx, y, aw * 0.8, ah * 0.6, color, 0.3);
   glow.__sx = 1; glow.__sy = 1;
   storyPutBehindPlayer(scene, glow);
   scene.tweens.add({ targets: glow, alpha: 0.65, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-  return { glow, core: null, art: false, setOpen() {} };
+  const bare = { glow, core: null, art: false, enter, isOpen: () => true, setOpen() {} };
+  arbrePassageEnter(scene, bare, cx, y + h / 2, ah, aw);
+  return bare;
 }
 
 // Lucioles / poussières de lumière qui montent lentement (décor, en boucle).
@@ -398,7 +429,7 @@ ZONE_SCRIPTS.grand_arbre_racines = {
     sendBehindFrontGround(scene, (scene.props || []).filter((p) => p.propType && p.propType.startsWith('grand_arbre_tronc_')));
     // (Bord droit : un mur, hors du passage de la corniche, cf. sorties de bord.)
     // La fente de l'épreuve du singe, au bout des lianes (corniche gauche).
-    arbreGlowPassage(scene, 40, -190, 120);
+    arbreGlowPassage(scene, 40, -190, 120, undefined, true, { targetScene: 'EpreuveSingeScene', data: { enterId: 'from_racines' } });
     // Lumière de la cime, au-dessus du vide des lianes (route de l'arène).
     arbreCimeLight(scene, levelWidth);
     // La mousse dense qui remonte le tunnel (sol et plafond), puis quelques
@@ -679,7 +710,8 @@ CUTSCENES.epreuve_talisman = [
 // jetterait Agarica.
 const EPREUVE_SINGE_SOMMET_X = 12088;
 const EPREUVE_SINGE_SOMMET_Y = -128;
-const EPREUVE_SINGE_SORTIE_SOMMET = { edge: 'right', to: -128, targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
+// (Plus une sortie de bord : on entre dans l'arche du sommet avec E, cf. arbrePassageEnter.)
+const EPREUVE_SINGE_SORTIE_SOMMET = { targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } };
 
 // Fente du sommet : posée FERMÉE dès l'arrivée tant que le talisman n'est
 // pas pris (option H7 : on voit de loin qu'un passage attend au bout du
@@ -691,13 +723,10 @@ const EPREUVE_SINGE_FENTE = { x: 12256, y: -186, h: 110 };
 function epreuveOuvrirSommet(scene, instant) {
   if (scene.__epreuveSommet) return;
   scene.__epreuveSommet = true;
-  // Nouveau tableau : scene.__exits EST le tableau `exits` de la donnée de zone
-  // (LevelKit) ; y pousser la sortie la laissait ouverte pour toute la page
-  // (nouvelle partie sans le talisman comprise). Même piège que boss_kainati.js.
-  scene.__exits = [...(scene.__exits || []), EPREUVE_SINGE_SORTIE_SOMMET];
   const f = EPREUVE_SINGE_FENTE;
   const closed = scene.__sommetFente;
   if (closed && closed.art && closed.core && closed.core.active) {
+    closed.enter = EPREUVE_SINGE_SORTIE_SOMMET;
     closed.setOpen(true);
     if (!instant) {
       // Centre de l'ouverture de l'arche (cf. arbreGlowPassage).
@@ -708,7 +737,7 @@ function epreuveOuvrirSommet(scene, instant) {
     }
     return;
   }
-  const p = arbreGlowPassage(scene, f.x, f.y, f.h);
+  const p = arbreGlowPassage(scene, f.x, f.y, f.h, undefined, true, EPREUVE_SINGE_SORTIE_SOMMET);
   if (!instant) {
     [p.glow, p.core].filter(Boolean).forEach((o) => {
       o.setScale(o.__sx * 0.1, o.__sy * 0.1);
@@ -1027,7 +1056,7 @@ ZONE_SCRIPTS.epreuve_singe = {
     }
     // Côté arrivée (option H8) : la même fente que celle de la corniche des
     // racines, au bord gauche, là où la sortie redescend vers elles.
-    arbreGlowPassage(scene, 40, 390, 120);
+    arbreGlowPassage(scene, 40, 390, 120, undefined, true, { targetScene: 'GrandArbreRacinesScene', data: { enterId: 'from_epreuve' } });
     const w = (data && data.levelWidth) || scene.levelWidth || 12288;
     arbreMotes(scene, 0, w, -380, 420, 60, [0xbfe8a0, 0xffe9a8, 0x9bff5a]);
     // (La mousse toxique du fond est la bande `liquidFloor` de la donnée,

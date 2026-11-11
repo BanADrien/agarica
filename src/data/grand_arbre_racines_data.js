@@ -133,7 +133,9 @@ const GRAND_ARBRE_RACINES_DATA = {
     // fourche, coupé en deux. Sa partie courbe (dessinée avant, sans case,
     // teinte d'arrière-plan) ne se lit plus comme une rampe : on la traversait
     // en tombant, sa mousse ressemblait au vrai sol.
-    { from: [1190, -128], via: [[1240, -112], [1296, -76]], to: [1424, 56], attach: 'right', thickness: 48, tint: 0x6e6878, solid: false },
+    // (`to` reculé de (1424, 56) à (1384, 16), 2026-11-11 : le bout, prolongé par la
+    // pièce d'attache, dépassait SOUS la branche de la fourche.)
+    { from: [1190, -128], via: [[1240, -112], [1296, -76]], to: [1384, 16], attach: 'right', thickness: 48, tint: 0x6e6878, solid: false },
     { from: [960, -128], to: [1216, -128], tip: 'both', thickness: 48 },
     // Branche de la fourche (x 1344-1728, y=64) : feu de camp.
     { from: [1344, 64], to: [1728, 64], attach: 'right', thickness: 56 },
@@ -151,7 +153,8 @@ const GRAND_ARBRE_RACINES_DATA = {
     // Marche (x 2944-3008, y=0) : filet +128, puis +192 = bond du singe. Un rameau
     // du filet (dessiné avant lui : le filet couvre son départ), coupé comme celui
     // de l'élan : marche plate, partie courbe en décor teinté (on la traversait).
-    { from: [2990, 0], via: [[3070, 44]], to: [3190, 150], attach: 'right', thickness: 42, tint: 0x6e6878, solid: false },
+    // (`to` reculé de (3190, 150) à (3165, 128) : même raison, il dépassait sous le filet.)
+    { from: [2990, 0], via: [[3070, 44]], to: [3165, 128], attach: 'right', thickness: 42, tint: 0x6e6878, solid: false },
     { from: [2944, 0], to: [3008, 0], tip: 'both', thickness: 42 },
     { from: [3008, 128], to: [3840, 128], tip: 'left', thickness: 56, forks: [{ at: 420 }] },
     // Corniche de la cime (x 3584-3840, y=-192) : sort de l'écran à droite.
@@ -245,9 +248,8 @@ const GRAND_ARBRE_RACINES_DATA = {
   exits: [
     // Bord gauche, deux passages séparés par la corniche : le pied de l'arbre…
     { edge: 'left', from: -64, to: 448, targetScene: 'ForetSombre2Scene', data: { enterId: 'from_racines' } },
-    // … et la fente de l'épreuve, sur la corniche. Même côté à l'arrivée : l'épreuve
-    // part de son bord gauche (cf. PLAN_DEV : passage à revoir, une porte conviendrait).
-    { edge: 'left', from: -576, to: -128, targetScene: 'EpreuveSingeScene', data: { enterId: 'from_racines' } },
+    // … l'épreuve du singe, sur la corniche : plus une sortie de bord depuis le
+    // 2026-11-11, on entre dans l'ARCHE avec E (arbreGlowPassage, acte1_arbre.js).
     // Au bout de la corniche de la cime : l'arène de Kainati. `frameFeetY` :
     // l'arène (un écran de haut) la montre pieds à 448 ; la caméra s'en
     // approche ici avant le bord (cf. updateEdgeFraming, LevelKit).

@@ -144,6 +144,12 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   mousse : facteur = 2 / échelle, sinon gros carrés), les icônes, les portraits (64 px) et les
   effets animés. `python tools/pixel_restant.py` liste ce qui n'est pas pixelisé. Laissés
   exprès : interface (cadres de texte), particules et lueurs, brumes, eau, tuiles faites main.
+  **Interface et dernières images** (2026-11-11, demandé ensuite) : toute l'interface est
+  pixelisée (`assets/ui/`, fenêtre de déblocage, panneau du feu de camp : petits éléments à
+  1 px d'écran, grands panneaux à 2), ainsi que les particules pleines, l'eau des mares, la
+  mousse toxique et l'horizon malade. Restent lisses EXPRÈS : lueurs et halos, brumes et nappes,
+  voile de la mare, logo et fond du titre, tuiles faites main.
+  **Arches de racines** : on y entre avec E (`arbreGlowPassage(..., enter)`), plus par le bord.
   Référence : `node tools/pixelfix.js agarica --height 128`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 

@@ -22,15 +22,15 @@ const BRANCHES_PIXEL = {
    "dx": -32,
    "dy": -48
   },
-  "autotile-branche-12xhds8": {
+  "autotile-branche-12jtd31": {
    "chunks": [
     {
-     "key": "autotile-branche-12xhds8-0",
+     "key": "autotile-branche-12jtd31-0",
      "x": 0
     }
    ],
-   "dx": -47,
-   "dy": -48
+   "dx": -46,
+   "dy": -52
   },
   "autotile-branche-140z5gs": {
    "chunks": [
@@ -100,6 +100,16 @@ const BRANCHES_PIXEL = {
     }
    ],
    "dx": -64,
+   "dy": -48
+  },
+  "autotile-branche-1ggznq6": {
+   "chunks": [
+    {
+     "key": "autotile-branche-1ggznq6-0",
+     "x": 0
+    }
+   ],
+   "dx": -47,
    "dy": -48
   },
   "autotile-branche-1iiw9k2": {
@@ -239,16 +249,6 @@ const BRANCHES_PIXEL = {
    ],
    "dx": -32,
    "dy": -48
-  },
-  "autotile-branche-5gmj60": {
-   "chunks": [
-    {
-     "key": "autotile-branche-5gmj60-0",
-     "x": 0
-    }
-   ],
-   "dx": -46,
-   "dy": -52
   },
   "autotile-branche-5klbx7": {
    "chunks": [
@@ -462,7 +462,7 @@ const BRANCHES_PIXEL = {
  "files": {
   "autotile-branche-1098u5r-0": "assets/decors/branches_pixel/autotile-branche-1098u5r-0.png",
   "autotile-branche-11dsr6j-0": "assets/decors/branches_pixel/autotile-branche-11dsr6j-0.png",
-  "autotile-branche-12xhds8-0": "assets/decors/branches_pixel/autotile-branche-12xhds8-0.png",
+  "autotile-branche-12jtd31-0": "assets/decors/branches_pixel/autotile-branche-12jtd31-0.png",
   "autotile-branche-140z5gs-0": "assets/decors/branches_pixel/autotile-branche-140z5gs-0.png",
   "autotile-branche-147z4lk-0": "assets/decors/branches_pixel/autotile-branche-147z4lk-0.png",
   "autotile-branche-15foncr-0": "assets/decors/branches_pixel/autotile-branche-15foncr-0.png",
@@ -470,6 +470,7 @@ const BRANCHES_PIXEL = {
   "autotile-branche-1dyyq41-0": "assets/decors/branches_pixel/autotile-branche-1dyyq41-0.png",
   "autotile-branche-1fikewh-0": "assets/decors/branches_pixel/autotile-branche-1fikewh-0.png",
   "autotile-branche-1g894ir-0": "assets/decors/branches_pixel/autotile-branche-1g894ir-0.png",
+  "autotile-branche-1ggznq6-0": "assets/decors/branches_pixel/autotile-branche-1ggznq6-0.png",
   "autotile-branche-1iiw9k2-0": "assets/decors/branches_pixel/autotile-branche-1iiw9k2-0.png",
   "autotile-branche-1j72r0d-0": "assets/decors/branches_pixel/autotile-branche-1j72r0d-0.png",
   "autotile-branche-1mk2rbv-0": "assets/decors/branches_pixel/autotile-branche-1mk2rbv-0.png",
@@ -485,7 +486,6 @@ const BRANCHES_PIXEL = {
   "autotile-branche-1u750oa-0": "assets/decors/branches_pixel/autotile-branche-1u750oa-0.png",
   "autotile-branche-38zlyc-0": "assets/decors/branches_pixel/autotile-branche-38zlyc-0.png",
   "autotile-branche-45vq6x-0": "assets/decors/branches_pixel/autotile-branche-45vq6x-0.png",
-  "autotile-branche-5gmj60-0": "assets/decors/branches_pixel/autotile-branche-5gmj60-0.png",
   "autotile-branche-5klbx7-0": "assets/decors/branches_pixel/autotile-branche-5klbx7-0.png",
   "autotile-branche-6nyq8k-0": "assets/decors/branches_pixel/autotile-branche-6nyq8k-0.png",
   "autotile-branche-6vj6n4-0": "assets/decors/branches_pixel/autotile-branche-6vj6n4-0.png",
