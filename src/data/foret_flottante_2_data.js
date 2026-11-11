@@ -83,11 +83,11 @@ const FORET_FLOTTANTE_2_DATA = {
     // Quelques îles PROCHES (2026-11-11) : deux fois plus grandes, refaites à cette
     // taille par pixel-fixer (même grain que les lointaines : on ne les étire pas).
     // Plus près = défilement un peu plus rapide, presque pas bleuies, devant les
-    // lointaines, toujours derrière les nuages. Deux îles moyennes seulement, une
+    // lointaines et DEVANT les nuages (les lointaines passent derrière). Deux îles moyennes seulement, une
     // répétition sur deux, cantonnées au haut du ciel : elles ne font pas
     // concurrence aux îles où l'on joue.
     { id: 'iles_proches', set: 'proches', only: [1, 2], every: 2, offsetX: 260, y: -30, scale: 0.7, alpha: 1,
-      tint: 0xeef3fb, scrollX: 0.24, scrollY: 0.26, floating: true, maxBottom: 300 },
+      tint: 0xeef3fb, scrollX: 0.24, scrollY: 0.26, floating: true, maxBottom: 300, aboveClouds: true },
     { id: 'couche_horizon_malade', y: 400, scale: 0.45, tint: 0x3c4e44, scrollX: 0.3, scrollY: 0.3, fill: true, fadeInX: [1400, 2400] },
   ],
   groundCells: [

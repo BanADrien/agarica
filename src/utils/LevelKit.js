@@ -531,7 +531,11 @@ function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
         .setScrollFactor(sx, sy).setAlpha(alpha);
       if (L.tint != null) img.setTint(L.tint);
       img.lookRole = 'back';
-      if (front) scene.children.moveBelow(img, front);
+      // `aboveClouds` : îles proches, DEVANT les nuages du ciel (posées juste
+      // au-dessus du dernier nuage) ; sinon derrière eux.
+      const lastCloud = L.aboveClouds && sky && sky.clouds && sky.clouds[sky.clouds.length - 1];
+      if (lastCloud) scene.children.moveAbove(img, lastCloud);
+      else if (front) scene.children.moveBelow(img, front);
       // Les grosses îles bougent moins et plus lentement que les petites.
       const big = Phaser.Math.Clamp((ile.w * ile.h) / 120000, 0.2, 1);
       scene.tweens.add({
