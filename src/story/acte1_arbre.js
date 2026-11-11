@@ -41,6 +41,11 @@
 // `__sy` (échelles de repos) : les appelants tweenent scaleX / scaleY, jamais
 // `scale`. Sans l'art : un halo couché seul (rien pour un passage fermé).
 const ARBRE_ARCHE_SRC = { w: 440, h: 300 };
+// Portail vivant (2026-11-11) : tourbillon qui tourne, étoiles, liseré qui
+// respire, grains de lumière. 24 images en boucle (2,4 s), même cadre que
+// l'arche : posées pile par-dessus, visibles seulement quand elle est ouverte.
+const ARCHE_PORTAIL_FRAMES = 24;
+const ANIM_ARCHE_PORTAIL_KEY = 'arche-portail';
 const ARBRE_ARCHE_HEIGHT_K = 1.25;
 function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true) {
   const key = open ? 'item-decor_arche_ouverte' : 'item-decor_arche_fermee';
@@ -70,11 +75,35 @@ function arbreGlowPassage(scene, x, y, h = 120, color = 0xbfe8a0, open = true) {
     core.__sy = core.scaleY;
     // Après le halo : le cœur passe devant lui (et toujours sous Agarica).
     storyPutBehindPlayer(scene, core);
+    // Tourbillon animé par-dessus l'ouverture ; il suit l'arche (les appelants
+    // tweenent son échelle, son alpha, sa visibilité).
+    let vortex = null;
+    if (scene.textures.exists('arche-portail-0')) {
+      if (!scene.anims.exists(ANIM_ARCHE_PORTAIL_KEY)) {
+        scene.anims.create({
+          key: ANIM_ARCHE_PORTAIL_KEY,
+          frames: Array.from({ length: ARCHE_PORTAIL_FRAMES }, (_, i) => ({ key: `arche-portail-${i}` })),
+          frameRate: 10, repeat: -1,
+        });
+      }
+      vortex = scene.add.sprite(cx, by, 'arche-portail-0').setOrigin(0.5, 1).setScale(scale).setVisible(open);
+      vortex.play(ANIM_ARCHE_PORTAIL_KEY);
+      vortex.__open = open;
+      storyPutBehindPlayer(scene, vortex);
+      const follow = () => {
+        if (!core.active || !vortex.active) { scene.events.off('postupdate', follow); if (vortex.active) vortex.destroy(); return; }
+        vortex.setPosition(core.x, core.y).setScale(core.scaleX, core.scaleY).setAlpha(core.alpha)
+          .setVisible(core.visible && vortex.__open);
+      };
+      scene.events.on('postupdate', follow);
+      scene.events.once('shutdown', () => scene.events.off('postupdate', follow));
+    }
     return {
-      glow, core, art: true,
+      glow, core, art: true, vortex,
       setOpen(v) {
         const k = v ? 'item-decor_arche_ouverte' : 'item-decor_arche_fermee';
         if (core.active && scene.textures.exists(k)) core.setTexture(k);
+        if (vortex) vortex.__open = !!v;
       },
     };
   }

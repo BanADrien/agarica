@@ -25,6 +25,11 @@ class BootScene extends Phaser.Scene {
         data.iles.forEach((ile, i) => this.load.image(`ile-${set}-${i}`, ile.file));
       }
     }
+    // Portail animé de l'arche de racines (pixelfx, tools/pixelfx/export_portail.mjs) :
+    // 24 images au cadre de l'arche, posées par-dessus elle (cf. arbreGlowPassage).
+    for (let i = 0; i < ARCHE_PORTAIL_FRAMES; i++) {
+      this.load.image(`arche-portail-${i}`, `assets/decors/elements/portail_frames/portail_${i}.png`);
+    }
     // Branches et troncs en pixel art, images toutes faites (cf. BrancheKit,
     // tools/bake_branches.py). Pas pendant leur fabrication (`?bake`).
     this.__branchPixelKeys = [];
@@ -507,6 +512,9 @@ class BootScene extends Phaser.Scene {
   }
 
   static applyPixelFixedFilter(scene) {
+    for (let i = 0; i < ARCHE_PORTAIL_FRAMES; i++) {
+      if (scene.textures.exists(`arche-portail-${i}`)) scene.textures.get(`arche-portail-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
     if (typeof ILES_SETS !== 'undefined') {
       for (const [set, data] of Object.entries(ILES_SETS)) {
         data.iles.forEach((ile, i) => {
