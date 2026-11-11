@@ -27,9 +27,10 @@ BRANCH_PIECES = {'branche_milieu', 'branche_base', 'branche_bout', 'branche_four
 FIXED = [  # (motif, échelle d'affichage)
     ('assets/decors/plantes_frames/bplante_*.png', 0.3),
     ('assets/decors/plantes_frames/hplante_*.png', 0.6),
-    ('assets/decors/sous_bois_frames/*.png', 0.45),
-    # gros arbres du fond : pixels bien plus gros, 8 px d'écran (demandé deux fois le 2026-11-11) -> échelle comptée au quart
-    ('assets/decors/arbres_frames/*.png', 1.35 / 4),
+    # plantes du second plan : 3 px d'écran (2 px jugé trop fin) -> échelle comptée aux deux tiers
+    ('assets/decors/sous_bois_frames/*.png', 0.45 / 1.5),
+    # gros arbres du fond : gros pixels, 6 px d'écran (4 trop fin, 8 trop gros : entre-deux du 2026-11-11) -> échelle comptée au tiers
+    ('assets/decors/arbres_frames/*.png', 1.35 / 3),
 ]
 
 

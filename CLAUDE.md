@@ -122,9 +122,9 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   décors posés de tous les biomes, les éléments de `assets/decors/elements/`, les plantes, le
   sous-bois et les arbres, même recette que le grand arbre (une image par lot, grain de 2 px
   d'écran selon l'échelle d'affichage, 24 couleurs, contour propre). **Fonds et gros arbres du
-  fond** : gros pixels, 8 px d'écran (4 px jugé encore trop fin) (fonds `fond_*.png` et ciel : `--tileable --factor 11.2
-  --colors 32` ; îles lointaines et nuages : `--factor 11.2 --colors 24` ; arbres :
-  `--factor 5.9`, déjà réglé ainsi dans `pixelfix_decors.py`).
+  fond** : gros pixels, 6 px d'écran (4 trop fin, 8 trop gros) (fonds `fond_*.png` et ciel : `--tileable --factor 8.4
+  --colors 32` ; îles lointaines et nuages : `--factor 8.4 --colors 24` ; arbres :
+  `--factor 4.44` ; sous-bois du second plan : 3 px, `--factor 6.67`, déjà réglé ainsi dans `pixelfix_decors.py`).
   Brumes, nappes, soleil et vignette : laissés tels quels (dégradés transparents). Non faits :
   formes d'Agarica (loup, singe, aigle, pieuvre, ours, papillon), effets, objets, interface.
   **Êtres vivants** (PNJ, ennemis, boss, animaux, Xara, crapaud, corbeau) : au grain d'Agarica,
