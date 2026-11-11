@@ -112,6 +112,12 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   zone**, sinon il s'affiche avec l'art d'origine lissé. Les six pièces de
   `assets/decors/elements/` restent l'art d'origine (les pixeliser une à une donnait un grain
   différent selon l'épaisseur).
+  **Décors posés du grand arbre** (10 images de `assets/decors/deco_item_frames/grand_arbre/`)
+  refaits le 2026-11-11 : UNE image par lot (palette propre à chaque décor, 24 couleurs ;
+  une palette commune les rendait boueux), grain de 2 px d'écran (`--factor` = 2 / échelle
+  de pose habituelle du décor), `--outline darkest --pixel-perfect`. Les **tuiles d'écorce**
+  sont passées à `--tile-px 32` (2 px d'écran) pour aller avec ; flottantes et corrompues
+  restent à 48.
   Référence : `node tools/pixelfix.js agarica --height 92`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 
