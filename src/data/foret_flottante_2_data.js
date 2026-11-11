@@ -77,7 +77,9 @@ const FORET_FLOTTANTE_2_DATA = {
   farLayers: [
     // 2026-11-11 (retour utilisateur) : opaques (alpha 1, teinte de lointain plus
     // légère), et `floating` : chaque île flotte à son rythme, derrière les nuages.
-    { id: 'couche_iles_lointaines', y: 0, scale: 0.4, alpha: 1, tint: 0xd2e0f2, scrollX: 0.15, scrollY: 0.2, floating: true },
+    { id: 'couche_iles_lointaines', y: 0, scale: 0.4, alpha: 1, tint: 0xd2e0f2, scrollX: 0.15, scrollY: 0.2, floating: true,
+      // Hauteurs variées, jamais plus bas que la ligne tracée par l'utilisateur (~73 % de l'écran).
+      maxBottom: 372 },
     { id: 'couche_horizon_malade', y: 400, scale: 0.45, tint: 0x3c4e44, scrollX: 0.3, scrollY: 0.3, fill: true, fadeInX: [1400, 2400] },
   ],
   groundCells: [

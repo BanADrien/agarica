@@ -505,7 +505,15 @@ function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
   for (let x0 = -100; x0 < span; x0 += period) {
     ILES_LOINTAINES.iles.forEach((ile, i) => {
       const x = x0 + ile.x * k;
-      const y = L.y + ile.y * k;
+      // `maxBottom` (px, repère de la bande) : les îles sont réparties à des
+      // hauteurs différentes, du haut du ciel jusqu'à cette ligne au plus bas
+      // (bas de l'île), au lieu de rester toutes dans la bande du haut. Chaque
+      // exemplaire tire sa hauteur : le motif ne se répète pas à l'identique.
+      let y = L.y + ile.y * k;
+      if (L.maxBottom != null) {
+        const room = L.maxBottom - ile.h * k - L.y;
+        if (room > 0) y = L.y + rnd.realInRange(0, room);
+      }
       const img = scene.add.image(x, y, `ile-lointaine-${i}`).setOrigin(0, 0).setScale(k)
         .setScrollFactor(sx, sy).setAlpha(alpha);
       if (L.tint != null) img.setTint(L.tint);
