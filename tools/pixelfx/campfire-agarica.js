@@ -85,8 +85,10 @@ function log(p, L, W, H, u0, u1, t, S) {
 
 // the bed of coals under the logs: coals that breathe in the heat, grey ash round the rim
 function coals(p, W, H, t, S) {
-  p.shade(-15, -3, 15, -1, (x, y, out) => {
-    const dx = x / 14, dy = (y + 0.3) / 2.2, d = dx * dx + dy * dy;
+  // Lit de braises plus haut (y -8 à 2) : avec les bûches relevées vers le feu, un trou laissait voir le décor
+  // entre leurs bouts et le pied des flammes (retour utilisateur du 2026-11-11).
+  p.shade(-13, -8, 13, 2, (x, y, out) => {
+    const dx = x / 12, dy = (y + 3) / 5, d = dx * dx + dy * dy;
     if (d > 1) return;
     const h = rand(Math.floor(x / 2), Math.floor(y), S + 20);
     if (d > 0.55 && h < 0.55) return ASH[h < 0.15 ? 2 : h < 0.32 ? 1 : 0];
