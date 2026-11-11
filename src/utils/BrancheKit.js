@@ -63,15 +63,48 @@ function brancheCtx(c) {
 // moyenne de la case ramenée à la palette de l'écorce (14 couleurs tirées des
 // pièces par pixel-fixer, `make-palette`), bord net (case pleine ou vide).
 // 0 = désactivé (art lissé d'origine).
-const BRANCHE_PIXEL = 3;
+const BRANCHE_PIXEL = 4;
 const BRANCHE_PALETTE = [
   0x0b0910, 0x1d141f, 0x2d1b24, 0x2e1f3b, 0x402225, 0x2d3c1b, 0x512a27,
   0x64332a, 0x495814, 0x7a3f2f, 0x68730d, 0x9d583f, 0x838e14, 0xa4b244,
 ].map((c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255]);
 
+// Avec pixel-fixer (src/vendor/pixelclean-core.js, copie de tools/pixel-fixer :
+// la recopier après une mise à jour de l'outil) : même algorithme que pour
+// Agarica et les tuiles -- traits d'encre de l'original gardés en lignes d'un
+// pixel, vote par case, nettoyage des pixels isolés. Mode tuile : grille calée
+// sur le coin de l'image, bords d'image = suite du bois (pas de contour).
+// Sans l'outil (script absent) : moyenne par case, plus bas.
+function branchePixelFixer(canvas) {
+  const PC = typeof PixelClean !== 'undefined' ? PixelClean : null;
+  if (!PC || !PC.process) return false;
+  const w = canvas.width, h = canvas.height;
+  const ctx = canvas.getContext('2d');
+  const src = ctx.getImageData(0, 0, w, h);
+  let res;
+  try {
+    res = PC.process({ width: w, height: h, data: src.data }, {
+      force: 'target', sizeMode: 'fixed', targetBy: 'factor', targetFactor: BRANCHE_PIXEL,
+      background: 'keep', tileable: true, palette: BRANCHE_PALETTE, pixelPerfect: true,
+      // « Contour propre » de l'outil (demande utilisateur) : contour extérieur d'un pixel, sans trou.
+      cleanOutline: true, outlineMode: 'darkest',
+    });
+  } catch (e) {
+    console.warn('branchePixelFixer', e);
+    return false;
+  }
+  const small = brancheCanvas(res.image.width, res.image.height);
+  small.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(res.image.data), res.image.width, res.image.height), 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(small, 0, 0, w, h);
+  return true;
+}
+
 function branchePixelate(canvas) {
   const G = BRANCHE_PIXEL;
   if (!G) return canvas;
+  if (branchePixelFixer(canvas)) return canvas;
   const w = canvas.width, h = canvas.height;
   const ctx = canvas.getContext('2d');
   const img = ctx.getImageData(0, 0, w, h);

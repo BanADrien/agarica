@@ -103,10 +103,13 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   manquait de détails pour l'utilisateur), 20 couleurs, raccords gardés (mode tuile) :
   `node tools/pixelfix.js tiles tuiles_ecorce tuiles_flottantes tuiles_corrompues --colors 20 --tile-px 48`.
   Comparaison 24/32/48/64 : `docs/production/apercus/tuiles_24_32_48_64.png`.
-  **Troncs et branches du grand arbre** : pixelisés EN JEU, après assemblage (BrancheKit,
-  `branchePixelate`, 2026-11-11) : cases de `BRANCHE_PIXEL` = 3 px du monde (2 ne se voyait pas), palette d'écorce
-  de 14 couleurs. Les six pièces de `assets/decors/elements/` restent l'art d'origine : les
-  pixeliser une à une donnait un grain différent selon l'épaisseur et cassé sur les courbes.
+  **Troncs et branches du grand arbre** : pixelisés EN JEU, après assemblage, par pixel-fixer
+  lui-même (BrancheKit `branchePixelFixer` ; `src/vendor/pixelclean-core.js` = copie de
+  `tools/pixel-fixer/pixelclean-core.js`, à recopier après chaque mise à jour de l'outil).
+  `BRANCHE_PIXEL` = 4 px du monde, palette d'écorce de 14 couleurs, contour propre et lignes
+  pixel-perfect. Les six pièces de `assets/decors/elements/` restent l'art d'origine : les
+  pixeliser une à une donnait un grain différent selon l'épaisseur. Coût : ~1 à 3 s de plus à
+  la première entrée dans une zone du grand arbre (textures gardées ensuite).
   Référence : `node tools/pixelfix.js agarica --height 92`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 
