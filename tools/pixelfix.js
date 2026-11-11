@@ -141,6 +141,12 @@ function loadRegistry() {
 }
 
 function saveRegistry(reg) {
+  // Nouvelle version des images : le jeu la colle à chaque adresse d'image (`?v=`), le navigateur
+  // recharge donc les images refaites au lieu de ressortir les anciennes de sa mémoire.
+  fs.writeFileSync(path.join(ROOT, 'src', 'data', 'asset_version.js'),
+    `// GÉNÉRÉ (tools/pixelfix.js et autres outils d'images) -- ne pas modifier à la main.
+const ASSET_VERSION = '${Date.now()}';
+`);
   const keys = Object.keys(reg).sort();
   const lines = keys.map((k) => `  ${JSON.stringify(k)}: ${JSON.stringify(reg[k])},`);
   fs.writeFileSync(REGISTRY, `// GÉNÉRÉ par tools/pixelfix.js -- ne pas modifier à la main.

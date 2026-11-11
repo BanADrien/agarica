@@ -492,22 +492,27 @@ class BootScene extends Phaser.Scene {
   // donc aucun autre code à toucher).
   static watchPixelFixed(scene) {
     scene.__pixelFixedKeys = [];
-    if (typeof PIXEL_FIXED === 'undefined' || !Object.keys(PIXEL_FIXED).length) return;
+    const fixed = typeof PIXEL_FIXED !== 'undefined' ? PIXEL_FIXED : {};
     const variants = new URLSearchParams(window.location.search).has('pixel');
+    // Numéro de version collé à chaque image (`?v=…`, src/data/asset_version.js,
+    // réécrit par les outils à chaque image refaite) : sans lui, le navigateur
+    // ressortait l'ANCIENNE image de sa mémoire après une retouche (retour du
+    // 2026-11-11 : totem encore lisse chez l'utilisateur, pixelisé sur le disque).
+    const version = typeof ASSET_VERSION !== 'undefined' ? `?v=${ASSET_VERSION}` : '';
+    const image = scene.load.image.bind(scene.load);
+    scene.load.image = (key, url, ...rest) => {
+      if (typeof url !== 'string') return image(key, url, ...rest);
+      const e = fixed[url];
+      const path = variants && e && e.v ? `assets/_pixel/${url.slice('assets/'.length)}` : url;
+      return image(key, path + version, ...rest);
+    };
     const urls = new Set();
-    for (const [url, e] of Object.entries(PIXEL_FIXED)) {
+    for (const [url, e] of Object.entries(fixed)) {
       if (!e.v) urls.add(url);
       else if (variants) urls.add(`assets/_pixel/${url.slice('assets/'.length)}`);
     }
-    if (variants) {
-      const image = scene.load.image.bind(scene.load);
-      scene.load.image = (key, url, ...rest) => {
-        const e = typeof url === 'string' && PIXEL_FIXED[url];
-        return image(key, e && e.v ? `assets/_pixel/${url.slice('assets/'.length)}` : url, ...rest);
-      };
-    }
     scene.load.on(Phaser.Loader.Events.FILE_LOAD, (file) => {
-      if (file && file.type === 'image' && urls.has(file.url)) scene.__pixelFixedKeys.push(file.key);
+      if (file && file.type === 'image' && typeof file.url === 'string' && urls.has(file.url.split('?')[0])) scene.__pixelFixedKeys.push(file.key);
     });
   }
 
