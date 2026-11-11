@@ -1273,12 +1273,47 @@ function drawCombatDebugOverlays(scene) {
 const DEV_KEYS_TEST_SCENES = ['Zone1Scene', 'Zone2Scene', 'Zone3Scene', 'Zone4Scene', 'Zone5Scene',
   'SousGrotteScene', 'ZoneAquatiqueScene', 'ZonetestScene', 'PlaytestScene'];
 
+// `?debug` est RETENU par le navigateur (localStorage) : une fois l'adresse
+// ouverte avec `?debug`, les raccourcis restent actifs aux lancements suivants,
+// même sans le remettre (2026-11-11 : « aucun raccourci ne marche » -- il
+// fallait l'ajouter à chaque fois). `?debug=0` les coupe de nouveau.
+const DEV_KEYS_STORAGE = 'agarica-debug';
+function devKeysRemembered() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('debug') === '0') { window.localStorage.removeItem(DEV_KEYS_STORAGE); return false; }
+    if (q.has('debug')) { window.localStorage.setItem(DEV_KEYS_STORAGE, '1'); return true; }
+    return window.localStorage.getItem(DEV_KEYS_STORAGE) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
 function devKeysAllowed(scene) {
   if (typeof window !== 'undefined' && window.location) {
     const q = new URLSearchParams(window.location.search);
-    if (q.has('debug') || q.has('editor')) return true;
+    if (q.has('editor') || devKeysRemembered()) return true;
   }
   return !!(scene && scene.scene && DEV_KEYS_TEST_SCENES.includes(scene.scene.key));
+}
+
+// Raccourcis de développement : UN seul écouteur pour tout le jeu, posé sur la
+// fenêtre, qui appelle l'action de la zone en cours. Avant, chaque zone posait
+// les siens sur son clavier Phaser : selon le parcours, une bascule pouvait
+// être jouée deux fois (donc s'annuler) ou pas du tout. `preventDefault` : le
+// navigateur ne prend plus Ctrl+I, Ctrl+Maj+D ou Ctrl+Maj+H pour lui.
+const DEV_KEY_HANDLERS = {};
+let devKeysBound = false;
+function devKeyOn(code, fn) {
+  DEV_KEY_HANDLERS[code] = fn;
+  if (devKeysBound || typeof window === 'undefined') return;
+  devKeysBound = true;
+  window.addEventListener('keydown', (event) => {
+    const handler = DEV_KEY_HANDLERS[event.code];
+    if (!handler || event.repeat || !currentLevelScene || !devKeysAllowed(currentLevelScene)) return;
+    if (event.ctrlKey) event.preventDefault();
+    handler(event);
+  });
 }
 
 function setupDebugToggle(scene) {
@@ -1295,7 +1330,7 @@ function setupDebugToggle(scene) {
   }
   applyDebugVisibility(scene);
   ensureCombatDebugGraphics(scene);
-  scene.input.keyboard.on('keydown-I', (event) => {
+  devKeyOn('KeyI', (event) => {
     if (!event.ctrlKey) return;
     debugHitboxesVisible = !debugHitboxesVisible;
     applyDebugVisibility(scene);
@@ -1308,17 +1343,17 @@ function setupDebugToggle(scene) {
   // compétence y est équipée, déclenche cette compétence (même effet de
   // bord que Ctrl+Shift+D avec la touche D, déjà accepté plus haut). 'J'
   // n'est lié à rien d'autre, aucun conflit de ce genre pour cette touche-là.
-  scene.input.keyboard.on('keydown-A', (event) => {
+  devKeyOn('KeyA', (event) => {
     if (!event.shiftKey) return;
     attackHitboxesVisible = !attackHitboxesVisible;
   });
-  scene.input.keyboard.on('keydown-J', (event) => {
+  devKeyOn('KeyJ', (event) => {
     if (!event.shiftKey) return;
     entityHitboxesVisible = !entityHitboxesVisible;
   });
 
   // Ctrl+Shift+H (retour utilisateur) : cf. groundHitboxesVisible plus haut.
-  scene.input.keyboard.on('keydown-H', (event) => {
+  devKeyOn('KeyH', (event) => {
     if (!event.ctrlKey || !event.shiftKey) return;
     groundHitboxesVisible = !groundHitboxesVisible;
   });
@@ -1335,7 +1370,7 @@ function setupDebugToggle(scene) {
   // `JustDown`, donc Ctrl+Shift+D fait avancer Agarica d'un cran vers la
   // droite pendant l'appui (effet de bord mineur, pas un bug) en plus de
   // débloquer/équiper.
-  scene.input.keyboard.on('keydown-D', (event) => {
+  devKeyOn('KeyD', (event) => {
     if (!event.ctrlKey || !event.shiftKey) return;
     for (const flag of ['hasWolfForm', 'hasEagleForm', 'hasOctopusForm']) {
       scene.registry.set(flag, true);
