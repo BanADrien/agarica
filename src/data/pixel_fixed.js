@@ -3,14 +3,14 @@
 // BootScene les affiche sans lissage (NEAREST) ; import_codex_assets.py ne
 // les réécrit pas. `f` : px de l'image = 1 pixel dessiné ; `set` : le lot.
 const PIXEL_FIXED = {
-  "assets/decors/arbres_frames/arbre_0.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_0.png"},
-  "assets/decors/arbres_frames/arbre_1.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_1.png"},
-  "assets/decors/arbres_frames/arbre_2.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_2.png"},
-  "assets/decors/arbres_frames/arbre_3.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_3.png"},
-  "assets/decors/arbres_frames/arbre_4.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_4.png"},
-  "assets/decors/arbres_frames/arbre_5.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_5.png"},
-  "assets/decors/arbres_frames/arbre_6.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_6.png"},
-  "assets/decors/arbres_frames/arbre_7.png": {"f":4.44,"set":"files:assets/decors/arbres_frames/arbre_7.png"},
+  "assets/decors/arbres_frames/arbre_0.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_0.png"},
+  "assets/decors/arbres_frames/arbre_1.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_1.png"},
+  "assets/decors/arbres_frames/arbre_2.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_2.png"},
+  "assets/decors/arbres_frames/arbre_3.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_3.png"},
+  "assets/decors/arbres_frames/arbre_4.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_4.png"},
+  "assets/decors/arbres_frames/arbre_5.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_5.png"},
+  "assets/decors/arbres_frames/arbre_6.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_6.png"},
+  "assets/decors/arbres_frames/arbre_7.png": {"f":3.7,"set":"files:assets/decors/arbres_frames/arbre_7.png"},
   "assets/decors/deco_item_frames/bosquet/bosquet_antler_totem.png": {"f":3.64,"set":"files:assets/decors/deco_item_frames/bosquet/bosquet_antler_totem.png"},
   "assets/decors/deco_item_frames/bosquet/bosquet_arbre.png": {"f":2.35,"set":"files:assets/decors/deco_item_frames/bosquet/bosquet_arbre.png"},
   "assets/decors/deco_item_frames/bosquet/bosquet_arbre_2.png": {"f":2.35,"set":"files:assets/decors/deco_item_frames/bosquet/bosquet_arbre_2.png"},

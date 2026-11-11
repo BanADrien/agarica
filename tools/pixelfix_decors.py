@@ -29,8 +29,8 @@ FIXED = [  # (motif, échelle d'affichage)
     ('assets/decors/plantes_frames/hplante_*.png', 0.6),
     # plantes du second plan : 3 px d'écran (2 px jugé trop fin) -> échelle comptée aux deux tiers
     ('assets/decors/sous_bois_frames/*.png', 0.45 / 1.5),
-    # gros arbres du fond : gros pixels, 6 px d'écran (4 trop fin, 8 trop gros : entre-deux du 2026-11-11) -> échelle comptée au tiers
-    ('assets/decors/arbres_frames/*.png', 1.35 / 3),
+    # gros arbres du fond : gros pixels, 5 px d'écran (4 trop fin, 6 trop gros, réglé le 2026-11-11) -> échelle divisée par 2,5
+    ('assets/decors/arbres_frames/*.png', 1.35 / 2.5),
 ]
 
 
