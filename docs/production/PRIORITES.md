@@ -36,6 +36,12 @@ l'écran (corniche, caméra centrée) à y 448 (arène) ; la caméra glisse main
 bord (clé de sortie `frameFeetY`, `updateEdgeFraming`) : 447 → 447 à l'aller, 64 px d'écart
 au retour (la caméra des racines ne monte pas plus haut).
 
+## Outil en cours
+
+Carte globale du jeu (`carte.html`, demandée le 2026-11-12) : les 24 zones avec leur vrai
+terrain, passages, ennemis, PNJ, objets, secrets et parcours de l'histoire ; clic pour ouvrir
+l'éditeur ou jouer, notes à copier pour Claude, portées de saut. En construction.
+
 ## P3 : contenu nouveau
 
 | Point | Pourquoi |
