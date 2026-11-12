@@ -50,7 +50,7 @@ Clic sur un point : note, éditeur ou jeu. « Copier pour Claude » pour m'envoy
 | Lot B : cime cachée, île des vents, île du gardien, et la quête de Pépin | zones facultatives de la vague 3 |
 | Lot C : marais des brumes, racines suspendues, nid de cocons, canopée malade, et la quête des fleurs de lune | zones facultatives de la vague 3 |
 | Placer d'autres papillons à libérer, pendant les lots A, B et C (3 sont posés pour l'instant) | collectible : un niveau de la compétence tous les 3 |
-| Familles d'animaux et passifs, test avec les ursidés : ours-hibou, panda, grizzly, ours polaire (conception : `FAMILLES_DESIGN.md`) | demande du 2026-11-12 ; à coder dès que la carte globale est finie (un seul agent à la fois) |
+| Familles et ursidés : à essayer dans la zone de test (`?zone=ZoneOursScene`), puis régler les chiffres ; valider le palier 4 (un coup ne l'arrête plus) ; images des 4 ours (`PROMPT_CODEX_14.md`) ; les brancher dans l'histoire | fait le 2026-11-12 en version de test (`FAMILLES_DESIGN.md`) |
 | Son et musique | le jeu est muet ; gros effet sur le ressenti, mais gros chantier ; à décider avec toi |
 
 ## P4 : quand il n'y a plus rien
