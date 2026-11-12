@@ -1,9 +1,9 @@
 // Rend moon-crescent aux 3 instants du jeu, pour les 3 directions ; écrit des PNG 308x288 (x4, sans lissage).
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync } from "node:fs";
-const root = "E:/projet/pixelfx/";
+import { root, installFx } from "./racine.mjs"; // pixelfx : à côté du jeu, sinon E:/projet/pixelfx
 const core = await import(pathToFileURL(root + "src/core/index.js"));
-const fx = await import(pathToFileURL(root + "src/fx/melee/moon-crescent.js"));
+const fx = await import(pathToFileURL(installFx("moon-crescent.js", "melee")));
 const { encodePNG } = await import(pathToFileURL(root + "tools/lib/png.mjs"));
 const out = process.argv[2], K = 4, W = 77, H = 72, TIMES = [0.05, 0.15, 0.24];
 mkdirSync(out, { recursive: true });

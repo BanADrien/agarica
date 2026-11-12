@@ -8,11 +8,42 @@ const WIND_PULL_RATE = 6; // vitesse de convergence vers -force (1/s)
 const WIND_STREAK_DENSITY = 1 / 1400; // traits par px²
 const WIND_COLOR = 0xcff6ff;
 
+// Art en pixel art fait avec pixelfx (2026-11-12, demande de l'utilisateur :
+// « refais les fx des courants ascendants avec pixelfx ») : deux plans de
+// filets de vent, chacun une boucle de COURANT_FRAMES cases de 256 px qui se
+// répètent sans raccord dans les deux sens (tools/pixelfx/updraft.js, rendu par
+// `node tools/pixelfx/export_courant.mjs assets/vfx/courant_frames`). La case
+// ne contient que la vie des filets (ils se tracent, ondulent, s'effacent) ;
+// la montée, c'est le défilement fait ici, plus rapide au plan avant.
+// Sans ces images : l'ancien rendu (image étirée + traits), plus bas.
+const COURANT_PLANS = ['fond', 'avant'];
+const COURANT_FRAMES = 24;
+const COURANT_FPS = 10;
+const COURANT_TILE = 256;
+// Grain des images (1 pixel dessiné = 2 px d'écran, comme les décors) : le
+// défilement avance par pas de ce grain, jamais d'un demi-pixel dessiné.
+const COURANT_GRAIN = 2;
+const COURANT_LAYERS = {
+  fond: { speed: 150, alpha: 0.6, shiftX: 96 },
+  avant: { speed: 270, alpha: 0.95, shiftX: 0 },
+};
+// Haut et bas de la colonne fondus sur cette hauteur (au plus un tiers).
+const COURANT_FADE = 110;
+// Voile de lumière sous les filets (additif).
+const COURANT_VEIL_ALPHA = 0.16;
+
 class CourantAir {
   constructor(scene, cfg) {
     this.scene = scene;
     this.rect = new Phaser.Geom.Rectangle(cfg.x, cfg.y, cfg.w || 120, cfg.h || 300);
     this.force = cfg.force || WIND_DEFAULT_FORCE;
+    this.layers = COURANT_PLANS.every((plan) => scene.textures.exists(`courant-${plan}-0`))
+      ? COURANT_PLANS.map((plan) => this.buildLayer(plan)) : null;
+    if (this.layers) {
+      this.veil = this.buildVeil();
+      for (const L of this.layers) for (const t of L.parts) scene.children.moveAbove(t, this.veil);
+      return;
+    }
     // Art ITEM_MANIFEST `courant_air` étiré sur le rectangle s'il existe ;
     // les traits procéduraux restent par-dessus (mouvement).
     if (scene.textures.exists('item-courant_air')) {
@@ -39,8 +70,74 @@ class CourantAir {
     this.draw(0);
   }
 
+  // Un plan = trois mosaïques empilées sur le rectangle : haut (fondu vers le
+  // haut), milieu, bas (fondu vers le bas). Même motif, calé sur le haut du
+  // rectangle (`offY`), pour qu'aucun raccord ne se voie entre les trois.
+  buildLayer(plan) {
+    const r = this.rect;
+    const cfg = COURANT_LAYERS[plan];
+    const fade = Math.min(COURANT_FADE, Math.floor(r.height / 3));
+    const key = `courant-${plan}-0`;
+    const part = (y, h, alphas) => {
+      const t = this.scene.add.tileSprite(r.x, y, r.width, h, key).setOrigin(0, 0);
+      t.setAlpha(...alphas);
+      t.tilePositionX = cfg.shiftX;
+      t.offY = y - r.y;
+      return t;
+    };
+    const a = cfg.alpha;
+    return {
+      plan, cfg, scroll: 0, frame: 0,
+      parts: [
+        part(r.y, fade, [0, 0, a, a]),
+        part(r.y + fade, r.height - fade * 2, [a]),
+        part(r.bottom - fade, fade, [a, a, 0, 0]),
+      ],
+    };
+  }
+
+  // Voile de lumière de la colonne, sous les filets : on voit de loin où le
+  // vent monte, même devant un nuage. Lueur lisse exprès (comme les halos du
+  // jeu) : pleine au centre, fondue sur les quatre bords.
+  buildVeil() {
+    const r = this.rect;
+    const g = this.scene.add.graphics().setBlendMode(Phaser.BlendModes.ADD);
+    const ex = Math.min(40, r.width / 3);
+    const ey = Math.min(COURANT_FADE, Math.floor(r.height / 3));
+    const xs = [r.x, r.x + ex, r.right - ex, r.right];
+    const ys = [r.y, r.y + ey, r.bottom - ey, r.bottom];
+    const A = COURANT_VEIL_ALPHA;
+    // alpha aux 16 coins de la grille 3 x 3 : 0 sur le pourtour, A à l'intérieur
+    const at = (i, j) => (i === 0 || i === 3 || j === 0 || j === 3 ? 0 : A);
+    for (let j = 0; j < 3; j++) {
+      for (let i = 0; i < 3; i++) {
+        g.fillGradientStyle(WIND_COLOR, WIND_COLOR, WIND_COLOR, WIND_COLOR, at(i, j), at(i + 1, j), at(i, j + 1), at(i + 1, j + 1));
+        g.fillRect(xs[i], ys[j], xs[i + 1] - xs[i], ys[j + 1] - ys[j]);
+      }
+    }
+    return g;
+  }
+
+  updateLayers(time, dt) {
+    const frame = Math.floor((time / 1000) * COURANT_FPS) % COURANT_FRAMES;
+    for (const L of this.layers) {
+      L.scroll = (L.scroll + L.cfg.speed * dt) % COURANT_TILE;
+      const step = Math.round(L.scroll / COURANT_GRAIN) * COURANT_GRAIN;
+      for (const t of L.parts) {
+        if (L.frame !== frame) t.setTexture(`courant-${L.plan}-${frame}`);
+        t.tilePositionY = t.offY + step;
+      }
+      L.frame = frame;
+    }
+  }
+
   update(time, delta) {
     const dt = Math.min(delta, 50) / 1000;
+    if (this.layers) {
+      this.updateLayers(time, dt);
+      this.pushPlayer(dt);
+      return;
+    }
     for (const s of this.streaks) {
       s.y -= s.speed * dt;
       if (s.y < 0) { s.y += 1; s.x = Math.random(); }

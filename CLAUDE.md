@@ -150,6 +150,10 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   mousse toxique et l'horizon malade. Restent lisses EXPRÈS : lueurs et halos, brumes et nappes,
   voile de la mare, logo et fond du titre, tuiles faites main.
   **Arches de racines** : on y entre avec E (`arbreGlowPassage(..., enter)`), plus par le bord.
+  **Effets pixelfx** (arc de la dague, feu de camp, portail, courants d'air ascendants) :
+  scripts dans `tools/pixelfx/` (voir son LISEZMOI) ; pixelfx se clone À CÔTÉ du jeu
+  (`…/projet/pixelfx`), il n'est pas dans le dépôt. Courants ascendants refaits le 2026-11-12 :
+  `node tools/pixelfx/export_courant.mjs assets/vfx/courant_frames`.
   Référence : `node tools/pixelfix.js agarica --height 128`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
 

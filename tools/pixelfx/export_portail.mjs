@@ -2,9 +2,9 @@
 // même cadre que decor_arche_ouverte.png : à poser pile par-dessus l'arche.
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync } from "node:fs";
-const root = "E:/projet/pixelfx/";
+import { root, installFx } from "./racine.mjs"; // pixelfx : à côté du jeu, sinon E:/projet/pixelfx
 const core = await import(pathToFileURL(root + "src/core/index.js"));
-const fx = await import(pathToFileURL(root + "src/fx/arcane/root-portal.js"));
+const fx = await import(pathToFileURL(installFx("root-portal.js", "arcane")));
 const { encodePNG } = await import(pathToFileURL(root + "tools/lib/png.mjs"));
 const out = process.argv[2], K = 5, W = 88, H = 60, N = 24, FPS = 10;
 mkdirSync(out, { recursive: true });

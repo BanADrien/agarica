@@ -1,9 +1,9 @@
 // Feu de camp pixelfx -> 36 images (3 s en boucle à 12 i/s), recadrées autour du feu, x10 sans lissage.
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync } from "node:fs";
-const root = "E:/projet/pixelfx/";
+import { root, installFx } from "./racine.mjs"; // pixelfx : à côté du jeu, sinon E:/projet/pixelfx
 const core = await import(pathToFileURL(root + "src/core/index.js"));
-const fx = await import(pathToFileURL(root + "src/fx/fire/campfire-agarica.js"));
+const fx = await import(pathToFileURL(installFx("campfire-agarica.js", "fire")));
 const { encodePNG } = await import(pathToFileURL(root + "tools/lib/png.mjs"));
 const out = process.argv[2], K = 10, W = 128, H = 128, N = 36, FPS = 12;
 const X0 = 30, X1 = 98, Y0 = 26, Y1 = 119, cw = X1 - X0, ch = Y1 - Y0, FADE = 12;
