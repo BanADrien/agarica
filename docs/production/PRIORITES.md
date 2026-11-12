@@ -51,6 +51,8 @@ Clic sur un point : note, éditeur ou jeu. « Copier pour Claude » pour m'envoy
 | Lot C : marais des brumes, racines suspendues, nid de cocons, canopée malade, et la quête des fleurs de lune | zones facultatives de la vague 3 |
 | Placer d'autres papillons à libérer, pendant les lots A, B et C (3 sont posés pour l'instant) | collectible : un niveau de la compétence tous les 3 |
 | Familles et ursidés : à essayer dans la zone de test (`?zone=ZoneOursScene`), puis régler les chiffres ; valider le palier 4 (un coup ne l'arrête plus) ; images des 4 ours (`PROMPT_CODEX_14.md`) ; les brancher dans l'histoire | fait le 2026-11-12 en version de test (`FAMILLES_DESIGN.md`) |
+| Ours du fracas refait : nouvelle feuille sans effets et au corps plus court (image n°9 de `PROMPT_CODEX_14.md`), effets du fracas refaits à part avec pixelfx (poussière, pierres, traînée), puis intégration (découpe, échelle, hitbox, pixel-fixer) | demande du 2026-11-12 ; à faire quand la feuille `ours_fracas.png` est générée |
+| Régénérer `grizzly.png`, `grizzly_p2.png` et `ours_hibou.png` : première livraison refusée (cape, grizzly trop proche de l'ours brun, ours-hibou sans rien d'un ours) | prompt n°14 corrigé le 2026-11-12 ; ensuite `bash tools/pixelfix_ours.sh` |
 | Son et musique | le jeu est muet ; gros effet sur le ressenti, mais gros chantier ; à décider avec toi |
 
 ## P4 : quand il n'y a plus rien
