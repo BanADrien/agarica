@@ -71,6 +71,7 @@ def main():
     ap.add_argument('--flags', action='append', default=[], help='cle=valeurJSON (registre Phaser)')
     ap.add_argument('--wait', type=float, default=2.0, help='secondes apres demarrage de la scene')
     ap.add_argument('--keys', default='')
+    ap.add_argument('--pre-js', action='append', default=[], help="JS evalue AVANT --keys (ex. poser le joueur) ; --js passe apres")
     ap.add_argument('--js', action='append', default=[])
     ap.add_argument('--shot', default=None, help='chemin du screenshot final')
     ap.add_argument('--headed', action='store_true')
@@ -123,6 +124,13 @@ def main():
                 }""",
                 [args.scene, json.loads(args.scene_data)])
         time.sleep(args.wait)
+
+        for expr in args.pre_js:
+            try:
+                res = page.evaluate(expr)
+                print(f'PRE-JS> {expr}\n  = {json.dumps(res, ensure_ascii=False, default=str)[:4000]}')
+            except Exception as e:  # noqa: BLE001
+                errors.append(f'pre-js-eval error: {e}')
 
         for step in [s for s in args.keys.split(',') if s.strip()]:
             key, _, dur = step.strip().partition(':')

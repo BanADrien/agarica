@@ -85,6 +85,11 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
 - **Art Codex** : tout élément sans image s'affiche en placeholder. Après toute génération
   d'images (manifest `src/data/asset_manifest.js`), lancer
   `python tools/import_codex_assets.py` (régénère `src/data/asset_present.js`).
+- **Commandes courtes** (skills du projet dans `.claude/skills/` : `verif`, `capture`, `livrer`,
+  `brief-agent`) : `python tools/verif.py` (scenes + editeur + regle des diagonales, sortie d'une
+  ligne ; `--scenes A,B`, `--rapide`, `--robot fs1 fs2`), `python tools/capture.py <zone> --x --y`
+  (capture + gros plan). Robot du chemin principal : `tools/robot/`. Regles communes des agents :
+  `docs/production/REGLES_AGENTS.md` (un brief y renvoie au lieu de les repeter).
 - **Tests** : `python tools/playtest.py --port 88xx --scene ForetSombre1Scene --flags
   xaraMet=true --keys "ArrowRight:1500" --js "…" --shot x.png` (Edge headless, code de
   sortie 1 si erreur JS). Ne pas utiliser `tools/dev_server.py` pour tester : son Save

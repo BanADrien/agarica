@@ -1,4 +1,6 @@
-.claude/
+# Reglages locaux de Claude ignores, sauf les skills du projet (partages entre les PC)
+.claude/*
+!.claude/skills/
 __pycache__/
 *.pyc
 .DS_Store
