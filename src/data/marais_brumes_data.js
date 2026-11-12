@@ -23,6 +23,14 @@ const MARAIS_BRUMES_DATA = {
   levelWidth: 3840,
   levelHeight: 720,
   fall: { y: 600, mode: 'hurt' },
+  // 2026-11-12 (retour utilisateur) : îles volantes et nuages de la forêt
+  // flottante 2 (zone sans ciel qui se révèle : nuages en couche `clouds`).
+  farLayers: [
+    { id: 'couche_iles_lointaines', y: 0, scale: 0.4, alpha: 1, tint: 0xd2e0f2, scrollX: 0.15, scrollY: 0.2, floating: true, maxBottom: 300 },
+    { id: 'nuages', clouds: 6, y: 20, maxBottom: 230, scrollX: 0.12, scrollY: 0.2 },
+    { id: 'iles_proches', set: 'proches', only: [1, 2], every: 2, offsetX: 260, y: -30, scale: 0.7, alpha: 1,
+      tint: 0xeef3fb, scrollX: 0.24, scrollY: 0.26, floating: true, maxBottom: 260 },
+  ],
   groundCells: [
     ...groundRow(0, 60, [7, 8]),     // berge (le lot C y met l'eau et les nénuphars)
     ...groundRow(9, 11, [5]),        // marche (x 576-704, surface 320)

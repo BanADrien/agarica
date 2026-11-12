@@ -50,7 +50,14 @@ const HUTTE_MORGAT_DATA = {
   // fond du vide, terrain du vol raté vers lequel on s'élance (assombrie par
   // la teinte). Elle se lève en approchant de la falaise (fadeInX) et
   // remplace l'ellipse sombre dessinée que le script n'affiche plus.
+  // 2026-11-12 (retour utilisateur) : îles volantes et nuages de la forêt
+  // flottante 2 (zone sans ciel qui se révèle : nuages en couche `clouds`).
+  // Ordre = ordre d'affichage : îles lointaines, nuages, îles proches, horizon.
   farLayers: [
+    { id: 'couche_iles_lointaines', y: 0, scale: 0.4, alpha: 1, tint: 0xd2e0f2, scrollX: 0.15, scrollY: 0.2, floating: true, maxBottom: 300 },
+    { id: 'nuages', clouds: 6, y: 20, maxBottom: 230, scrollX: 0.12, scrollY: 0.2 },
+    { id: 'iles_proches', set: 'proches', only: [1, 2], every: 2, offsetX: 260, y: -30, scale: 0.7, alpha: 1,
+      tint: 0xeef3fb, scrollX: 0.24, scrollY: 0.26, floating: true, maxBottom: 260 },
     { id: 'couche_horizon_malade', y: 395, scale: 0.45, tint: 0x3c4e44, scrollX: 0.3, scrollY: 1, fill: true, fadeInX: [1700, 2500] },
   ],
   campfires: [{ x: 1500, y: 448 }],

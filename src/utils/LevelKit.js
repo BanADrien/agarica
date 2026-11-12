@@ -453,10 +453,22 @@ function addFarLayers(scene, layers, { levelWidth, width }) {
   const manifest = typeof getItemManifest === 'function' ? getItemManifest() : {};
   for (const L of layers) {
     if (!L || !L.id || L.y == null) continue;
+    // Nuages du lointain (`clouds: n`, 2026-11-12) : pour les zones à îles
+    // volantes SANS ciel qui se révèle (clairière, hutte, marais), dont les
+    // nuages n'existaient qu'avec `skyReveal`. Retour utilisateur : « rajouter
+    // les nuages et les îles partout où il y a le fond avec les îles volantes ».
+    if (L.clouds) {
+      const clouds = addFarClouds(scene, L, { levelWidth, width });
+      if (clouds.length) list.push({ cfg: L, parts: clouds, alpha: L.alpha ?? 0.9 });
+      continue;
+    }
     // Jeu d'îles sans image de bande (`floating` + `set`, ex. les îles proches).
     if (L.floating && L.set && !scene.textures.exists(`item-${L.id}`)) {
-      addFloatingIslands(scene, L, { k: L.scale ?? 1, sx: L.scrollX ?? 0.25, sy: L.scrollY ?? 0.3, alpha: L.alpha ?? 1,
+      const imgs = addFloatingIslands(scene, L, { k: L.scale ?? 1, sx: L.scrollX ?? 0.25, sy: L.scrollY ?? 0.3, alpha: L.alpha ?? 1,
         span: levelWidth * (L.scrollX ?? 0.25) + width + 200 });
+      // Dans la liste des fondus : `withSky` marche aussi pour les îles (forêt
+      // flottante 1 : elles n'apparaissent qu'au-dessus des arbres).
+      if (imgs) list.push({ cfg: L, parts: imgs, alpha: L.alpha ?? 1 });
       continue;
     }
     const key = `item-${L.id}`;
@@ -471,7 +483,10 @@ function addFarLayers(scene, layers, { levelWidth, width }) {
     // 2026-11-11) : au lieu d'une bande figée, chaque île est sa propre image
     // (tools/cut_iles.py), monte et descend à son rythme, et passe DERRIÈRE
     // les nuages du ciel. Images absentes : la bande d'origine, plus bas.
-    if (L.floating && addFloatingIslands(scene, L, { k, sx, sy, alpha, span: levelWidth * sx + width + 200 })) continue;
+    if (L.floating) {
+      const imgs = addFloatingIslands(scene, L, { k, sx, sy, alpha, span: levelWidth * sx + width + 200 });
+      if (imgs) { list.push({ cfg: L, parts: imgs, alpha }); continue; }
+    }
     const t = scene.add.tileSprite(-100, L.y, levelWidth * sx + width + 200, h, key)
       .setOrigin(0, 0).setTileScale(k, k).setScrollFactor(sx, sy).setAlpha(alpha);
     if (L.tint != null) t.setTint(L.tint);
@@ -514,6 +529,7 @@ function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
   const sky = scene.__sky;
   // Derrière les nuages (créés avant les nappes) ; sans nuages, derrière les nappes.
   const front = sky && ((sky.clouds && sky.clouds[0]) || (sky.nappes && sky.nappes[0]));
+  const imgs = [];
   for (let x0 = -100 + (L.offsetX || 0); x0 < span; x0 += period) {
     SET.iles.forEach((ile, i) => {
       if (L.only && !L.only.includes(i)) return;
@@ -531,6 +547,7 @@ function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
         .setScrollFactor(sx, sy).setAlpha(alpha);
       if (L.tint != null) img.setTint(L.tint);
       img.lookRole = 'back';
+      imgs.push(img);
       // `aboveClouds` : îles proches, DEVANT les nuages du ciel (posées juste
       // au-dessus du dernier nuage) ; sinon derrière eux.
       const lastCloud = L.aboveClouds && sky && sky.clouds && sky.clouds[sky.clouds.length - 1];
@@ -550,7 +567,44 @@ function addFloatingIslands(scene, L, { k, sx, sy, alpha, span }) {
       });
     });
   }
-  return true;
+  return imgs;
+}
+
+// Nuages du lointain (entrée de `farLayers` avec `clouds: n`) : les nuages
+// isolés `couche_nuage_0..4`, répartis sur la largeur visible du lointain à des
+// hauteurs tirées entre `y` et `maxBottom` (bas du nuage), avec la même dérive
+// lente que ceux du ciel qui se révèle (addSkyRevealBackLayers). Posés dans
+// l'ordre de `farLayers` : une couche d'îles listée AVANT passe derrière eux,
+// une couche listée APRÈS passe devant. Graine fixe : mêmes nuages à chaque visite.
+//   { id: 'nuages', clouds: 5, y: 20, maxBottom: 260, scrollX: 0.12, scrollY: 0.2, alpha: 0.9 }
+function addFarClouds(scene, L, { levelWidth, width }) {
+  const out = [];
+  const sx = L.scrollX ?? 0.12;
+  const sy = L.scrollY ?? 0.2;
+  const alpha = L.alpha ?? 0.9;
+  const span = width + Math.max(0, levelWidth - width) * sx;
+  const n = Math.max(1, Math.round(L.clouds));
+  const rnd = new Phaser.Math.RandomDataGenerator([`nuages-${L.id}`]);
+  const manifest = typeof getItemManifest === 'function' ? getItemManifest() : {};
+  for (let i = 0; i < n; i++) {
+    const id = [`couche_nuage_${i % 5}`, 'couche_nuage_0'].find((c) => scene.textures.exists(`item-${c}`));
+    if (!id) break;
+    const c = scene.add.image(0, 0, `item-${id}`).setOrigin(0.5, 1);
+    c.setScale((L.scale ?? (manifest[id] || {}).scale ?? 0.7) * rnd.realInRange(0.75, 1.1));
+    // Même rognage que dans le ciel qui se révèle : un bout du nuage voisin de
+    // la planche dépasse au bord gauche de `couche_nuage_4`.
+    if (id === 'couche_nuage_4') c.setCrop(44, 0, c.width - 44, c.height);
+    const top = L.y + c.displayHeight;
+    const bottom = Math.max(top, L.maxBottom ?? top + 200);
+    const cy = rnd.realInRange(top, bottom);
+    const cx = (span * (i + 0.5)) / n + rnd.between(-60, 60);
+    const drift = rnd.between(60, 120);
+    c.setPosition(cx - drift, cy).setScrollFactor(sx, sy).setAlpha(alpha);
+    c.lookRole = 'back';
+    scene.tweens.add({ targets: c, x: cx + drift, duration: rnd.between(40000, 70000), yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    out.push(c);
+  }
+  return out;
 }
 
 // Fondus `withSky` / `fadeInX`, recalculés à chaque image (appelée par

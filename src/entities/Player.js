@@ -2922,7 +2922,20 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // L'arc ou les crocs affichés, et seulement pendant leurs images actives
     // (cf. SLASH_ARCS) -- null pendant l'élan et le retour. Même rectangle que
     // celui que dessine drawSlashArc().
-    return this.isSlashActive(this.scene.time.now) ? this.getSlashRect() : null;
+    if (!this.isSlashActive(this.scene.time.now)) return null;
+    const r = this.getSlashRect();
+    // Morsure du loup : touche aussi la moitié AVANT de son propre corps
+    // (retour de l'utilisateur, 2026-11-12 : « taper devant et sur la moitié
+    // avant de sa hitbox, pas que devant lui »). Un ennemi collé contre le
+    // museau, ou déjà sous la tête, échappait aux crocs placés devant la gueule.
+    // Zone de dégâts seulement : les crocs dessinés et le rebond ne changent pas.
+    if (this.slashDir === 'bite' && this.body) {
+      const b = this.body;
+      const half = b.width / 2;
+      const front = new Phaser.Geom.Rectangle(this.slashFacing > 0 ? b.center.x : b.x, b.y, half, b.height);
+      return Phaser.Geom.Rectangle.Union(r, front);
+    }
+    return r;
   }
 
   // Rectangle (espace monde) de la compétence active, pendant sa courte

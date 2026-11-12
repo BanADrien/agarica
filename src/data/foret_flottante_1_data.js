@@ -72,7 +72,16 @@ const FORET_FLOTTANTE_1_DATA = {
   // peint les montre déjà. y 125 (et non 95, valeur du plan) : vue du
   // belvédère (caméra en haut, scrollY -1200), les cimes noires commencent
   // vers y 425 à l'écran, SOUS le pied des îles peintes, qui restent entières.
+  // 2026-11-12 (retour utilisateur) : les îles volantes de la forêt flottante 2,
+  // « bien au-dessus des arbres, en hauteur ». `withSky` : invisibles dans le
+  // camp de Geralt, elles se lèvent avec le ciel en montant. Positions
+  // calculées pour la caméra tout en haut (scrollY -1200) : lointaines entre
+  // 10 et 330 px de l'écran (au-dessus de l'horizon malade, ~425), proches entre
+  // 0 et 250. Les nuages viennent déjà du ciel qui se révèle.
   farLayers: [
+    { id: 'couche_iles_lointaines', y: -290, scale: 0.4, alpha: 1, tint: 0xd2e0f2, scrollX: 0.15, scrollY: 0.25, floating: true, maxBottom: 30, withSky: true },
+    { id: 'iles_proches', set: 'proches', only: [1, 2], every: 2, offsetX: 260, y: -390, scale: 0.7, alpha: 1,
+      tint: 0xeef3fb, scrollX: 0.24, scrollY: 0.3, floating: true, maxBottom: -110, aboveClouds: true, withSky: true },
     { id: 'couche_horizon_malade', y: 125, scale: 0.45, tint: 0x3c4e44, scrollX: 0.12, scrollY: 0.25, fill: true, fadeInX: [2300, 2900], withSky: true },
   ],
   groundCells: [

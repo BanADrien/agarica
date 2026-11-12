@@ -38,6 +38,15 @@ const CLAIRIERE_PLANTE_DATA = {
   tileset: 'tuiles_flottantes',
   levelWidth: 2240,
   levelHeight: 540,
+  // 2026-11-12 (retour utilisateur) : îles volantes et nuages de la forêt
+  // flottante 2 (zone sans ciel qui se révèle : nuages en couche `clouds`).
+  // Ordre = ordre d'affichage : îles lointaines, nuages, îles proches.
+  farLayers: [
+    { id: 'couche_iles_lointaines', y: 0, scale: 0.4, alpha: 1, tint: 0xd2e0f2, scrollX: 0.15, scrollY: 0.2, floating: true, maxBottom: 300 },
+    { id: 'nuages', clouds: 4, y: 20, maxBottom: 230, scrollX: 0.12, scrollY: 0.2 },
+    { id: 'iles_proches', set: 'proches', only: [1, 2], every: 2, offsetX: 260, y: -30, scale: 0.7, alpha: 1,
+      tint: 0xeef3fb, scrollX: 0.24, scrollY: 0.26, floating: true, maxBottom: 260 },
+  ],
   groundCells: [
     // gx 0-1 : le bord effondré sous le courant (sortie basse, racines suspendues).
     ...groundRow(2, 35, [7, 8]),

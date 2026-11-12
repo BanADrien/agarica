@@ -29,6 +29,14 @@ const ILE_DES_VENTS_DATA = {
   skyReveal: { start: -1, end: 0, leaves: false },
   largeTrees: false,
   liquidFloor: { y: 520, style: 'brume' },
+  // 2026-11-12 (retour utilisateur) : îles volantes de la forêt flottante 2
+  // (les nuages viennent du ciel qui se révèle).
+  // Défilement vertical plus lent qu'en FF2 : la caméra monte ici jusqu'à -1200.
+  farLayers: [
+    { id: 'couche_iles_lointaines', y: 0, scale: 0.4, alpha: 1, tint: 0xd2e0f2, scrollX: 0.15, scrollY: 0.1, floating: true, maxBottom: 300 },
+    { id: 'iles_proches', set: 'proches', only: [1, 2], every: 2, offsetX: 260, y: -30, scale: 0.7, alpha: 1,
+      tint: 0xeef3fb, scrollX: 0.24, scrollY: 0.12, floating: true, maxBottom: 260, aboveClouds: true },
+  ],
   groundCells: [
     ...groundRow(8, 13, [2]),        // I0 (x 512-832, surface 128)
   ],
