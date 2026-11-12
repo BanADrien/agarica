@@ -24,8 +24,10 @@ const COURANT_TILE = 256;
 // défilement avance par pas de ce grain, jamais d'un demi-pixel dessiné.
 const COURANT_GRAIN = 2;
 const COURANT_LAYERS = {
-  fond: { speed: 150, alpha: 0.6, shiftX: 96 },
-  avant: { speed: 270, alpha: 0.95, shiftX: 0 },
+  // Vitesses de montée à l'écran (px/s). 150 et 270 au départ : « le vent monte
+  // trop vite » (utilisateur, 2026-11-12), ramenées à moins de la moitié.
+  fond: { speed: 60, alpha: 0.6, shiftX: 96 },
+  avant: { speed: 110, alpha: 0.95, shiftX: 0 },
 };
 // Haut et bas de la colonne fondus sur cette hauteur (au plus un tiers).
 const COURANT_FADE = 110;
