@@ -16,8 +16,8 @@ grizzly ressemblait trop à l'ours de la première compétence ; l'ours-hibou n'
 « juste un hibou à quatre pattes ». Le prompt ci-dessous est corrigé ; les trois feuilles déjà
 livrées (`grizzly.png`, `grizzly_p2.png`, `ours_hibou.png`) sont à régénérer.
 
-**9 images** à générer : 7 feuilles animées (4 entrées d'`ASSET_MANIFEST`), 1 planche de 4 icônes
-(4 entrées d'`ITEM_MANIFEST`) et l'ours du fracas refait (image n°9, voir plus bas). **Les entrées
+**10 images** à générer : 7 feuilles animées (4 entrées d'`ASSET_MANIFEST`), 1 planche de 4 icônes
+(4 entrées d'`ITEM_MANIFEST`) et l'ours brun refait (images n°9 et 10, voir plus bas). **Les entrées
 des 8 premières sont déjà dans `src/data/asset_manifest.js`** ; ce
 document ne le modifie pas. Tant qu'une feuille manque, le jeu montre l'ours actuel recoloré par le
 code (`src/entities/Ursides.js`) : l'aspect provisoire est visible dans
@@ -35,7 +35,8 @@ code (`src/entities/Ursides.js`) : l'aspect provisoire est visible dans
 | 6 | `assets/sprites/ours_polaire.png` | 1536x1024 | 2 rangées x 4, silhouettes | `ours_polaire`, rangées 0-1 |
 | 7 | `assets/sprites/ours_polaire_p2.png` | 1536x512 | 1 rangée de 4, silhouettes | `ours_polaire`, rangée 2 |
 | 8 | `assets/_codex_src/icones_ours.png` | 1448x1448 | grille 2 x 2 | `skill_icone_panda`, `skill_icone_ours_polaire`, `form_icone_grizzly`, `form_icone_ours_hibou` |
-| 9 | `assets/sprites/ours_fracas.png` | 2172x724 | 2 rangées x 3, silhouettes | aucune pour l'instant : remplacera l'ours du fracas (intégration à part) |
+| 9 | `assets/sprites/ours_fracas.png` | 2172x724 | 2 rangées x 3, silhouettes | aucune pour l'instant : l'ours brun du chef (compétence fracas), recréé (intégration à part) |
+| 10 | `assets/sprites/ours_fracas_p2.png` | 1536x512 | 1 rangée de 4, silhouettes | aucune pour l'instant : sa transformation, sans cape |
 
 Les frames finales vont dans `assets/sprites/grizzly_frames/`, `ours_hibou_frames/`, `panda_frames/`,
 `ours_polaire_frames/` ; les icônes dans `assets/items/skill_icone/` et `assets/items/form_icone/`.
@@ -87,30 +88,33 @@ impacts (`slam`) restent **collées** au corps, en nuage continu au ras des patt
 détaché (c'est ce qui avait cassé le découpage de la feuille de l'ours actuel). **Aucune glace**
 dans les feuilles de l'ours polaire : les pics sont dessinés par le code.
 
-## L'ours du fracas, refait (image n°9)
+## L'ours brun, recréé (images n°9 et 10)
 
-Demande de l'utilisateur du 2026-11-12 : l'ours de la première compétence est à refaire,
-**sans ses effets** et avec un **corps moins long**.
+L'ours brun est le premier ours du jeu : celui du talisman donné par le chef, la compétence
+« fracas ». Demandes de l'utilisateur du 2026-11-12 :
 
-- Aujourd'hui (`assets/sprites/compétence/ours.png`), la poussière, les pierres qui volent et la
-  traînée du coup de patte sont peintes dans l'image : impossible de les régler. La nouvelle feuille
-  ne montre que l'ours. Les effets seront refaits à part avec pixelfx (`tools/pixelfx/`), comme l'arc
-  de la dague et le feu de camp : couleurs, taille, nombre de pierres et durée modifiables en une ligne.
-- L'ours actuel mesure environ 520 x 300 px sur sa feuille, soit 177 x 103 px à l'écran. Le nouveau
-  est plus ramassé : environ **400 x 300 px** (136 x 103 px à l'écran), même hauteur.
-- Mêmes six poses, dans le même ordre : le code de l'attaque ne change pas de rythme.
-- La feuille est livrée sous un NOUVEAU nom (`ours_fracas.png`) et n'est pas importée par Codex :
-  l'ours actuel reste en jeu jusqu'à l'intégration (découpe, échelle, hitbox, effets pixelfx,
-  pixel-fixer), faite à part.
+- il entre dans la liste de création, **dans le même style graphique que les autres ours** (la
+  référence est le grizzly validé), mais avec son propre dessin : aucun ours n'est la copie d'un
+  autre avec d'autres couleurs ;
+- **sans ses effets** : aujourd'hui la poussière, les pierres et la traînée du coup de patte sont
+  peintes dans l'image, impossible de les régler. La nouvelle feuille ne montre que l'ours ; les
+  effets seront refaits à part avec pixelfx (`tools/pixelfx/`), modifiables en une ligne ;
+- **un corps moins long** : environ 400 x 300 px sur la feuille (136 x 103 px à l'écran), contre
+  520 x 300 aujourd'hui.
+
+Mêmes six poses, dans le même ordre : le rythme de l'attaque ne change pas. L'image n°10 est sa
+transformation, refaite elle aussi : l'actuelle se termine sur une ourse qui porte la cape.
+Les deux feuilles arrivent sous de NOUVEAUX noms et ne sont pas importées par Codex : l'ours actuel
+reste en jeu jusqu'à l'intégration (découpe, échelle, hitbox, effets pixelfx, pixel-fixer).
 
 ## Prompt à coller dans Codex
 
 ```
-Nouvelle commande d'images pour « Legend of Agarica » (prompt n°14) : 9 images. Les 8 premières sont déjà déclarées dans src/data/asset_manifest.js (grizzly, ours_hibou, panda, ours_polaire, skill_icone_panda, skill_icone_ours_polaire, form_icone_grizzly, form_icone_ours_hibou).
+Nouvelle commande d'images pour « Legend of Agarica » (prompt n°14) : 10 images. Les 8 premières sont déjà déclarées dans src/data/asset_manifest.js (grizzly, ours_hibou, panda, ours_polaire, skill_icone_panda, skill_icone_ours_polaire, form_icone_grizzly, form_icone_ours_hibou).
 
 RÈGLES
 - Ne modifie ni `src/` ni le manifeste `src/data/asset_manifest.js` : les entrées y sont déjà. N'édite pas non plus tools/import_codex_assets.py.
-- Ne régénère et ne retouche aucune image existante en dehors de ce lot (en particulier assets/sprites/compétence/ours.png, assets/sprites/ours_frames/ et assets/sprites/transformation/transfo_ours.png : le jeu s'en sert, et s'en sert comme repli). L'image n°9 est une NOUVELLE feuille (ours_fracas.png) : elle ne remplace aucun fichier.
+- Ne régénère et ne retouche aucune image existante en dehors de ce lot (en particulier assets/sprites/compétence/ours.png, assets/sprites/ours_frames/ et assets/sprites/transformation/transfo_ours.png : le jeu s'en sert, et s'en sert comme repli). Les images n°9 et 10 sont de NOUVELLES feuilles (ours_fracas.png, ours_fracas_p2.png) : elles ne remplacent aucun fichier.
 - Fond transparent partout (alpha réel). Aucun texte, aucune lettre, aucun chiffre, aucune grille, aucun cadre.
 - Feuilles animées : une rangée = une animation, nombre de frames EXACT, frames séparées d'au moins 40 px, rangées d'au moins 60 px. Animaux tournés vers la DROITE (le code retourne l'image pour la gauche).
 - Une silhouette connexe par frame, aucune particule détachée : la poussière, la terre et la neige des impacts restent collées au corps, en nuage continu au ras des pattes. Aucun éclat qui vole à part.
@@ -118,10 +122,12 @@ RÈGLES
 - Ce sont des transformations d'AGARICA : le SEUL rappel d'elle est le regard vert lunaire (voir [AGARICA]). AUCUNE CAPE, aucun tissu, aucun vêtement, aucun accessoire sur les animaux : ce sont de vrais animaux, nus.
 - CORRECTION DU 2026-11-12 : les feuilles grizzly.png, grizzly_p2.png et ours_hibou.png déjà livrées sont REFUSÉES (cape verte sur le dos ; grizzly identique à l'ours brun existant ; ours-hibou qui est un hibou à quatre pattes avec des ailes). Régénère-les d'après les descriptions ci-dessous et remplace les fichiers ; réimporte avec --force.
 - Finition mécanique autorisée (recadrage, translation, mise à l'échelle uniforme), jamais de dessin produit par code.
-- Commence par grizzly.png : il fixe la finition et l'échelle des quatre ours. L'ours actuel donne la finition, PAS les couleurs ni la silhouette : chacun des quatre doit se reconnaître de lui en noir et blanc.
+- MÊME STYLE GRAPHIQUE POUR TOUS LES OURS, DESSINS DIFFÉRENTS. La référence de style est assets/sprites/grizzly.png (déjà livrée et validée) : même rendu de la fourrure en mèches, même contour sombre, mêmes paliers d'ombre, même regard vert, mêmes griffes, même niveau de détail, même échelle de dessin. Mais chaque ours est un ANIMAL DIFFÉRENT : sa propre silhouette, ses propres proportions, sa propre tête, ses propres marques. JAMAIS le même dessin recoloré : si on met deux ours en silhouette noire côte à côte, on doit les distinguer.
+- L'ancien ours brun (assets/sprites/compétence/ours.png) n'est PLUS la référence de style : il est remplacé par l'image n°9. Ne copie ni son rendu ni ses poses trait pour trait.
 
 RÉFÉRENCES À JOINDRE
-- L'ours actuel d'Agarica (finition, grain de pixel, œil vert, proportions) : assets/sprites/compétence/ours.png et assets/sprites/ours_frames/ours_row0_0.png (à quatre pattes), ours_row0_1.png (patte levée), ours_row0_2.png (impact).
+- RÉFÉRENCE DE STYLE de tous les ours : assets/sprites/grizzly.png (le grizzly validé : rendu de la fourrure, contour, ombres, regard, griffes, échelle).
+- L'ancien ours brun, pour ses POSES seulement (à quatre pattes, patte levée, impact) : assets/sprites/ours_frames/ours_row0_0.png, ours_row0_1.png, ours_row0_2.png. Pas pour son style.
 - La transformation actuelle : assets/sprites/transformation/transfo_ours.png (Agarica, puis mi-femme mi-ourse, puis l'ourse). Ne reprends pas la cape sur le dos de l'animal.
 - Agarica : assets/sprites/agarica_frames/agarica_row0_0.png (cheveux roux, cape verte, tunique claire, bottes brunes).
 - Autres formes d'Agarica (même finition, même échelle de dessin) : assets/sprites/singe.png, assets/sprites/transfo_singe.png, assets/sprites/loup_frames/ (une frame de course).
@@ -134,7 +140,7 @@ BLOCS COMMUNS (remplace [STYLE], [AGARICA], [OURS2] et [PLANCHE] par le bloc com
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Dark silhouettes in the spirit of Hollow Knight. World palette: night forest in deep violet, indigo and teal, magical accents in luminous moonlit green (#8fe3b8) and touches of rose pink (#ff9fc9). Strict side view (profile).
 
 [AGARICA] =
-THIS ANIMAL IS THE DRUID AGARICA, SHAPE-SHIFTED INTO A REAL ANIMAL. Same finish and same drawing scale as her current bear form (reference ours.png). The ONLY reminder of her, in every frame: glowing moonlit-green eyes (#8fe3b8, no pupil). ABSOLUTELY NO CLOAK, no cape, no cloth, no clothing, no collar, no jewelry, no accessory of any kind on the animal: bare fur (or feathers) only. Powerful, a little wild, never gory, never cute-cartoon.
+THIS ANIMAL IS THE DRUID AGARICA, SHAPE-SHIFTED INTO A REAL ANIMAL. ONE FAMILY, ONE STYLE: same finish as the reference grizzly.png (fur drawn in tufts, dark outline, same shading steps, same claws, same level of detail, same drawing scale), but a DIFFERENT ANIMAL with its own silhouette, proportions, head and markings: never the same drawing in other colors. The ONLY reminder of her, in every frame: glowing moonlit-green eyes (#8fe3b8, no pupil). ABSOLUTELY NO CLOAK, no cape, no cloth, no clothing, no collar, no jewelry, no accessory of any kind on the animal: bare fur (or feathers) only. Powerful, a little wild, never gory, never cute-cartoon.
 
 [OURS2] =
 SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 2 horizontal rows; each row is ONE animation, read left to right. Each row is a band about 512 px tall; frame cells are 384 px wide; each pose is centered in its cell with the lowest point on the same baseline within a row. Leave at least 40 px of empty space between neighboring frames and at least 60 px between rows. Every frame is ONE single connected silhouette; NO detached particles, sparkles, dust, motion lines, NO cast shadow, NO ground line. Same animal, same scale, same colors in every frame. The animal faces RIGHT. No text, no grid lines, no borders.
@@ -149,7 +155,7 @@ Prompt :
 [STYLE]
 [AGARICA]
 [OURS2]
-A SILVERTIP GRIZZLY, built like a battering ram. It must NOT look like the existing brown bear (reference ours.png): different colors AND a different silhouette. SILHOUETTE: front-heavy like a bison: an enormous shoulder hump that is the highest point of the body, a very thick neck ruff, a broad wedge-shaped head carried LOW below the line of the back, small hindquarters, a sloping back, long forelegs made for running, long pale claws. COLORS: coat in near-black charcoal with a cold blue-violet cast (#24222c, #34323f, shadows #15131b); a bright SILVER mane of long frosted hairs over the hump, the neck ruff and along the spine (#c3c7d6, #8e92a6); an ash-grey muzzle (#9a9aa8); pale bone-colored claws (#d8d2c0). DETAILS: a notched left ear and one old pale scar across the muzzle. No brown anywhere.
+A SILVERTIP GRIZZLY, built like a battering ram. It must NOT look like the brown bear of this lot (image 9): different colors AND a different silhouette. SILHOUETTE: front-heavy like a bison: an enormous shoulder hump that is the highest point of the body, a very thick neck ruff, a broad wedge-shaped head carried LOW below the line of the back, small hindquarters, a sloping back, long forelegs made for running, long pale claws. COLORS: coat in near-black charcoal with a cold blue-violet cast (#24222c, #34323f, shadows #15131b); a bright SILVER mane of long frosted hairs over the hump, the neck ruff and along the spine (#c3c7d6, #8e92a6); an ash-grey muzzle (#9a9aa8); pale bone-colored claws (#d8d2c0). DETAILS: a notched left ear and one old pale scar across the muzzle. No brown anywhere.
 Row 1 - "run" (a heavy gallop, looping), 4 frames: 1 gathered: all four paws under the body, back arched, head low (this frame is also the standing pose, it must read well alone); 2 push-off: hind legs extended backward, front legs reaching forward; 3 fully stretched, front paws about to land; 4 landing on the front paws, hind legs swinging forward. The body stays at the same height; the shoulder hump rolls.
 Row 2 - "charge" (the same gallop at full speed, looping), 4 frames: the SAME four phases, but lower and more compact: head tucked down between the shoulders like a ram, ears flat, jaws clenched, the silver mane of the hump bristling and swept backward by the speed. It must read at a glance as "this bear will not stop".
 Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 4 frames.
@@ -230,7 +236,7 @@ Puis : python tools/import_codex_assets.py --only ours_polaire
 Prompt :
 [STYLE]
 [PLANCHE]
-Canvas 1448 x 1448 px, 2 columns x 2 rows of 724 px cells. Four round MEDALLION ICONS, the SAME carved-wood and ivy medallion as the references ours.png and loup.png (dark wood ring, a few ivy leaves, deep violet background inside), each about 640 px across, each showing the HEAD of one animal in profile, facing right, with glowing moonlit-green eyes:
+Canvas 1448 x 1448 px, 2 columns x 2 rows of 724 px cells. Four round MEDALLION ICONS, the SAME carved-wood and ivy medallion as the references assets/items/skill_icone/ours.png and assets/items/form_icone/loup.png (dark wood ring, a few ivy leaves, deep violet background inside), each about 640 px across, each showing the HEAD of one animal in profile, facing right, with glowing moonlit-green eyes:
 Cell 1 (top left): a GIANT PANDA head, white with black ears and eye patch, a bamboo leaf in the mouth.
 Cell 2 (top right): a POLAR BEAR head, white and ice blue, roaring, one small pale-blue ice shard behind it inside the medallion.
 Cell 3 (bottom left): a SILVERTIP GRIZZLY head, charcoal black with a bright silver mane and an ash-grey muzzle, a scar across the muzzle, head low, charging.
@@ -239,18 +245,28 @@ Output: one PNG, 1448 x 1448 px, transparent background, 4 medallions.
 Puis : python tools/import_codex_assets.py --only skill_icone_panda skill_icone_ours_polaire form_icone_grizzly form_icone_ours_hibou
 
 9) assets/sprites/ours_fracas.png (2172 x 724, 2 rangées de 3 frames, cases 724 x 362)
-L'ours brun EXISTANT d'Agarica (référence assets/sprites/compétence/ours.png : mêmes couleurs, même tête, mêmes yeux verts), redessiné SANS AUCUN EFFET et avec un corps PLUS COURT. Ce n'est pas un nouvel animal.
-Taille : environ 400 px de long et 300 px de haut à quatre pattes (l'ours actuel fait 520 x 300 : même hauteur, corps nettement plus ramassé, dos plus court, pattes plus rapprochées, tête et épaules qui gardent leur volume).
+L'OURS BRUN d'Agarica, le premier de la famille (talisman du chef, compétence « fracas »), RECRÉÉ dans le style de la famille : même rendu que grizzly.png, mais son propre dessin. Aucun effet, corps court.
+Taille : environ 400 px de long et 300 px de haut à quatre pattes.
 Prompt :
 [STYLE]
 [AGARICA]
 SPRITE SHEET LAYOUT RULES: canvas 2172 x 724 px, fully transparent background. Exactly 2 horizontal rows of exactly 3 frames each, read left to right, then top row to bottom row; frame cells are 724 px wide and 362 px tall; each pose is centered in its cell, hind paws on the same baseline in all six frames. Leave at least 60 px of empty space between neighboring frames and between rows. Every frame is ONE single connected silhouette: the bear and NOTHING ELSE. The bear faces RIGHT. No text, no grid lines, no borders, no cast shadow, no ground line.
-THE BROWN BEAR of the reference ours.png: same warm brown fur (#6b4226, #8a5a34, shadows #3a2414), same head, same glowing green eyes, same dark claws, same finish. COMPACT BUILD: a short stocky body, clearly shorter from nose to tail than in the reference, same height.
-ABSOLUTELY NO EFFECTS IN ANY FRAME: no dust, no dirt cloud, no rocks, no debris, no cracks, no impact burst, no motion trail, no swipe arc, no speed lines, no sparks. Only the bear's body. The effects are added by the game.
+A FOREST BROWN BEAR, the classic bear of the family: the roundest and most compact of them all. SILHOUETTE: a short, stocky, barrel-shaped body with a ROUNDED back (no shoulder hump, no mane), a big round head carried level with the back, a short broad muzzle, round ears set wide apart, thick short legs, a heavy rump. It must not be mistaken for the grizzly (bison build, huge silver mane, low wedge head) even in black silhouette. COLORS: warm chestnut and honey brown fur (#6b4226, #8a5a34, highlights #b07a48, shadows #3a2414), a paler honey muzzle (#c69a64), dark brown claws. ABSOLUTELY NO EFFECTS IN ANY FRAME: no dust, no dirt cloud, no rocks, no debris, no cracks, no impact burst, no motion trail, no swipe arc, no speed lines, no sparks. Only the bear's body. The effects are added by the game.
 Row 1, 3 frames: 1 standing on all fours, alert, facing right; 2 WIND-UP: rearing on its hind legs, the right front paw raised high above the head, claws spread, jaws open in a roar; 3 IMPACT: the raised paw slammed down on the ground in front of it, body compressed forward, head low.
-Row 2, 3 frames: 4 impact held: both front paws planted, shoulders at their lowest, fur bristling; 5 recovering: the body pushing back up, head rising; 6 back on all fours, exactly like frame 1 but looking forward and down.
+Row 2, 3 frames: 4 impact held: both front paws planted, shoulders at their lowest, fur bristling; 5 recovering: the body pushing back up, head rising; 6 back on all fours, like frame 1, looking forward and down.
 Output: one PNG, 2172 x 724 px, transparent background, exactly 2 rows of 3 frames, six bears and nothing else.
 N'importe pas cette feuille et ne touche pas à assets/sprites/ours_frames/ : son intégration est faite à part.
+
+10) assets/sprites/ours_fracas_p2.png (1536 x 512, 1 rangée de 4 frames, cases 384 x 512)
+Même ours brun, même échelle et mêmes couleurs que la feuille n°9.
+Prompt :
+[STYLE]
+[AGARICA]
+SPRITE SHEET LAYOUT RULES: canvas 1536 x 512 px, fully transparent background. Exactly 1 horizontal row of 4 frames, read left to right; frame cells are 384 px wide; each pose is centered in its cell, feet on the same baseline. At least 40 px of empty space between neighboring frames. Every frame is ONE single connected silhouette; NO detached particles, NO cast shadow, NO ground line. The character faces RIGHT. No text, no grid lines, no borders.
+THE SAME FOREST BROWN BEAR as the previous sheet.
+Row 1 - "transform", 4 frames, the feet stay at the same place: 1 AGARICA standing, neutral, facing right (small chibi druid about 250 px tall - copy the reference agarica_row0_0.png); 2 she hunches forward, her arms thicken and grow chestnut fur, her cloak and clothes dissolving into the fur; 3 half woman, half bear, dropping on all fours, a round bear head forming, no clothing left; 4 the full brown bear on all fours, exactly frame 1 of the previous sheet, with no cloak.
+Output: one PNG, 1536 x 512 px, transparent background, exactly 1 row, 4 frames.
+N'importe pas cette feuille et ne touche pas à assets/sprites/transformation/ : son intégration est faite à part.
 
 À LA FIN
 Contrôles, sur les fichiers finaux après import (montages dans docs/production/controles/lot_14/) :
@@ -261,7 +277,8 @@ Contrôles, sur les fichiers finaux après import (montages dans docs/production
 - Grizzly : charbon et argent, bosse d'épaules plus haute que la tête ; posé à côté de assets/sprites/ours_frames/ours_row0_0.png, on ne les confond pas, même en silhouette noire.
 - Ours-hibou : en silhouette noire, c'est un ours (oreilles rondes, quatre grosses pattes, pas d'ailes) ; le hibou ne se lit que dans la face, le bec et le col de plumes.
 - Aucune glace dans ours_polaire ; aucun éclat détaché dans les rangées slam.
-- ours_fracas.png : six ours, AUCUN effet (ni poussière, ni pierre, ni traînée) ; corps d'environ 400 px de long pour 300 de haut ; pattes arrière au même endroit dans les six frames.
+- ours_fracas.png : six ours bruns, AUCUN effet (ni poussière, ni pierre, ni traînée) ; corps d'environ 400 px de long pour 300 de haut ; pattes arrière au même endroit dans les six frames. ours_fracas_p2.png : 4 frames, l'ours final sans cape.
+- FAMILLE : un montage des cinq ours côte à côte (grizzly, ours brun, ours-hibou, panda, ours polaire, première frame de chacun, même échelle) dans docs/production/controles/lot_14/famille.png : même rendu de fourrure, même contour, même niveau de détail ; cinq silhouettes différentes.
 Puis :
 - lance un python tools/import_codex_assets.py final (il régénère src/data/asset_present.js) ;
 - ajoute une section « Lot n°14 » à docs/production/RAPPORT_CODEX.md : une ligne par image (statut, frames ou dimensions finales), puis le rapport du dernier import.
