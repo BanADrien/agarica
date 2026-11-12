@@ -50,6 +50,7 @@ l'éditeur ou jouer, notes à copier pour Claude, portées de saut. En construct
 | Lot B : cime cachée, île des vents, île du gardien, et la quête de Pépin | zones facultatives de la vague 3 |
 | Lot C : marais des brumes, racines suspendues, nid de cocons, canopée malade, et la quête des fleurs de lune | zones facultatives de la vague 3 |
 | Placer d'autres papillons à libérer, pendant les lots A, B et C (3 sont posés pour l'instant) | collectible : un niveau de la compétence tous les 3 |
+| Familles d'animaux et passifs, test avec les ursidés : ours-hibou, panda, grizzly, ours polaire (conception : `FAMILLES_DESIGN.md`) | demande du 2026-11-12 ; à coder dès que la carte globale est finie (un seul agent à la fois) |
 | Son et musique | le jeu est muet ; gros effet sur le ressenti, mais gros chantier ; à décider avec toi |
 
 ## P4 : quand il n'y a plus rien
