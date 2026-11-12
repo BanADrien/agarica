@@ -764,6 +764,9 @@ function secretDrawHint(scene, b) {
   }[spot.side];
   b.hintAt = at;
   if (kind === 'poussiere') return;
+  // Blocs de l'ours : le sol de la zone, mais fracturé sur tout le bloc
+  // (demande de l'utilisateur, 2026-11-12), au lieu de la petite fissure.
+  if (kind === 'fissure' && b.by === 'bear' && secretDrawFractures(scene, b)) return;
   if (kind === 'fissure' && scene.textures.exists('item-fissure_secret')) {
     const img = scene.add.image(at.x, at.y, 'item-fissure_secret').setAlpha(SECRET_HINT_ALPHA);
     img.setScale(26 / Math.max(img.width, img.height));
@@ -809,6 +812,133 @@ function secretDrawHint(scene, b) {
   }
   g.setAlpha(SECRET_HINT_ALPHA / 0.55 * 0.85);
   b.hint.push(g);
+}
+
+// Fractures d'un bloc cassable à l'ours (demande de l'utilisateur du
+// 2026-11-12 : « les éléments de sol de base, mais un peu fracturés,
+// fissurés »). Le bloc garde les tuiles de la zone ; par-dessus, UNE image en
+// pixel art couvre toutes ses cases : de grandes fissures en zigzag qui
+// traversent le bloc d'une case à l'autre, de petites branches, quelques
+// éclats manquants. Dessinée au grain des tuiles (24 pixels par case pour le
+// jeu fait main, 32 pour les jeux de biome), sans lissage. Graine = id du
+// bloc : mêmes fissures à chaque visite. Renvoie faux si rien n'a pu être
+// dessiné (l'appelant garde alors la petite fissure).
+const SECRET_FRACTURE_DARK = 'rgba(14, 8, 20, 0.82)';
+// Arête claire : c'est elle qui se lit sur un sol sombre (forêt sombre), où
+// le trait foncé se perd.
+const SECRET_FRACTURE_LIGHT = 'rgba(232, 222, 255, 0.4)';
+
+function secretDrawFractures(scene, b) {
+  if (!b.cells.length || !scene.textures || !scene.textures.createCanvas) return false;
+  const T = GROUND_TILE_SIZE;
+  const N = scene.__groundRender && scene.__groundRender.tileset ? 32 : 24;
+  const gxs = b.cells.map((c) => c[0]);
+  const gys = b.cells.map((c) => c[1]);
+  const gx0 = Math.min(...gxs);
+  const gy0 = Math.min(...gys);
+  const cols = Math.max(...gxs) - gx0 + 1;
+  const rows = Math.max(...gys) - gy0 + 1;
+  const W = cols * N;
+  const H = rows * N;
+  const key = `fracture-${storyZoneId(scene)}-${b.id}`;
+  if (scene.textures.exists(key)) scene.textures.remove(key);
+  const tex = scene.textures.createCanvas(key, W, H);
+  if (!tex) return false;
+  const ctx = tex.getContext();
+  const rnd = new Phaser.Math.RandomDataGenerator([`fracture-${b.id}`]);
+  // Pixels permis : dans une case du bloc, et pas dans la bande d'herbe du
+  // haut d'une case dont le dessus est à l'air libre.
+  const grass = Math.round(N * 0.22);
+  const topOpen = new Set(b.cells.filter(([gx, gy]) => secretExposedSides(scene, gx, gy).includes('top')).map(([gx, gy]) => gridCellKey(gx, gy)));
+  const inside = (x, y) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return false;
+    const k = gridCellKey(gx0 + Math.floor(x / N), gy0 + Math.floor(y / N));
+    if (!b.keys.has(k)) return false;
+    return !(topOpen.has(k) && y % N < grass);
+  };
+  const dark = new Set();
+  const plot = (x, y) => { if (inside(x, y)) dark.add(y * W + x); };
+  const line = (x0, y0, x1, y1) => {
+    let x = Math.round(x0);
+    let y = Math.round(y0);
+    const ex = Math.round(x1);
+    const ey = Math.round(y1);
+    const dx = Math.abs(ex - x);
+    const dy = Math.abs(ey - y);
+    const sx = x < ex ? 1 : -1;
+    const sy = y < ey ? 1 : -1;
+    let err = dx - dy;
+    for (let guard = 0; guard < 4000; guard++) {
+      plot(x, y);
+      if (x === ex && y === ey) break;
+      const e2 = err * 2;
+      if (e2 > -dy) { err -= dy; x += sx; }
+      if (e2 < dx) { err += dx; y += sy; }
+    }
+  };
+  // Un point au hasard sur le pourtour du bloc.
+  const edgePoint = (side) => ({
+    top: [rnd.between(2, W - 3), 0], bottom: [rnd.between(2, W - 3), H - 1],
+    left: [0, rnd.between(2, H - 3)], right: [W - 1, rnd.between(2, H - 3)],
+  }[side]);
+  const opposite = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+  // Grandes fissures : d'un bord vers le bord d'en face, en zigzag anguleux ;
+  // une sur deux s'arrête en chemin. Plus le bloc est grand, plus il y en a.
+  const count = Phaser.Math.Clamp(Math.round(b.cells.length * 0.9), 4, 9);
+  for (let c = 0; c < count; c++) {
+    const side = ['top', 'left', 'right', 'bottom'][(c + rnd.between(0, 1)) % 4];
+    const from = edgePoint(side);
+    const to = edgePoint(rnd.frac() < 0.7 ? opposite[side] : rnd.pick(['top', 'bottom', 'left', 'right'].filter((s) => s !== side)));
+    const reach = c % 2 ? rnd.realInRange(0.45, 0.75) : 1;
+    const len = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1;
+    const nx = -(to[1] - from[1]) / len;
+    const ny = (to[0] - from[0]) / len;
+    const steps = Math.max(3, Math.round((len * reach) / rnd.between(5, 8)));
+    let prev = from;
+    for (let i = 1; i <= steps; i++) {
+      const t = (i / steps) * reach;
+      const off = i === steps && reach === 1 ? 0 : rnd.realInRange(-0.16, 0.16) * N * (i % 2 ? 1 : -1);
+      const pt = [from[0] + (to[0] - from[0]) * t + nx * off, from[1] + (to[1] - from[1]) * t + ny * off];
+      line(prev[0], prev[1], pt[0], pt[1]);
+      // Épaisse de 2 pixels sur sa première moitié : la fissure s'affine vers son bout.
+      if (i <= steps / 2) line(prev[0] + 1, prev[1], pt[0] + 1, pt[1]);
+      // Petite branche qui part d'un coude.
+      if (rnd.frac() < 0.55) {
+        const a = Math.atan2(pt[1] - prev[1], pt[0] - prev[0]) + rnd.pick([-1, 1]) * rnd.realInRange(0.6, 1.2);
+        const l = rnd.realInRange(0.12, 0.3) * N;
+        line(pt[0], pt[1], pt[0] + Math.cos(a) * l, pt[1] + Math.sin(a) * l);
+      }
+      // Éclat manquant : deux ou trois pixels collés à la fissure.
+      if (rnd.frac() < 0.22) {
+        const ox = Math.round(pt[0]) + rnd.pick([-1, 1]);
+        const oy = Math.round(pt[1]);
+        plot(ox, oy); plot(ox, oy + 1);
+        if (rnd.frac() < 0.5) plot(ox + rnd.pick([-1, 1]), oy);
+      }
+      prev = pt;
+    }
+  }
+  if (!dark.size) { scene.textures.remove(key); return false; }
+  // Liseré clair sous chaque pixel sombre (arête éclairée), puis les fissures.
+  ctx.fillStyle = SECRET_FRACTURE_LIGHT;
+  for (const k of dark) {
+    const x = k % W;
+    const y = Math.floor(k / W);
+    if (!dark.has((y + 1) * W + x) && inside(x, y + 1)) ctx.fillRect(x, y + 1, 1, 1);
+  }
+  ctx.fillStyle = SECRET_FRACTURE_DARK;
+  for (const k of dark) ctx.fillRect(k % W, Math.floor(k / W), 1, 1);
+  tex.refresh();
+  tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  const img = scene.add.image(gx0 * T, gy0 * T, key).setOrigin(0, 0).setScale(T / N);
+  img.lookRole = 'world';
+  // Juste au-dessus des cases du sol (cf. `end` de __groundRender), sous les
+  // décors et les personnages.
+  const end = scene.__groundRender && scene.__groundRender.end;
+  if (end) scene.children.moveBelow(img, end);
+  b.hint.push(img);
+  b.fractureKey = key;
+  return true;
 }
 
 // Fissures qui s'agrandissent à chaque coup (épée) : traits depuis le point d'impact.
