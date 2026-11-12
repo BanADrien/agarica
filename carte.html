@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carte du monde — Legend of Agarica (outil)</title>
+  <link rel="icon" href="data:," />
+  <!--
+    Outil de travail, pas une page du jeu : carte de toutes les zones, lue dans
+    les vrais fichiers (src/data/*_data.js). Doc : docs/production/CARTE_MONDE.md.
+    À ouvrir par un serveur : http://localhost:8000/carte.html
+    Le code est dans tools/carte/ (non copié par tools/build_netlify.py).
+  -->
+  <style>
+    :root {
+      --fond: #0d0b1a; --panneau: #17112a; --bord: #4a3f6b; --bord-doux: #2c2447;
+      --texte: #e8d9ff; --doux: #a99bd6; --lune: #8fe6c4; --rose: #ff9fc9; --violet: #9c7fe0; --champ: #241c3f;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--fond); color: var(--texte); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
+    #app { display: grid; grid-template-columns: 286px 1fr 318px; height: 100vh; }
+    aside { background: var(--panneau); overflow-y: auto; padding: 10px 12px 16px; }
+    #gauche { border-right: 1px solid var(--bord); }
+    #droite { border-left: 1px solid var(--bord); }
+    h1 { font-size: 16px; margin: 2px 0 2px; color: var(--lune); }
+    h1 small { display: block; font-weight: normal; font-size: 11.5px; color: var(--doux); }
+    h2 { font-size: 13px; margin: 0 0 6px; color: #cbb6ff; text-transform: uppercase; letter-spacing: .04em; }
+    h2 small { text-transform: none; letter-spacing: 0; color: var(--doux); font-weight: normal; }
+    h3 { font-size: 11.5px; margin: 8px 0 3px; color: var(--doux); font-weight: 600; }
+    h4 { font-size: 11.5px; margin: 8px 0 2px; color: var(--doux); }
+    section { padding: 10px 0; border-bottom: 1px solid var(--bord-doux); }
+    section:last-child { border-bottom: none; }
+    p { margin: 4px 0; }
+    .doux { color: var(--doux); font-size: 12px; }
+    button, select, textarea { font: inherit; color: var(--texte); background: var(--champ); border: 1px solid var(--bord); border-radius: 4px; }
+    button { padding: 4px 8px; cursor: pointer; }
+    button:hover:not(:disabled) { background: #362a5c; }
+    button:disabled { opacity: .45; cursor: default; }
+    button.principal { background: #2b5a4b; border-color: var(--lune); color: #eafff7; font-weight: 600; }
+    button.principal:hover:not(:disabled) { background: #37715e; }
+    button.petit { font-size: 11px; padding: 1px 6px; }
+    button.lien { background: none; border: none; padding: 0; color: var(--lune); text-align: left; cursor: pointer; }
+    button.lien:hover { background: none; text-decoration: underline; }
+    button.lien.bloc { display: block; width: 100%; padding: 1px 0; font-size: 12px; }
+    .rangee { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    select { padding: 3px 4px; flex: 1; min-width: 0; }
+
+    /* Liste des zones */
+    #liste-zones .zone { display: flex; align-items: center; gap: 5px; width: 100%; text-align: left; padding: 3px 5px; margin-bottom: 2px; background: transparent; border: 1px solid transparent; border-left: 3px solid var(--lune); border-radius: 3px; }
+    #liste-zones .zone:hover { background: #241c3f; }
+    #liste-zones .zone.choisie { background: #2c2350; border-color: var(--bord); border-left-color: var(--lune); }
+    #liste-zones .zone.facultatif, #liste-zones .zone.optionnelle { border-left-color: var(--rose); border-left-style: dashed; }
+    #liste-zones .zone.test { border-left-color: #6d6880; }
+    #liste-zones .num { min-width: 30px; text-align: center; font-weight: 700; font-size: 11.5px; color: #0d0b1a; background: var(--lune); border-radius: 3px; padding: 0 3px; }
+    #liste-zones .facultatif .num, #liste-zones .optionnelle .num { background: var(--rose); }
+    #liste-zones .test .num { background: #8a8698; }
+    #liste-zones .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #liste-zones .compte { color: var(--doux); font-size: 10.5px; white-space: nowrap; }
+    .besoins i { display: inline-block; width: 14px; height: 14px; line-height: 14px; border-radius: 50%; text-align: center; font: bold 9.5px system-ui, sans-serif; color: #0d0b1a; margin-left: 2px; }
+    .brouillon { font-size: 9.5px; color: #1a1300; background: #ffd95e; border-radius: 3px; padding: 0 3px; }
+    #legende-besoins { display: flex; flex-wrap: wrap; gap: 3px 9px; font-size: 11px; color: var(--doux); margin-top: 6px; }
+    #legende-besoins span { white-space: nowrap; }
+
+    /* Filtres = légende */
+    .filtre { display: flex; align-items: center; gap: 6px; padding: 1px 0; cursor: pointer; font-size: 12.5px; }
+    .filtre input { margin: 0; accent-color: var(--violet); }
+    .filtre canvas { flex: none; }
+    .traits { font-size: 11.5px; color: var(--doux); margin-top: 6px; }
+    .traits b { font-weight: 600; }
+
+    /* Carte */
+    #centre { position: relative; overflow: hidden; }
+    #carte { position: absolute; inset: 0; width: 100%; height: calc(100% - 24px); cursor: crosshair; display: block; }
+    #carte.glisse { cursor: grabbing; }
+    #barre { position: absolute; left: 0; right: 0; bottom: 0; height: 24px; line-height: 24px; padding: 0 10px; background: var(--panneau); border-top: 1px solid var(--bord); font-size: 12px; color: var(--doux); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #barre b { color: var(--lune); }
+    #chargement { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--fond); z-index: 5; padding: 30px; text-align: center; }
+    #chargement[hidden] { display: none; }
+    #chargement-texte { color: var(--doux); max-width: 560px; }
+    #chargement-texte.erreur { color: #ff9aa5; }
+    .flottant { position: absolute; z-index: 8; background: #1d1636; border: 1px solid var(--violet); border-radius: 6px; box-shadow: 0 6px 24px rgba(0, 0, 0, .6); padding: 6px; min-width: 250px; }
+    .flottant[hidden] { display: none; }
+    .flottant .tete { font-size: 11.5px; color: var(--lune); padding: 2px 6px 6px; border-bottom: 1px solid var(--bord-doux); margin-bottom: 4px; font-weight: 600; }
+    #menu a, #menu button.entree { display: block; width: 100%; text-align: left; padding: 5px 8px; border: none; border-radius: 4px; background: none; color: var(--texte); text-decoration: none; cursor: pointer; }
+    #menu a:hover, #menu button.entree:hover { background: #362a5c; }
+    #menu .sep { height: 1px; background: var(--bord-doux); margin: 4px 0; }
+    #menu .info { font-size: 10.5px; color: var(--doux); padding: 0 8px 3px; max-width: 300px; }
+    #menu a[hidden] { display: none; }
+    #saisie-note { width: 300px; }
+    #note-texte { width: 100%; height: 74px; resize: vertical; padding: 5px; }
+    #bulle { position: absolute; z-index: 7; pointer-events: none; background: rgba(23, 17, 42, .96); border: 1px solid var(--bord); border-radius: 5px; padding: 5px 8px; font-size: 12px; max-width: 340px; }
+    #bulle[hidden] { display: none; }
+    #bulle b { color: var(--lune); }
+    #annonce { position: absolute; z-index: 9; left: 50%; top: 12px; transform: translateX(-50%); background: #2b5a4b; border: 1px solid var(--lune); border-radius: 5px; padding: 6px 12px; max-width: 80%; }
+    #annonce[hidden] { display: none; }
+
+    /* Panneau de droite */
+    .fiche-titre { font-size: 14.5px; font-weight: 700; color: var(--texte); }
+    .etiquette { display: inline-block; margin: 4px 0; padding: 0 6px; border: 1px solid var(--bord); border-radius: 9px; font-size: 11px; color: var(--doux); }
+    .acces { color: var(--rose); margin-top: 2px; }
+    .avert { color: #ffd95e; font-size: 12px; margin-top: 3px; }
+    .note { border: 1px solid var(--bord-doux); border-left: 3px solid #ffe36e; border-radius: 4px; padding: 4px 6px; margin-bottom: 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .note-tete { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; margin-bottom: 2px; }
+    .note-tete .lien { font-size: 11.5px; flex: 1; }
+    .note-tete .petit { flex: none; white-space: nowrap; }
+    #texte-notes { width: 100%; height: 70px; margin-top: 6px; font: 11px/1.35 Consolas, monospace; color: var(--doux); resize: vertical; padding: 4px; }
+    .controle { display: block; width: 100%; text-align: left; font-size: 11.5px; padding: 3px 6px; margin-bottom: 3px; background: transparent; border: 1px solid var(--bord-doux); border-left: 3px solid #ff9440; }
+    .controle.alerte { border-left-color: #ff4d5e; }
+    .saut-legende { font-size: 11.5px; color: var(--doux); margin: 4px 0; }
+    .saut-legende i { display: inline-block; width: 18px; height: 0; border-top: 2px solid #fff; vertical-align: middle; margin-right: 5px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="gauche">
+      <section>
+        <h1>Carte du monde <small>Legend of Agarica — outil de travail, lu dans les vrais fichiers de zones</small></h1>
+        <div class="rangee" style="margin-top:8px">
+          <button id="btn-tout-voir" title="Raccourci : F">Tout voir</button>
+          <select id="sel-disposition" title="Disposition des zones dans le plan">
+            <option value="actes">Deux bandes : acte I, acte II</option>
+            <option value="monde">Monde réel (carte du jeu)</option>
+          </select>
+        </div>
+        <p class="doux">Molette : zoom · glisser : déplacer · clic sur un point : menu (note, éditeur, jouer) · clic sur un nom : cadrer la zone.</p>
+      </section>
+
+      <section>
+        <h2>Zones</h2>
+        <div id="liste-zones"></div>
+        <label class="filtre" style="margin-top:6px"><input type="checkbox" id="chk-tests" /> <span>Montrer les anciennes zones de test et le monde spirituel</span></label>
+        <div id="legende-besoins">
+          <span><span class="besoins"><i style="background:#b9a7ff">L</i></span> loup</span>
+          <span><span class="besoins"><i style="background:#e0b062">S</i></span> singe</span>
+          <span><span class="besoins"><i style="background:#8fd0ff">A</i></span> aigle</span>
+          <span><span class="besoins"><i style="background:#d08a4a">O</i></span> ours</span>
+          <span><span class="besoins"><i style="background:#8fe6c4">2</i></span> second saut</span>
+          <span><span class="besoins"><i style="background:#ff9fc9">H</i></span> étape de l'histoire</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Afficher <small>(légende)</small></h2>
+        <div class="rangee" style="margin-bottom:5px">
+          <button class="petit" id="btn-filtres-tous">Tout</button>
+          <button class="petit" id="btn-filtres-aucun">Terrain seul</button>
+        </div>
+        <div id="filtres"></div>
+        <div class="traits">
+          <b style="color:#8fe6c4">Cadre vert</b> : chemin principal (numéro = ordre) · <b style="color:#ff9fc9">cadre rose pointillé</b> : facultatif.<br />
+          <b style="color:#ffd95e">Trait or</b> : passage du chemin principal · <b style="color:#c79bff">trait violet</b> : passage facultatif · pointillé : passage fait par un script. La flèche donne le sens, elle arrive sur l'entrée.
+        </div>
+      </section>
+    </aside>
+
+    <main id="centre">
+      <canvas id="carte"></canvas>
+      <div id="chargement"><div id="chargement-texte">Lecture des fichiers du jeu…</div></div>
+      <div id="annonce" hidden></div>
+      <div id="bulle" hidden></div>
+
+      <!-- Menu du clic sur un point d'une zone (ordre voulu : note, éditeur, jouer). -->
+      <div id="menu" class="flottant" hidden>
+        <div class="tete" id="menu-titre"></div>
+        <button class="entree" id="menu-note">Ajouter une note ici</button>
+        <a id="menu-editeur" href="index.html?editor" target="agarica-editeur">Ouvrir dans l'éditeur</a>
+        <a id="menu-jouer" href="#" target="_blank" rel="noopener">Jouer ici</a>
+        <a id="menu-jouer-chapitre" href="#" target="_blank" rel="noopener">Jouer ici, comme au début du chapitre</a>
+        <div class="info" id="menu-jouer-info"></div>
+        <div class="sep"></div>
+        <button class="entree" id="menu-saut">Portée de saut depuis ici</button>
+        <button class="entree" id="menu-coord">Copier les coordonnées</button>
+      </div>
+
+      <div id="saisie-note" class="flottant" hidden>
+        <div class="tete" id="note-titre"></div>
+        <textarea id="note-texte" placeholder="Ce qu'il faut changer ici… (Entrée : enregistrer, Maj + Entrée : à la ligne)"></textarea>
+        <div class="rangee" style="margin-top:6px; justify-content:flex-end">
+          <button id="note-annuler">Annuler</button>
+          <button id="note-ok" class="principal">Enregistrer la note</button>
+        </div>
+      </div>
+
+      <div id="barre"></div>
+    </main>
+
+    <aside id="droite">
+      <section>
+        <h2>Zone</h2>
+        <div id="fiche-zone"></div>
+      </section>
+
+      <section>
+        <h2>Notes <small id="compte-notes"></small></h2>
+        <div id="liste-notes"></div>
+        <div class="rangee">
+          <button id="btn-copier" class="principal">Copier pour Claude</button>
+          <button id="btn-vider">Tout vider</button>
+        </div>
+        <textarea id="texte-notes" readonly title="Le texte copié : une ligne par note"></textarea>
+      </section>
+
+      <section>
+        <h2>Portée de saut</h2>
+        <p class="doux" id="saut-etat">Maj + clic sur la carte, ou « Portée de saut depuis ici » dans le menu du clic.</p>
+        <div class="saut-legende"><i></i>saut simple : 172 px de haut, 180 px de portée</div>
+        <div class="saut-legende"><i style="border-top:2px dashed #b9a7ff"></i>saut du loup lancé : 376 px de portée</div>
+        <div class="saut-legende"><i style="border-top:2px dashed #7fdc3a"></i>2e saut du singe : 264 px de haut</div>
+        <div class="saut-legende"><i style="border-top:2px dashed #8fd0ff"></i>2e saut de l'aigle : 284 px de haut</div>
+        <p class="doux">Repères tirés des mesures du jeu (une rangée = 64 px), pas une simulation.</p>
+        <button id="btn-saut-effacer" class="petit">Effacer</button>
+      </section>
+
+      <section>
+        <h2>Contrôles <small id="compte-controles"></small></h2>
+        <p class="doux">Ce que la carte trouve de douteux dans les données. Clic : aller voir.</p>
+        <button id="btn-resume" class="petit" title="Zones, accès, sorties, contenu et contrôles, en texte" style="margin-bottom:6px">Copier le résumé du monde pour Claude</button>
+        <div id="liste-controles"></div>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    // Scripts de la carte redemandés à chaque ouverture (jamais une vieille
+    // version gardée par le navigateur), dans l'ordre : chargement, modèle, vue.
+    for (const f of ['charge', 'monde', 'carte']) document.write(`<script src="tools/carte/${f}.js?v=${Date.now()}"><\/script>`);
+  </script>
+</body>
+</html>

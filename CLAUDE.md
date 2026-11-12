@@ -67,6 +67,9 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   - **[Maj] tenue = loup**, même à l'arrêt ; en avançant, le loup sprinte ;
   - K ou clic : attaque en arc dans la direction visée ;
   - E interagir, A/F/R compétences, I inventaire, M carte, Échap/P pause.
+- **Carte globale (outil)** : `carte.html` + `tools/carte/` (hors mise en ligne), lit les vrais
+  fichiers de zones ; les notes de l'utilisateur arrivent au format
+  `zone_id (x, y / case gx, gy) : texte`. Mode d'emploi : `docs/production/CARTE_MONDE.md`.
 - **Priorités** : chaque demande est classée P1-P4 dans `docs/production/PRIORITES.md` ; petits
   paquets, version testable donnée vite avec la liste des modifications.
 - **Formes** débloquées par l'histoire, automatiques (jamais un bouton) : sol = **Loup**

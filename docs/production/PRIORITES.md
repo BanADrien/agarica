@@ -36,11 +36,11 @@ l'écran (corniche, caméra centrée) à y 448 (arène) ; la caméra glisse main
 bord (clé de sortie `frameFeetY`, `updateEdgeFraming`) : 447 → 447 à l'aller, 64 px d'écart
 au retour (la caméra des racines ne monte pas plus haut).
 
-## Outil en cours
+## Outil : carte globale du jeu
 
-Carte globale du jeu (`carte.html`, demandée le 2026-11-12) : les 24 zones avec leur vrai
-terrain, passages, ennemis, PNJ, objets, secrets et parcours de l'histoire ; clic pour ouvrir
-l'éditeur ou jouer, notes à copier pour Claude, portées de saut. En construction.
+`http://localhost:8000/carte.html` (faite le 2026-11-12, mode d'emploi : `CARTE_MONDE.md`) :
+les 24 zones avec leur vrai terrain, passages, ennemis, PNJ, objets, secrets et parcours.
+Clic sur un point : note, éditeur ou jeu. « Copier pour Claude » pour m'envoyer les notes.
 
 ## P3 : contenu nouveau
 
