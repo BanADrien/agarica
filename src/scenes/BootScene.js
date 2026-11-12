@@ -32,7 +32,9 @@ class BootScene extends Phaser.Scene {
     }
     // Courants d'air ascendants (pixelfx, tools/pixelfx/export_courant.mjs) : deux
     // plans de 24 cases qui se répètent sans raccord (cf. CourantAir.js).
-    for (const plan of COURANT_PLANS) {
+    // (`typeof` : un navigateur qui ressort un ancien CourantAir.js de sa mémoire
+    // ne doit pas bloquer le chargement ; il garde alors l'ancien rendu.)
+    for (const plan of (typeof COURANT_PLANS !== 'undefined' ? COURANT_PLANS : [])) {
       for (let i = 0; i < COURANT_FRAMES; i++) this.load.image(`courant-${plan}-${i}`, `assets/vfx/courant_frames/courant_${plan}_${i}.png`);
     }
     // Branches et troncs en pixel art, images toutes faites (cf. BrancheKit,
@@ -525,7 +527,7 @@ class BootScene extends Phaser.Scene {
     for (let i = 0; i < ARCHE_PORTAIL_FRAMES; i++) {
       if (scene.textures.exists(`arche-portail-${i}`)) scene.textures.get(`arche-portail-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
-    for (const plan of COURANT_PLANS) {
+    for (const plan of (typeof COURANT_PLANS !== 'undefined' ? COURANT_PLANS : [])) {
       for (let i = 0; i < COURANT_FRAMES; i++) {
         if (scene.textures.exists(`courant-${plan}-${i}`)) scene.textures.get(`courant-${plan}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
