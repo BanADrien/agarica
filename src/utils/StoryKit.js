@@ -420,6 +420,8 @@ const LEGACY_TEST_ZONES = [
   { scene: 'ZoneAquatiqueScene', name: 'Zone aquatique' },
   { scene: 'Zone5Scene', name: 'Zone 5 — Loup Alpha' },
   { scene: 'ZonetestScene', name: 'Zone test' },
+  // Familles d'animaux : les quatre ours (cf. src/data/zone_ours_data.js).
+  { scene: 'ZoneOursScene', name: 'Zone des ours' },
 ];
 
 // `sceneOrKey` : scène Phaser, clé de scène ('BosquetScene') ou id de zone ('bosquet').
@@ -457,7 +459,8 @@ const SAVE_STORAGE_KEY = 'agarica-save-v1';
 // est sauvegardée, ces clés-là comprises, ainsi que les flags d'histoire et
 // l'inventaire `inventory`).
 const SAVE_PLAYER_KEYS = [
-  'hasWolfForm', 'hasEagleForm', 'hasOctopusForm', 'hasMonkeyForm', 'equippedForms', 'airForm',
+  'hasWolfForm', 'hasEagleForm', 'hasOctopusForm', 'hasMonkeyForm', 'hasGrizzlyForm', 'hasOwlbearForm',
+  'equippedForms', 'airForm',
   'hearts', 'energy', 'unlockedSkills', 'skillSlots', 'equippedTotem',
 ];
 
@@ -4386,7 +4389,9 @@ function updateStoryMossBlocks(scene) {
     }
   }
   const hitbox = player.getSkillHitbox && player.getSkillHitbox();
-  if (!hitbox || player.activeSkillId !== 'ours') return;
+  // `skillHitboxId` : le fracas de l'ours, ou un fracas qui compte comme lui
+  // (ours-hibou à l'atterrissage, cf. `hitboxKind` dans Ursides.js).
+  if (!hitbox || (player.activeSkillId !== 'ours' && player.skillHitboxId !== 'ours')) return;
   for (const m of scene.__story.mossBlocks) {
     if (m.destroyed) continue;
     const rect = new Phaser.Geom.Rectangle(m.x - m.w / 2, m.y - m.h / 2, m.w, m.h);

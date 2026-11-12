@@ -47,6 +47,11 @@ const CAMPFIRE_TOTEMS_LOCKED = typeof DEMO_TOTEMS_LOCKED !== 'undefined' ? DEMO_
 // le 2026-11-08 (plus de section totem, ni cadenas ni chaînes) ; `true` la
 // rend telle qu'avant, en cartes inertes tant que les totems sont verrouillés.
 const CAMPFIRE_SHOW_TOTEMS = false;
+// Colonne des FAMILLES d'animaux (2026-11-12, cf. Familles.js) : pour chaque
+// famille équipée, le nombre d'animaux, les paliers actifs et le suivant. Elle
+// prend la colonne de droite, celle des totems : jamais les deux à la fois
+// (les familles reprennent l'idée des « têtes » de totem).
+const CAMPFIRE_SHOW_FAMILIES = !CAMPFIRE_SHOW_TOTEMS && typeof familySummary === 'function';
 
 const FORM_INFO = {
   // Maj tenue = loup, même à l'arrêt (2026-11-09) ; en l'air, S/↓ + K : coup de patte.
@@ -55,12 +60,16 @@ const FORM_INFO = {
   monkey: { flag: 'hasMonkeyForm', label: 'Singe', slot: 'air', icon: ['form-icon-monkey', 'item-form_icone_singe'], desc: 'Singe (aérien) : 2e appui sur Espace en l\'air. ↑ près d\'une liane : s\'accrocher (← → : se balancer, Espace : lâcher).' },
   eagle: { flag: 'hasEagleForm', label: 'Aigle', slot: 'air', icon: ['form-icon-eagle'], desc: 'Aigle (aérien) : 2e appui sur Espace en l\'air, plus haut, puis plané. Les courants d\'air le portent (S : piqué).' },
   octopus: { flag: 'hasOctopusForm', label: 'Pieuvre', slot: 'water', icon: ['form-icon-octopus'], desc: 'Pieuvre (eau) : nage libre.' },
+  // Ours du premier test des familles (Ursides.js). Icônes : celles du
+  // manifeste dès qu'elles existent, sinon la pastille à initiale.
+  grizzly: { flag: 'hasGrizzlyForm', label: 'Grizzly', slot: 'ground', icon: ['form-icon-grizzly', 'item-form_icone_grizzly'], desc: 'Grizzly (sol) : Maj tenue. Il prend de l\'élan, puis charge : il renverse les petits ennemis. Un mur ou un gros ennemi l\'arrête net.' },
+  owlbear: { flag: 'hasOwlbearForm', label: 'Ours-hibou', slot: 'air', icon: ['form-icon-owlbear', 'item-form_icone_ours_hibou'], desc: 'Ours-hibou (aérien) : 2e appui sur Espace en l\'air. Il fracasse le sol en retombant.' },
 };
 const FORM_IDS = Object.keys(FORM_INFO);
 // Sous-titre court : l'ancien « Aérien (une seule forme) » débordait de sa
 // colonne de 108 px.
 const FORM_SLOTS = [
-  { slot: 'ground', label: 'Sol' },
+  { slot: 'ground', label: 'Sol · une seule' },
   { slot: 'air', label: 'Aérien · une seule' },
   { slot: 'water', label: 'Eau' },
 ];
@@ -73,6 +82,8 @@ const SKILL_INFO_DESC = {
   pierre: 'Pierre : lancer en cloche (talisman du singe).',
   papillon: 'Papillons : soigne les créatures corrompues, sans les blesser.',
   crapaud: 'Crapaud : coup de langue devant soi.',
+  panda: 'Panda : elle s\'assoit, mange une pousse et retrouve un cœur. Rien si les cœurs sont pleins.',
+  ours_polaire: 'Ours polaire : il se dresse, retombe, et des pics de glace percent le sol devant lui. Le dernier est plus gros.',
 };
 const SKILL_KEYS = ['A', 'F', 'R'];
 // Les ids de têtes (Player.js) sont sans accents : libellés d'affichage.
@@ -120,7 +131,7 @@ const CAMPFIRE_SAFE = {
 // de 24 px : à 18 px les médaillons des formes devenaient identiques) dans
 // des emplacements et des rangées de 34 px.
 const CAMPFIRE_LAYOUT = {
-  left: { x0: CAMPFIRE_SHOW_TOTEMS ? 212 : 306, colW: 108, gap: 12 },
+  left: { x0: CAMPFIRE_SHOW_TOTEMS || CAMPFIRE_SHOW_FAMILIES ? 212 : 306, colW: 108, gap: 12 },
   right: { x0: 576, x1: 748, slotW: 80, cellW: 52, cellStep: 58 },
   rows: {
     title: 106,
@@ -176,6 +187,7 @@ class CampfireMenuScene extends Phaser.Scene {
     }
     this.totemsLocked = CAMPFIRE_TOTEMS_LOCKED;
     this.showTotems = CAMPFIRE_SHOW_TOTEMS;
+    this.showFamilies = CAMPFIRE_SHOW_FAMILIES;
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
     // Voile sombre : fond du menu ET repli si le panneau peint manque.
     this.add.rectangle(480, 270, 960, 540, 0x0d0b1a, 0.82).setName('fond');
@@ -653,6 +665,13 @@ class CampfireMenuScene extends Phaser.Scene {
       }
     }
 
+    // -- Familles (colonne droite) : l'en-tête ; le contenu suit l'équipe
+    // (rebuildFamilies, à chaque changement).
+    if (this.showFamilies) {
+      this.familyColumn = { x0: L.right.x0, x1: L.right.x1 };
+      this.addSectionHeader(L.right.x0, L.right.x1, R.head, 'Familles');
+    }
+
     // Description de la carte survolée/sélectionnée (aide contextuelle) :
     // largeur de la bande `foot` (plus étroite) car, sur 2 lignes, elle
     // descend sous y 390, là où les feuilles des coins resserrent le bois.
@@ -795,11 +814,12 @@ class CampfireMenuScene extends Phaser.Scene {
     // emplacements (pas de 120) ; 4 (rien d'équipé) : cartes de 63, pas de
     // 69, SANS icône : avec, il resterait 31 px pour le nom (un nom de 8
     // lettres fait ~40 px à 11 px) et toute la rangée tomberait à 8 px.
-    const formFew = pool.length <= 3;
-    this.rowXs(pool.length, leftCx, formFew ? 120 : 69).forEach((x, i) => {
+    // (5 ou 6 depuis les ours : cf. campfirePoolGrid, cartes sans icône.)
+    const formGrid = campfirePoolGrid(pool.length, true);
+    this.rowXs(pool.length, leftCx, formGrid.step).forEach((x, i) => {
       const [id, opts] = pool[i];
-      const o = formFew ? opts : { ...opts, iconKeys: null };
-      formCards.push(this.makeCard(x, R.pool, formFew ? 100 : 63, L.cardH, FORM_INFO[id].label, 'form', id, null, o));
+      const o = formGrid.icons ? opts : { ...opts, iconKeys: null };
+      formCards.push(this.makeCard(x, R.pool, formGrid.w, L.cardH, FORM_INFO[id].label, 'form', id, null, o));
     });
     campfireUniformLabels(formCards);
     if (!pool.length) {
@@ -813,7 +833,8 @@ class CampfireMenuScene extends Phaser.Scene {
     // Papillons : niveau gagné en libérant des papillons prisonniers (SecretKit).
     const butterflyLvl = typeof papillonSkillLevel === 'function' ? papillonSkillLevel() : 0;
     const skillName = (id) => {
-      const name = SKILL_DEFS[id].label.split(' — ')[0];
+      // `cardLabel` : nom court pour la carte (« Polaire » pour l'ours polaire).
+      const name = SKILL_DEFS[id].cardLabel || SKILL_DEFS[id].label.split(' — ')[0];
       return id === 'papillon' && butterflyLvl > 0 ? `${name} ${butterflyLvl}` : name;
     };
     const skillOpts = (id) => ({
@@ -835,10 +856,12 @@ class CampfireMenuScene extends Phaser.Scene {
     const unequippedSkills = [...player.unlockedSkills].filter((id) => SKILL_DEFS[id] && !player.skillSlots.includes(id));
     // Même grille que les formes : jusqu'à 3 sur les colonnes, sinon
     // cartes de 80 (comme dans les emplacements), pas de 86.
-    const skillFew = unequippedSkills.length <= 3;
-    this.rowXs(unequippedSkills.length, leftCx, skillFew ? 120 : 86).forEach((x, i) => {
+    // Plus de compétences que d'emplacements depuis les ours : cf. campfirePoolGrid.
+    const skillGrid = campfirePoolGrid(unequippedSkills.length, false);
+    this.rowXs(unequippedSkills.length, leftCx, skillGrid.step).forEach((x, i) => {
       const id = unequippedSkills[i];
-      skillCards.push(this.makeCard(x, R.skillPool, skillFew ? 100 : 80, L.cardH, skillName(id), 'skill', id, null, skillOpts(id)));
+      const o = skillGrid.icons ? skillOpts(id) : { ...skillOpts(id), iconKeys: null };
+      skillCards.push(this.makeCard(x, R.skillPool, skillGrid.w, L.cardH, skillName(id), 'skill', id, null, o));
     });
     campfireUniformLabels(skillCards);
     if (!unequippedSkills.length) {
@@ -877,7 +900,9 @@ class CampfireMenuScene extends Phaser.Scene {
       campfireUniformLabels(totemCards);
     }
 
-    // Bonus actuels (cœurs gagnés dans l'histoire, totems s'ils comptent).
+    if (this.showFamilies) this.rebuildFamilies();
+
+    // Bonus actuels (cœurs gagnés dans l'histoire, passifs de famille, totems s'ils comptent).
     const hearts = player.maxHearts - HEART_MAX;
     const energy = player.maxEnergy - ENERGY_MAX;
     this.bonusText.setText(inert
@@ -890,6 +915,66 @@ class CampfireMenuScene extends Phaser.Scene {
       : 'Les formes et les compétences se débloquent au fil de l\'histoire.';
     if (!this.descText.text) this.showDesc('');
     this.selectedCard = null;
+  }
+
+  // Colonne des familles : une entrée par famille ÉQUIPÉE (Familles.js). Avec
+  // un passif : son nom, chaque palier (carré plein = actif, jaune = le
+  // suivant, gris = plus loin) et ce qu'il manque pour le suivant. Sans
+  // passif : une ligne commune, discrète. Recréée à chaque changement d'équipe.
+  rebuildFamilies() {
+    const R = CAMPFIRE_LAYOUT.rows;
+    const { x0, x1 } = this.familyColumn;
+    const keep = (o) => { this.dynamicDecor.push(o); return o; };
+    const list = familySummary(this.player);
+    let y = R.slotSub;
+    const bottom = R.skillPool + CAMPFIRE_LAYOUT.poolH / 2;
+    if (!list.length) {
+      keep(this.addPanelText(x0, y, 'Aucun animal équipé.', { size: 10, color: '#a99bd6', originX: 0 }));
+      return;
+    }
+    const plain = [];
+    for (const fam of list) {
+      if (!fam.tiers.length) { plain.push(`${fam.label} ${fam.count}`); continue; }
+      if (y > bottom - 60) break;
+      const name = keep(this.addPanelText(x0, y, fam.label, { size: 12, bold: true, color: colorToHex(fam.color), originX: 0 }));
+      keep(this.addPanelText(x1, y + 1, `${fam.count} équipé${fam.count > 1 ? 's' : ''}`, { size: 10, color: '#ffe9f5', originX: 1 }));
+      y += name.height + 1;
+      const passive = keep(this.addPanelText(x0, y, fam.passive, { size: 10, color: '#c9b8f0', originX: 0 }));
+      passive.setFontStyle('italic');
+      y += passive.height + 4;
+      for (const t of fam.tiers) {
+        const isNext = fam.next === t;
+        const color = t.active ? '#ffe9f5' : isNext ? '#ffe066' : '#c9b8f0';
+        // Carré du palier : plein s'il est actif, contour seul sinon.
+        const box = keep(this.add.rectangle(x0 + 5, y + 7, 8, 8, t.active ? 0x8fe3b8 : 0x241c3d, 1));
+        box.setStrokeStyle(1, t.active ? 0xe8fff2 : isNext ? 0xffe066 : 0x6f6391, 1);
+        const line = keep(this.addPanelText(x0 + 15, y, `${t.count} : ${t.text}`, { size: 10, color, originX: 0 }));
+        line.setWordWrapWidth(x1 - x0 - 15);
+        y += line.height + 2;
+      }
+      const missing = fam.next ? fam.next.count - fam.count : 0;
+      const hint = fam.next
+        ? `Encore ${missing} pour le palier suivant.`
+        : 'Tous les paliers sont actifs.';
+      const h = keep(this.addPanelText(x0, y + 1, hint, { size: 10, color: fam.next ? '#ffe066' : '#8fe3b8', originX: 0 }));
+      h.setWordWrapWidth(x1 - x0);
+      y += h.height + 8;
+    }
+    if (plain.length && y < bottom - 12) {
+      const t = keep(this.addPanelText(x0, y, `${plain.join(' · ')}\n(pas encore de passif)`, { size: 10, color: '#a99bd6', originX: 0 }));
+      t.setWordWrapWidth(x1 - x0).setLineSpacing(1);
+    }
+  }
+
+  // Équipe changée au feu : passifs de famille recalculés tout de suite (le
+  // monde est gelé, Player.update ne tourne pas). Un cœur gagné par un palier
+  // arrive plein : elle est assise au feu, qui soigne de toute façon.
+  afterTeamChange() {
+    const player = this.player;
+    const before = player.maxHearts;
+    player.recomputeTotemBonuses();
+    if (player.maxHearts > before) player.hearts = player.maxHearts;
+    this.registry.set('hearts', player.hearts);
   }
 
   setCardHighlight(card, on) {
@@ -982,10 +1067,12 @@ class CampfireMenuScene extends Phaser.Scene {
       // (le singe remplace l'aigle et inversement, cf. Player.equipForm).
       if (zoneSlot === 'pool') player.unequipForm(id);
       else player.equipForm(id);
+      this.afterTeamChange();
     } else if (kind === 'skill') {
       if (sourceSlot !== null) player.skillSlots[sourceSlot] = null;
       if (zoneSlot !== 'pool') player.skillSlots[zoneSlot] = id; // l'ancien occupant retourne au pool
       this.registry.set('skillSlots', player.skillSlots);
+      this.afterTeamChange();
     } else if (kind === 'totemHead' || kind === 'totemBody') {
       // Garde-fou : rien ne doit pouvoir modifier le totem pendant la démo
       // (ni quand sa colonne est cachée).
@@ -997,6 +1084,18 @@ class CampfireMenuScene extends Phaser.Scene {
       player.recomputeTotemBonuses();
     }
   }
+}
+
+// Grille d'une rangée de réserve selon le nombre de cartes (colonne de
+// 348 px) : jusqu'à 3, cartes de 100 sur les colonnes des emplacements ; 4 :
+// cartes de 80 (63 sans icône pour les formes, comme avant) ; 5 et 6 (depuis
+// les ours : 6 formes, 5 compétences et plus) : cartes étroites SANS icône,
+// sinon il ne resterait pas la place du nom.
+function campfirePoolGrid(count, forms) {
+  if (count <= 3) return { step: 120, w: 100, icons: true };
+  if (count === 4) return forms ? { step: 69, w: 63, icons: false } : { step: 86, w: 80, icons: true };
+  if (count === 5) return { step: 69, w: 63, icons: false };
+  return { step: 58, w: 54, icons: false };
 }
 
 // Ajuste le libellé (un seul mot : les cartes ne portent que des noms) à

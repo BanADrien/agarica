@@ -65,6 +65,8 @@ const EDITOR_ENEMY_TYPES = [
   { value: 'crapaud_piege', label: 'Crapaud-piège (corrompu, caché sous la mousse)', color: 0x7f8f6a, letter: 'Cp' },
   { value: 'crapaud_corrompu', label: 'Crapaud corrompu (= crapaud sauteur)', color: 0x9bff5a, letter: 'Cc', patrol: true },
   { value: 'ghilt', label: "Ghil't (boss)", color: 0xff5533, letter: 'G' },
+  // Mannequin d'entraînement des zones de test (gros, immobile, inoffensif).
+  { value: 'mannequin', label: 'Mannequin (zone de test, 6 PV)', color: 0xd6b25e, letter: 'Mq' },
 ];
 const EDITOR_ENEMY_BY_TYPE = Object.fromEntries(EDITOR_ENEMY_TYPES.map((t) => [t.value, t]));
 const EDITOR_DEFAULT_TOTEM_MESSAGE = "Une nouvelle capacité s'éveille en toi.";

@@ -1325,7 +1325,7 @@ function drawCombatDebugOverlays(scene) {
 // (`?editor`, playtest compris) ou les anciennes zones de test (menu « Zones
 // de test » du titre). En partie normale, aucune de ces touches n'agit.
 const DEV_KEYS_TEST_SCENES = ['Zone1Scene', 'Zone2Scene', 'Zone3Scene', 'Zone4Scene', 'Zone5Scene',
-  'SousGrotteScene', 'ZoneAquatiqueScene', 'ZonetestScene', 'PlaytestScene'];
+  'SousGrotteScene', 'ZoneAquatiqueScene', 'ZonetestScene', 'ZoneOursScene', 'PlaytestScene'];
 
 // `?debug` est RETENU par le navigateur (localStorage) : une fois l'adresse
 // ouverte avec `?debug`, les raccourcis restent actifs aux lancements suivants,
@@ -4419,6 +4419,9 @@ function leaveByEdgeExit(scene, exit) {
     facing: p.facingDir,
     wolfJumpCarry: p.wolfJumpCarry,
     wolfSprintActive: p.wolfSprintActive,
+    // Grizzly : sa forme et son élan passent le bord avec lui.
+    sprintForm: p.sprintForm,
+    grizzlyRamp: p.grizzlyRamp,
     tapSprintDirection: p.tapSprintDirection,
     vineMomentumSpeed: p.vineMomentumSpeed,
     vineFlight: p.vineFlight,
@@ -4629,6 +4632,8 @@ function applyEdgeArrivalState(player, entry, arrival) {
   player.airJumpForm = arrival.airJumpForm ?? null;
   player.wolfJumpCarry = !!arrival.wolfJumpCarry;
   player.wolfSprintActive = !!arrival.wolfSprintActive;
+  if (arrival.sprintForm) player.sprintForm = arrival.sprintForm;
+  player.grizzlyRamp = arrival.grizzlyRamp || 0;
   player.tapSprintDirection = arrival.tapSprintDirection ?? null;
   player.vineMomentumSpeed = arrival.vineMomentumSpeed || 0;
   player.vineFlight = !!arrival.vineFlight;
@@ -5258,6 +5263,9 @@ function buildLevelFromData(scene, data, sceneData) {
     // qu'un script ajoute (renforts, mousses de Ghil't) n'en lâchent pas.
     enemy.__lootType = e.type;
     if (e.eclats !== undefined) enemy.__lootEclats = e.eclats;
+    // « Gros » ennemi (clé `heavy` de la donnée, sinon celle de sa classe) : il
+    // arrête la charge du grizzly au lieu d'être renversé (cf. Ursides.js).
+    if (e.heavy !== undefined) enemy.heavy = !!e.heavy;
     // `group.add()` réinitialise `body.allowGravity` à `true`, écrasant le
     // `setAllowGravity(false)` posé dans le constructeur des ennemis fixes/
     // volants — sans ce rattrapage ils tombent hors du niveau dès l'ajout.
@@ -5273,6 +5281,9 @@ function buildLevelFromData(scene, data, sceneData) {
   scene.physics.add.overlap(scene.player, scene.enemies, (player, enemy) => {
     if (player.isInvulnerable || enemy.defeated || isWorldFrozen(scene)) return;
     if (tryPlayerMeleeHit(scene, player, enemy)) return;
+    // Grizzly en charge : le petit ennemi est renversé, le gros l'arrête
+    // (Ursides.js) -- dans les deux cas, pas de cœur perdu au contact.
+    if (typeof ursideChargeContact === 'function' && ursideChargeContact(scene, player, enemy)) return;
     if (!enemy.harmless) player.hitByEnemy();
   });
 

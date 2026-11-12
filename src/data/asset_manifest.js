@@ -121,6 +121,82 @@ const ASSET_MANIFEST = {
     ],
     cut: "blob", align: "bottom",
   },
+  // [P2] Familles d'animaux, les quatre ours (prompt Codex n°14, 2026-11-12,
+  // docs/production/FAMILLES_DESIGN.md). Formes d'Agarica : grizzly (sol) et
+  // ours-hibou (aérien) ; compétences : panda et ours polaire. Tant qu'une
+  // feuille manque, le jeu montre l'ours actuel recoloré (src/entities/Ursides.js).
+  // Grizzly : course, charge (plus ramassée, tête basse), saut (montée, chute,
+  // réception), transformation depuis Agarica.
+  grizzly: {
+    dir: "assets/sprites/grizzly_frames", prefix: "grizzly",
+    anims: {
+      run: { row: 0, frames: 4, fps: 12, repeat: -1 },
+      charge: { row: 1, frames: 4, fps: 16, repeat: -1 },
+      jump: { row: 2, frames: 3, fps: 10, repeat: 0 },
+      transform: { row: 3, frames: 4, fps: 20, repeat: 0 },
+    },
+    scale: 0.4,
+    facing: "right",
+    placeholder: { w: 136, h: 80, color: 0x5a3a22, label: "Grizzly" },
+    sheets: [
+      { file: "assets/sprites/grizzly.png", rows: [0, 1] },
+      { file: "assets/sprites/grizzly_p2.png", rows: [2, 3] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // Ours-hibou : 2e saut (bond, pattes écartées), chute (plongeon, griffes en
+  // avant), fracas à l'atterrissage, transformation depuis Agarica.
+  ours_hibou: {
+    dir: "assets/sprites/ours_hibou_frames", prefix: "ours_hibou",
+    anims: {
+      jump: { row: 0, frames: 4, fps: 12, repeat: -1 },
+      fall: { row: 1, frames: 3, fps: 10, repeat: -1 },
+      slam: { row: 2, frames: 4, fps: 10, repeat: 0 },
+      transform: { row: 3, frames: 4, fps: 20, repeat: 0 },
+    },
+    scale: 0.4,
+    facing: "right",
+    placeholder: { w: 130, h: 84, color: 0x7a6a8c, label: "Ours-hibou" },
+    sheets: [
+      { file: "assets/sprites/ours_hibou.png", rows: [0, 1] },
+      { file: "assets/sprites/ours_hibou_p2.png", rows: [2, 3] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // Panda (compétence de soin) : il s'assoit et mange une pousse.
+  panda: {
+    dir: "assets/sprites/panda_frames", prefix: "panda",
+    anims: {
+      eat: { row: 0, frames: 4, fps: 6, repeat: 0 },
+      transform: { row: 1, frames: 4, fps: 20, repeat: 0 },
+    },
+    scale: 0.4,
+    facing: "right",
+    placeholder: { w: 96, h: 88, color: 0xe6e6da, label: "Panda" },
+    sheets: [
+      { file: "assets/sprites/panda.png", rows: [0, 1] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // Ours polaire (compétence des pics de glace) : il se dresse (rear, tenu
+  // 0,45 s), retombe (slam), puis redevient Agarica. Les pics sont dessinés
+  // par le code.
+  ours_polaire: {
+    dir: "assets/sprites/ours_polaire_frames", prefix: "ours_polaire",
+    anims: {
+      rear: { row: 0, frames: 4, fps: 9, repeat: 0 },
+      slam: { row: 1, frames: 4, fps: 9, repeat: 0 },
+      transform: { row: 2, frames: 4, fps: 20, repeat: 0 },
+    },
+    scale: 0.4,
+    facing: "right",
+    placeholder: { w: 150, h: 110, color: 0xcfe8ff, label: "Ours polaire" },
+    sheets: [
+      { file: "assets/sprites/ours_polaire.png", rows: [0, 1] },
+      { file: "assets/sprites/ours_polaire_p2.png", rows: [2] },
+    ],
+    cut: "blob", align: "bottom",
+  },
   // [P1] Geralt invoque Clak (duel de la forêt flottante 1, art Codex du
   // 2026-10-23) : rangée 0 = préparation / élévation, rangée 1 = canalisation
   // (yeux blancs) / retour au sol. Même échelle que `geralt`.
@@ -1252,6 +1328,32 @@ const ITEM_MANIFEST = {
     path: "assets/items/skill_icone/papillon.png", scale: 0.1,
     placeholder: { w: 72, h: 72, color: 0x6ff0e0, label: "Papillon" },
     src: { file: "assets/_codex_src/skill_icone_papillon.png" },
+    norm: { mode: "square", value: 724 },
+  },
+  // [P2] Icônes des quatre ours (prompt Codex n°14) : compétences panda et ours
+  // polaire, formes grizzly et ours-hibou. Une planche 2 x 2.
+  skill_icone_panda: {
+    path: "assets/items/skill_icone/panda.png", scale: 0.1,
+    placeholder: { w: 72, h: 72, color: 0x4f7a43, label: "Panda" },
+    src: { planche: "assets/_codex_src/icones_ours.png", grid: [2, 2], cell: 0, cut: "grid" },
+    norm: { mode: "square", value: 724 },
+  },
+  skill_icone_ours_polaire: {
+    path: "assets/items/skill_icone/ours_polaire.png", scale: 0.1,
+    placeholder: { w: 72, h: 72, color: 0x3f7fc4, label: "Polaire" },
+    src: { planche: "assets/_codex_src/icones_ours.png", grid: [2, 2], cell: 1, cut: "grid" },
+    norm: { mode: "square", value: 724 },
+  },
+  form_icone_grizzly: {
+    path: "assets/items/form_icone/grizzly.png", scale: 0.1,
+    placeholder: { w: 72, h: 72, color: 0x5a3a22, label: "Grizzly" },
+    src: { planche: "assets/_codex_src/icones_ours.png", grid: [2, 2], cell: 2, cut: "grid" },
+    norm: { mode: "square", value: 724 },
+  },
+  form_icone_ours_hibou: {
+    path: "assets/items/form_icone/ours_hibou.png", scale: 0.1,
+    placeholder: { w: 72, h: 72, color: 0x7a6a8c, label: "Ours-hibou" },
+    src: { planche: "assets/_codex_src/icones_ours.png", grid: [2, 2], cell: 3, cut: "grid" },
     norm: { mode: "square", value: 724 },
   },
   // [P1] Boîte de dialogue (9-slice)

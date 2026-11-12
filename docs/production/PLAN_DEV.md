@@ -1495,6 +1495,66 @@ socle à ajouter à `DECOR_SECTIONS.decor` (LevelKit) quand l'art existe.
 aucune boîte de zone ne se chevauche (hauteur réelle : le sol descend à 576), écarts voulus de 144 px
 (racines / galeries), 416 px (belvédère / île du gardien), 22 px (îles / racines suspendues).
 
+### Familles d'animaux et les quatre ours (2026-11-12, rétro-compatible)
+Conception : `docs/production/FAMILLES_DESIGN.md`. Fichiers : `src/entities/Familles.js` (table et
+calcul), `src/entities/Ursides.js` (les ours : images provisoires, élan, pics, effets),
+`src/entities/Mannequin.js`, zone de test `zone_ours` (`ZoneOursScene`, script `zone_ours`).
+Rien dans l'histoire ne débloque encore ces ours : sans eux, le jeu se joue comme avant.
+
+- **Familles** (`ANIMAL_FAMILIES`, `ANIMAL_FAMILY_OF`) : chaque forme et chaque compétence a la
+  sienne (loup = canidés, singe = simiens, aigle = oiseaux, pieuvre = céphalopodes, papillon =
+  insectes, pierre = aucune ; ours, grizzly, ours-hibou, panda, ours polaire = **ursidés**). Le
+  passif se compte sur les animaux **équipés** : formes des emplacements sol / aérien / eau (si
+  débloquées) et les 3 compétences. `familyEquippedAnimals(player)`, `familyCounts`,
+  `familyPassiveStats(player)` → `{ hearts, bearSize, steadfast }`, `familySummary(player)` (menu).
+  Ajouter un passif = ajouter `passive` + `tiers: [{ count, text, stats }]` à une famille.
+- **Ursidés, « Robustesse »** : 2 équipés → +1 cœur max ; 3 → fracas et impacts d'ours agrandis de
+  25 % (`player.bearSizeMultiplier` : fracas de l'ours, atterrissage de l'ours-hibou, pics de glace,
+  impact du grizzly) ; 4 → `player.knockbackImmune` : un coup ne l'arrête plus (ni vitesse remise à
+  zéro, ni bascule, ni pose de douleur, ni recul du duel de Geralt) ; le cœur perdu, le flash et
+  l'invulnérabilité restent. Calculé dans `Player.recomputeTotemBonuses` (les totems restent
+  dormants), relancé dès que l'équipe change (`familyTeamSignature`) et par le menu du feu
+  (`afterTeamChange` : un cœur gagné au feu arrive plein).
+- **Emplacements** : `GROUND_FORM_IDS = ['wolf', 'grizzly']` (exclusifs, comme les formes
+  aériennes), `AIR_FORM_IDS = ['eagle', 'monkey', 'owlbear']`. `equippedForms` reste `[sol, aérien,
+  eau]` ; `player.getActiveGroundForm()`, `equipForm('grizzly' | 'owlbear')`. Drapeaux :
+  `hasGrizzlyForm`, `hasOwlbearForm` (sauvegardés comme les autres). `player.sprintForm` : forme du
+  sprint en cours.
+- **Grizzly** (forme au sol, [Maj] tenue comme le loup ; `GRIZZLY_TUNING`) : part à 230 px/s et monte
+  à 470 en 1,5 s de course (`player.grizzlyRamp`) ; au-delà de 85 % (400 px/s) : **charge**
+  (`player.isGrizzlyCharging()`, traits de vitesse, mottes, tremblement). En charge, un petit ennemi
+  touché est tué sans dégât pour elle (`ursideChargeContact`, appelé par l'overlap joueur / ennemis) ;
+  un mur ou un **gros** ennemi : `player.grizzlyCrash` (1 dégât au gros ennemi, forme perdue,
+  projection en arrière et vers le haut, 0,6 s d'invulnérabilité, [Maj] à relâcher pour reprendre la
+  forme). La percussion frappe devant lui (`getGrizzlyImpactRect`) : ennemis et blocs `by: 'bear'`.
+  Sous le seuil : arrêt simple contre un mur, contact ordinaire avec un ennemi. Pas de morsure ; saut
+  un peu plus court que le loup. Événement `grizzly-crash`.
+- **Gros ennemi** : propriété explicite `enemy.heavy` (loup alpha, Ghil't, mannequin) ou clé de
+  donnée `enemies: [{ …, heavy: true }]`. Tout autre ennemi du groupe est « petit ».
+- **Ours-hibou** (forme aérienne) : 2e appui sur [Espace] en l'air, hauteur du singe, ni liane ni
+  plané. S'il retombe d'au moins une case depuis le sommet du 2e saut : fracas à l'atterrissage
+  (compétence interne `owlbear_slam`, zone et dégât de l'ours ; `hitboxKind: 'ours'` : il casse les
+  blocs `by: 'bear'` et les amas de mousse).
+- **Compétences** : `panda` (45 d'énergie ; assise ~0,9 s, +1 cœur à la fin ; rien et aucun coût si
+  les cœurs sont pleins ; un coup reçu annule le soin) et `ours_polaire` (40 ; dressé 0,45 s, puis 5
+  pics sur 320 px et un 6e deux fois plus haut, un toutes les 70 ms ; la rangée suit le sol et
+  s'arrête au premier vide ou mur ; 1 dégât par lancer pour les petits pics, 2 pour le gros ; ils
+  traversent les ennemis ; fonte en 1 s). Les deux : au sol seulement.
+- **Mécanique des compétences** (Player) : `beginSkill(id, now)` (lance sans faire payer),
+  `INTERNAL_SKILL_DEFS` + `skillDefOf(id)` ; nouveaux champs de `SKILL_DEFS` : `rooted`,
+  `groundOnly`, `canActivate(player)` + `denyText`, `onStart(player, now)`, `family`, `hitboxKind`,
+  `cardLabel`, `internal`.
+- **Images** : provisoires, fabriquées au chargement à partir de `ours-0…5` recolorées dans un
+  canvas (`ursideVariantTexture` ; aucune image écrite). Vraies feuilles : ids `grizzly`,
+  `ours_hibou`, `panda`, `ours_polaire` du manifeste (prompt `PROMPT_CODEX_14.md`), prises dès
+  qu'elles existent. Effets (glace, traits de vitesse, impacts) dessinés par code, grain de 2 px.
+- **Menu du feu** : sol = loup ou grizzly, aérien = singe, aigle ou ours-hibou ; réserve de
+  compétences à 5 cartes et plus (`campfirePoolGrid`) ; colonne **Familles** à droite (nombre
+  d'animaux équipés, paliers actifs, palier suivant).
+- **Zone de test** : « Zones de test » du titre → « Zone des ours », ou `?zone=ZoneOursScene`. Elle
+  débloque tout et pose une équipe d'ours ; la sauvegarde trouvée à l'entrée est remise en sortant
+  (`zoneOursProtectSave`). Ennemi `mannequin` (immobile, inoffensif, PV affichés, se remonte seul).
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |

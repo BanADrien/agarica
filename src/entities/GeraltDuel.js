@@ -727,7 +727,8 @@ class GeraltDuel {
     const before = p.hearts;
     p.hitByEnemy();
     const hit = p.hearts < before;
-    if (hit && p.hearts > 0 && dir) p.setVelocity(dir * kx, ky);
+    // (Palier 4 des ursidés, cf. Familles.js : elle encaisse sans reculer.)
+    if (hit && p.hearts > 0 && dir && !p.knockbackImmune) p.setVelocity(dir * kx, ky);
     return hit;
   }
 

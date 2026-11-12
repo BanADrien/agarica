@@ -857,13 +857,17 @@ const TRANSFO_WOLF_EAGLE_BODY = transfoBodyConfig(TRANSFO_WOLF_EAGLE_FRAME_WIDTH
 // battement + dash en diagonale est retiré) : seuls le singe et l'aigle
 // donnent le 2e saut. Le papillon reste la compétence de soin (SKILL_DEFS,
 // Projectiles.js), avec sa courte pose d'incantation (startSkillFormPose).
-const AIR_FORM_IDS = ['eagle', 'monkey'];
+// Familles (2026-11-12) : l'ours-hibou est une 3e forme aérienne ; au sol, le
+// grizzly peut prendre la place du loup (exclusifs, comme les formes aériennes).
+const AIR_FORM_IDS = ['eagle', 'monkey', 'owlbear'];
+const GROUND_FORM_IDS = ['wolf', 'grizzly'];
 // Anciennes formes aériennes encore présentes dans de vieilles sauvegardes
 // (`airForm`, `equippedForms`) : migrées au chargement vers la forme
 // aérienne débloquée restante (cf. resolveInitialAirForm).
 const OBSOLETE_AIR_FORM_IDS = ['butterfly'];
 const FORM_FLAG_BY_ID = {
   wolf: 'hasWolfForm', eagle: 'hasEagleForm', monkey: 'hasMonkeyForm', octopus: 'hasOctopusForm',
+  grizzly: 'hasGrizzlyForm', owlbear: 'hasOwlbearForm',
 };
 // --- Pose PAPILLON de la compétence de soin ---------------------------------
 // Durée de la transformation humaine -> papillon (art `transfo_papillon`,
@@ -967,6 +971,7 @@ const VINE_GRAB_BUFFER_MS = 200;
 // Juice (visuel seul) : couleurs des éclats de transformation par forme.
 const FORM_FX_COLORS = {
   agarica: 0xff9fc9, wolf: 0x7dfcd8, eagle: 0xfff1c0, monkey: 0xa8e07a, octopus: 0x9fe3ff,
+  grizzly: 0xd9a441, owlbear: 0xe8c890,
 };
 // Même idée en sortant de l'eau (forme pieuvre) : la nage s'arrête
 // `waterGraceMs` après la surface ; un saut dans cette fenêtre fait sortir
@@ -1438,6 +1443,16 @@ const TOTEM_BODIES = {
 // méthode depuis le menu (patch invisible).
 const DEMO_TOTEMS_LOCKED = true;
 
+// Compétences INTERNES (2026-11-12) : même mécanique que SKILL_DEFS
+// (transformation, animation, zone de dégâts), mais jamais dans un emplacement,
+// ni débloquées, ni payées -- lancées par le jeu (Player.beginSkill). Ex. le
+// fracas de l'ours-hibou à l'atterrissage (Ursides.js). Table à part : la triche
+// Ctrl+Maj+D et le menu du feu parcourent SKILL_DEFS.
+const INTERNAL_SKILL_DEFS = {};
+function skillDefOf(id) {
+  return (id && (SKILL_DEFS[id] || INTERNAL_SKILL_DEFS[id])) || null;
+}
+
 class Player extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
     ensurePlayerAnimations(scene);
@@ -1507,11 +1522,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.equippedForms = scene.registry.get('equippedForms') || [null, null, null];
     // Forme singe (démo histoire) + emplacement aérien (cf. AIR_FORM_IDS).
     this.hasMonkeyForm = scene.registry.get('hasMonkeyForm') || false;
+    // Ours du premier test des familles (cf. Ursides.js) : grizzly (sol) et
+    // ours-hibou (aérien). Débloqués par la zone de test, rien dans l'histoire.
+    this.hasGrizzlyForm = scene.registry.get('hasGrizzlyForm') || false;
+    this.hasOwlbearForm = scene.registry.get('hasOwlbearForm') || false;
     // Formes aériennes déjà connues à la création : seule une forme débloquée
     // EN COURS de jeu (totem, cinématique, triche) devient automatiquement
     // la forme aérienne active, cf. syncFormSlots(). (Plus de forme papillon :
     // `hasButterflyForm` d'une vieille sauvegarde reste au registre, ignoré.)
-    this.airFormsSeen = { eagle: this.hasEagleForm, monkey: this.hasMonkeyForm };
+    this.airFormsSeen = { eagle: this.hasEagleForm, monkey: this.hasMonkeyForm, owlbear: this.hasOwlbearForm };
     this.airForm = this.resolveInitialAirForm(scene.registry.get('airForm'));
     this.applyAirForm(this.airForm);
 
@@ -1574,6 +1593,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.maxHearts = HEART_MAX;
     this.maxEnergy = ENERGY_MAX;
     this.skillSizeMultiplier = 1;
+    // Passifs de famille (cf. Familles.js), recalculés avec les bonus ci-dessous :
+    // taille des fracas d'ours (palier 3 des ursidés) et « plus de recul sous
+    // les coups » (palier 4). `familySig` : équipe pour laquelle ils sont à jour.
+    this.bearSizeMultiplier = 1;
+    this.knockbackImmune = false;
+    this.familySig = null;
     // Recalcule maxHearts/maxEnergy/skillSizeMultiplier ET replafonne
     // hearts/energy (chargés juste au-dessus) dessus -- doit tourner APRÈS
     // avoir chargé equippedTotems mais peut tourner avant ou après
@@ -1731,6 +1756,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // (cf. agaricaSheetScale, `method: 'area'`) -- même « masse » apparente
     // qu'Agarica, une échelle par image source (singe.png / singe_p2.png).
     FORMS.monkey = agaricaSheetPoseConfig(scene, 'singe', 'jump', { method: 'area' });
+    // Grizzly et ours-hibou : FORMS.grizzly / FORMS.owlbear (vraie feuille ou
+    // ours recoloré), art des compétences d'ours.
+    if (typeof ursideSetupPlayer === 'function') ursideSetupPlayer(scene, this);
     // Papillon (pose de la compétence de soin, cf. drawSkillFormPose) : art
     // `forme_papillon` (centré, face à DROITE) s'il existe, sinon placeholder
     // dessiné par code ; hitbox au gabarit humain (comme le singe) pour que
@@ -1864,6 +1892,25 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // en l'air (au lieu de retomber en Agarica) tant qu'un double-saut ne
     // déclenche pas l'Aigle. Remis à faux à l'atterrissage.
     this.wolfJumpCarry = false;
+    // Forme au sol du sprint en cours ('wolf' | 'grizzly') : gardée pendant
+    // le saut porté (wolfJumpCarry), même si [Maj] est relâchée en l'air.
+    this.sprintForm = 'wolf';
+    // Grizzly (cf. Ursides.js) : élan (0 à 1), charge en cours et son sens,
+    // zone d'impact de la dernière percussion. `groundFormLocked` : après une
+    // percussion, [Maj] doit être relâchée avant de reprendre la forme ;
+    // `controlLockUntil` : directions ignorées pendant la projection.
+    this.grizzlyRamp = 0;
+    this.grizzlyCharging = false;
+    this.grizzlyChargeDir = 1;
+    this.grizzlyChargeId = 0;
+    this.grizzlyImpact = null;
+    this.groundFormLocked = false;
+    this.controlLockUntil = 0;
+    // Ours-hibou : point le plus haut depuis son 2e saut (hauteur de chute).
+    this.owlbearTopY = 0;
+    // Horloges des compétences d'ours (soin du panda, départ de la glace).
+    this.pandaHealAt = 0;
+    this.iceCastAt = 0;
     // Sens courant (mis à jour uniquement quand une direction est pressée) :
     // le sprite humain fait face à gauche par défaut, le loup fait face à
     // droite par défaut (cf. application du flip après setForm() plus bas).
@@ -1893,6 +1940,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Assise au feu de camp : immobile tant qu'aucune action ne la relève.
     if (this.campfireRest && this.updateCampfireRest()) return;
     this.syncFormSlots();
+    // Équipe changée (feu de camp, histoire, triche) : passifs de famille à jour.
+    if (typeof familyTeamSignature === 'function' && familyTeamSignature(this) !== this.familySig) this.recomputeTotemBonuses();
     let left = this.cursors.left.isDown || this.keys.left.isDown;
     let right = this.cursors.right.isDown || this.keys.right.isDown;
     const leftJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.left)
@@ -1902,7 +1951,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Décision utilisateur : SAUT = ESPACE SEUL. Z/↑ et S/↓ servent à viser
     // (attaque vers le haut / vers le bas en l'air) ; S/↓ garde ses rôles de
     // piqué (Aigle), de lâcher de liane (singe) et de nage (pieuvre).
-    const jumpJustPressed = Phaser.Input.Keyboard.JustDown(this.keys.jump);
+    let jumpJustPressed = Phaser.Input.Keyboard.JustDown(this.keys.jump);
     const upHeld = this.cursors.up.isDown || this.keys.up.isDown;
     const downHeld = this.cursors.down.isDown || this.keys.down.isDown;
 
@@ -1935,6 +1984,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const wasEagleForm = this.form === 'eagle';
     const wasOctopusForm = this.form === 'octopus';
     const wasMonkeyForm = this.form === 'monkey';
+    const prevForm = this.form;
     let transitionTriggeredThisFrame = false;
 
     if (Phaser.Input.Keyboard.JustDown(this.skillKeys.slot1)) this.tryActivateSkill(0, now);
@@ -1942,6 +1992,23 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     else if (Phaser.Input.Keyboard.JustDown(this.skillKeys.slot3)) this.tryActivateSkill(2, now);
     // Pose « compétence avec la forme » : horloge (lâcher de la pierre, fin).
     this.tickSkillFormPose(now);
+    // Compétences d'ours : soin du panda, départ des pics de glace.
+    if (typeof ursideSkillTick === 'function') ursideSkillTick(this, now);
+    // Grizzly en charge arrêté par un mur : percussion (cf. grizzlyCrash).
+    // Testé ICI, avant la lecture du sol : la projection vers le haut fait
+    // d'elle un corps en l'air dès cette image. `grizzlyCharging` date de
+    // l'image d'avant -- à celle-ci, le mur a déjà remis sa vitesse à zéro.
+    if (this.grizzlyCharging && this.form === 'grizzly') {
+      const cd = this.grizzlyChargeDir;
+      if ((cd > 0 && this.body.blocked.right) || (cd < 0 && this.body.blocked.left)) this.grizzlyCrash(now, cd);
+    }
+    // Compétence qui cloue sur place (`rooted` : panda qui mange, ours polaire
+    // dressé, fracas de l'ours-hibou) : ni marche, ni saut, ni coup. Projection
+    // après une percussion : directions ignorées un instant (controlLockUntil).
+    const rootedDef = this.skillTransformActive ? skillDefOf(this.activeSkillId) : null;
+    const skillRooted = !!(rootedDef && rootedDef.rooted);
+    if (skillRooted || now < this.controlLockUntil) { left = false; right = false; }
+    if (skillRooted) jumpJustPressed = false;
     // Fenêtre de dégâts de la compétence active (cf. tryActivateSkill) :
     // se referme toute seule, jamais consommée/effacée ailleurs — un seul
     // rectangle par activation, jamais recalculé frame après frame comme
@@ -1953,11 +2020,20 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.skillHitboxPendingRect && now >= this.skillHitboxActivateAt) {
       this.skillHitboxRect = this.skillHitboxPendingRect;
       this.skillHitboxPendingRect = null;
+      // Image très longue (à-coup de chargement) : l'heure de fin a pu passer
+      // avant même l'ouverture -- la zone vit au moins cette image, sinon le
+      // coup ne toucherait rien (LevelKit la lit après cet update).
+      if (now >= this.skillActiveUntil) this.skillActiveUntil = now + 1;
       // Juice : l'impact du fracas (poussière des deux côtés, onde au sol).
       if (this.skillHitboxId === 'ours') {
         spawnFx(this.scene, 'slam', this.x, this.y, { size: this.skillSizeMultiplier || 1 });
         juiceShake(this.scene, 'medium');
         playSfx('ours_slam');
+        // Vague de blocs sur la largeur RÉELLE de la zone : fracas de
+        // l'ours-hibou, et fracas de l'ours élargi (palier 3 des ursidés).
+        if ((this.activeSkillId === 'owlbear_slam' || this.bearSizeMultiplier > 1) && typeof ursideOwlbearSlamFx === 'function') {
+          ursideOwlbearSlamFx(this, this.skillHitboxRect);
+        }
       }
     }
     if (this.skillHitboxRect && now >= this.skillActiveUntil) this.skillHitboxRect = null;
@@ -1971,7 +2047,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // l'échelle/hitbox de la forme réelle.
     if (this.skillTransformActive && now >= this.skillTransformEndTime) {
       this.skillTransformActive = false;
-      const endedSkillDef = SKILL_DEFS[this.activeSkillId];
+      const endedSkillDef = skillDefOf(this.activeSkillId);
       this.activeSkillId = null;
       // Restaure l'origine par défaut si cette compétence l'avait changée
       // (cf. SKILL_DEFS.crapaud.originX/update()) -- sinon la forme humaine
@@ -2009,7 +2085,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       spawnFx(this.scene, 'feathers', this.x, this.y - 40, { count: 2, power: 0.8 });
       playSfx('feather_shot');
     } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.vine
-      && now >= this.attackCooldownEndTime) {
+      && this.form !== 'grizzly' && !skillRooted && now >= this.attackCooldownEndTime) {
+      // (Grizzly : pas de morsure, sa charge est son attaque -- K est ignoré.)
       // (Sur une liane : aucune attaque -- les deux mains tiennent la liane,
       // demande utilisateur ; K/clic y est simplement ignoré.)
       // Retour utilisateur : "retire l'attaque de la pieuvre" -- forme
@@ -2102,21 +2179,34 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // vitesse de sprint. Le double appui ← / → reste un sprint : il n'existe
     // qu'avec la direction tenue.
     const sprintInputHeld = shiftHeld || ((left || right) && this.tapSprintDirection !== null);
+    // Forme au sol équipée : loup ou grizzly (même touche, mêmes règles).
+    const groundForm = this.getActiveGroundForm();
+    if (this.groundFormLocked && !sprintInputHeld) this.groundFormLocked = false;
+    const groundReady = !!groundForm && !this.groundFormLocked;
     if (swimming) {
       // La Pieuvre a la priorité absolue dans l'eau (cf. commentaire sur
       // `swimming` plus haut) : un sprint entamé juste avant d'entrer dans
       // l'eau ne doit pas rester actif en arrière-plan pendant la nage.
       this.wolfSprintActive = false;
     } else if (!this.wolfSprintActive) {
-      this.wolfSprintActive = this.hasWolfForm && this.formEquipped('wolf') && onGround && sprintInputHeld;
+      this.wolfSprintActive = groundReady && onGround && sprintInputHeld;
     } else {
-      this.wolfSprintActive = this.hasWolfForm && this.formEquipped('wolf') && sprintInputHeld;
+      this.wolfSprintActive = groundReady && sprintInputHeld;
     }
     const sprinting = this.wolfSprintActive;
-    const acceleration = sprinting ? this.wolfAcceleration : this.moveAcceleration;
+    if (sprinting) this.sprintForm = groundForm;
+    // Grizzly : l'élan monte en courant (cf. ursideGrizzlyRun) ; au-delà du
+    // seuil, c'est la charge. Hors de sa course : ni élan ni charge.
+    const grizzlyRun = sprinting && groundForm === 'grizzly' && typeof ursideGrizzlyRun === 'function'
+      ? ursideGrizzlyRun(this, now, { dir: left && !right ? -1 : right && !left ? 1 : 0, onGround }) : null;
+    if (!grizzlyRun) {
+      this.grizzlyCharging = false;
+      this.grizzlyRamp = 0;
+    }
+    const acceleration = grizzlyRun ? grizzlyRun.acceleration : sprinting ? this.wolfAcceleration : this.moveAcceleration;
     const webSlowed = this.inWeb && !sprinting;
     const biteSlow = onGround && this.slashDir === 'bite' ? WOLF_BITE_GROUND_SPEED : 1;
-    const maxSpeed = biteSlow * (sprinting ? this.wolfMaxSpeed
+    const maxSpeed = biteSlow * (grizzlyRun ? grizzlyRun.maxSpeed : sprinting ? this.wolfMaxSpeed
       : webSlowed ? this.moveMaxSpeed * this.webSlowMultiplier : this.moveMaxSpeed);
 
     this.body.maxVelocity.x = maxSpeed;
@@ -2132,6 +2222,17 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setAccelerationX(0);
     }
 
+    // Ours-hibou : il retombe après son 2e saut -> fracas (compétence interne
+    // `owlbear_slam`, Ursides.js), seulement après une vraie chute depuis le
+    // sommet du saut (une case) : un simple saut ne le déclenche jamais.
+    if (this.airJumpForm === 'owlbear') {
+      if (!onGround) {
+        this.owlbearTopY = Math.min(this.owlbearTopY, this.y);
+      } else if (!swimming && !this.skillTransformActive && typeof OWLBEAR_TUNING !== 'undefined'
+        && this.y - this.owlbearTopY >= OWLBEAR_TUNING.minFall) {
+        this.beginSkill('owlbear_slam', now);
+      }
+    }
     if (onGround) {
       this.jumpsUsed = 0;
       this.wolfJumpCarry = false;
@@ -2212,7 +2313,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (jumpPress && !jumpConsumed && !this.vine) {
       if (groundLikeJump) {
-        this.setVelocityY(this.jumpVelocity);
+        // Grizzly : le saut du loup, un peu plus court (il est lourd).
+        this.setVelocityY(grizzlyRun ? GRIZZLY_TUNING.jumpVelocity : this.jumpVelocity);
         this.jumpsUsed = 1;
         this.wolfJumpCarry = sprinting;
         juiceJump = 'ground';
@@ -2233,6 +2335,21 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           this.airJumpForm = 'monkey';
           this.setVelocityY(this.monkeyJumpVelocity);
           this.wolfJumpCarry = false;
+        } else {
+          this.setVelocityY(this.jumpVelocity);
+        }
+      } else if (!swimming && airForm === 'owlbear' && this.jumpsUsed < 2) {
+        // Ours-hibou : mêmes règles et même hauteur que le singe ; ni liane
+        // ni plané. Le fracas part à l'atterrissage (cf. plus haut).
+        this.jumpsUsed += 1;
+        jumpActed = true;
+        juiceJump = 'air';
+        this.jumpCutArmed = true;
+        if (this.jumpsUsed === 2) {
+          this.airJumpForm = 'owlbear';
+          this.setVelocityY(this.monkeyJumpVelocity);
+          this.wolfJumpCarry = false;
+          this.owlbearTopY = this.y;
         } else {
           this.setVelocityY(this.jumpVelocity);
         }
@@ -2349,10 +2466,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setForm('eagle');
     } else if (!onGround && this.airJumpForm === 'monkey') {
       this.setForm('monkey');
-    } else if (this.slashDir === 'bite' || this.slashDir === 'paw' || sprinting || (this.wolfJumpCarry && this.jumpsUsed < 2)) {
+    } else if (!onGround && this.airJumpForm === 'owlbear') {
+      this.setForm('owlbear');
+    } else if (this.slashDir === 'bite' || this.slashDir === 'paw') {
       // 'bite' : le Loup reste jusqu'au bout du coup, même Maj relâchée
       // (sinon Agarica apparaîtrait à la place du loup, crocs encore affichés).
       this.setForm('wolf');
+    } else if (sprinting || (this.wolfJumpCarry && this.jumpsUsed < 2)) {
+      // Forme au sol du sprint : loup ou grizzly (cf. sprintForm).
+      this.setForm(this.sprintForm === 'grizzly' ? 'grizzly' : 'wolf');
     } else {
       this.setForm('agarica');
     }
@@ -2434,6 +2556,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       && this.monkeyTransfoReverseKey && this.form === 'agarica' && wasMonkeyForm) {
       const tcfg = this.monkeyTransfoCfg;
       this.beginFormTransition(now, this.monkeyTransfoReverseKey, MONKEY_TRANSFO_MS, tcfg.scale, tcfg.body, MONKEY_FACES_RIGHT);
+    } else if (!transitionTriggeredThisFrame && !this.formTransitionActive && !swimming && !this.skillTransformActive
+      && this.form !== prevForm && typeof ursideFormTransfo === 'function') {
+      // Grizzly / ours-hibou : transformation dessinée seulement quand leur
+      // vraie feuille existe (rangée `transform`), à l'aller comme au retour ;
+      // avec les images provisoires, bascule nette + éclat.
+      const bear = (id) => id === 'grizzly' || id === 'owlbear';
+      const ut = bear(this.form) ? ursideFormTransfo(this.scene, this.form, false)
+        : this.form === 'agarica' && bear(prevForm) ? ursideFormTransfo(this.scene, prevForm, true) : null;
+      if (ut) this.beginFormTransition(now, ut.key, ut.ms, ut.scale, ut.body, true);
     }
 
     // Compétence avec art dédié (cf. SKILL_DEFS.ours, `animKey`) en cours :
@@ -2444,7 +2575,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // à (0.5, 1) chaque frame AVANT les blocs ci-dessous, qui supposent tous
     // les pieds à l'origine ; la branche liane la repose si besoin.
     this.resetVineArtAnchor();
-    const activeSkillDef = this.activeSkillId ? SKILL_DEFS[this.activeSkillId] : null;
+    const activeSkillDef = skillDefOf(this.activeSkillId);
     const skillArtActive = !!(this.skillTransformActive && activeSkillDef && activeSkillDef.animKey);
 
     // Le sprite humain fait face à gauche par défaut, le Loup et l'Aigle
@@ -2457,7 +2588,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       ? this.formTransitionFacesRight
       : skillArtActive
         ? activeSkillDef.facesRight
-        : (this.form === 'wolf' || this.form === 'eagle' || (this.form === 'monkey' && MONKEY_FACES_RIGHT));
+        : (this.form === 'wolf' || this.form === 'eagle' || this.form === 'grizzly' || this.form === 'owlbear'
+          || (this.form === 'monkey' && MONKEY_FACES_RIGHT));
     this.setFlipX(defaultFacesRight ? this.facingDir < 0 : this.facingDir > 0);
 
     if (this.formTransitionActive) {
@@ -2663,6 +2795,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           const mc = agaricaSheetPoseConfig(this.scene, 'singe', monkeyAnim, { method: 'area' });
           this.applyBodyForScale(mc.scale, mc.body);
         }
+      } else if (this.form === 'grizzly') {
+        // Course, charge et saut du grizzly (vraie feuille ou image provisoire).
+        ursideGrizzlyPose(this, now, { onGround, dir });
+      } else if (this.form === 'owlbear') {
+        ursideOwlbearPose(this);
       } else if (this.form === 'octopus') {
         // Pas d'attaque du tout pour cette forme (cf. le garde-fou
         // `this.form !== 'octopus'` sur le déclenchement plus haut) --
@@ -2776,9 +2913,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const cy = this.y - 38;
     const color = FORM_FX_COLORS[to] || 0x8fe3b8;
     playSfx(`transform_${to}`, { from });
-    if (to === 'wolf' || (from === 'wolf' && to === 'agarica')) {
+    // (Grizzly : comme le loup, il va et vient avec [Maj].)
+    const groundSide = GROUND_FORM_IDS.includes(to) ? to : (GROUND_FORM_IDS.includes(from) && to === 'agarica' ? from : null);
+    if (groundSide) {
       spawnFx(sc, 'land', this.x, this.y, { power: 0.45 });
-      spawnFx(sc, 'star', this.x, cy, { count: 4, tint: [FORM_FX_COLORS.wolf, 0xffffff], power: 0.8 });
+      spawnFx(sc, 'star', this.x, cy, { count: 4, tint: [FORM_FX_COLORS[groundSide], 0xffffff], power: 0.8 });
       return;
     }
     if (to === 'monkey' && this.vine) return; // gerbe de feuilles déjà faite à la prise
@@ -2790,7 +2929,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     }
     spawnFx(sc, 'transform', this.x, cy, { color, size: 0.85 });
     if (to === 'monkey') spawnFx(sc, 'leaves', this.x, cy, { count: 8 });
-    if (to === 'eagle') spawnFx(sc, 'feathers', this.x, cy, { count: 6, power: 1.3 });
+    if (to === 'eagle' || to === 'owlbear') spawnFx(sc, 'feathers', this.x, cy, { count: 6, power: 1.3 });
   }
 
   // L'arc d'un coup qui heurte le décor (mur, plafond, sol en coup vers le
@@ -2842,6 +2981,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   setForm(form) {
     if (this.form === form) return;
     this.form = form;
+    // Forme d'ours débloquée en cours de jeu : son image provisoire (Ursides.js).
+    if (typeof ursideEnsureForm === 'function') ursideEnsureForm(this.scene, form);
 
     const cfg = FORMS[form];
     this.setScale(cfg.scale);
@@ -2956,6 +3097,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const skillId = this.skillSlots[slotIndex];
     if (!skillId || now < this.skillCooldownEndTime) return;
     const def = SKILL_DEFS[skillId];
+    if (!def) return;
+    // Compétence sans effet ici : ni coût ni délai, l'icône refuse. `groundOnly`
+    // (panda, ours polaire : pas en l'air) ; `canActivate` (panda : cœurs pleins),
+    // avec sa raison en clair (`denyText`).
+    const refused = typeof def.canActivate === 'function' && !def.canActivate(this);
+    if (refused || (def.groundOnly && !this.onGround)) {
+      juiceHudDeny(this.scene);
+      if (refused && def.denyText && typeof showToast === 'function') showToast(this.scene, def.denyText, 1400);
+      return;
+    }
     if (this.energy < def.cost) {
       // Retour visuel : la barre d'énergie tremble (juice, HUD).
       juiceHudDeny(this.scene);
@@ -2974,6 +3125,18 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       def.onActivate(this, now);
       return;
     }
+    this.beginSkill(skillId, now);
+  }
+
+  // Lance la transformation, l'animation et la zone de dégâts d'une compétence
+  // (SKILL_DEFS ou INTERNAL_SKILL_DEFS), sans rien vérifier ni faire payer :
+  // tryActivateSkill pour les touches A/F/R, ou le jeu lui-même (fracas de
+  // l'ours-hibou à l'atterrissage).
+  beginSkill(skillId, now) {
+    const def = skillDefOf(skillId);
+    if (!def) return;
+    // Image provisoire d'un ours recoloré : fabriquée au premier lancer.
+    if (typeof ursideEnsureSkillArt === 'function') ursideEnsureSkillArt(this.scene, def);
     // Léger cooldown propre à la compétence (pas juste borné par le coût en
     // énergie) : évite un spam à 2 activations la même frame si jamais le
     // coût devient très faible plus tard (totems ?).
@@ -2982,8 +3145,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.skillTransformActive = true;
     this.skillTransformEndTime = now + def.transformDurationMs;
     this.activeSkillId = skillId;
-    // Juice : éclat de transformation (ours : brun doré).
-    spawnFx(this.scene, 'transform', this.x, this.y - 40, { color: skillId === 'ours' ? 0xd9a441 : (def.hudColor || 0x8fe3b8), size: 1 });
+    // Juice : éclat de transformation (ours : brun doré). Pas pour une
+    // compétence interne : elle part d'une forme déjà prise.
+    if (!def.internal) {
+      spawnFx(this.scene, 'transform', this.x, this.y - 40, { color: skillId === 'ours' ? 0xd9a441 : (def.hudColor || 0x8fe3b8), size: 1 });
+    }
     if (def.animKey) {
       // Art dédié (cf. SKILL_DEFS.ours) : le vrai changement de
       // texture/anim se fait dans update() (branché sur skillTransformActive
@@ -3011,16 +3177,30 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // hauteur de la zone (donc "monte" depuis le sol). `skillSizeMultiplier`
     // (cf. recomputeTotemBonuses) grossit la zone selon les totems "dégâts"
     // équipés -- 1 si aucun.
+    // Compétence sans zone de dégâts propre (panda, ours polaire : ses pics
+    // sont des objets à part) : seulement son départ (`onStart`).
+    if (!def.hitboxWidth) {
+      this.skillHitboxId = null;
+      this.skillHitboxRect = null;
+      this.skillHitboxPendingRect = null;
+      this.skillActiveUntil = now;
+      if (typeof def.onStart === 'function') def.onStart(this, now);
+      return;
+    }
+    // Palier 3 des ursidés (cf. Familles.js) : fracas d'ours plus larges.
+    const size = this.skillSizeMultiplier * (def.family === 'ursides' ? this.bearSizeMultiplier : 1);
     const dir = this.facingDir >= 0 ? 1 : -1;
     const centerX = this.x + dir * def.hitboxOffsetX;
-    const w = def.hitboxWidth * this.skillSizeMultiplier;
-    const h = def.hitboxHeight * this.skillSizeMultiplier;
+    const w = def.hitboxWidth * size;
+    const h = def.hitboxHeight * size;
     const rect = new Phaser.Geom.Rectangle(centerX - w / 2, this.y - h, w, h);
     // `hitboxDelayMs` (cf. SKILL_DEFS.ours) repousse seulement l'ACTIVATION
     // de la zone (cf. update()), pas sa position -- figée ici, au moment du
     // cast, comme avant.
     const delay = def.hitboxDelayMs || 0;
-    this.skillHitboxId = skillId;
+    // `hitboxKind` : ce fracas compte comme celui d'une autre compétence
+    // (ours-hibou -> 'ours' : blocs cassables et amas de mousse y réagissent).
+    this.skillHitboxId = def.hitboxKind || skillId;
     if (delay > 0) {
       this.skillHitboxRect = null;
       this.skillHitboxPendingRect = rect;
@@ -3030,6 +3210,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.skillHitboxPendingRect = null;
     }
     this.skillActiveUntil = now + delay + def.hitboxDurationMs;
+    if (typeof def.onStart === 'function') def.onStart(this, now);
   }
 
   // Recalcule maxHearts/maxEnergy/skillSizeMultiplier à partir de
@@ -3055,7 +3236,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // Cœurs entiers ramassés (coffres, trésors, marchand : registre
     // `heartUpgrades`, cf. heartUpgradeCount dans SecretKit.js).
     const upgrades = typeof heartUpgradeCount === 'function' ? heartUpgradeCount() : 0;
-    this.maxHearts = HEART_MAX + bonus.heartBonus + storyHeartBonus + upgrades;
+    // Passifs de famille (cf. Familles.js), comptés sur les animaux ÉQUIPÉS.
+    // Ursidés : 2 -> +1 cœur, 3 -> fracas d'ours plus larges, 4 -> plus de
+    // recul sous les coups. Sans ours équipé en plus : rien ne change.
+    const fam = typeof familyPassiveStats === 'function' ? familyPassiveStats(this) : { hearts: 0, bearSize: 0, steadfast: false };
+    this.bearSizeMultiplier = 1 + (fam.bearSize || 0);
+    this.knockbackImmune = !!fam.steadfast;
+    this.familySig = typeof familyTeamSignature === 'function' ? familyTeamSignature(this) : null;
+    this.maxHearts = HEART_MAX + bonus.heartBonus + storyHeartBonus + upgrades + (fam.hearts || 0);
     this.maxEnergy = ENERGY_MAX + bonus.energyBonus;
     this.skillSizeMultiplier = 1 + bonus.skillSizeBonus;
     this.hearts = Math.min(this.hearts, this.maxHearts);
@@ -3076,7 +3264,61 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     return !!this[FORM_FLAG_BY_ID[id]];
   }
 
-  // Forme aérienne réellement utilisable ('eagle' | 'monkey' | null).
+  // Forme au sol réellement utilisable ('wolf' | 'grizzly' | null).
+  getActiveGroundForm() {
+    const id = GROUND_FORM_IDS.find((g) => this.equippedForms.includes(g));
+    return id && this.isFormUnlocked(id) ? id : null;
+  }
+
+  // Grizzly lancé en charge (au-delà du seuil de vitesse, cf. Ursides.js).
+  isGrizzlyCharging() {
+    return !!this.grizzlyCharging && this.form === 'grizzly';
+  }
+
+  // Percussion du grizzly en charge (mur, ou gros ennemi : cf.
+  // ursideChargeContact) : la forme casse, Agarica est projetée en diagonale,
+  // vers le haut et l'arrière, sans perdre de cœur (courte invulnérabilité).
+  // L'impact frappe devant lui (ennemis, blocs cassables de l'ours).
+  grizzlyCrash(now, dir, opts = {}) {
+    const T = GRIZZLY_TUNING;
+    const b = this.body;
+    this.grizzlyCharging = false;
+    this.grizzlyRamp = 0;
+    this.wolfSprintActive = false;
+    this.wolfJumpCarry = false;
+    this.tapSprintDirection = null;
+    this.groundFormLocked = true;
+    this.controlLockUntil = now + T.crashLockMs;
+    // Comme après un premier saut : le 2e saut (forme aérienne) reste possible.
+    this.jumpsUsed = 1;
+    this.airJumpForm = null;
+    this.jumpCutArmed = false;
+    // Élan de la projection gardé jusqu'au sol (même mécanisme que le lâcher
+    // de liane : vitesse max relevée, frein de l'air réduit).
+    this.vineMomentumSpeed = T.crashVx;
+    b.maxVelocity.x = Math.max(b.maxVelocity.x, T.crashVx);
+    this.setAccelerationX(0);
+    this.setVelocity(-dir * T.crashVx, T.crashVy);
+    this.grantStoryInvulnerability(T.crashInvulnMs, { blink: false });
+    const size = this.bearSizeMultiplier || 1;
+    const w = T.impactW * size;
+    const h = T.impactH * size;
+    const x = dir > 0 ? b.right - 12 : b.left + 12 - w;
+    this.grizzlyImpact = {
+      rect: new Phaser.Geom.Rectangle(x, b.bottom - h, w, h), until: now + T.impactMs, token: `charge-${this.grizzlyChargeId}`,
+    };
+    ursideCrashFx(this, dir > 0 ? b.right : b.left, b.center.y);
+    this.scene.events.emit('grizzly-crash', { player: this, dir, enemy: opts.enemy || null });
+  }
+
+  // Zone d'impact de la percussion en cours, ou null (lue par SecretKit :
+  // elle casse les blocs de l'ours).
+  getGrizzlyImpactRect() {
+    const imp = this.grizzlyImpact;
+    return imp && this.scene.time.now < imp.until ? imp.rect : null;
+  }
+
+  // Forme aérienne réellement utilisable ('eagle' | 'monkey' | 'owlbear' | null).
   getActiveAirForm() {
     return this.airForm && this.isFormUnlocked(this.airForm) ? this.airForm : null;
   }
@@ -3109,7 +3351,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   applyAirForm(id) {
     this.airForm = AIR_FORM_IDS.includes(id) ? id : null;
     const slots = [
-      this.equippedForms.includes('wolf') ? 'wolf' : null,
+      GROUND_FORM_IDS.find((g) => this.equippedForms.includes(g)) || null,
       this.airForm,
       this.equippedForms.includes('octopus') ? 'octopus' : null,
     ];
@@ -3126,10 +3368,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.applyAirForm(id);
       return;
     }
-    const slotIdx = id === 'wolf' ? 0 : id === 'octopus' ? 2 : -1;
-    if (slotIdx === -1) return;
-    const next = this.equippedForms.slice();
-    next[slotIdx] = id;
+    // Sol : le grizzly remplace le loup et inversement.
+    const ground = GROUND_FORM_IDS.includes(id);
+    if (!ground && id !== 'octopus') return;
+    const next = this.equippedForms.filter((f) => f && f !== id && !(ground && GROUND_FORM_IDS.includes(f)));
+    next.push(id);
     this.equippedForms = next;
     this.applyAirForm(this.airForm);
   }
@@ -4276,6 +4519,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.wolfSprintActive = false;
     this.tapSprintDirection = null;
     this.wolfJumpCarry = false;
+    this.grizzlyCharging = false;
+    this.grizzlyRamp = 0;
+    this.pandaHealAt = 0;
+    this.iceCastAt = 0;
     this.formTransitionActive = false;
     this.jumpBufferedAt = -Infinity;
     this.monkeyReleasePoseUntil = 0;
@@ -4288,7 +4535,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // normale dans update() (origine, teinte du repli sans art). Sa zone de
     // dégâts n'agit de toute façon pas pendant le gel.
     if (this.skillTransformActive) {
-      const def = SKILL_DEFS[this.activeSkillId];
+      const def = skillDefOf(this.activeSkillId);
       this.skillTransformActive = false;
       this.activeSkillId = null;
       this.skillHitboxRect = null;
@@ -4436,7 +4683,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.endCampfireRest();
     this.isInvulnerable = true;
     if (this.vine) this.releaseVine(false, this.scene.time.now);
-    this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;
+    // Palier 4 des ursidés (« Robustesse », cf. Familles.js) : elle encaisse
+    // sans reculer -- ni arrêt net, ni bascule en arrière, ni pose de douleur ;
+    // elle garde son élan. Le cœur perdu, le flash et l'invulnérabilité restent.
+    const steady = !!this.knockbackImmune;
+    if (!steady) this.hurtPoseUntil = this.scene.time.now + HURT_POSE_MS;
+    // Panda dérangé pendant son repas : pas de cœur rendu, la compétence s'arrête.
+    if (this.pandaHealAt) {
+      this.pandaHealAt = 0;
+      if (this.activeSkillId === 'panda') this.skillTransformEndTime = this.scene.time.now;
+    }
     this.hearts -= 1;
     this.scene.registry.set('hearts', this.hearts);
     // Juice (visuel seul, la vitesse reste remise à 0 comme avant) : flash
@@ -4448,15 +4704,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.tintFill = false;
       this.setTint(0xff4d6d);
     });
-    juiceTilt(this, -(this.facingDir >= 0 ? 1 : -1) * 0.2, 280);
+    if (!steady) juiceTilt(this, -(this.facingDir >= 0 ? 1 : -1) * 0.2, 280);
     juiceSquash(this, 0.92, 1.06, 220);
     juiceHitStop(this.scene, 60);
     juiceShake(this.scene, 'medium');
     juiceHurtVignette(this.scene);
     spawnFx(this.scene, 'spark', this.x, this.y - 40, { count: 9, tint: [0xff4d6d, 0xff9fc9, 0xffffff], power: 0.8 });
     playSfx('player_hurt');
-    this.setVelocity(0, 0);
     const depleted = this.hearts <= 0;
+    if (!steady || depleted || opts.fall) this.setVelocity(0, 0);
     // Dernier cœur perdu : signalé aux scripts de zone (boss : remise à zéro
     // du combat). Le registre seul ne suffit pas : son 1er `set('hearts')`
     // émet 'setdata' et non 'changedata-hearts'.
@@ -4517,7 +4773,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       if (respawnLater) this.reviveAtSpawn();
       // Pas après une chute (elle a déjà repris la main au point de reprise)
       // ni en pleine chute dans le vide (elle doit sortir de l'écran).
-      if (!opts.fall && !this.fallingOut) this.setVelocity(0, 0);
+      if (!opts.fall && !this.fallingOut && (depleted || !this.knockbackImmune)) this.setVelocity(0, 0);
       this.clearTint();
       // Correctif : 300 ms d'invulnérabilité laissaient une salve (pierres de
       // Kainati) enlever 3 cœurs d'affilée. Elle dure maintenant

@@ -143,6 +143,7 @@ class Ghilt extends Phaser.Physics.Arcade.Sprite {
     this.tempo = this.phase === 2 ? 0.8 : 1;
 
     this.corrupted = true; // contrat : la compétence papillon appelle heal()
+    this.heavy = true; // gros ennemi : il arrête la charge du grizzly (Ursides.js)
     this.isBoss = true;
     this.defeated = false;
     this.healed = false;

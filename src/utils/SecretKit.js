@@ -1178,11 +1178,13 @@ function breakablesUpdate(scene) {
   const extend = (r) => (r ? new Phaser.Geom.Rectangle(r.x, r.y, r.width, r.height + SECRET_BEAR_REACH_DOWN) : null);
   const bear = extend(bearRect);
   const bearSoon = extend(bearPending);
+  // Percussion du grizzly en charge (Ursides.js) : casse aussi les blocs de l'ours.
+  const crash = typeof p.getGrizzlyImpactRect === 'function' ? p.getGrizzlyImpactRect() : null;
   const view = scene.cameras.main.worldView;
   for (const b of st.breakables) {
     if (b.broken) continue;
-    if (bear) {
-      const hit = secretHitPoint(b, bear);
+    if (bear || crash) {
+      const hit = (bear && secretHitPoint(b, bear)) || (crash && secretHitPoint(b, crash));
       if (hit) { secretBreak(scene, b, { cause: 'bear', x: hit.x, y: hit.y }); continue; }
     }
     if (bearSoon && !b.trembled && secretHitPoint(b, bearSoon)) {

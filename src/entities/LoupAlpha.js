@@ -43,6 +43,8 @@ class LoupAlpha extends Phaser.Physics.Arcade.Sprite {
     this.hp = 3;
     this.maxHp = 3;
     this.defeated = false;
+    // Gros ennemi : il arrête la charge du grizzly (cf. Ursides.js).
+    this.heavy = true;
   }
 
   update(player) {
