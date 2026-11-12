@@ -164,6 +164,9 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   `node tools/pixelfx/export_courant.mjs assets/vfx/courant_frames`.
   Référence : `node tools/pixelfix.js agarica --height 128`. Les autres personnages se
   calent sur cette densité. Ne refaire d'autres images qu'avec l'accord de l'utilisateur.
+  **Toute NOUVELLE image générée** (Codex) passe dans pixel-fixer juste après son import
+  (accord permanent de l'utilisateur, 2026-11-12), au grain de sa catégorie, aperçu d'abord.
+  Les quatre ours du prompt n°14 : `bash tools/pixelfix_ours.sh`.
 
 ## Direction artistique
 

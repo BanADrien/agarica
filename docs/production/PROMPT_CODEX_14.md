@@ -236,8 +236,11 @@ existe (`hasManifestArt`), rangée par rangée :
   `transform`.
 
 Les icônes sont prises par le menu du feu (`item-skill_icone_<id>`, `item-form_icone_<id>`) et par le
-HUD. Ensuite, comme pour les autres formes : `bash tools/pixelfix_formes.sh` (à compléter avec ces
-quatre ids) pour les mettre au grain des formes d'Agarica — avec l'accord de l'utilisateur.
+HUD.
+
+**Ensuite, obligatoire** (demande de l'utilisateur du 2026-11-12) : passer les nouvelles images dans
+pixel-fixer, au grain des autres formes d'Agarica : `bash tools/pixelfix_ours.sh` (regarder d'abord
+un aperçu avec `--preview`, voir l'en-tête du script).
 
 **Échelle** : `scale: 0.4` au manifeste suppose les tailles du tableau ci-dessus. Si les feuilles
 livrées sont plus grandes ou plus petites, corriger `scale` dans le manifeste (seule valeur à ajuster).
