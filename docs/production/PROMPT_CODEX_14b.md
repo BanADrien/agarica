@@ -1,99 +1,110 @@
 # Prompt Codex n°14b — propositions de design des ours (2026-11-13)
 
 Demande de l'utilisateur : « fais-moi des propositions de design au lieu de faire les feuilles
-d'animation direct ». On choisit d'abord le dessin de chaque ours sur une planche de variantes ;
-les feuilles d'animation (prompt n°14) ne se font qu'ensuite, d'après la variante retenue.
+d'animation direct », puis « à chaque asset que je demande tu me montres 3 versions différentes ».
+On choisit d'abord le dessin de chaque ours sur une planche ; les feuilles d'animation (prompt n°14)
+ne se font qu'ensuite, d'après la proposition retenue.
 
-**Méthode à garder pour tout nouvel animal** : une planche de 3 DESIGNS VRAIMENT DIFFÉRENTS (trois
-idées : couleurs, motifs, tête, silhouette ; jamais trois fois le même dessin avec une autre carrure,
-sauf si l'utilisateur a demandé de garder le dessin), une seule pose debout de profil, puis le choix de l'utilisateur (une variante, ou un mélange : « la tête de A, le corps de C »),
-puis seulement les animations.
+**Méthode à garder pour tout asset** : une planche de 3 DESIGNS VRAIMENT DIFFÉRENTS (trois idées :
+couleurs, motifs, tête, silhouette ; jamais trois fois le même dessin avec une autre carrure), une
+seule pose debout de profil, puis le choix de l'utilisateur (une proposition, ou un mélange), puis
+seulement l'asset final.
 
-4 planches, une par ours encore en discussion. Le panda est validé (pas de planche).
+## Historique des planches
+
+| Planche | Résultat |
+|---|---|
+| `propositions/ours_hibou.png` | refusée : trois fois le même animal, tête de rapace (« ressemble à rien ») |
+| `propositions/ours_hibou_v2.png` | la proposition C (lunaire : violet nuit, plumes à pointes lumineuses, voûté) est RETENUE pour le corps ; mais « la tête est horrible » : à refaire en 3 têtes et 3 jeux de couleurs |
+| `propositions/grizzly.png`, `ours_brun.png`, `ours_polaire.png` | à refaire : elles ne variaient que la carrure |
+
+## Planches en cours (troisième série)
 
 | # | Image | Ours | Ce qui varie |
 |---|---|---|---|
-| 1 | `docs/production/controles/lot_14/propositions/ours_hibou_v2.png` | ours-hibou | TROIS DESIGNS différents (couleurs, plumage, tête, silhouette) ; la première planche, trois fois le même animal, a été refusée |
-| 2 | `docs/production/controles/lot_14/propositions/grizzly.png` | grizzly | la carrure seulement (dessin et couleurs gardés) |
-| 3 | `docs/production/controles/lot_14/propositions/ours_brun.png` | ours brun | la carrure seulement (dessin et couleurs gardés) |
-| 4 | `docs/production/controles/lot_14/propositions/ours_polaire.png` | ours polaire | le dos et la silhouette |
+| 1 | `docs/production/controles/lot_14/propositions/ours_hibou_v3.png` | ours-hibou | la TÊTE et les COULEURS, sur le corps de la proposition C |
+| 2 | `docs/production/controles/lot_14/propositions/grizzly_v2.png` | grizzly | trois designs (A reste proche du dessin actuel) |
+| 3 | `docs/production/controles/lot_14/propositions/ours_brun_v2.png` | ours brun | trois designs (A reste proche du dessin actuel) |
+| 4 | `docs/production/controles/lot_14/propositions/ours_polaire_v2.png` | ours polaire | trois designs |
 
-Les variantes se lisent de gauche à droite : A, B, C. Les lettres sont ajoutées après coup par
-`montage` (aucun texte dans les images générées).
+Les propositions se lisent de gauche à droite : A, B, C. Les lettres sont ajoutées après coup par
+`python tools/planche_abc.py` (aucun texte dans les images générées).
 
 ## Prompt à coller dans Codex
 
 ```
-Commande d'images pour « Legend of Agarica » (prompt n°14b) : 4 PLANCHES DE PROPOSITIONS DE DESIGN. Ce ne sont pas des feuilles d'animation : chaque planche montre TROIS VARIANTES du même animal, dans la même pose, pour que l'utilisateur choisisse.
+Commande d'images pour « Legend of Agarica » (prompt n°14b, troisième série) : 4 PLANCHES DE PROPOSITIONS DE DESIGN. Ce ne sont pas des feuilles d'animation : chaque planche montre TROIS PROPOSITIONS pour un même animal, dans la même pose, pour que l'utilisateur choisisse.
 
 RÈGLES
-- N'écris que dans docs/production/controles/lot_14/propositions/ (crée le dossier). Ne touche à aucun fichier de assets/ ni de src/. Ne lance aucun import.
+- N'écris que dans docs/production/controles/lot_14/propositions/. Ne touche à aucun fichier de assets/ ni de src/. Ne remplace aucune planche existante de ce dossier. Ne lance aucun import.
 - Fond transparent (alpha réel). Aucun texte, aucune lettre, aucun chiffre, aucune flèche, aucun cadre, aucune ligne de sol, aucune ombre portée.
-- Chaque planche : 1536 x 1024 px, UNE rangée de 3 cases de 512 px de large. Dans chaque case, UN animal entier, debout sur ses quatre pattes, vu de profil strict, tourné vers la DROITE, pattes posées sur la même ligne dans les trois cases, au moins 40 px de vide entre deux animaux.
-- Les trois variantes sont à la MÊME ÉCHELLE de dessin : si l'une est plus massive, elle doit paraître plus grosse sur la planche.
-- Les trois variantes doivent être NETTEMENT différentes entre elles sur les points demandés (pas trois fois le même dessin), mais rester le même animal.
+- Chaque planche : 1536 x 1024 px, UNE rangée de 3 cases de 512 px de large. Dans chaque case, UN animal entier, debout sur ses quatre pattes, vu de profil strict, tourné vers la DROITE, pattes posées sur la même ligne dans les trois cases, au moins 40 px de vide entre deux animaux, les trois à la même échelle de dessin.
+- TROIS PROPOSITIONS VRAIMENT DIFFÉRENTES par planche : trois idées, pas un même dessin décliné. Elles doivent se distinguer au premier coup d'œil par les couleurs, les marques, la tête et la silhouette.
+- Des animaux BEAUX et expressifs, qu'on a envie de jouer : têtes soignées, bien proportionnées, lisibles ; jamais un collage maladroit de deux animaux.
 - Aucun vêtement, aucune cape, aucun accessoire. Seul rappel de la druidesse Agarica : le regard vert lunaire (#8fe3b8, sans pupille).
 - MÊME STYLE GRAPHIQUE pour les quatre planches : celui de docs/production/controles/lot_14/ref_v2/grizzly.png (fourrure en mèches, contour sombre, paliers d'ombre nets, griffes, niveau de détail).
 
 RÉFÉRENCES À JOINDRE
 - Style : docs/production/controles/lot_14/ref_v2/grizzly.png.
-- Dessins de la livraison précédente : docs/production/controles/lot_14/ref_v2/ours_fracas.png (ours brun), ours_hibou.png, ours_polaire.png, panda.png (validé, pour la cohérence de la famille).
+- Ours-hibou retenu pour le corps : docs/production/controles/lot_14/propositions/ours_hibou_v2.png, l'animal de DROITE (violet nuit, plumes à pointes vert lunaire, croissant sur le front).
+- Dessins actuels, pour la proposition A du grizzly et de l'ours brun : docs/production/controles/lot_14/ref_v2/grizzly.png et ref_v2/ours_fracas.png.
+- Panda validé, pour la cohérence de la famille : docs/production/controles/lot_14/ref_v2/panda.png.
 
 BLOC COMMUN (remplace [STYLE] par le bloc complet ci-dessous, dans chaque prompt)
 
 [STYLE] =
-Design proposal sheet for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines, flat saturated fills with 2-3 tone cel shading, fur drawn in tufts, visible chunky pixel texture, clean readable silhouettes, light from the upper left. Strict side view. Canvas 1536 x 1024 px, fully transparent background, exactly ONE horizontal row of THREE animals in three invisible cells of 512 px, each animal whole, standing on all fours, facing RIGHT, feet on the same baseline, at least 40 px of empty space between animals, all three at the same drawing scale. Glowing moonlit-green eyes (#8fe3b8, no pupil). No clothing, no cloak, no accessory. No text, no letters, no arrows, no frame, no ground line, no cast shadow.
+Design proposal sheet for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines, flat saturated fills with 2-3 tone cel shading, fur drawn in tufts, visible chunky pixel texture, clean readable silhouettes, light from the upper left. Strict side view. Canvas 1536 x 1024 px, fully transparent background, exactly ONE horizontal row of THREE animals in three invisible cells of 512 px, each animal whole, standing on all fours, facing RIGHT, feet on the same baseline, at least 40 px of empty space between animals, all three at the same drawing scale. Appealing, well-proportioned, expressive heads. Glowing moonlit-green eyes (#8fe3b8, no pupil). No clothing, no cloak, no accessory. No text, no letters, no arrows, no frame, no ground line, no cast shadow.
 
 
-1) docs/production/controles/lot_14/propositions/ours_hibou_v2.png (1536 x 1024, 3 designs)
-L'ours-hibou, deuxième essai. La première planche (ours_hibou.png) est REFUSÉE : trois fois le même animal, et une tête de rapace. Ici, TROIS DESIGNS VRAIMENT DIFFÉRENTS : trois idées d'animal, avec des couleurs, des plumages, des têtes et des silhouettes différentes. Ne varie pas seulement la carrure.
-Commun aux trois : c'est un OURS (corps, fourrure, quatre grosses pattes à griffes), le plus imposant de sa famille ; une vraie TÊTE D'OURS (crâne rond, joues, front, petits yeux d'ours) où seul le bout du museau est remplacé par un bec ; des aigrettes de hibou à la place des oreilles ; des plumes sur l'arrière des pattes avant, comme de petites ailes. Il ne vole pas.
+1) docs/production/controles/lot_14/propositions/ours_hibou_v3.png (1536 x 1024, 3 propositions)
+L'ours-hibou, troisième essai. L'utilisateur a RETENU le corps de la proposition C de la planche précédente (ours_hibou_v2.png, l'animal de droite) : un ours énorme et voûté, épaules plus hautes que la tête, manteau de plumes sombres à pointes lumineuses sur les épaules, les bras et le dos. Mais sa TÊTE était « horrible » (une tête d'ours avec un bec collé au bout). Ici : le MÊME CORPS dans les trois cases, avec TROIS TÊTES DIFFÉRENTES et TROIS JEUX DE COULEURS DIFFÉRENTS.
+Obligatoire dans les trois, et absent de la planche précédente : (1) des OREILLES DE HIBOU, deux grandes aigrettes de plumes bien visibles, PAS d'oreilles rondes d'ours ; (2) des plumes sur l'ARRIÈRE des pattes avant, de l'épaule au poignet, qui pendent comme une petite AILE repliée.
 Prompt :
 [STYLE]
-THREE COMPLETELY DIFFERENT DESIGNS OF AN OWLBEAR: three different creatures, not one creature drawn three times. They must differ in COLORS, in PLUMAGE PATTERN, in HEAD and in SILHOUETTE. Common to all three: a huge heavy BEAR covered in fur, four massive bear legs with big clawed paws, a short bear tail. THE HEAD IS A BEAR'S HEAD: a round furry bear skull with a bear's forehead, cheeks and small eyes set like a bear's (glowing green); it must NOT be a bird of prey head, NOT an eagle or griffin head. Only the tip of the bear's muzzle is replaced by a beak. Owl ear tufts instead of round ears. Feathers on the back edge of the front legs, like small wings attached to the arms. It does not fly.
-Design A (left) - GREAT HORNED OWLBEAR: very dark umber and black-brown fur, mottled with small cream and rust speckles like bark. A short thick dark-grey beak on a broad bear muzzle. Two long horn-like ear tufts pointing up and outward. On the arms, broad rounded feathers barred black and rust, and the same feathers as a heavy cape over the shoulders. The widest and lowest of the three: a boulder of a bear.
-Design B (middle) - BARN OWLBEAR: pale golden-buff fur on the back sprinkled with tiny grey dots, pure cream-white belly, chest and legs. A slim ivory beak on a long narrow bear muzzle. Two small soft ear tufts. On the arms, long narrow elegant feathers, golden with white tips, hanging like a folded wing, and a short fan of the same feathers at the tail. The tallest and longest-legged of the three: upright shoulders, a long neck.
-Design C (right) - MOON OWLBEAR: night-violet and slate-blue fur (#3a3558, #56507a, shadows #221f38) with a pale crescent-moon mark on the forehead. A hooked silver beak on a heavy square bear muzzle. Two tall swept-back ear tufts. On the arms and along the spine, dark feathers whose tips GLOW moonlit green (#8fe3b8), like runes; a thick feathered ruff around the neck like a lion's mane. The most hunched of the three: shoulders higher than the head, a wild guardian spirit.
-Output: one PNG, 1536 x 1024 px, transparent background, exactly three owlbears in one row, clearly three different creatures.
+THREE PROPOSALS FOR AN OWLBEAR, the most imposing bear of its family. THE BODY IS THE SAME IN ALL THREE: copy the body of the rightmost creature of the reference ours_hibou_v2.png: a huge hunched bear, shoulders higher than the head, thick fur, four massive bear legs with big clawed paws, a mantle of dark layered feathers with glowing tips over the shoulders and back. In all three: TWO TALL OWL EAR TUFTS made of feathers (no round bear ears), and long feathers on the BACK EDGE of each front leg from shoulder to wrist, hanging like a small folded wing. It does not fly. WHAT CHANGES: the HEAD and the COLORS. Each head must be handsome, coherent and expressive, never a bear face with a beak glued on.
+Proposal A (left) - NIGHT VIOLET, WISE HEAD: night-violet and slate-blue fur (#3a3558, #56507a), feather tips glowing moonlit green (#8fe3b8). HEAD: a broad noble bear head whose whole muzzle is one smooth, short, curved beak of dark horn that flows out of the fur of the cheeks (like a tortoise or parrot beak, upper and lower jaw), heavy feathered brows that sweep up into the two ear tufts, calm deep-set eyes.
+Proposal B (middle) - MIDNIGHT BLUE, OWL-EYED HEAD: deep midnight-blue and teal fur (#1f2f4a, #2f5566), feather tips glowing pale silver-white (#e6f1ff). HEAD: a rounder bear head with a short snout, two large round expressive eyes ringed by a dark feather mask (around the eyes only, not a full owl disc), a small neat pale beak between them, tall pointed ear tufts; alert, almost gentle.
+Proposal C (right) - CHARCOAL AND ROSE, MASKED HEAD: charcoal-black fur (#24222c, #3a3742), feather tips glowing rose pink (#ff9fc9). HEAD: a fierce bear head wearing a natural bone-white beak that covers the muzzle and rises between the eyes like a mask (part of the animal, not an object), narrow glowing eyes, long ragged ear tufts swept backward; a wild guardian spirit.
+Output: one PNG, 1536 x 1024 px, transparent background, exactly three owlbears in one row: same body, three different heads and color schemes.
 
-2) docs/production/controles/lot_14/propositions/grizzly.png (1536 x 1024, 3 variantes)
-Le grizzly : MÊME DESSIN ET MÊMES COULEURS que la référence ref_v2/grizzly.png (pelage charbon presque noir, crinière d'argent, museau gris cendre, cicatrice sur le museau, griffes claires). Seule la CARRURE change : il doit être imposant, fait pour percuter, bien plus massif que l'ours brun.
+2) docs/production/controles/lot_14/propositions/grizzly_v2.png (1536 x 1024, 3 propositions)
+Le grizzly : la forme qui CHARGE et percute. Un colosse, bien plus massif que l'ours brun. Trois designs différents ; A reste proche du dessin actuel, B et C sont de nouvelles idées. Aucun ne doit ressembler à un ours brun ordinaire.
 Prompt :
 [STYLE]
-THREE BUILD VARIANTS OF THE SAME SILVERTIP GRIZZLY (copy the design and colors of the reference grizzly.png: near-black charcoal coat #24222c / #34323f, bright silver mane #c3c7d6 / #8e92a6 over the shoulders and spine, ash-grey muzzle, a pale scar across the muzzle, pale bone claws). Only the body build differs. In all three the body mass dominates the silhouette: the mane sits on a huge body.
-Variant A (left) - BISON: front-heavy, an enormous shoulder hump as the highest point, a thick neck, a low wedge head, smaller hindquarters, sloping back.
-Variant B (middle) - WALL: a square, even block of muscle: very broad chest, flat powerful back, thick legs like pillars front and rear, short tidy mane.
-Variant C (right) - CHARGER: taller, longer forelegs, a very deep chest, a lean waist, mane swept backward; built for speed and impact.
-Output: one PNG, 1536 x 1024 px, transparent background, exactly three grizzlies in one row.
+THREE DIFFERENT DESIGNS FOR A GRIZZLY, a colossal bear built to charge and ram: a giant barrel chest, enormously broad shoulders, thick legs. Three different animals: different colors, markings, heads and silhouettes.
+Proposal A (left) - SILVERTIP: the design of the reference ref_v2/grizzly.png on a heavier body: near-black charcoal coat (#24222c, #34323f), a bright silver mane over the shoulders and spine, an ash-grey muzzle, a pale scar across the muzzle, pale bone claws. Square and massive like a wall.
+Proposal B (middle) - GOLDEN HUMP: a true wild grizzly: dark coffee-brown legs and belly (#3a2416), a huge shoulder hump and back frosted with pale gold-blond guard hairs (#d9b46a), a wide dished face with a pale blond muzzle, small round ears set far apart, very long ivory claws. Front-heavy like a bison, head carried low.
+Proposal C (right) - IRONHEAD: slate-grey and steel-blue coat (#4a5360, #6b7684) with darker charcoal stripes across the shoulders, a massive head with a thick bony brow ridge and a broad flat forehead made for ramming, one torn ear, a short dark bristling crest along the neck (no long mane), heavy dark claws. The tallest at the shoulder, deep chest, lean waist.
+Output: one PNG, 1536 x 1024 px, transparent background, exactly three grizzlies in one row, clearly three different animals.
 
-3) docs/production/controles/lot_14/propositions/ours_brun.png (1536 x 1024, 3 variantes)
-L'ours brun (le premier ours du jeu) : MÊME DESSIN ET MÊMES COULEURS que la référence ref_v2/ours_fracas.png (pelage châtaigne et miel #6b4226 / #8a5a34 / #b07a48, museau miel, tête ronde, oreilles rondes). Seule la CARRURE change : un ours MOYEN, nettement plus petit et moins massif que le grizzly. Les trois doivent paraître plus petits que les grizzlis de la planche n°2 (ils n'occupent qu'environ les deux tiers de la hauteur de leur case).
+3) docs/production/controles/lot_14/propositions/ours_brun_v2.png (1536 x 1024, 3 propositions)
+L'ours brun : le premier ours du jeu (talisman du chef), celui qui frappe le sol de sa patte. Un ours MOYEN, sympathique mais puissant, nettement plus petit et moins massif que le grizzly : chacun n'occupe qu'environ les deux tiers de la hauteur de sa case. Trois designs différents ; A reste proche du dessin actuel.
 Prompt :
 [STYLE]
-THREE BUILD VARIANTS OF THE SAME FOREST BROWN BEAR (copy the design and colors of the reference ours_fracas.png: warm chestnut and honey brown fur, paler honey muzzle, big round head, round ears, dark claws). A MEDIUM-SIZED bear, clearly smaller and lighter than a grizzly: each one fills only about two thirds of its cell height. Only the body build differs.
-Variant A (left) - ROUND: short and compact, a rounded back, a round belly, short legs.
-Variant B (middle) - AGILE: leaner and a little longer-legged, a narrower chest, a lighter step, a younger look.
-Variant C (right) - STOCKY: low and wide, very short thick legs, heavy rump, a short neck.
-Output: one PNG, 1536 x 1024 px, transparent background, exactly three brown bears in one row.
+THREE DIFFERENT DESIGNS FOR A FOREST BROWN BEAR, a MEDIUM-SIZED, friendly but strong bear, clearly smaller and lighter than a grizzly: each one fills only about two thirds of its cell height. Three different animals: different colors, markings, heads and silhouettes. No mane, no hump.
+Proposal A (left) - CHESTNUT: the design of the reference ref_v2/ours_fracas.png, a little smaller: warm chestnut and honey fur (#6b4226, #8a5a34, #b07a48), a paler honey muzzle, a big round head, round ears, dark claws. Round and compact.
+Proposal B (middle) - CINNAMON: light cinnamon and sandy-blond fur (#b9824a, #dcae72) with dark chocolate legs, ears and a dark mask around the eyes, a longer narrower muzzle, a leaner body with longer legs; young and agile.
+Proposal C (right) - DARK HONEY-COLLAR: deep dark chocolate fur (#3c2616, #55381f) with a wide honey-gold crescent collar across the chest and throat and honey-gold paws, a short broad muzzle, small ears, a low stocky body with very thick forearms: a bear made to slam the ground.
+Output: one PNG, 1536 x 1024 px, transparent background, exactly three brown bears in one row, clearly three different animals.
 
-4) docs/production/controles/lot_14/propositions/ours_polaire.png (1536 x 1024, 3 variantes)
-L'ours polaire : fourrure blanche et bleu glacier (#f2fbff, #cfe8ff, ombres #7fa8d8, #3f5f96), truffe et griffes noires. Sur la livraison précédente (ref_v2/ours_polaire.png), son DOS était bizarre : une plaque gris-bleu mouchetée, comme une bosse de givre. À corriger : dos en fourrure blanche, comme le reste. AUCUNE glace, aucun cristal, aucun givre.
+4) docs/production/controles/lot_14/propositions/ours_polaire_v2.png (1536 x 1024, 3 propositions)
+L'ours polaire : il se dresse sur ses pattes arrière puis retombe, et la glace jaillit du sol (la glace est dessinée par le jeu : AUCUNE glace, aucun cristal, aucun givre sur l'animal). Trois designs différents. Dos en fourrure propre dans les trois (pas de plaque mouchetée).
 Prompt :
 [STYLE]
-THREE DESIGN VARIANTS OF A POLAR BEAR: white and pale ice-blue fur, black nose and claws, long neck, small head. In all three the BACK is covered in the same plain white fur as the rest of the body: NO frost patch, NO grey-blue speckled area, NO different texture, NO hump of ice. No ice, no icicles, no crystals anywhere.
-Variant A (left) - CLASSIC: a long smooth back line, a long neck stretched forward, the natural proportions of a real polar bear, short sleek fur.
-Variant B (middle) - SHAGGY: the same proportions with longer, thicker fur in big clean tufts along the back, the neck and the legs, all white.
-Variant C (right) - POWERFUL: heavier, a higher rump than the shoulders, a thick neck, massive forelegs, a slightly arched back, short fur.
-Output: one PNG, 1536 x 1024 px, transparent background, exactly three polar bears in one row.
+THREE DIFFERENT DESIGNS FOR A POLAR BEAR, a big powerful bear of the cold. Three different animals: different colors, markings, heads and silhouettes. In all three the back is clean fur: no frost patch, no speckled area, no ice, no icicles, no crystals anywhere.
+Proposal A (left) - PURE WHITE: snow-white fur with pale ice-blue shadows (#f2fbff, #cfe8ff, #7fa8d8), black nose and claws, a long neck and a small elegant head, a long smooth back, short sleek fur. The natural polar bear.
+Proposal B (middle) - IVORY MANE: warm ivory and cream fur (#f4ead2, #d9c7a0) with a long shaggy mane on the neck, shoulders and forelegs, a broad heavy head with a darker grey-brown muzzle, grey paws. Massive, old and battle-worn.
+Proposal C (right) - GLACIER: white fur that darkens toward the legs, the muzzle and the ears into deep glacier blue-grey (#f2fbff fading to #4f6f9a), like an arctic fox's gradient, a short thick neck, a high rump, very massive forelegs, short dense fur.
+Output: one PNG, 1536 x 1024 px, transparent background, exactly three polar bears in one row, clearly three different animals.
 
 À LA FIN
 - Ne fais ni commit ni push.
-- Termine par un bilan court en français : pour chaque planche, le fichier écrit, sa taille en pixels, et si les trois variantes sont bien distinctes.
+- Termine par un bilan court en français : pour chaque planche, le fichier écrit, sa taille en pixels, si les trois propositions sont bien distinctes, et pour l'ours-hibou si les aigrettes et les plumes des pattes avant sont présentes sur les trois.
 ```
 
 ## Après la génération
 
-`python tools/codex_prompt.py 14b` puis lancement de Codex (skill `codex-images`). Ensuite un montage
-étiqueté A / B / C de chaque planche est envoyé à l'utilisateur. Sa réponse (« ours-hibou B avec la
-crête de C »…) est reportée dans `PROMPT_CODEX_14.md` avant de lancer les feuilles d'animation, avec
-la variante retenue jointe en référence.
+`python tools/codex_prompt.py 14b` puis lancement de Codex (skill `codex-images`). Chaque planche est
+étiquetée (`python tools/planche_abc.py <planche> "Titre"`) et envoyée à l'utilisateur. Son choix
+(« ours-hibou B avec les couleurs de A »…) est reporté dans `PROMPT_CODEX_14.md` avant de lancer les
+feuilles d'animation, avec la proposition retenue jointe en référence.
