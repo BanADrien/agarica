@@ -73,10 +73,16 @@ Toutes les feuilles sont jouées à **0,4** (`scale` du manifeste). Agarica debo
 
 | Id | Taille de la pose (px source) | À l'écran | Repère |
 |---|---|---|---|
-| `grizzly` | environ 340 de long, 270 de haut | ≈ 170 x 135 (échelle à passer à 0,5) | le plus imposant de la famille |
-| `ours_hibou` | environ 340 de long, 290 de haut (bond : jusqu'à 360 de long) | ≈ 190 x 160 (échelle à passer à 0,55) | le plus imposant de tous |
-| `panda` | assis : environ 230 de large, 220 de haut | ≈ 92 x 88 | rond, plus petit que le grizzly |
-| `ours_polaire` | à quatre pattes : environ 400 x 250 ; dressé : environ 260 x 400 | ≈ 160 x 100, dressé ≈ 104 x 160 | le plus grand des quatre, comme l'ours actuel (≈ 177 x 103) |
+| `grizzly` | il remplit sa case : environ 340 de long | ≈ 170 de long (régler `scale` à l'intégration) | un colosse, juste derrière l'ours-hibou |
+| `ours_hibou` | il remplit sa case : environ 340 de long (bond : jusqu'à 360) | ≈ 190 de long (régler `scale` à l'intégration) | le plus imposant de tous |
+| `panda` | assis : environ 230 de large, 220 de haut | ≈ 150 de long à quatre pattes | même taille que l'ours brun |
+| `ours_polaire` | il remplit sa case : environ 340 de long ; dressé : environ 260 x 400 | ≈ 165 de long | presque la taille du grizzly |
+| ours brun (`ours_fracas`) | environ 330 de long, 230 de haut | ≈ 150 de long | même taille que le panda |
+
+**Tailles à l'écran fixées par l'utilisateur le 2026-11-13** (longueur à quatre pattes) : ours-hibou 190 px,
+grizzly 170, ours polaire 165 (« quasi la taille du grizzly »), ours brun 150 et panda 150 (« la taille de
+l'ours polaire » du premier montage). Elles se règlent à l'affichage (`scale` du manifeste), pas dans le dessin :
+dans chaque feuille, l'animal remplit simplement sa case. Montage : `controles/lot_14/famille_finale.png`.
 | icônes | médaillon dans une cellule de 724 | 72 (menu), 40 (HUD) | mêmes médaillons de bois et de lierre que `assets/items/skill_icone/ours.png` |
 
 **Rangée `transform`** : la frame 1 est **Agarica debout, neutre**, à sa taille normale (environ 250 px
