@@ -13,3 +13,11 @@ dist.zip
 
 # pixel-fixer (sous-module tools/pixel-fixer) : etat de sa vue web
 .unslop-status.json
+
+# Son (docs/production/SON_OUTILS.md) : ce que le skill real-sfx fabrique sur chaque PC
+# (index a refaire par build_index.py, modeles et environnements Python optionnels)
+.claude/skills/real-sfx/library_index.json
+.claude/skills/real-sfx/library_embeddings.*
+.claude/skills/real-sfx/listening_log.json
+.claude/skills/real-sfx/vendor/venv*/
+.claude/skills/real-sfx/vendor/models/
