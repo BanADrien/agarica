@@ -11,7 +11,7 @@ nouveaux ursidés, tous des **transformations d'Agarica** :
 - l'**ours polaire**, compétence : il se dresse, retombe, et des pics de glace percent le sol devant
   lui (les pics sont dessinés par le code, pas par ces feuilles).
 
-**Retour sur la deuxième livraison (2026-11-13)** : inverser les carrures du grizzly (le plus imposant,
+**Retour sur la deuxième livraison (2026-11-13)** : l'ours-hibou est le plus imposant de tous les ours ; inverser les carrures du grizzly (le plus imposant,
 il percute) et de l'ours brun (plus petit), sans changer leur dessin ni leurs couleurs ; l'ours-hibou
 prend une tête d'ours avec un bec et des oreilles de hibou, et des plumes en petites ailes sur
 l'arrière des pattes avant ; le dos de l'ours polaire est à refaire (plaque de givre bizarre). Le
@@ -74,7 +74,7 @@ Toutes les feuilles sont jouées à **0,4** (`scale` du manifeste). Agarica debo
 | Id | Taille de la pose (px source) | À l'écran | Repère |
 |---|---|---|---|
 | `grizzly` | environ 340 de long, 270 de haut | ≈ 170 x 135 (échelle à passer à 0,5) | le plus imposant de la famille |
-| `ours_hibou` | environ 320 de long, 210 de haut (bond : jusqu'à 360 de long) | ≈ 128 x 84 | même gabarit que le grizzly |
+| `ours_hibou` | environ 340 de long, 290 de haut (bond : jusqu'à 360 de long) | ≈ 190 x 160 (échelle à passer à 0,55) | le plus imposant de tous |
 | `panda` | assis : environ 230 de large, 220 de haut | ≈ 92 x 88 | rond, plus petit que le grizzly |
 | `ours_polaire` | à quatre pattes : environ 400 x 250 ; dressé : environ 260 x 400 | ≈ 160 x 100, dressé ≈ 104 x 160 | le plus grand des quatre, comme l'ours actuel (≈ 177 x 103) |
 | icônes | médaillon dans une cellule de 724 | 72 (menu), 40 (HUD) | mêmes médaillons de bois et de lierre que `assets/items/skill_icone/ours.png` |
@@ -127,7 +127,8 @@ RÈGLES
 - AUCUNE GLACE, aucun pic, aucun cristal dans les feuilles de l'ours polaire : la glace est dessinée par le code.
 - Ce sont des transformations d'AGARICA : le SEUL rappel d'elle est le regard vert lunaire (voir [AGARICA]). AUCUNE CAPE, aucun tissu, aucun vêtement, aucun accessoire sur les animaux : ce sont de vrais animaux, nus.
 - CORRECTION DU 2026-11-13 (deuxième livraison, retours de l'utilisateur ; les feuilles de cette livraison sont gardées comme références dans docs/production/controles/lot_14/ref_v2/) :
-  * GRIZZLY et OURS BRUN : leurs CARRURES sont à inverser. Le grizzly doit être le plus imposant de la famille (il percute) ; l'ours brun, plus petit et moins massif. NE CHANGE NI LEUR DESSIN NI LEURS COULEURS : mêmes têtes, mêmes pelages, mêmes marques que ref_v2/grizzly.png et ref_v2/ours_fracas.png.
+  * ORDRE DES CARRURES, du plus imposant au plus petit : OURS-HIBOU (le plus imposant de tous), puis GRIZZLY (énorme, il percute), puis ours polaire, puis ours brun, puis panda.
+  * GRIZZLY et OURS BRUN : leurs CARRURES sont à inverser. Le grizzly doit être bien plus massif que l'ours brun ; l'ours brun, plus petit et moins massif. NE CHANGE NI LEUR DESSIN NI LEURS COULEURS : mêmes têtes, mêmes pelages, mêmes marques que ref_v2/grizzly.png et ref_v2/ours_fracas.png.
   * OURS-HIBOU : une TÊTE D'OURS (plus de face de hibou, plus de disque clair), avec un bec et des OREILLES DE HIBOU (aigrettes de plumes à la place des oreilles rondes) ; et des plumes en forme de petites AILES sur l'ARRIÈRE des pattes avant.
   * OURS POLAIRE : son dos était bizarre (une plaque de givre gris-bleu, mouchetée, comme une bosse). Dos lisse, en fourrure blanche comme le reste, aucune plaque.
   * PANDA : validé, ne pas le régénérer.
@@ -162,13 +163,13 @@ SHEET OF SINGLE IMAGES: fully transparent background (alpha). The canvas is divi
 
 
 1) assets/sprites/grizzly.png (1536 x 1024, 2 rangées de 4 frames, cases 384 x 512)
-Taille : le PLUS GROS ours de la famille. Il remplit sa case : environ 340 px de long et 270 px de haut (le jeu l'affichera plus grand que les autres) ; même échelle de dessin dans les deux rangées.
+Taille : un colosse, bien plus gros que l'ours brun (seul l'ours-hibou est plus imposant). Il remplit sa case : environ 340 px de long et 270 px de haut (le jeu l'affichera plus grand que les autres) ; même échelle de dessin dans les deux rangées.
 MÊME DESSIN ET MÊMES COULEURS que docs/production/controles/lot_14/ref_v2/grizzly.png (charbon, crinière d'argent, museau gris cendre, cicatrice, griffes claires) : seule la carrure change.
 Prompt :
 [STYLE]
 [AGARICA]
 [OURS2]
-A SILVERTIP GRIZZLY, built like a battering ram, THE BIGGEST AND HEAVIEST BEAR OF THE FAMILY: a colossal, deep barrel chest, enormously broad shoulders, a thick neck, massive tree-trunk legs and wide heavy paws; a wall of muscle that nothing stops. Much bulkier and taller than the brown bear. The body mass must dominate the silhouette (the mane sits on a huge body, it does not replace it). It must NOT look like the brown bear of this lot (image 9): different colors AND a different silhouette. SILHOUETTE: front-heavy like a bison: an enormous shoulder hump that is the highest point of the body, a very thick neck ruff, a broad wedge-shaped head carried LOW below the line of the back, small hindquarters, a sloping back, long forelegs made for running, long pale claws. COLORS: coat in near-black charcoal with a cold blue-violet cast (#24222c, #34323f, shadows #15131b); a bright SILVER mane of long frosted hairs over the hump, the neck ruff and along the spine (#c3c7d6, #8e92a6); an ash-grey muzzle (#9a9aa8); pale bone-colored claws (#d8d2c0). DETAILS: a notched left ear and one old pale scar across the muzzle. No brown anywhere.
+A SILVERTIP GRIZZLY, built like a battering ram, A GIANT AMONG BEARS (only the owlbear is bigger): a colossal, deep barrel chest, enormously broad shoulders, a thick neck, massive tree-trunk legs and wide heavy paws; a wall of muscle that nothing stops. Much bulkier and taller than the brown bear. The body mass must dominate the silhouette (the mane sits on a huge body, it does not replace it). It must NOT look like the brown bear of this lot (image 9): different colors AND a different silhouette. SILHOUETTE: front-heavy like a bison: an enormous shoulder hump that is the highest point of the body, a very thick neck ruff, a broad wedge-shaped head carried LOW below the line of the back, small hindquarters, a sloping back, long forelegs made for running, long pale claws. COLORS: coat in near-black charcoal with a cold blue-violet cast (#24222c, #34323f, shadows #15131b); a bright SILVER mane of long frosted hairs over the hump, the neck ruff and along the spine (#c3c7d6, #8e92a6); an ash-grey muzzle (#9a9aa8); pale bone-colored claws (#d8d2c0). DETAILS: a notched left ear and one old pale scar across the muzzle. No brown anywhere.
 Row 1 - "run" (a heavy gallop, looping), 4 frames: 1 gathered: all four paws under the body, back arched, head low (this frame is also the standing pose, it must read well alone); 2 push-off: hind legs extended backward, front legs reaching forward; 3 fully stretched, front paws about to land; 4 landing on the front paws, hind legs swinging forward. The body stays at the same height; the shoulder hump rolls.
 Row 2 - "charge" (the same gallop at full speed, looping), 4 frames: the SAME four phases, but lower and more compact: head tucked down between the shoulders like a ram, ears flat, jaws clenched, the silver mane of the hump bristling and swept backward by the speed. It must read at a glance as "this bear will not stop".
 Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 4 frames.
@@ -187,19 +188,19 @@ Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 3 / 4 f
 Puis : python tools/import_codex_assets.py --force --only grizzly
 
 3) assets/sprites/ours_hibou.png (1536 x 1024, 2 rangées : 4 / 3 frames, cases 384 x 512)
-Taille : environ 320 px de long et 210 px de haut ; bras écartés jusqu'à 360 px.
+Taille : LE PLUS IMPOSANT DE TOUS LES OURS. Il remplit sa case : environ 340 px de long et 290 px de haut ; bras écartés jusqu'à 360 px (le jeu l'affichera plus grand que tous les autres).
 Prompt :
 [STYLE]
 [AGARICA]
 [OURS2]
-AN OWLBEAR THAT IS A BEAR FIRST: in pure black silhouette it must read as a BEAR, not as a bird. Same tawny colors and same body as the reference ref_v2/ours_hibou.png; the HEAD changes and the forelegs gain feathers. BODY: the full heavy body of a bear, covered in thick FUR: barrel chest, four thick bear legs with big clawed bear paws, a short bear tail. No bird legs, no talons, no tail feathers. HEAD: A BEAR'S HEAD, furry, with a bear's skull, cheeks and brow, and small bear eyes glowing green. NO owl face: NO pale facial disc, NO huge round owl eyes. Only two owl features on this bear head: (1) a short hooked amber BEAK (#e89a2a) in place of the bear's nose and mouth; (2) OWL EARS: two tall pointed feather tufts standing where a bear's round ears would be (no round ears). FORELEG FEATHERS: along the BACK EDGE of each front leg, from the shoulder down past the elbow, a fringe of long layered barred feathers hanging backward like a small folded WING attached to the arm (dark brown #3d2f24 with cream bars #d9c6a0). The front legs stay thick bear legs with paws and claws; the feathers are only on their rear edge, they are not real wings and it does not fly. Also a short collar of the same barred feathers over the neck and shoulders. COLORS: fur in warm tawny ochre and russet (#a06a30, #c4904a, shadows #5a3a1c), paler cream on the chest (#e0c898). It LEAPS like a bear.
+AN OWLBEAR THAT IS A BEAR FIRST: in pure black silhouette it must read as a BEAR, not as a bird. IT IS THE MOST IMPOSING BEAR OF THE WHOLE FAMILY, bigger and heavier than the grizzly: a towering monster with a gigantic barrel chest, a huge hunched back, enormously thick forelegs and oversized clawed paws; heavy, slow to turn, crushing when it lands. Same tawny colors and same body as the reference ref_v2/ours_hibou.png; the HEAD changes and the forelegs gain feathers. BODY: the full heavy body of a bear, covered in thick FUR: barrel chest, four thick bear legs with big clawed bear paws, a short bear tail. No bird legs, no talons, no tail feathers. HEAD: A BEAR'S HEAD, furry, with a bear's skull, cheeks and brow, and small bear eyes glowing green. NO owl face: NO pale facial disc, NO huge round owl eyes. Only two owl features on this bear head: (1) a short hooked amber BEAK (#e89a2a) in place of the bear's nose and mouth; (2) OWL EARS: two tall pointed feather tufts standing where a bear's round ears would be (no round ears). FORELEG FEATHERS: along the BACK EDGE of each front leg, from the shoulder down past the elbow, a fringe of long layered barred feathers hanging backward like a small folded WING attached to the arm (dark brown #3d2f24 with cream bars #d9c6a0). The front legs stay thick bear legs with paws and claws; the feathers are only on their rear edge, they are not real wings and it does not fly. Also a short collar of the same barred feathers over the neck and shoulders. COLORS: fur in warm tawny ochre and russet (#a06a30, #c4904a, shadows #5a3a1c), paler cream on the chest (#e0c898). It LEAPS like a bear.
 Row 1 - "jump" (the leap of the double jump, looping), 4 frames: a bear leaping upward, body angled up about 30 degrees, both front paws reaching up and forward with claws open, hind legs tucked under the belly; the foreleg feathers fan out behind the raised arms like small spread wings; the four frames differ only by these feathers and the fur rippling in the wind and the front paws opening and closing slightly; the head and body stay in place. No flapping flight.
 Row 2 - "fall" (plunging down, looping), 3 frames: body angled DOWN about 40 degrees, both front paws thrust forward and down with claws wide open, the foreleg feathers, the feather collar and the ear tufts blown upward, the fur of the back streaming up; the three frames only differ by the fur and feathers fluttering.
 Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 3 frames.
 Puis : python tools/import_codex_assets.py --force --only ours_hibou
 
 4) assets/sprites/ours_hibou_p2.png (1536 x 1024, 2 rangées de 4 frames, cases 384 x 512)
-Même ours-hibou, même échelle et mêmes couleurs que la feuille n°3.
+Même ours-hibou (le plus imposant de la famille), même échelle et mêmes couleurs que la feuille n°3.
 Prompt :
 [STYLE]
 [AGARICA]
@@ -290,7 +291,7 @@ Contrôles, sur les fichiers finaux après import (montages dans docs/production
 - Rappel d'Agarica : yeux vert lunaire dans toutes les frames. AUCUNE cape ni tissu sur aucun animal (seule la frame 1 des rangées transform montre Agarica habillée).
 - Grizzly : charbon et argent, bosse d'épaules plus haute que la tête ; posé à côté de assets/sprites/ours_frames/ours_row0_0.png, on ne les confond pas, même en silhouette noire.
 - Ours-hibou : en silhouette noire, c'est un ours (quatre grosses pattes) ; tête d'ours sans disque facial, bec, aigrettes de plumes à la place des oreilles ; plumes en petites ailes sur l'arrière des pattes avant, dans toutes les frames.
-- Carrures : dans le montage famille.png, le grizzly est le plus gros et le plus haut, l'ours brun nettement plus petit.
+- Carrures : dans le montage famille.png, l'ours-hibou est le plus imposant, puis le grizzly ; l'ours brun est nettement plus petit que les deux.
 - Ours polaire : dos lisse et blanc, sans plaque de givre ni mouchetures.
 - Aucune glace dans ours_polaire ; aucun éclat détaché dans les rangées slam.
 - ours_fracas.png : six ours bruns, AUCUN effet (ni poussière, ni pierre, ni traînée) ; corps d'environ 330 px de long pour 230 de haut, visiblement moins massif que le grizzly ; pattes arrière au même endroit dans les six frames. ours_fracas_p2.png : 4 frames, l'ours final sans cape.
