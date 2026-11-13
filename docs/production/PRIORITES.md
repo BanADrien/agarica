@@ -50,10 +50,9 @@ Clic sur un point : note, éditeur ou jeu. « Copier pour Claude » pour m'envoy
 | Lot B : cime cachée, île des vents, île du gardien, et la quête de Pépin | zones facultatives de la vague 3 |
 | Lot C : marais des brumes, racines suspendues, nid de cocons, canopée malade, et la quête des fleurs de lune | zones facultatives de la vague 3 |
 | Placer d'autres papillons à libérer, pendant les lots A, B et C (3 sont posés pour l'instant) | collectible : un niveau de la compétence tous les 3 |
-| Familles et ursidés : à essayer dans la zone de test (`?zone=ZoneOursScene`), puis régler les chiffres ; valider le palier 4 (un coup ne l'arrête plus) ; images des 4 ours (`PROMPT_CODEX_14.md`) ; les brancher dans l'histoire | fait le 2026-11-12 en version de test (`FAMILLES_DESIGN.md`) |
-| Ours brun (celui du chef, compétence fracas) recréé dans le style de la famille : six poses sans effets et corps plus court (image n°9), transformation sans cape (n°10) ; effets du fracas refaits à part avec pixelfx ; puis intégration (découpe, échelle, hitbox, pixel-fixer) | demande du 2026-11-12 ; génération lancée par Codex le soir même |
-| Lot d'images n°14 : les cinq ours dans UN même style (référence : le grizzly validé), cinq dessins différents, aucune cape ; contrôler les feuilles livrées, relancer les ratées | génération lancée le 2026-11-12 au soir ; ensuite `bash tools/pixelfix_ours.sh` |
-| Son et musique | le jeu est muet ; gros effet sur le ressenti, mais gros chantier ; à décider avec toi |
+| Ours en jeu (2026-11-13) : à essayer dans `?zone=ZoneOursScene`, puis régler : animation du grizzly (échelles par image estimées), corps de collision de l'ours-hibou, poussière du fracas sous la patte, icône de la compétence « ours », retombée de l'ours polaire ; valider le palier 4 du passif ; brancher les ours dans l'histoire | designs, tailles et pixel art faits ; conception : `FAMILLES_DESIGN.md` |
+| Contrôle des verrous dans la carte globale : prouver qu'on peut tout finir avec les formes obtenues, sans cul-de-sac | piste du skill `gamedev` (`GAMEDEV_PISTES.md`), à faire avant les lots A, B et C si l'utilisateur est d'accord |
+| Son et musique : outils installés (Openverse, Real SFX, earshot, skill `son`) ; reste le moteur de son (`SFX_HOOKS` vide) puis les sons, 3 versions à écouter pour chacun | le jeu est muet ; mode d'emploi : `SON_OUTILS.md` |
 
 ## P4 : quand il n'y a plus rien
 
