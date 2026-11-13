@@ -10,6 +10,12 @@ compte et son quota : on avance par petits essais, on ne régénère pas pour ri
 
 ## Étapes
 
+0. **Design d'abord, animations ensuite** (demande de l'utilisateur du 2026-11-13) : pour tout
+   nouveau personnage ou animal, ou dès qu'un dessin est discuté, générer une PLANCHE DE
+   PROPOSITIONS (3 variantes nettement différentes, une seule pose debout de profil, même
+   échelle), y ajouter les lettres A / B / C par montage et l'envoyer. Ne lancer les feuilles
+   d'animation qu'après son choix, avec la variante retenue jointe en référence. Modèle :
+   `docs/production/PROMPT_CODEX_14b.md`.
 1. **Écrire le prompt du lot** dans `docs/production/PROMPT_CODEX_<n>.md`, au gabarit des
    lots 12 à 14 : un bloc de code sous « Prompt à coller dans Codex », des images numérotées
    `1) chemin…`, puis `À LA FIN`. Règles de dessin retenues : aucun vêtement ni accessoire sur
