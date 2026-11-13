@@ -11,6 +11,12 @@ nouveaux ursidés, tous des **transformations d'Agarica** :
 - l'**ours polaire**, compétence : il se dresse, retombe, et des pics de glace percent le sol devant
   lui (les pics sont dessinés par le code, pas par ces feuilles).
 
+**Retour sur la deuxième livraison (2026-11-13)** : inverser les carrures du grizzly (le plus imposant,
+il percute) et de l'ours brun (plus petit), sans changer leur dessin ni leurs couleurs ; l'ours-hibou
+prend une tête d'ours avec un bec et des oreilles de hibou, et des plumes en petites ailes sur
+l'arrière des pattes avant ; le dos de l'ours polaire est à refaire (plaque de givre bizarre). Le
+panda est validé. Les feuilles de cette livraison servent de références : `controles/lot_14/ref_v2/`.
+
 **Retour de l'utilisateur sur la première livraison (2026-11-12)** : pas de cape sur les ours ; le
 grizzly ressemblait trop à l'ours de la première compétence ; l'ours-hibou n'avait rien d'un ours,
 « juste un hibou à quatre pattes ». Le prompt ci-dessous est corrigé ; les trois feuilles déjà
@@ -67,7 +73,7 @@ Toutes les feuilles sont jouées à **0,4** (`scale` du manifeste). Agarica debo
 
 | Id | Taille de la pose (px source) | À l'écran | Repère |
 |---|---|---|---|
-| `grizzly` | environ 340 de long, 200 de haut | ≈ 136 x 80 | plus gros que le loup d'Agarica (≈ 107 x 68) |
+| `grizzly` | environ 340 de long, 270 de haut | ≈ 170 x 135 (échelle à passer à 0,5) | le plus imposant de la famille |
 | `ours_hibou` | environ 320 de long, 210 de haut (bond : jusqu'à 360 de long) | ≈ 128 x 84 | même gabarit que le grizzly |
 | `panda` | assis : environ 230 de large, 220 de haut | ≈ 92 x 88 | rond, plus petit que le grizzly |
 | `ours_polaire` | à quatre pattes : environ 400 x 250 ; dressé : environ 260 x 400 | ≈ 160 x 100, dressé ≈ 104 x 160 | le plus grand des quatre, comme l'ours actuel (≈ 177 x 103) |
@@ -120,13 +126,19 @@ RÈGLES
 - Une silhouette connexe par frame, aucune particule détachée : la poussière, la terre et la neige des impacts restent collées au corps, en nuage continu au ras des pattes. Aucun éclat qui vole à part.
 - AUCUNE GLACE, aucun pic, aucun cristal dans les feuilles de l'ours polaire : la glace est dessinée par le code.
 - Ce sont des transformations d'AGARICA : le SEUL rappel d'elle est le regard vert lunaire (voir [AGARICA]). AUCUNE CAPE, aucun tissu, aucun vêtement, aucun accessoire sur les animaux : ce sont de vrais animaux, nus.
+- CORRECTION DU 2026-11-13 (deuxième livraison, retours de l'utilisateur ; les feuilles de cette livraison sont gardées comme références dans docs/production/controles/lot_14/ref_v2/) :
+  * GRIZZLY et OURS BRUN : leurs CARRURES sont à inverser. Le grizzly doit être le plus imposant de la famille (il percute) ; l'ours brun, plus petit et moins massif. NE CHANGE NI LEUR DESSIN NI LEURS COULEURS : mêmes têtes, mêmes pelages, mêmes marques que ref_v2/grizzly.png et ref_v2/ours_fracas.png.
+  * OURS-HIBOU : une TÊTE D'OURS (plus de face de hibou, plus de disque clair), avec un bec et des OREILLES DE HIBOU (aigrettes de plumes à la place des oreilles rondes) ; et des plumes en forme de petites AILES sur l'ARRIÈRE des pattes avant.
+  * OURS POLAIRE : son dos était bizarre (une plaque de givre gris-bleu, mouchetée, comme une bosse). Dos lisse, en fourrure blanche comme le reste, aucune plaque.
+  * PANDA : validé, ne pas le régénérer.
 - CORRECTION DU 2026-11-12 : les feuilles grizzly.png, grizzly_p2.png et ours_hibou.png déjà livrées sont REFUSÉES (cape verte sur le dos ; grizzly identique à l'ours brun existant ; ours-hibou qui est un hibou à quatre pattes avec des ailes). Régénère-les d'après les descriptions ci-dessous et remplace les fichiers ; réimporte avec --force.
 - Finition mécanique autorisée (recadrage, translation, mise à l'échelle uniforme), jamais de dessin produit par code.
-- MÊME STYLE GRAPHIQUE POUR TOUS LES OURS, DESSINS DIFFÉRENTS. La référence de style est assets/sprites/grizzly.png (déjà livrée et validée) : même rendu de la fourrure en mèches, même contour sombre, mêmes paliers d'ombre, même regard vert, mêmes griffes, même niveau de détail, même échelle de dessin. Mais chaque ours est un ANIMAL DIFFÉRENT : sa propre silhouette, ses propres proportions, sa propre tête, ses propres marques. JAMAIS le même dessin recoloré : si on met deux ours en silhouette noire côte à côte, on doit les distinguer.
+- MÊME STYLE GRAPHIQUE POUR TOUS LES OURS, DESSINS DIFFÉRENTS. La référence de style est docs/production/controles/lot_14/ref_v2/grizzly.png (validée) : même rendu de la fourrure en mèches, même contour sombre, mêmes paliers d'ombre, même regard vert, mêmes griffes, même niveau de détail, même échelle de dessin. Mais chaque ours est un ANIMAL DIFFÉRENT : sa propre silhouette, ses propres proportions, sa propre tête, ses propres marques. JAMAIS le même dessin recoloré : si on met deux ours en silhouette noire côte à côte, on doit les distinguer.
 - L'ancien ours brun (assets/sprites/compétence/ours.png) n'est PLUS la référence de style : il est remplacé par l'image n°9. Ne copie ni son rendu ni ses poses trait pour trait.
 
 RÉFÉRENCES À JOINDRE
-- RÉFÉRENCE DE STYLE de tous les ours : assets/sprites/grizzly.png (le grizzly validé : rendu de la fourrure, contour, ombres, regard, griffes, échelle).
+- RÉFÉRENCE DE STYLE de tous les ours : docs/production/controles/lot_14/ref_v2/grizzly.png (le grizzly validé : rendu de la fourrure, contour, ombres, regard, griffes).
+- Dessins et couleurs À GARDER (livraison précédente) : docs/production/controles/lot_14/ref_v2/grizzly.png, ours_fracas.png, ours_hibou.png (couleurs et corps seulement, la tête change), ours_polaire.png (tout sauf le dos), panda.png (validé).
 - L'ancien ours brun, pour ses POSES seulement (à quatre pattes, patte levée, impact) : assets/sprites/ours_frames/ours_row0_0.png, ours_row0_1.png, ours_row0_2.png. Pas pour son style.
 - La transformation actuelle : assets/sprites/transformation/transfo_ours.png (Agarica, puis mi-femme mi-ourse, puis l'ourse). Ne reprends pas la cape sur le dos de l'animal.
 - Agarica : assets/sprites/agarica_frames/agarica_row0_0.png (cheveux roux, cape verte, tunique claire, bottes brunes).
@@ -140,7 +152,7 @@ BLOCS COMMUNS (remplace [STYLE], [AGARICA], [OURS2] et [PLANCHE] par le bloc com
 Game asset for 'Legend of Agarica', a 2D side-scrolling dark-fantasy druid platformer. Art style: high-resolution 'HD pixel-art / cel-shaded 2D' look, thick near-black outlines (3-4 px), flat saturated color fills with 2-3 tone cel shading, visible chunky pixel texture, clean readable silhouettes, lighting from the upper left. Dark silhouettes in the spirit of Hollow Knight. World palette: night forest in deep violet, indigo and teal, magical accents in luminous moonlit green (#8fe3b8) and touches of rose pink (#ff9fc9). Strict side view (profile).
 
 [AGARICA] =
-THIS ANIMAL IS THE DRUID AGARICA, SHAPE-SHIFTED INTO A REAL ANIMAL. ONE FAMILY, ONE STYLE: same finish as the reference grizzly.png (fur drawn in tufts, dark outline, same shading steps, same claws, same level of detail, same drawing scale), but a DIFFERENT ANIMAL with its own silhouette, proportions, head and markings: never the same drawing in other colors. The ONLY reminder of her, in every frame: glowing moonlit-green eyes (#8fe3b8, no pupil). ABSOLUTELY NO CLOAK, no cape, no cloth, no clothing, no collar, no jewelry, no accessory of any kind on the animal: bare fur (or feathers) only. Powerful, a little wild, never gory, never cute-cartoon.
+THIS ANIMAL IS THE DRUID AGARICA, SHAPE-SHIFTED INTO A REAL ANIMAL. ONE FAMILY, ONE STYLE: same finish as the reference ref_v2/grizzly.png (fur drawn in tufts, dark outline, same shading steps, same claws, same level of detail, same drawing scale), but a DIFFERENT ANIMAL with its own silhouette, proportions, head and markings: never the same drawing in other colors. The ONLY reminder of her, in every frame: glowing moonlit-green eyes (#8fe3b8, no pupil). ABSOLUTELY NO CLOAK, no cape, no cloth, no clothing, no collar, no jewelry, no accessory of any kind on the animal: bare fur (or feathers) only. Powerful, a little wild, never gory, never cute-cartoon.
 
 [OURS2] =
 SPRITE SHEET LAYOUT RULES: canvas 1536 x 1024 px, fully transparent background. Exactly 2 horizontal rows; each row is ONE animation, read left to right. Each row is a band about 512 px tall; frame cells are 384 px wide; each pose is centered in its cell with the lowest point on the same baseline within a row. Leave at least 40 px of empty space between neighboring frames and at least 60 px between rows. Every frame is ONE single connected silhouette; NO detached particles, sparkles, dust, motion lines, NO cast shadow, NO ground line. Same animal, same scale, same colors in every frame. The animal faces RIGHT. No text, no grid lines, no borders.
@@ -150,19 +162,20 @@ SHEET OF SINGLE IMAGES: fully transparent background (alpha). The canvas is divi
 
 
 1) assets/sprites/grizzly.png (1536 x 1024, 2 rangées de 4 frames, cases 384 x 512)
-Taille : environ 340 px de long et 200 px de haut ; même échelle de dessin dans les deux rangées.
+Taille : le PLUS GROS ours de la famille. Il remplit sa case : environ 340 px de long et 270 px de haut (le jeu l'affichera plus grand que les autres) ; même échelle de dessin dans les deux rangées.
+MÊME DESSIN ET MÊMES COULEURS que docs/production/controles/lot_14/ref_v2/grizzly.png (charbon, crinière d'argent, museau gris cendre, cicatrice, griffes claires) : seule la carrure change.
 Prompt :
 [STYLE]
 [AGARICA]
 [OURS2]
-A SILVERTIP GRIZZLY, built like a battering ram. It must NOT look like the brown bear of this lot (image 9): different colors AND a different silhouette. SILHOUETTE: front-heavy like a bison: an enormous shoulder hump that is the highest point of the body, a very thick neck ruff, a broad wedge-shaped head carried LOW below the line of the back, small hindquarters, a sloping back, long forelegs made for running, long pale claws. COLORS: coat in near-black charcoal with a cold blue-violet cast (#24222c, #34323f, shadows #15131b); a bright SILVER mane of long frosted hairs over the hump, the neck ruff and along the spine (#c3c7d6, #8e92a6); an ash-grey muzzle (#9a9aa8); pale bone-colored claws (#d8d2c0). DETAILS: a notched left ear and one old pale scar across the muzzle. No brown anywhere.
+A SILVERTIP GRIZZLY, built like a battering ram, THE BIGGEST AND HEAVIEST BEAR OF THE FAMILY: a colossal, deep barrel chest, enormously broad shoulders, a thick neck, massive tree-trunk legs and wide heavy paws; a wall of muscle that nothing stops. Much bulkier and taller than the brown bear. The body mass must dominate the silhouette (the mane sits on a huge body, it does not replace it). It must NOT look like the brown bear of this lot (image 9): different colors AND a different silhouette. SILHOUETTE: front-heavy like a bison: an enormous shoulder hump that is the highest point of the body, a very thick neck ruff, a broad wedge-shaped head carried LOW below the line of the back, small hindquarters, a sloping back, long forelegs made for running, long pale claws. COLORS: coat in near-black charcoal with a cold blue-violet cast (#24222c, #34323f, shadows #15131b); a bright SILVER mane of long frosted hairs over the hump, the neck ruff and along the spine (#c3c7d6, #8e92a6); an ash-grey muzzle (#9a9aa8); pale bone-colored claws (#d8d2c0). DETAILS: a notched left ear and one old pale scar across the muzzle. No brown anywhere.
 Row 1 - "run" (a heavy gallop, looping), 4 frames: 1 gathered: all four paws under the body, back arched, head low (this frame is also the standing pose, it must read well alone); 2 push-off: hind legs extended backward, front legs reaching forward; 3 fully stretched, front paws about to land; 4 landing on the front paws, hind legs swinging forward. The body stays at the same height; the shoulder hump rolls.
 Row 2 - "charge" (the same gallop at full speed, looping), 4 frames: the SAME four phases, but lower and more compact: head tucked down between the shoulders like a ram, ears flat, jaws clenched, the silver mane of the hump bristling and swept backward by the speed. It must read at a glance as "this bear will not stop".
 Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 4 frames.
 Puis : python tools/import_codex_assets.py --force --only grizzly
 
 2) assets/sprites/grizzly_p2.png (1536 x 1024, 2 rangées : 3 / 4 frames, cases 384 x 512)
-Même grizzly, même échelle et mêmes couleurs que la feuille n°1.
+Même grizzly (colossal), même échelle et mêmes couleurs que la feuille n°1.
 Prompt :
 [STYLE]
 [AGARICA]
@@ -179,9 +192,9 @@ Prompt :
 [STYLE]
 [AGARICA]
 [OURS2]
-AN OWLBEAR THAT IS A BEAR FIRST: in pure black silhouette it must read as a BEAR, not as a bird. BODY: the full heavy body of a bear, covered in thick FUR (not feathers): barrel chest, four thick bear legs with big clawed bear paws, a short bear tail, round furry bear EARS on top of the head. NO WINGS, no wing-like arms, no long flight feathers, no bird legs, no talons, no tail feathers. OWL PARTS, only these three: (1) the FACE: on a broad bear-shaped head, a pale heart-shaped facial disc (#efe2c4, rim #a8763c) around two very large round eyes, and a short hooked amber BEAK (#e89a2a) in place of the bear's nose and mouth; (2) a short MANTLE of barred feathers, like a collar, over the neck and shoulders only (#3d2f24 with cream bars #d9c6a0); (3) two small feather tufts just behind the round ears. COLORS: fur in warm tawny ochre and russet (#a06a30, #c4904a, shadows #5a3a1c), paler cream on the chest (#e0c898). It does not fly: it LEAPS like a bear.
-Row 1 - "jump" (the leap of the double jump, looping), 4 frames: a bear leaping upward, body angled up about 30 degrees, both front paws reaching up and forward with claws open, hind legs tucked under the belly; the four frames differ only by the fur and the feather mantle rippling in the wind and the front paws opening and closing slightly; the head and body stay in place. No flapping.
-Row 2 - "fall" (plunging down, looping), 3 frames: body angled DOWN about 40 degrees, both front paws thrust forward and down with claws wide open, the feather mantle and the ear tufts blown upward, the fur of the back streaming up; the three frames only differ by the fur and feathers fluttering.
+AN OWLBEAR THAT IS A BEAR FIRST: in pure black silhouette it must read as a BEAR, not as a bird. Same tawny colors and same body as the reference ref_v2/ours_hibou.png; the HEAD changes and the forelegs gain feathers. BODY: the full heavy body of a bear, covered in thick FUR: barrel chest, four thick bear legs with big clawed bear paws, a short bear tail. No bird legs, no talons, no tail feathers. HEAD: A BEAR'S HEAD, furry, with a bear's skull, cheeks and brow, and small bear eyes glowing green. NO owl face: NO pale facial disc, NO huge round owl eyes. Only two owl features on this bear head: (1) a short hooked amber BEAK (#e89a2a) in place of the bear's nose and mouth; (2) OWL EARS: two tall pointed feather tufts standing where a bear's round ears would be (no round ears). FORELEG FEATHERS: along the BACK EDGE of each front leg, from the shoulder down past the elbow, a fringe of long layered barred feathers hanging backward like a small folded WING attached to the arm (dark brown #3d2f24 with cream bars #d9c6a0). The front legs stay thick bear legs with paws and claws; the feathers are only on their rear edge, they are not real wings and it does not fly. Also a short collar of the same barred feathers over the neck and shoulders. COLORS: fur in warm tawny ochre and russet (#a06a30, #c4904a, shadows #5a3a1c), paler cream on the chest (#e0c898). It LEAPS like a bear.
+Row 1 - "jump" (the leap of the double jump, looping), 4 frames: a bear leaping upward, body angled up about 30 degrees, both front paws reaching up and forward with claws open, hind legs tucked under the belly; the foreleg feathers fan out behind the raised arms like small spread wings; the four frames differ only by these feathers and the fur rippling in the wind and the front paws opening and closing slightly; the head and body stay in place. No flapping flight.
+Row 2 - "fall" (plunging down, looping), 3 frames: body angled DOWN about 40 degrees, both front paws thrust forward and down with claws wide open, the foreleg feathers, the feather collar and the ear tufts blown upward, the fur of the back streaming up; the three frames only differ by the fur and feathers fluttering.
 Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 3 frames.
 Puis : python tools/import_codex_assets.py --force --only ours_hibou
 
@@ -193,7 +206,7 @@ Prompt :
 [OURS2]
 THE SAME OWLBEAR as the previous sheet.
 Row 1 - "slam" (it crashes down on the ground), 4 frames, hind paws at the same place: 1 IMPACT: both front paws smashing the ground, body compressed, head down, a low continuous burst of dust and earth hugging the paws on both sides (attached to the body, no flying chunks); 2 the dust cloud at its widest, still attached, the feather mantle ruffled; 3 the cloud thinning, the owlbear starting to rise; 4 standing on all fours like a bear, shaking its fur.
-Row 2 - "transform", 4 frames, centered on the body (this happens in mid-air): 1 AGARICA in a jump pose, facing right (small chibi druid about 250 px tall, red-brown hair, green cloak - copy the reference agarica_row0_0.png); 2 tawny fur spreading along her arms and legs, a collar of feathers bursting around her neck, her cloak and clothes dissolving; 3 half woman, half owlbear: heavy furry bear limbs, the owl face and beak forming, no clothing left; 4 the full owlbear, exactly frame 1 of "jump", with no cloak and no wings.
+Row 2 - "transform", 4 frames, centered on the body (this happens in mid-air): 1 AGARICA in a jump pose, facing right (small chibi druid about 250 px tall, red-brown hair, green cloak - copy the reference agarica_row0_0.png); 2 tawny fur spreading along her arms and legs, a collar of feathers bursting around her neck, her cloak and clothes dissolving; 3 half woman, half owlbear: heavy furry bear limbs with feathers growing behind the arms, a bear head with a beak and feather ear tufts forming, no clothing left; 4 the full owlbear, exactly frame 1 of "jump", with no cloak and no wings.
 Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 4 frames.
 Puis : python tools/import_codex_assets.py --force --only ours_hibou
 
@@ -215,7 +228,7 @@ Prompt :
 [STYLE]
 [AGARICA]
 [OURS2]
-A POLAR BEAR: huge, long neck, small head, thick fur in white and pale ice blue (#f2fbff, #cfe8ff, shadows #7fa8d8, deepest shadows #3f5f96), black nose and claws. A faint frost on the fur of the back. NO ICE, no icicles, no crystals anywhere.
+A POLAR BEAR: huge, long neck, small head, thick fur in white and pale ice blue (#f2fbff, #cfe8ff, shadows #7fa8d8, deepest shadows #3f5f96), black nose and claws. THE BACK is a smooth, clean line covered in the same plain white fur as the rest of the body: NO frost patch, no grey-blue speckled area, no different texture, no hump on the back. Same design as the reference ref_v2/ours_polaire.png except for the back. NO ICE, no icicles, no crystals anywhere.
 Row 1 - "rear" (it stands up on its hind legs: the warning before the attack), 4 frames: 1 on all fours, weight shifting back; 2 front paws leaving the ground, body at 45 degrees; 3 almost upright, front paws raised; 4 FULLY UPRIGHT, towering, both front paws high above the head, claws spread, jaws open in a roar.
 Row 2 - "slam" (it drops back down), 4 frames: 1 IMPACT: both front paws slamming the ground in front of it, body compressed, head down, a low continuous spray of snow and frost hugging the paws (attached to the body, no flying chunks); 2 the snow spray at its widest, still attached; 3 the spray settling, the bear pushing back up; 4 on all fours, head up, breathing out.
 Output: one PNG, 1536 x 1024 px, transparent background, exactly 2 rows, 4 / 4 frames.
@@ -240,18 +253,19 @@ Canvas 1448 x 1448 px, 2 columns x 2 rows of 724 px cells. Four round MEDALLION 
 Cell 1 (top left): a GIANT PANDA head, white with black ears and eye patch, a bamboo leaf in the mouth.
 Cell 2 (top right): a POLAR BEAR head, white and ice blue, roaring, one small pale-blue ice shard behind it inside the medallion.
 Cell 3 (bottom left): a SILVERTIP GRIZZLY head, charcoal black with a bright silver mane and an ash-grey muzzle, a scar across the muzzle, head low, charging.
-Cell 4 (bottom right): an OWLBEAR head: a broad tawny furry BEAR head with round bear ears, a pale owl facial disc around big round eyes and a hooked amber beak, a collar of barred feathers on the neck.
+Cell 4 (bottom right): an OWLBEAR head: a broad tawny furry BEAR head (no owl facial disc), two tall pointed feather ear tufts instead of round ears, a hooked amber beak instead of the nose and mouth, a collar of barred feathers on the neck.
 Output: one PNG, 1448 x 1448 px, transparent background, 4 medallions.
 Puis : python tools/import_codex_assets.py --only skill_icone_panda skill_icone_ours_polaire form_icone_grizzly form_icone_ours_hibou
 
 9) assets/sprites/ours_fracas.png (2172 x 724, 2 rangées de 3 frames, cases 724 x 362)
 L'OURS BRUN d'Agarica, le premier de la famille (talisman du chef, compétence « fracas »), RECRÉÉ dans le style de la famille : même rendu que grizzly.png, mais son propre dessin. Aucun effet, corps court.
-Taille : environ 400 px de long et 300 px de haut à quatre pattes.
+Taille : nettement PLUS PETIT et moins massif que le grizzly : environ 330 px de long et 230 px de haut à quatre pattes.
+MÊME DESSIN ET MÊMES COULEURS que docs/production/controles/lot_14/ref_v2/ours_fracas.png (tête ronde, pelage châtaigne et miel, regard vert) : seule la carrure change.
 Prompt :
 [STYLE]
 [AGARICA]
 SPRITE SHEET LAYOUT RULES: canvas 2172 x 724 px, fully transparent background. Exactly 2 horizontal rows of exactly 3 frames each, read left to right, then top row to bottom row; frame cells are 724 px wide and 362 px tall; each pose is centered in its cell, hind paws on the same baseline in all six frames. Leave at least 60 px of empty space between neighboring frames and between rows. Every frame is ONE single connected silhouette: the bear and NOTHING ELSE. The bear faces RIGHT. No text, no grid lines, no borders, no cast shadow, no ground line.
-A FOREST BROWN BEAR, the classic bear of the family: the roundest and most compact of them all. SILHOUETTE: a short, stocky, barrel-shaped body with a ROUNDED back (no shoulder hump, no mane), a big round head carried level with the back, a short broad muzzle, round ears set wide apart, thick short legs, a heavy rump. It must not be mistaken for the grizzly (bison build, huge silver mane, low wedge head) even in black silhouette. COLORS: warm chestnut and honey brown fur (#6b4226, #8a5a34, highlights #b07a48, shadows #3a2414), a paler honey muzzle (#c69a64), dark brown claws. ABSOLUTELY NO EFFECTS IN ANY FRAME: no dust, no dirt cloud, no rocks, no debris, no cracks, no impact burst, no motion trail, no swipe arc, no speed lines, no sparks. Only the bear's body. The effects are added by the game.
+A FOREST BROWN BEAR, the classic bear of the family: a MEDIUM-SIZED, compact, agile bear, clearly SMALLER AND LIGHTER than the grizzly: a shorter body, a narrower chest, slimmer legs, a rounder and friendlier outline. SILHOUETTE: a short, stocky, barrel-shaped body with a ROUNDED back (no shoulder hump, no mane), a big round head carried level with the back, a short broad muzzle, round ears set wide apart, thick short legs, a heavy rump. It must not be mistaken for the grizzly (bison build, huge silver mane, low wedge head) even in black silhouette. COLORS: warm chestnut and honey brown fur (#6b4226, #8a5a34, highlights #b07a48, shadows #3a2414), a paler honey muzzle (#c69a64), dark brown claws. ABSOLUTELY NO EFFECTS IN ANY FRAME: no dust, no dirt cloud, no rocks, no debris, no cracks, no impact burst, no motion trail, no swipe arc, no speed lines, no sparks. Only the bear's body. The effects are added by the game.
 Row 1, 3 frames: 1 standing on all fours, alert, facing right; 2 WIND-UP: rearing on its hind legs, the right front paw raised high above the head, claws spread, jaws open in a roar; 3 IMPACT: the raised paw slammed down on the ground in front of it, body compressed forward, head low.
 Row 2, 3 frames: 4 impact held: both front paws planted, shoulders at their lowest, fur bristling; 5 recovering: the body pushing back up, head rising; 6 back on all fours, like frame 1, looking forward and down.
 Output: one PNG, 2172 x 724 px, transparent background, exactly 2 rows of 3 frames, six bears and nothing else.
@@ -275,9 +289,11 @@ Contrôles, sur les fichiers finaux après import (montages dans docs/production
 - Échelle : grizzly environ 200 px de haut ; ours-hibou environ 210 ; panda assis environ 220 ; ours polaire environ 250 à quatre pattes et 400 dressé ; Agarica de la frame 1 des rangées transform environ 250.
 - Rappel d'Agarica : yeux vert lunaire dans toutes les frames. AUCUNE cape ni tissu sur aucun animal (seule la frame 1 des rangées transform montre Agarica habillée).
 - Grizzly : charbon et argent, bosse d'épaules plus haute que la tête ; posé à côté de assets/sprites/ours_frames/ours_row0_0.png, on ne les confond pas, même en silhouette noire.
-- Ours-hibou : en silhouette noire, c'est un ours (oreilles rondes, quatre grosses pattes, pas d'ailes) ; le hibou ne se lit que dans la face, le bec et le col de plumes.
+- Ours-hibou : en silhouette noire, c'est un ours (quatre grosses pattes) ; tête d'ours sans disque facial, bec, aigrettes de plumes à la place des oreilles ; plumes en petites ailes sur l'arrière des pattes avant, dans toutes les frames.
+- Carrures : dans le montage famille.png, le grizzly est le plus gros et le plus haut, l'ours brun nettement plus petit.
+- Ours polaire : dos lisse et blanc, sans plaque de givre ni mouchetures.
 - Aucune glace dans ours_polaire ; aucun éclat détaché dans les rangées slam.
-- ours_fracas.png : six ours bruns, AUCUN effet (ni poussière, ni pierre, ni traînée) ; corps d'environ 400 px de long pour 300 de haut ; pattes arrière au même endroit dans les six frames. ours_fracas_p2.png : 4 frames, l'ours final sans cape.
+- ours_fracas.png : six ours bruns, AUCUN effet (ni poussière, ni pierre, ni traînée) ; corps d'environ 330 px de long pour 230 de haut, visiblement moins massif que le grizzly ; pattes arrière au même endroit dans les six frames. ours_fracas_p2.png : 4 frames, l'ours final sans cape.
 - FAMILLE : un montage des cinq ours côte à côte (grizzly, ours brun, ours-hibou, panda, ours polaire, première frame de chacun, même échelle) dans docs/production/controles/lot_14/famille.png : même rendu de fourrure, même contour, même niveau de détail ; cinq silhouettes différentes.
 Puis :
 - lance un python tools/import_codex_assets.py final (il régénère src/data/asset_present.js) ;
