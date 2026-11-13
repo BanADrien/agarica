@@ -1544,10 +1544,34 @@ Rien dans l'histoire ne débloque encore ces ours : sans eux, le jeu se joue com
   `INTERNAL_SKILL_DEFS` + `skillDefOf(id)` ; nouveaux champs de `SKILL_DEFS` : `rooted`,
   `groundOnly`, `canActivate(player)` + `denyText`, `onStart(player, now)`, `family`, `hitboxKind`,
   `cardLabel`, `internal`.
-- **Images** : provisoires, fabriquées au chargement à partir de `ours-0…5` recolorées dans un
-  canvas (`ursideVariantTexture` ; aucune image écrite). Vraies feuilles : ids `grizzly`,
-  `ours_hibou`, `panda`, `ours_polaire` du manifeste (prompt `PROMPT_CODEX_14.md`), prises dès
-  qu'elles existent. Effets (glace, traits de vitesse, impacts) dessinés par code, grain de 2 px.
+- **Images** (vraies feuilles, 2026-11-13) : ids `grizzly`, `ours_hibou`, `panda`, `ours_polaire` et
+  `ours_brun` du manifeste (prompt `PROMPT_CODEX_14.md`). Repli si une feuille manque : l'ancien ours
+  (`ours-0…5`) recoloré dans un canvas (`ursideVariantTexture` ; aucune image écrite). Glace et
+  traits de vitesse dessinés par code, grain de 2 px.
+- **Tailles à l'écran** (fixées par l'utilisateur, longueur à quatre pattes) : ours-hibou 190 px,
+  grizzly 170, ours polaire 165, ours brun 150, panda 150. Elles se règlent par le `scale` du
+  manifeste (cible / longueur de la pose debout dans la feuille). Images dessinées à une autre
+  échelle que leur feuille : `URSIDE_FRAME_K` (foulées allongées et saut du grizzly, patte levée de
+  l'ours brun) et rangées `transform` (Agarica à 0,332, puis 25 %, 70 %, 100 % du chemin vers
+  l'animal : `URSIDE_TRANSFO_STEPS`). `ursideFrameScale(cléDeTexture)` → échelle propre ou `null` ;
+  lue par `ursideGrizzlyFrameScale`, `transfoFrameScale` et `Player.applyFrameScaleOverride` (les
+  pieds restent au sol, le corps physique garde sa taille). Corps du grizzly : 112 x 66 px. Si un
+  `scale` ou un facteur change : relancer `bash tools/pixelfix_ours.sh` (1 pixel dessiné = 1 px
+  d'écran ; `--apercu <dossier>` pour regarder avant).
+- **Ours brun** (compétence `ours`) : la feuille `ours_brun` (`assets/sprites/ours_brun_frames/`,
+  rangée `slam` de 6 images, rangée `transform`) remplace l'ancien ours ; `ursideRefreshBrownBear`
+  la branche sur `SKILL_DEFS.ours` sans toucher aux durées ni à la zone (188 ms de transformation,
+  600 d'attaque, 300 de retour, zone de 220 x 40). L'ancien ours (`assets/sprites/ours_frames/`,
+  `transformation/transfo_ours_frames/`) reste sur le disque ; BootScene ne le charge plus que si
+  une des cinq feuilles manque (`ursideLegacyBearNeeded`).
+- **Effets du fracas** (pixelfx, hors de l'image de l'ours) : `tools/pixelfx/bear-slam.js` (réglages
+  en tête : couleurs, nombre de pierres, portée, hauteur, durée), rendu par
+  `node tools/pixelfx/export_fracas.mjs` → `assets/vfx/fracas_frames/` + `src/data/fracas_fx.js`
+  (`FRACAS_FX` : nombre d'images, cadence, ancrage). `ursidePlayFracas(scene, 'impact' | 'griffe',
+  x, y, { dir, size })` ; `ursideSlamFx(player, rect)` à l'ouverture de la zone d'un fracas d'ours
+  (largeur réelle de la zone, traînée de la patte pour l'ours brun) ; aussi à l'atterrissage de
+  l'ours-hibou et, en plus petit, au pied de ce que le grizzly percute. Sans les images : anciens
+  effets par code (`spawnFx 'slam'`, `ursideGroundWave`).
 - **Menu du feu** : sol = loup ou grizzly, aérien = singe, aigle ou ours-hibou ; réserve de
   compétences à 5 cartes et plus (`campfirePoolGrid`) ; colonne **Familles** à droite (nombre
   d'animaux équipés, paliers actifs, palier suivant).

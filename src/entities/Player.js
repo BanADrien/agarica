@@ -291,6 +291,12 @@ const TRANSFO_FRAME_CALIBRATION = {
 };
 const TRANSFO_FRAME_SCALE_CACHE = new Map();
 function transfoFrameScale(scene, key) {
+  // Ours : chaque image de leur rangée `transform` a son échelle (Agarica au
+  // départ, l'animal à l'arrivée -- cf. ursideFrameScale, Ursides.js).
+  if (typeof ursideFrameScale === 'function') {
+    const bear = ursideFrameScale(key);
+    if (bear) return bear;
+  }
   const cal = TRANSFO_FRAME_CALIBRATION[key];
   if (!cal || typeof calibratedScale !== 'function') return null;
   if (TRANSFO_FRAME_SCALE_CACHE.has(key)) return TRANSFO_FRAME_SCALE_CACHE.get(key);
@@ -1301,24 +1307,28 @@ function transfoOursFrames(indices) {
   return indices.map((i) => ({ key: `transfo-ours-${i}` }));
 }
 
+// ANCIEN ours (2026-11-13) : l'ours brun refait (`ours_brun` au manifeste,
+// branché par ursideRefreshBrownBear dans Ursides.js) le remplace. Ses images
+// ne sont plus chargées que comme repli (feuille manquante, cf. BootScene) :
+// ces trois anims ne sont créées que si elles le sont (createAnimIfLoaded).
 function ensureOursAnimations(scene) {
   if (scene.anims.exists(ANIM_OURS_SLAM_KEY)) return;
   // 6 frames, calé pile sur SKILL_DEFS.ours.attackDurationMs -- jouée une
   // seule fois (repeat 0), tient sur la dernière frame (pose de retombée)
   // le temps que le reste de la fenêtre de transfo s'écoule.
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_OURS_SLAM_KEY,
     frames: oursAnimFrames(),
     frameRate: OURS_ATTACK_FRAME_RATE,
     repeat: 0,
   });
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_TO_OURS_KEY,
     frames: transfoOursFrames([0, 1, 2]),
     frameRate: TRANSFO_OURS_FRAME_RATE,
     repeat: 0,
   });
-  scene.anims.create({
+  createAnimIfLoaded(scene, {
     key: ANIM_TRANSFO_FROM_OURS_KEY,
     frames: transfoOursFrames([2, 1, 0]),
     frameRate: TRANSFO_OURS_EXIT_FRAME_RATE,
@@ -2026,14 +2036,20 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       if (now >= this.skillActiveUntil) this.skillActiveUntil = now + 1;
       // Juice : l'impact du fracas (poussière des deux côtés, onde au sol).
       if (this.skillHitboxId === 'ours') {
-        spawnFx(this.scene, 'slam', this.x, this.y, { size: this.skillSizeMultiplier || 1 });
+        // Poussière, pierres et traînée de la patte : images pixelfx, à part de
+        // l'ours et sur la largeur RÉELLE de la zone (ursideSlamFx, Ursides.js).
+        // Sans elles : l'ancien effet par code.
+        const drawn = typeof ursideSlamFx === 'function' && ursideSlamFx(this, this.skillHitboxRect);
+        if (!drawn) {
+          spawnFx(this.scene, 'slam', this.x, this.y, { size: this.skillSizeMultiplier || 1 });
+          // Vague de blocs sur la largeur RÉELLE de la zone : fracas de
+          // l'ours-hibou, et fracas de l'ours élargi (palier 3 des ursidés).
+          if ((this.activeSkillId === 'owlbear_slam' || this.bearSizeMultiplier > 1) && typeof ursideOwlbearSlamFx === 'function') {
+            ursideOwlbearSlamFx(this, this.skillHitboxRect);
+          }
+        }
         juiceShake(this.scene, 'medium');
         playSfx('ours_slam');
-        // Vague de blocs sur la largeur RÉELLE de la zone : fracas de
-        // l'ours-hibou, et fracas de l'ours élargi (palier 3 des ursidés).
-        if ((this.activeSkillId === 'owlbear_slam' || this.bearSizeMultiplier > 1) && typeof ursideOwlbearSlamFx === 'function') {
-          ursideOwlbearSlamFx(this, this.skillHitboxRect);
-        }
       }
     }
     if (this.skillHitboxRect && now >= this.skillActiveUntil) this.skillHitboxRect = null;
@@ -2657,6 +2673,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // laissée sur la texture de l'anim précédente.
         this.anims.play(activeSkillDef.transitionAnimKey, true);
         this.applySkillTransitionVisual(activeSkillDef);
+        this.applyFrameScaleOverride();
       } else if (activeSkillDef.transitionOutAnimKey && now >= this.skillAttackEndTime) {
         // Phase 3 : retour à l'humaine, jouée APRÈS l'anim d'attaque
         // (demande explicite : "mettre l'animation de transformation a
@@ -2666,10 +2683,12 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         // l'envers (cf. ANIM_TRANSFO_FROM_OURS_KEY/ANIM_CRAPAUD_RETRACT_KEY).
         this.anims.play(activeSkillDef.transitionOutAnimKey, true);
         this.applySkillTransitionVisual(activeSkillDef);
+        this.applyFrameScaleOverride();
       } else {
         // Phase 2 : anim d'attaque principale (cf. SKILL_DEFS.ours.animKey).
         this.applyBodyForScale(activeSkillDef.scale, activeSkillDef.body);
         this.anims.play(activeSkillDef.animKey, true);
+        this.applyFrameScaleOverride();
       }
     } else if (!this.formTransitionActive) {
       // Toujours réappliquées (même hors sortie de transfo à l'instant) :
@@ -3030,6 +3049,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.applyBodyForScale(def.transitionScale, def.transitionBody);
     }
+  }
+
+  // Image d'une compétence dessinée à une autre échelle que sa feuille (ours :
+  // Agarica des rangées `transform`, patte levée de l'ours brun -- cf.
+  // ursideFrameScale, Ursides.js) : son échelle, avec le même corps au gabarit
+  // humain recentré sur elle. Sans effet pour toute autre image.
+  applyFrameScaleOverride() {
+    const scale = typeof ursideFrameScale === 'function' ? ursideFrameScale(this.texture.key) : null;
+    if (scale) this.applyBodyForScale(scale, transfoBodyConfig(this.frame.realWidth, this.frame.realHeight, scale));
   }
 
   // Arme l'overlay de transformation (cf. commentaire sur formTransitionActive

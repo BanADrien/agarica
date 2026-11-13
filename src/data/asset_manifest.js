@@ -125,6 +125,14 @@ const ASSET_MANIFEST = {
   // docs/production/FAMILLES_DESIGN.md). Formes d'Agarica : grizzly (sol) et
   // ours-hibou (aérien) ; compétences : panda et ours polaire. Tant qu'une
   // feuille manque, le jeu montre l'ours actuel recoloré (src/entities/Ursides.js).
+  // `scale` = taille à l'écran fixée par l'utilisateur le 2026-11-13, en longueur
+  // de l'animal à quatre pattes : ours-hibou 190 px, grizzly 170, ours polaire
+  // 165, ours brun 150, panda 150. scale = cible / longueur de la pose debout
+  // dans la feuille (boîte des pixels visibles). Les images dessinées à une
+  // autre échelle que leur feuille (Agarica des rangées transform, foulées
+  // allongées du grizzly) ont leur échelle propre dans URSIDE_FRAME_K
+  // (src/entities/Ursides.js). Si `scale` change : refaire le pixel art
+  // (bash tools/pixelfix_ours.sh, facteur = 1 / échelle).
   // Grizzly : course, charge (plus ramassée, tête basse), saut (montée, chute,
   // réception), transformation depuis Agarica.
   grizzly: {
@@ -135,7 +143,7 @@ const ASSET_MANIFEST = {
       jump: { row: 2, frames: 3, fps: 10, repeat: 0 },
       transform: { row: 3, frames: 4, fps: 20, repeat: 0 },
     },
-    scale: 0.4,
+    scale: 0.494,
     facing: "right",
     placeholder: { w: 136, h: 80, color: 0x5a3a22, label: "Grizzly" },
     sheets: [
@@ -154,7 +162,7 @@ const ASSET_MANIFEST = {
       slam: { row: 2, frames: 4, fps: 10, repeat: 0 },
       transform: { row: 3, frames: 4, fps: 20, repeat: 0 },
     },
-    scale: 0.4,
+    scale: 0.5975,
     facing: "right",
     placeholder: { w: 130, h: 84, color: 0x7a6a8c, label: "Ours-hibou" },
     sheets: [
@@ -170,7 +178,7 @@ const ASSET_MANIFEST = {
       eat: { row: 0, frames: 4, fps: 6, repeat: 0 },
       transform: { row: 1, frames: 4, fps: 20, repeat: 0 },
     },
-    scale: 0.4,
+    scale: 0.605,
     facing: "right",
     placeholder: { w: 96, h: 88, color: 0xe6e6da, label: "Panda" },
     sheets: [
@@ -188,12 +196,34 @@ const ASSET_MANIFEST = {
       slam: { row: 1, frames: 4, fps: 9, repeat: 0 },
       transform: { row: 2, frames: 4, fps: 20, repeat: 0 },
     },
-    scale: 0.4,
+    scale: 0.509,
     facing: "right",
     placeholder: { w: 150, h: 110, color: 0xcfe8ff, label: "Ours polaire" },
     sheets: [
       { file: "assets/sprites/ours_polaire.png", rows: [0, 1] },
       { file: "assets/sprites/ours_polaire_p2.png", rows: [2] },
+    ],
+    cut: "blob", align: "bottom",
+  },
+  // Ours brun (compétence « ours », le fracas du talisman du chef), refait dans
+  // le style de la famille (images n°9 et 10 du prompt n°14) : il REMPLACE
+  // l'ancien ours de assets/sprites/ours_frames/ (gardé sur le disque, chargé
+  // seulement en repli). Mêmes six poses dans le même ordre, sans aucun effet
+  // peint : la poussière et les pierres sont l'effet pixelfx `fracas`
+  // (tools/pixelfx/bear-slam.js). Deux rangées de 3 dans l'image = une seule
+  // anim de 6 images. 150 px de long à l'écran : 150 / 315.
+  ours_brun: {
+    dir: "assets/sprites/ours_brun_frames", prefix: "ours_brun",
+    anims: {
+      slam: { row: 0, frames: 6, fps: 10, repeat: 0 },
+      transform: { row: 1, frames: 4, fps: 16, repeat: 0 },
+    },
+    scale: 0.476,
+    facing: "right",
+    placeholder: { w: 150, h: 110, color: 0x6b4226, label: "Ours" },
+    sheets: [
+      { file: "assets/sprites/ours_fracas.png", rows: [0, 0], frames: [3, 3] },
+      { file: "assets/sprites/ours_fracas_p2.png", rows: [1] },
     ],
     cut: "blob", align: "bottom",
   },

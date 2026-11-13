@@ -563,3 +563,22 @@ Aucun avertissement.
 
 asset_present.js : 768 fichier(s) présent(s).
 ```
+
+
+<!-- LOT14 -->
+## Lot n°14 — Famille des ours — 2026-11-12
+
+Dessins via imagegen ; prompts, générations, aperçus et imports : [galerie du lot 14](controles/lot_14/index.html). Finition mécanique : `lot_14.py`. Aucun asset existant ni code du jeu remplacé.
+
+| # | Source | État | Frames / dimensions |
+|---|---|---|---|
+| 1 | `assets/sprites/grizzly.png` | importe sans avertissement | [4, 4] |
+| 2 | `assets/sprites/grizzly_p2.png` | importe sans avertissement | [3, 4] |
+| 3 | `assets/sprites/ours_hibou.png` | importe sans avertissement | [4, 3] |
+| 4 | `assets/sprites/ours_hibou_p2.png` | importe sans avertissement | [4, 4] |
+| 5 | `assets/sprites/panda.png` | importe sans avertissement | [4, 4] |
+| 6 | `assets/sprites/ours_polaire.png` | En attente | — |
+| 7 | `assets/sprites/ours_polaire_p2.png` | En attente | — |
+| 8 | `assets/_codex_src/icones_ours.png` | En attente | — |
+
+<!-- /LOT14 -->

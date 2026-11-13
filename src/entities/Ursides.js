@@ -7,20 +7,85 @@
 // appelle les fonctions `urside…` d'ici pour ce qui est propre aux ours :
 // images provisoires, poses, élan du grizzly, pics de glace, effets.
 //
-// IMAGES PROVISOIRES : aucune feuille n'existe pour ces ours. Chaque variante
-// est fabriquée au chargement à partir des images de l'ours actuel (`ours-0`
-// à `ours-5`), recolorées pixel par pixel dans un canvas -- aucun fichier
-// écrit. Dès que les vraies feuilles arrivent (ids du manifeste : `grizzly`,
-// `ours_hibou`, `panda`, `ours_polaire`, cf. PROMPT_CODEX_14.md), elles sont
-// prises à la place, sans autre changement (hasManifestArt partout).
-// Effets (glace, traits de vitesse, impact) : dessinés par code en gros
-// pixels nets, grain de 2 px d'écran, sans dégradé.
+// IMAGES (2026-11-13) : les vraies feuilles sont livrées (ids du manifeste :
+// `grizzly`, `ours_hibou`, `panda`, `ours_polaire`, et `ours_brun` qui remplace
+// l'ancien ours de la compétence « ours », cf. PROMPT_CODEX_14.md). Tailles à
+// l'écran fixées par l'utilisateur, en longueur de l'animal à quatre pattes :
+// ours-hibou 190 px, grizzly 170, ours polaire 165, ours brun 150, panda 150
+// (`scale` du manifeste ; échelles par image : URSIDE_FRAME_K ci-dessous).
+// REPLI, seulement si une feuille manque : l'ANCIEN ours (`ours-0` à `ours-5`,
+// assets/sprites/ours_frames/, chargé alors par BootScene) recoloré pixel par
+// pixel dans un canvas -- aucun fichier écrit (hasManifestArt partout).
+// Effets : poussière et pierres des fracas = images pixelfx (FRACAS_FX,
+// tools/pixelfx/bear-slam.js) ; glace, traits de vitesse = dessinés par code
+// en gros pixels nets, grain de 2 px d'écran, sans dégradé.
 
 // ---------------------------------------------------------------------------
 // Réglages (valeurs de départ de FAMILLES_DESIGN.md, ajustées en jouant)
 // ---------------------------------------------------------------------------
-// Taille à l'écran des deux formes : l'ours fait ~135 x 78 px (le loup ~107 x 68).
+// Échelle des images PROVISOIRES (ancien ours recoloré, 521 px de long) : ~135 x 78 px
+// à l'écran. Les vraies feuilles ont leur `scale` au manifeste.
 const URSIDE_FORM_SCALE = 0.26;
+
+// Feuilles des cinq ours (ids du manifeste). Une seule manque -> BootScene
+// charge aussi l'ancien ours, qui sert de repli (ursideLegacyBearNeeded).
+const URSIDE_SHEET_IDS = ['ours_brun', 'grizzly', 'ours_hibou', 'panda', 'ours_polaire'];
+
+// Images dessinées à une autre échelle que le reste de leur feuille : facteur à
+// appliquer à l'échelle de la feuille, par rangée et par image (1 = rien).
+//  - grizzly : dans la course et la charge, les deux foulées allongées sont
+//    dessinées plus petites (elles remplissent la même case que l'ours ramassé :
+//    œil-oreille à 65 et 57 px contre 75) ; le saut aussi (64 px). Sans cela
+//    l'ours « pompe » en courant.
+//  - ours brun : la pose patte levée est dessinée un peu plus petite.
+// Les pieds restent au sol (origine en bas) et le corps physique ne change pas.
+// Le pixel art est fait avec ces mêmes facteurs (tools/pixelfix_ours.sh) : si
+// on en change un ici, le changer là-bas aussi.
+const URSIDE_FRAME_K = {
+  grizzly: { run: [1, 1.15, 1.3, 1], charge: [1, 1.1, 1.25, 1], jump: [1.15, 1.15, 1.15] },
+  ours_brun: { slam: [1, 1.1, 1, 1, 1, 1] },
+};
+// Rangées `transform` : l'image 0 est Agarica, dessinée ~250 px de haut alors
+// qu'elle en fait 83 à l'écran ; la dernière est l'animal, à l'échelle de sa
+// feuille. Entre les deux, la part du chemin parcourue par chaque image (petit
+// pas d'abord, grand ensuite : la surface vue grandit avec le carré).
+const URSIDE_AGARICA_SCALE = 83 / 250;
+const URSIDE_TRANSFO_STEPS = [0, 0.25, 0.7, 1];
+
+let ursideFrameScaleMap = null;
+// Échelle d'affichage propre à une image (clé de texture du manifeste), ou
+// null si elle suit simplement l'échelle de sa feuille. Lue par les poses du
+// grizzly, par les compétences d'ours et par les transformations (Player.js).
+function ursideFrameScale(key) {
+  if (!ursideFrameScaleMap) {
+    ursideFrameScaleMap = new Map();
+    const manifest = getAssetManifest();
+    for (const id of URSIDE_SHEET_IDS) {
+      const def = manifest[id];
+      if (!def || !def.scale) continue;
+      if (def.anims && def.anims.transform) {
+        URSIDE_TRANSFO_STEPS.forEach((k, i) => ursideFrameScaleMap.set(
+          manifestFrameKey(id, 'transform', i), URSIDE_AGARICA_SCALE + (def.scale - URSIDE_AGARICA_SCALE) * k,
+        ));
+      }
+      for (const [anim, ks] of Object.entries(URSIDE_FRAME_K[id] || {})) {
+        ks.forEach((k, i) => { if (k !== 1) ursideFrameScaleMap.set(manifestFrameKey(id, anim, i), def.scale * k); });
+      }
+    }
+  }
+  return ursideFrameScaleMap.get(key) || null;
+}
+
+// Vrai si l'ancien ours doit être chargé (BootScene) : la feuille de l'ours
+// brun manque (il reprend alors sa place), ou celle d'un autre ours (il sert
+// d'image provisoire, recoloré). Toutes livrées : il n'est plus chargé du tout.
+function ursideLegacyBearNeeded() {
+  const manifest = getAssetManifest();
+  return !URSIDE_SHEET_IDS.every((id) => {
+    const def = manifest[id];
+    return def && Object.values(def.anims || {}).every((a) => assetPresent(`${def.dir}/${def.prefix}_row${a.row}_0.png`));
+  });
+}
 
 const GRIZZLY_TUNING = {
   // Il part moins vite que le loup (396) et le dépasse au bout de l'élan.
@@ -39,9 +104,12 @@ const GRIZZLY_TUNING = {
   // Directions ignorées pendant presque tout le vol : tenir « avant » ne la
   // ramène pas contre ce qu'elle vient de percuter.
   crashLockMs: 520,
-  // Corps physique (px du monde) : large et bas, comme le loup (86 x 54).
-  bodyW: 92,
-  bodyH: 60,
+  // Corps physique (px du monde) : large et bas, comme le loup (86 x 54), à la
+  // mesure de l'ours affiché (170 px de long, ~125 de haut avec la crête) :
+  // les deux tiers de sa longueur, pas plus haut qu'Agarica debout (67 px : pas de
+  // surprise sous un plafond en changeant de forme).
+  bodyW: 112,
+  bodyH: 66,
   // Zone de l'impact devant lui (ennemis, blocs de l'ours).
   impactW: 64,
   impactH: 96,
@@ -390,6 +458,7 @@ function ursideGrizzlyPose(p, now, s) {
     } else {
       playManifestOn(p, 'grizzly', p.grizzlyCharging && hasManifestArt(sc, 'grizzly', 'charge') ? 'charge' : 'run');
     }
+    ursideGrizzlyFrameScale(p);
     return;
   }
   p.anims.stop();
@@ -406,6 +475,22 @@ function ursideGrizzlyPose(p, now, s) {
   p.setRotation(rot * (p.facingDir >= 0 ? 1 : -1));
   // Rotation remise à zéro à l'image suivante (Player.resetVineArtAnchor).
   p.vineArtAnchored = true;
+}
+
+// Image du grizzly dessinée à une autre échelle que sa feuille (foulées
+// allongées, saut : URSIDE_FRAME_K) : son échelle, et le MÊME corps physique
+// recalculé pour elle (taille monde et position inchangées, pieds au sol).
+const URSIDE_GRIZZLY_BODIES = new Map();
+function ursideGrizzlyFrameScale(p) {
+  const key = p.texture.key;
+  const scale = ursideFrameScale(key);
+  if (!scale) return;
+  let body = URSIDE_GRIZZLY_BODIES.get(key);
+  if (!body) {
+    body = ursideBody(p.frame.realWidth, p.frame.realHeight, scale, GRIZZLY_TUNING.bodyW, GRIZZLY_TUNING.bodyH);
+    URSIDE_GRIZZLY_BODIES.set(key, body);
+  }
+  p.applyBodyForScale(scale, body);
 }
 
 // Pose de l'ours-hibou en l'air : `jump` en montée, `fall` en chute ;
@@ -907,6 +992,39 @@ function ursideRefreshSkillArt(scene) {
     slam.transitionDurationMs = 0;
     slam.transformDurationMs = slam.attackDurationMs;
   }
+  ursideRefreshBrownBear(scene);
+}
+
+// Ours brun de la compétence « ours » (le fracas du talisman du chef) : la
+// feuille refaite `ours_brun` remplace l'ancien ours (assets/sprites/ours_frames/,
+// SKILL_DEFS.ours tel que Player.js le définit, qui reste le repli sans elle).
+// Mêmes six poses dans le même ordre et MÊMES durées : ni le rythme ni la zone
+// du fracas ne changent. La transformation garde ses trois images (Agarica,
+// mi-ourse, presque ourse) : la 4e de la feuille est la 1re pose de l'attaque.
+function ursideRefreshBrownBear(scene) {
+  const id = 'ours_brun';
+  if (!hasManifestArt(scene, id, 'slam') || !hasManifestArt(scene, id, 'transform')) return;
+  const def = SKILL_DEFS.ours;
+  const scale = (getAssetManifest()[id] || {}).scale || OURS_SCALE;
+  const animKey = ursideManifestTimedAnim(scene, id, 'slam', OURS_ATTACK_DURATION);
+  const steps = manifestAnimFrames(scene, id, 'transform').slice(0, TRANSFO_OURS_FRAME_COUNT);
+  if (!animKey || steps.length < 2) return;
+  if (!scene.anims.exists('ours_brun-transfo-in')) {
+    scene.anims.create({ key: 'ours_brun-transfo-in', frames: steps, frameRate: TRANSFO_OURS_FRAME_RATE, repeat: 0 });
+    scene.anims.create({ key: 'ours_brun-transfo-out', frames: steps.slice().reverse(), frameRate: TRANSFO_OURS_EXIT_FRAME_RATE, repeat: 0 });
+  }
+  const src = scene.textures.get(manifestFrameKey(id, 'slam', 0)).getSourceImage();
+  def.animKey = animKey;
+  def.scale = scale;
+  def.body = transfoBodyConfig(src.width, src.height, scale);
+  def.transitionAnimKey = 'ours_brun-transfo-in';
+  def.transitionOutAnimKey = 'ours_brun-transfo-out';
+  // Une échelle par image de la transformation (ursideFrameScale, lue par
+  // Player) : plus de tableau indexé sur les anciennes textures.
+  def.transitionScales = null;
+  def.transitionBodies = null;
+  def.transitionScale = scale;
+  def.transitionBody = def.body;
 }
 
 // Player.beginSkill : l'anim provisoire de la compétence existe-t-elle ?
@@ -923,8 +1041,11 @@ function ursideSkillTick(player, now) {
     if (now >= (player.pandaMunchAt || 0) && now < player.pandaHealAt) {
       player.pandaMunchAt = now + 110;
       const dir = player.facingDir >= 0 ? 1 : -1;
+      // Bouche du panda assis : 28 px devant lui, 94 au-dessus du sol (vraie
+      // feuille à 150 px de long) ; plus bas avec l'image provisoire.
+      const real = hasManifestArt(sc, 'panda', 'eat');
       ursideFxAdd(sc, {
-        x: player.x + dir * 34, y: player.y - 34, w: 4, h: 4, color: Math.random() < 0.5 ? 0x7fd06a : 0xc9f0a0,
+        x: player.x + dir * (real ? 28 : 34), y: player.y - (real ? 94 : 34), w: 4, h: 4, color: Math.random() < 0.5 ? 0x7fd06a : 0xc9f0a0,
         vx: dir * (20 + Math.random() * 60), vy: -60 - Math.random() * 80, gy: 520, ms: 300,
       });
     }
@@ -950,15 +1071,75 @@ function ursideSkillTick(player, now) {
   }
 }
 
-// Fracas de l'ours-hibou : vague de blocs sur toute la largeur de la zone.
+// ---------------------------------------------------------------------------
+// Effets du fracas en images (pixelfx : tools/pixelfx/bear-slam.js, rendues
+// par export_fracas.mjs ; nombre d'images, cadence et ancrage : FRACAS_FX,
+// src/data/fracas_fx.js). Deux parties : `impact` (poussière et pierres, au
+// point de choc) et `griffe` (traînée du coup de patte de l'ours brun).
+// Sans les images : les anciens effets par code (repli).
+// ---------------------------------------------------------------------------
+// Largeur de la zone de fracas pour laquelle l'effet est dessiné à l'échelle 1.
+const URSIDE_FRACAS_BASE_WIDTH = 220;
+
+function ursideFracasReady(scene, part) {
+  return typeof FRACAS_FX !== 'undefined' && !!FRACAS_FX[part] && scene.textures.exists(`fracas-${part}-0`);
+}
+
+// Joue une partie de l'effet, ancrée en (x, y) ; `dir` < 0 : retournée ;
+// `size` : agrandie (palier 3 des ursidés). Vrai si l'effet est parti.
+function ursidePlayFracas(scene, part, x, y, { dir = 1, size = 1 } = {}) {
+  if (!ursideFracasReady(scene, part)) return false;
+  const c = FRACAS_FX[part];
+  const key = `fracas-${part}`;
+  if (!scene.anims.exists(key)) {
+    const frames = [];
+    for (let i = 0; i < c.frames; i++) if (scene.textures.exists(`${key}-${i}`)) frames.push({ key: `${key}-${i}` });
+    scene.anims.create({ key, frames, frameRate: c.fps, repeat: 0 });
+  }
+  const spr = scene.add.sprite(x, y, `${key}-0`).setDepth(CHARACTER_DEPTH + 2).setScale(size);
+  spr.lookRole = 'fx';
+  // Image retournée : Phaser la retourne dans son cadre, pas autour de son
+  // origine -- l'ancrage passe donc de l'autre côté.
+  const ox = c.ox / c.w;
+  spr.setOrigin(dir >= 0 ? ox : 1 - ox, c.oy / c.h).setFlipX(dir < 0);
+  spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => spr.destroy());
+  spr.play(key);
+  return true;
+}
+
+// Impact d'un fracas d'ours (Player, à l'ouverture de la zone de dégâts) :
+// poussière et pierres sur la largeur RÉELLE de la zone (`rect`), et pour
+// l'ours brun la traînée de sa patte. Faux sans les images (Player retombe
+// alors sur l'ancien effet).
+function ursideSlamFx(player, rect) {
+  const sc = player.scene;
+  if (!rect || !ursideFracasReady(sc, 'impact')) return false;
+  ursidePlayFracas(sc, 'impact', rect.centerX, rect.bottom, { size: rect.width / URSIDE_FRACAS_BASE_WIDTH });
+  // (même facteur pour l'anneau : palier 3 des ursidés, totems)
+  const size = rect.width / URSIDE_FRACAS_BASE_WIDTH;
+  if (player.activeSkillId === 'ours') {
+    // Le fracas de l'ours brun est le pouvoir du talisman : son anneau ambre
+    // dessiné reste (le même qu'avant, cf. spawnFx 'slam' dans LevelKit).
+    juiceShockRing(sc, rect.centerX, rect.bottom - 6, { size: 230 * size, ms: 380, color: 0xffe2b0, flat: 0.28, variant: 'talisman' });
+    if (hasManifestArt(sc, 'ours_brun', 'slam')) {
+      ursidePlayFracas(sc, 'griffe', player.x, player.y, { dir: player.facingDir >= 0 ? 1 : -1 });
+    }
+  }
+  return true;
+}
+
+// Fracas de l'ours-hibou SANS les images de l'effet : vague de blocs sur toute
+// la largeur de la zone.
 function ursideOwlbearSlamFx(player, rect) {
   ursideGroundWave(player.scene, rect.centerX, rect.bottom, rect.width);
 }
 
-// Percussion du grizzly : gerbe d'éclats au point de contact.
+// Percussion du grizzly : éclats au point de contact, pierres et poussière au
+// pied de ce qu'il percute (même effet que le fracas, en plus petit).
 function ursideCrashFx(player, x, y) {
   const sc = player.scene;
-  ursideBurst(sc, x, y, { count: 14, power: 1.3, colors: [0xffffff, 0xffd08a, 0xc9a878, 0x8a6a48] });
+  const stones = ursidePlayFracas(sc, 'impact', x, player.body.bottom, { size: 0.7 * (player.bearSizeMultiplier || 1) });
+  ursideBurst(sc, x, y, { count: stones ? 6 : 14, power: 1.3, colors: [0xffffff, 0xffd08a, 0xc9a878, 0x8a6a48] });
   juiceShake(sc, 'heavy');
   juiceHitStop(sc, 70);
   playSfx('grizzly_crash');

@@ -166,7 +166,12 @@ class BootScene extends Phaser.Scene {
     // hybride -> hybride avancée -> ours final), découpées via l'habituel
     // tools/split_spritesheet.py (silhouette d'un seul tenant, contrairement
     // à la planche d'attaque de l'Ours qui a besoin de son découpage dédié).
-    for (let i = 0; i < TRANSFO_OURS_FRAME_COUNT; i++) {
+    // 2026-11-13 : l'ours brun refait (`ours_brun` au manifeste, chargé avec
+    // lui) remplace cet ancien ours. Ses images restent sur le disque et ne
+    // sont plus chargées que si une feuille des cinq ours manque : il reprend
+    // alors sa place, ou sert d'image provisoire recolorée (Ursides.js).
+    const legacyBear = typeof ursideLegacyBearNeeded !== 'function' || ursideLegacyBearNeeded();
+    for (let i = 0; legacyBear && i < TRANSFO_OURS_FRAME_COUNT; i++) {
       this.load.image(`transfo-ours-${i}`, `assets/sprites/transformation/transfo_ours_frames/transfo_ours_row0_${i}.png`);
     }
     // Compétence Ours ("fracas au sol", voir ANIM_OURS_SLAM_KEY/SKILL_DEFS
@@ -176,8 +181,17 @@ class BootScene extends Phaser.Scene {
     // source, ce qui explose la découpe par composantes connexes standard).
     // Index i -> row{floor(i/3)}_{i%3} = ordre de lecture naturel de la
     // planche (gauche->droite, haut->bas), qui est aussi l'ordre de l'anim.
-    for (let i = 0; i < OURS_ANIM_FRAME_COUNT; i++) {
+    for (let i = 0; legacyBear && i < OURS_ANIM_FRAME_COUNT; i++) {
       this.load.image(`ours-${i}`, `assets/sprites/ours_frames/ours_row${Math.floor(i / 3)}_${i % 3}.png`);
+    }
+    // Effets du fracas de l'ours (pixelfx, tools/pixelfx/export_fracas.mjs) :
+    // poussière et pierres de l'impact, traînée du coup de patte. Nombre
+    // d'images lu dans FRACAS_FX (src/data/fracas_fx.js, écrit par le rendu).
+    if (typeof FRACAS_FX !== 'undefined') {
+      for (const part of ['impact', 'griffe']) {
+        const c = FRACAS_FX[part];
+        for (let i = 0; c && i < c.frames; i++) this.load.image(`fracas-${part}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
+      }
     }
     // Ennemi Crapaud (langue-attaque, voir Crapaud.js), généré depuis
     // assets/sprites/image.png via tools/crop_crapaud.py -- PAS
@@ -530,6 +544,14 @@ class BootScene extends Phaser.Scene {
     for (const plan of (typeof COURANT_PLANS !== 'undefined' ? COURANT_PLANS : [])) {
       for (let i = 0; i < COURANT_FRAMES; i++) {
         if (scene.textures.exists(`courant-${plan}-${i}`)) scene.textures.get(`courant-${plan}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
+    }
+    if (typeof FRACAS_FX !== 'undefined') {
+      for (const part of ['impact', 'griffe']) {
+        const c = FRACAS_FX[part];
+        for (let i = 0; c && i < c.frames; i++) {
+          if (scene.textures.exists(`fracas-${part}-${i}`)) scene.textures.get(`fracas-${part}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
       }
     }
     if (typeof ILES_SETS !== 'undefined') {
