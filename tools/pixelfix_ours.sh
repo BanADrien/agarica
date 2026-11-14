@@ -5,8 +5,8 @@
 #
 # Même réglage que les autres formes d'Agarica (tools/pixelfix_formes.sh) : 1 pixel dessiné =
 # 1 px d'écran, donc facteur = 1 / échelle d'affichage. L'échelle de chaque ours est son `scale`
-# de src/data/asset_manifest.js (tailles fixées le 2026-11-13 : ours-hibou 190 px de long,
-# grizzly 170, ours polaire 165, ours brun 150, panda 150) ; elle est relue ici à chaque passage,
+# de src/data/asset_manifest.js (tailles : ours-hibou 160 px de long et grizzly 145 depuis le 2026-11-14,
+# ours polaire 165, ours brun 150, panda 150) ; elle est relue ici à chaque passage,
 # rien à recopier. Les images affichées à une autre échelle que leur feuille ont leur facteur :
 #   - K ci-dessous : mêmes valeurs que URSIDE_FRAME_K (src/entities/Ursides.js) -- foulées
 #     allongées et saut du grizzly, patte levée de l'ours brun. En changer une = changer l'autre ;

@@ -11,7 +11,8 @@
 // `grizzly`, `ours_hibou`, `panda`, `ours_polaire`, et `ours_brun` qui remplace
 // l'ancien ours de la compétence « ours », cf. PROMPT_CODEX_14.md). Tailles à
 // l'écran fixées par l'utilisateur, en longueur de l'animal à quatre pattes :
-// ours-hibou 190 px, grizzly 170, ours polaire 165, ours brun 150, panda 150
+// ours-hibou 160 px, grizzly 145 (réduits le 2026-11-14 : 190 et 170 étaient
+// trop gros en jeu), ours polaire 165, ours brun 150, panda 150
 // (`scale` du manifeste ; échelles par image : URSIDE_FRAME_K ci-dessous).
 // REPLI, seulement si une feuille manque : l'ANCIEN ours (`ours-0` à `ours-5`,
 // assets/sprites/ours_frames/, chargé alors par BootScene) recoloré pixel par
@@ -105,11 +106,11 @@ const GRIZZLY_TUNING = {
   // ramène pas contre ce qu'elle vient de percuter.
   crashLockMs: 520,
   // Corps physique (px du monde) : large et bas, comme le loup (86 x 54), à la
-  // mesure de l'ours affiché (170 px de long, ~125 de haut avec la crête) :
+  // mesure de l'ours affiché (145 px de long, ~105 de haut avec la crête) :
   // les deux tiers de sa longueur, pas plus haut qu'Agarica debout (67 px : pas de
   // surprise sous un plafond en changeant de forme).
-  bodyW: 112,
-  bodyH: 66,
+  bodyW: 96,
+  bodyH: 58,
   // Zone de l'impact devant lui (ennemis, blocs de l'ours).
   impactW: 64,
   impactH: 96,
@@ -117,6 +118,20 @@ const GRIZZLY_TUNING = {
 };
 
 const OWLBEAR_TUNING = {
+  // Retour du 2026-11-14 : il doit sauter plus haut que le singe (-500), être
+  // plus maniable en l'air (vitesse de pointe 300 au lieu de 190) et plus
+  // « lourd » à lancer et à arrêter : accélération et frein en l'air bien plus
+  // doux (750 et 130, contre 1500 et 500), sans coup de frein au demi-tour.
+  jumpVelocity: -640,
+  airMaxSpeed: 300,
+  airAcceleration: 750,
+  airDrag: 130,
+  // Pattes dans l'herbe : le bas visible de l'image est déjà posé sur la ligne
+  // de marche (anchorVisibleFeet, LevelKit), mais l'herbe se lit ~5 px plus bas
+  // et ses larges pattes semblaient flotter à l'atterrissage. Image descendue
+  // d'autant (px du monde ; `__footSink`, lu par anchorVisibleFeet), corps
+  // physique inchangé. Forme et fracas.
+  footSink: 5,
   // Chute minimale depuis le sommet du 2e saut pour que le fracas parte.
   minFall: 64,
   slamMs: 400,

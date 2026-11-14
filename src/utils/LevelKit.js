@@ -2059,7 +2059,9 @@ function anchorVisibleFeet(sprite, { body = false } = {}) {
     sprite.updateDisplayOrigin = function updateDisplayOriginOnVisibleFeet() {
       base.call(this);
       if (this.originY === 1 && this.frame && this.frame.cutHeight) {
-        this._displayOriginY = this.height - stableFootMargin(this) * (this.height / this.frame.cutHeight);
+        // `__footSink` (px monde) : image descendue d'autant sous la ligne de marche (ours-hibou).
+        this._displayOriginY = this.height - stableFootMargin(this) * (this.height / this.frame.cutHeight)
+          - (this.__footSink || 0) / (Math.abs(this.scaleY) || 1);
       }
       return this;
     };

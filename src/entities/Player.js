@@ -1148,8 +1148,12 @@ function playManifestOn(sprite, id, anim) {
   if (sprite.scene.anims.exists(key)) {
     // Anim non bouclée déjà jouée jusqu'au bout : on garde sa dernière frame
     // (sinon play() la relancerait à chaque frame, cf. formTransitionActive).
+    // Seulement pour une anim NON bouclée : une boucle arrêtée entre-temps par
+    // `anims.stop()` (pose de saut ou d'arrêt du grizzly) doit repartir, sinon
+    // elle restait figée sur une image (2026-11-14 : le grizzly ne retrouvait
+    // plus sa course après un saut ou un demi-tour).
     const cur = sprite.anims.currentAnim;
-    if (cur && cur.key === key && !sprite.anims.isPlaying) return;
+    if (cur && cur.key === key && !sprite.anims.isPlaying && cur.repeat !== -1) return;
     sprite.anims.play(key, true);
   } else {
     sprite.anims.stop();
@@ -2225,14 +2229,16 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const maxSpeed = biteSlow * (grizzlyRun ? grizzlyRun.maxSpeed : sprinting ? this.wolfMaxSpeed
       : webSlowed ? this.moveMaxSpeed * this.webSlowMultiplier : this.moveMaxSpeed);
 
-    this.body.maxVelocity.x = maxSpeed;
-    this.setDragX(onGround ? this.groundDrag : this.airDrag);
+    // Ours-hibou en l'air : plus rapide, mais lent à lancer et à freiner (OWLBEAR_TUNING).
+    const owl = !onGround && this.airJumpForm === 'owlbear' && typeof OWLBEAR_TUNING !== 'undefined' ? OWLBEAR_TUNING : null;
+    this.body.maxVelocity.x = owl ? Math.max(maxSpeed, owl.airMaxSpeed) : maxSpeed;
+    this.setDragX(onGround ? this.groundDrag : owl ? owl.airDrag : this.airDrag);
 
     const dir = left && !right ? -1 : right && !left ? 1 : 0;
     if (dir !== 0) {
       const isReversing = Math.sign(this.body.velocity.x) === -dir;
-      const turnBoost = isReversing ? this.turnAccelerationMultiplier : 1;
-      this.setAccelerationX(dir * acceleration * turnBoost);
+      const turnBoost = isReversing && !owl ? this.turnAccelerationMultiplier : 1;
+      this.setAccelerationX(dir * (owl ? owl.airAcceleration : acceleration) * turnBoost);
       this.facingDir = dir;
     } else {
       this.setAccelerationX(0);
@@ -2363,7 +2369,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.jumpCutArmed = true;
         if (this.jumpsUsed === 2) {
           this.airJumpForm = 'owlbear';
-          this.setVelocityY(this.monkeyJumpVelocity);
+          this.setVelocityY(typeof OWLBEAR_TUNING !== 'undefined' ? OWLBEAR_TUNING.jumpVelocity : this.monkeyJumpVelocity);
           this.wolfJumpCarry = false;
           this.owlbearTopY = this.y;
         } else {
@@ -2591,6 +2597,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // à (0.5, 1) chaque frame AVANT les blocs ci-dessous, qui supposent tous
     // les pieds à l'origine ; la branche liane la repose si besoin.
     this.resetVineArtAnchor();
+    // Ours-hibou (forme et fracas) : pattes enfoncées dans l'herbe (OWLBEAR_TUNING.footSink).
+    const footSink = typeof OWLBEAR_TUNING !== 'undefined' && (this.form === 'owlbear' || this.activeSkillId === 'owlbear_slam')
+      ? OWLBEAR_TUNING.footSink : 0;
+    if ((this.__footSink || 0) !== footSink) { this.__footSink = footSink; this.updateDisplayOrigin(); }
     const activeSkillDef = skillDefOf(this.activeSkillId);
     const skillArtActive = !!(this.skillTransformActive && activeSkillDef && activeSkillDef.animKey);
 
