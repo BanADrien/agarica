@@ -1,8 +1,9 @@
-// Pics de glace de l'ours polaire (pixelfx, ice/polar-spike) -> images du jeu, sans lissage, 1 px de l'effet =
-// 2 px d'écran : assets/vfx/glace_frames/glace_petit_<i>.png (pics de la rangée) et glace_gros_<i>.png (gros pic
-// du bout). Écrit aussi src/data/glace_fx.js (nombre d'images, cadence, ancrage : le jeu les lit là) et change
-// le numéro de src/data/asset_version.js. Réglages : en tête de tools/pixelfx/polar-spike.js ; hauteurs ci-dessous
-// (moitié de POLAR_TUNING.spikeH / bigH de src/entities/Ursides.js).
+// Traînée de glace de l'ours polaire (pixelfx, ice/polar-spike) -> images du jeu, sans lissage, 1 px de l'effet =
+// 2 px d'écran. Six segments qui se touchent et montent jusqu'au bout (croquis de l'utilisateur, 2026-11-14) :
+//   assets/vfx/glace_frames/glace_<k>_<i>.png, k = 0..4 (segments de la rangée), puis glace_gros_<i>.png (le bout).
+// Écrit aussi src/data/glace_fx.js (largeur, hauteur, ancrage et nombre d'images de chaque segment : le jeu les
+// lit là) et change le numéro de src/data/asset_version.js. La largeur d'un segment suit l'écart entre deux
+// pics du jeu (POLAR_TUNING.reach / POLAR_TUNING.spikes, src/entities/Ursides.js : 320 / 5 = 64 px d'écran).
 //   node tools/pixelfx/export_glace.mjs            (depuis la racine du jeu)
 //   node tools/pixelfx/export_glace.mjs <dossier>  (rendu d'essai : n'écrit que les images)
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -19,13 +20,21 @@ const trial = !!process.argv[2];
 const dir = "assets/vfx/glace_frames";
 const out = trial ? resolve(process.argv[2]) : resolve(game, dir);
 const K = 2, FPS = fx.meta.fps;
-const parts = {
-  petit: { w: 72, h: 60, ox: 36, oy: 52, opts: { height: 24, width: 9, big: false, seed: 4 } },
-  gros: { w: 110, h: 92, ox: 55, oy: 84, opts: { height: 48, width: 15, big: true, seed: 7 } },
-};
+// Largeur d'un segment (px de l'effet) : l'écart entre deux pics (32) et 2 de chevauchement de chaque côté.
+const SPAN = 36;
+// Hauteurs (px de l'effet ; x2 à l'écran) : elles montent d'un segment à l'autre, jusqu'au gros pic.
+const LADDER = [10, 13, 16, 19, 22, 26];
+const parts = {};
+for (let k = 0; k < 5; k++) {
+  const H = LADDER[k + 1];
+  parts[k] = { w: SPAN + 24, h: Math.ceil(H * 1.25) + 26, opts: { span: SPAN, from: LADDER[k], height: H, big: false, seed: 4 + k } };
+}
+parts.gros = { w: 76, h: 94, opts: { span: 40, from: LADDER[5], height: 58, big: true, seed: 11 } };
+for (const c of Object.values(parts)) { c.ox = Math.round(c.w / 2) - 4; c.oy = c.h - 12; }
+
 mkdirSync(out, { recursive: true });
-for (const f of readdirSync(out)) if (/^glace_(petit|gros)_\d+\.png$/.test(f)) unlinkSync(resolve(out, f));
-const data = { px: K };
+for (const f of readdirSync(out)) if (/^glace_\w+_\d+\.png$/.test(f)) unlinkSync(resolve(out, f));
+const data = { px: K, rangee: [] };
 for (const [part, c] of Object.entries(parts)) {
   const n = Math.round(fx.meta.duration * FPS);
   for (let i = 0; i < n; i++) {
@@ -43,13 +52,16 @@ for (const [part, c] of Object.entries(parts)) {
     }
     writeFileSync(`${out}/glace_${part}_${i}.png`, encodePNG(c.w * K, c.h * K, big));
   }
-  data[part] = { dir, prefix: `glace_${part}`, frames: n, fps: FPS, w: c.w * K, h: c.h * K, ox: c.ox * K, oy: c.oy * K };
+  const entry = { key: `glace-${part}`, dir, prefix: `glace_${part}`, frames: n, fps: FPS, w: c.w * K, h: c.h * K, ox: c.ox * K, oy: c.oy * K,
+    // largeur et hauteur visibles de la glace (px d'écran) : zone de dégâts du jeu
+    span: c.opts.span * K, height: Math.round(c.opts.height * K) };
+  if (part === "gros") data.gros = entry;
+  else data.rangee.push(entry);
 }
 if (!trial) {
-  const lines = Object.entries(data).map(([k, v]) => `  ${k}: ${JSON.stringify(v)},`).join("\n");
   writeFileSync(resolve(game, "src/data/glace_fx.js"),
-    `// GÉNÉRÉ par tools/pixelfx/export_glace.mjs -- ne pas modifier à la main.\n// Pics de glace de l'ours polaire (pixelfx) : images de ${dir}/, tailles en px d'écran,\n// (ox, oy) = pied du pic dans l'image. Réglages : tools/pixelfx/polar-spike.js.\nconst GLACE_FX = {\n${lines}\n};\n`);
+    `// GÉNÉRÉ par tools/pixelfx/export_glace.mjs -- ne pas modifier à la main.\n// Traînée de glace de l'ours polaire (pixelfx) : images de ${dir}/, tailles en px d'écran,\n// (ox, oy) = pied du segment dans l'image. Réglages : tools/pixelfx/polar-spike.js.\nconst GLACE_FX = ${JSON.stringify(data, null, 1)};\n`);
   writeFileSync(resolve(game, "src/data/asset_version.js"),
     `// GÉNÉRÉ (tools/pixelfix.js et autres outils d'images) -- ne pas modifier à la main.\nconst ASSET_VERSION = '${Date.now()}';\n`);
 }
-console.log("ok", Object.entries(data).filter(([k]) => k !== "px").map(([k, v]) => `${k} ${v.frames} images ${v.w}x${v.h}`).join(", "));
+console.log("ok", [...data.rangee, data.gros].map((v) => `${v.key} ${v.w}x${v.h}`).join(", "));

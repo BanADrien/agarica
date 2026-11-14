@@ -694,14 +694,17 @@ function ursideFxDraw(scene, now) {
 // ---------------------------------------------------------------------------
 // Ours polaire : pics de glace
 // ---------------------------------------------------------------------------
-// Art des pics (2026-11-14 : l'ancien dessin par code était « atroce ») : effet
+// Art de la traînée (2026-11-14, d'après le croquis de l'utilisateur) : effet
 // pixelfx `ice/polar-spike` rendu en images (GLACE_FX, src/data/glace_fx.js,
-// tools/pixelfx/export_glace.mjs) -- le pic perce le sol dans un éclair blanc
-// avec des éclats et du givre, scintille, puis vole en éclats. Une image par
-// 50 ms, jouée d'après l'âge du pic. Sans ces images : le dessin par code.
-function ursideSpikeArt(scene, big) {
-  const c = typeof GLACE_FX !== 'undefined' ? GLACE_FX[big ? 'gros' : 'petit'] : null;
-  return c && scene.textures.exists(`glace-${big ? 'gros' : 'petit'}-0`) ? c : null;
+// tools/pixelfx/export_glace.mjs). Chaque « pic » de la rangée est un SEGMENT
+// de lames serrées, aussi large que l'écart entre deux pics : posés côte à côte,
+// ils font une traînée continue qui monte jusqu'au gros pic du bout. Un segment
+// perce le sol (éclair, éclats, givre), scintille, puis vole en éclats ; une
+// image par 50 ms, jouée d'après son âge. Sans ces images : le dessin par code.
+function ursideSpikeArt(scene, big, index) {
+  if (typeof GLACE_FX === 'undefined') return null;
+  const c = big ? GLACE_FX.gros : GLACE_FX.rangee[Math.min(index, GLACE_FX.rangee.length - 1)];
+  return c && scene.textures.exists(`${c.key}-0`) ? c : null;
 }
 
 // Texture d'un pic, dessinée en « gros pixels » : 1 case du canvas = 2 px
@@ -789,11 +792,15 @@ function ursideCastIceSpikes(scene, player, now) {
     const top = ursideGroundTopAt(scene, x, groundY, T.stepUp, T.stepDown);
     if (top === null || ursideWallAt(scene, x, top)) break;
     groundY = top;
-    const w = (big ? T.bigW : T.spikeW) * size;
-    const h = (big ? T.bigH : T.spikeH) * size;
-    const art = ursideSpikeArt(scene, big);
+    const art = ursideSpikeArt(scene, big, i);
+    // Zone de dégâts = la glace dessinée : toute la largeur du segment (la
+    // traînée est continue), sa hauteur.
+    const w = (art ? art.span : big ? T.bigW : T.spikeW) * size;
+    const h = (art ? art.height : big ? T.bigH : T.spikeH) * size;
+    // Segment centré entre ce pic et le précédent : ils se touchent bord à bord.
+    const sx = art && !big ? x - dir * step / 2 : x;
     const img = art
-      ? scene.add.image(x, top, `glace-${big ? 'gros' : 'petit'}-0`).setOrigin(art.ox / art.w, art.oy / art.h)
+      ? scene.add.image(sx, top, `${art.key}-0`).setOrigin(art.ox / art.w, art.oy / art.h)
         .setScale(size).setFlipX(dir < 0).setDepth(CHARACTER_DEPTH + 1).setVisible(false)
       : scene.add.image(x, top, ursideSpikeTexture(scene, big)).setOrigin(0.5, 1)
         .setScale(URSIDE_PX * size).setDepth(CHARACTER_DEPTH + 1).setVisible(false);
@@ -801,7 +808,7 @@ function ursideCastIceSpikes(scene, player, now) {
     const spike = {
       img, art, x, y: top, w, h, big, index: i, castId, dir, hits,
       bornAt: now + i * T.spikeEveryMs, damage: big ? 2 : 1, popped: false, hitDone: false,
-      rect: new Phaser.Geom.Rectangle(x - w / 2, top - h, w, h),
+      rect: new Phaser.Geom.Rectangle(sx - w / 2, top - h, w, h),
     };
     st.spikes.push(spike);
     made.push(spike);
@@ -844,8 +851,7 @@ function ursideSpikesUpdate(scene, now) {
     }
     if (s.art) {
       // Art pixelfx : l'image de son âge (l'effet dure meltMs).
-      const prefix = s.big ? 'glace-gros-' : 'glace-petit-';
-      img.setTexture(prefix + Math.min(s.art.frames - 1, Math.floor((age / T.meltMs) * s.art.frames)));
+      img.setTexture(`${s.art.key}-${Math.min(s.art.frames - 1, Math.floor((age / T.meltMs) * s.art.frames))}`);
     }
     // Le pic SORT du sol puis y rentre : image rognée par le bas, par crans
     // d'une case (2 px d'écran) -- jamais étirée ni fondue.

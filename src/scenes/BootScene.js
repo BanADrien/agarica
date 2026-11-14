@@ -195,9 +195,8 @@ class BootScene extends Phaser.Scene {
     }
     // Pics de glace de l'ours polaire (pixelfx, tools/pixelfx/export_glace.mjs).
     if (typeof GLACE_FX !== 'undefined') {
-      for (const part of ['petit', 'gros']) {
-        const c = GLACE_FX[part];
-        for (let i = 0; c && i < c.frames; i++) this.load.image(`glace-${part}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
+      for (const c of [...GLACE_FX.rangee, GLACE_FX.gros]) {
+        for (let i = 0; c && i < c.frames; i++) this.load.image(`${c.key}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
       }
     }
     // Ennemi Crapaud (langue-attaque, voir Crapaud.js), généré depuis
@@ -546,10 +545,9 @@ class BootScene extends Phaser.Scene {
 
   static applyPixelFixedFilter(scene) {
     if (typeof GLACE_FX !== 'undefined') {
-      for (const part of ['petit', 'gros']) {
-        const c = GLACE_FX[part];
+      for (const c of [...GLACE_FX.rangee, GLACE_FX.gros]) {
         for (let i = 0; c && i < c.frames; i++) {
-          if (scene.textures.exists(`glace-${part}-${i}`)) scene.textures.get(`glace-${part}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+          if (scene.textures.exists(`${c.key}-${i}`)) scene.textures.get(`${c.key}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
       }
     }

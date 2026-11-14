@@ -3231,7 +3231,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     const centerX = this.x + dir * def.hitboxOffsetX;
     const w = def.hitboxWidth * size;
     const h = def.hitboxHeight * size;
-    const rect = new Phaser.Geom.Rectangle(centerX - w / 2, this.y - h, w, h);
+    // Pieds = bas du CORPS physique : à l'image même de l'atterrissage (fracas de
+    // l'ours-hibou), `this.y` n'a pas encore rattrapé le corps posé au sol --
+    // la zone et la poussière partaient 10 px en l'air (2026-11-14).
+    const feetY = this.body ? this.body.bottom : this.y;
+    const rect = new Phaser.Geom.Rectangle(centerX - w / 2, feetY - h, w, h);
     // `hitboxDelayMs` (cf. SKILL_DEFS.ours) repousse seulement l'ACTIVATION
     // de la zone (cf. update()), pas sa position -- figée ici, au moment du
     // cast, comme avant.

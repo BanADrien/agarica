@@ -64,8 +64,9 @@ vent (ils se tracent, ondulent, s'enroulent, s'effacent) ; la montée est le dé
 jeu, plus rapide au plan avant qu'au plan du fond. Le jeu ajoute un voile de lumière sous les filets.
 Sans les images, `CourantAir.js` retombe sur l'ancien rendu (image étirée et traits).
 
-## Pics de glace de l'ours polaire
+## Traînée de glace de l'ours polaire
 
-- `polar-spike.js` : l'effet (un amas de lames qui perce le sol, scintille, puis vole en éclats).
-- `node tools/pixelfx/export_glace.mjs` : petit et gros pic, 20 images chacun, dans `assets/vfx/glace_frames/`,
-  et `src/data/glace_fx.js` (lu par BootScene et par `ursideSpikeArt`, src/entities/Ursides.js).
+- `polar-spike.js` : un segment de lames serrées qui monte d'une hauteur à l'autre (croquis du 2026-11-14).
+- `node tools/pixelfx/export_glace.mjs` : cinq segments de la rangée (hauteurs croissantes) et le gros pic du
+  bout, 20 images chacun, dans `assets/vfx/glace_frames/`, et `src/data/glace_fx.js` (lu par BootScene et par
+  `ursideSpikeArt`, src/entities/Ursides.js). Posés bord à bord, ils font une traînée continue.
