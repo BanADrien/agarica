@@ -27,10 +27,10 @@ const LADDER = [10, 13, 16, 19, 22, 26];
 const parts = {};
 for (let k = 0; k < 5; k++) {
   const H = LADDER[k + 1];
-  parts[k] = { w: SPAN + 24, h: Math.ceil(H * 1.25) + 26, opts: { span: SPAN, from: LADDER[k], height: H, big: false, seed: 4 + k } };
+  parts[k] = { w: SPAN + Math.ceil(H * 1.8) + 12, h: Math.ceil(H * 1.25) + 26, opts: { span: SPAN, from: LADDER[k], height: H, big: false, seed: 4 + k } };
 }
-parts.gros = { w: 76, h: 94, opts: { span: 40, from: LADDER[5], height: 58, big: true, seed: 11 } };
-for (const c of Object.values(parts)) { c.ox = Math.round(c.w / 2) - 4; c.oy = c.h - 12; }
+parts.gros = { w: 140, h: 94, opts: { span: 40, from: LADDER[5], height: 58, big: true, seed: 11 } };
+for (const c of Object.values(parts)) { c.ox = Math.round(c.w / 2); c.oy = c.h - 12; }
 
 mkdirSync(out, { recursive: true });
 for (const f of readdirSync(out)) if (/^glace_\w+_\d+\.png$/.test(f)) unlinkSync(resolve(out, f));

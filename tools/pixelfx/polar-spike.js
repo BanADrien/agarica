@@ -1,18 +1,18 @@
 // Traînée de glace de l'ours polaire (Legend of Agarica), d'après le croquis de l'utilisateur (2026-11-14) :
-// une rangée CONTINUE de lames de glace serrées les unes contre les autres, de plus en plus hautes jusqu'au
-// gros pic du bout. Le jeu pose côte à côte six segments (cinq de la rangée, puis le gros), chacun rendu par
-// cet effet : `span` = largeur couverte (les segments se touchent), hauteur qui monte de `from` à `height`
-// sur sa largeur, lames penchées vers l'avant (le sens de la traînée). Un segment perce le sol dans un éclair
-// blanc avec éclats et givre, scintille, puis blanchit et vole en éclats.
-// Rendu par tools/pixelfx/export_glace.mjs. La lame (facettes, arête claire, encoche) et les éclats viennent de
-// pixelfx (ice/_lib.js), adaptés des effets de glace de Sprite Fusion (MIT, Copyright (c) 2026 Hugo Duprez).
+// une rangée CONTINUE de cristaux de glace serrés, de plus en plus hauts jusqu'au gros amas du bout. Des
+// CRISTAUX (prismes à six pans : flancs parallèles, pointe taillée), pas des pics, et dans TOUS les sens :
+// droits, penchés en avant, en arrière, en éventail. Le jeu pose côte à côte six segments (cinq de la rangée,
+// puis le gros), chacun rendu par cet effet : `span` = largeur couverte (les segments se touchent), hauteur qui
+// monte de `from` à `height` sur sa largeur. Un segment perce le sol dans un éclair blanc avec éclats et givre,
+// scintille, puis blanchit et vole en éclats.
+// Rendu par tools/pixelfx/export_glace.mjs. Particules et éclats : pixelfx (sim.js, adapté des effets de
+// Sprite Fusion, MIT, Copyright (c) 2026 Hugo Duprez).
 import { Particles, Bits, Lights, P, B, Rng, fit, sparkle, clamp, ease, rand, WHITE } from "../../core/index.js";
-import { blade } from "./_lib.js";
 
 export const meta = {
   name: "Polar spike",
-  desc: "A tight row of jagged ice blades punches up out of the floor, rising toward its far end, glints on a frosted strip, then flashes white and shatters.",
-  tags: ["ice", "spike", "ground", "wave", "magic", "one-shot"],
+  desc: "A tight row of six-sided ice crystals bursts out of the floor at every angle, rising toward its far end, glints on a frosted strip, then flashes white and shatters.",
+  tags: ["ice", "crystal", "ground", "wave", "magic", "one-shot"],
   size: [96, 96],
   origin: [48, 80],
   duration: 1.0,
@@ -25,7 +25,7 @@ export const meta = {
     span: 34,
     from: 10,
     height: 16,
-    // gros pic du bout : une grande lame dressée, entourée de lames plus courtes
+    // gros amas du bout : un grand cristal dressé et une couronne de cristaux en éventail
     big: false,
     seed: 4,
   },
@@ -35,62 +35,101 @@ const RISE = 0.11;      // il sort du sol (POLAR_TUNING.riseMs)
 const GLINT = 0.3;      // un reflet le parcourt
 const FLASH = 0.7, SHATTER = 0.76; // il blanchit, puis casse
 
+// Un cristal : prisme de demi-largeur `hw`, long de `len` depuis sa base (bx, 0), orienté `ang` (radians depuis
+// la verticale, + = vers l'avant). Flancs parallèles, puis pointe taillée sur `cap`. Facettes : face gauche
+// claire, arête blanche, face droite plus sombre, contour sombre d'un pixel, pointe blanche.
+function prism(p, bx, len, hw, ang, C, opts = {}) {
+  if (len < 2 || hw < 0.8) return;
+  const ux = Math.sin(ang), uy = -Math.cos(ang); // axe (vers le haut)
+  const nx = -uy, ny = ux;                         // normale (vers la droite de l'axe)
+  const cap = Math.min(len * 0.45, hw * 1.7), body = len - cap, dim = opts.dim ?? 0;
+  const K = (i) => C[clamp(i - dim, 0, C.length - 1)];
+  const halfAt = (u) => (u < 0 ? hw : u <= body ? hw : hw * (1 - (u - body) / cap));
+  const local = (x, y) => {
+    const dx = x - bx, dy = y;
+    return [dx * ux + dy * uy, dx * nx + dy * ny];
+  };
+  const inside = (x, y) => {
+    const [u, v] = local(x + 0.5, y + 0.5);
+    return u >= -3 && u <= len && Math.abs(v) <= halfAt(u) + 0.3 && y + 0.5 <= 0.6;
+  };
+  const r = len + hw + 3;
+  for (let y = Math.floor(-r); y <= 1; y++) {
+    for (let x = Math.floor(bx - r); x <= Math.ceil(bx + r); x++) {
+      if (!inside(x, y)) continue;
+      const rim = !inside(x - 1, y) || !inside(x + 1, y) || !inside(x, y - 1) || (!inside(x, y + 1) && y < 0);
+      if (opts.white) { p.dot(x, y, rim ? K(5) : WHITE, opts.a ?? 1); continue; }
+      const [u, v] = local(x + 0.5, y + 0.5), hv = v / Math.max(0.5, halfAt(u));
+      let col;
+      if (rim) col = K(1);
+      else if (u > len - cap * 0.55) col = hv < 0.2 ? WHITE : K(6);       // pointe taillée
+      else if (Math.abs(hv + 0.2) < 0.18) col = K(7);                      // arête
+      else if (hv < -0.2) col = hv < -0.7 ? K(6) : K(5);                    // face éclairée
+      else col = hv > 0.65 ? K(2) : K(3);                                   // face dans l'ombre
+      if (opts.glint >= 0 && hv < 0.1) {
+        const g = Math.abs(u / len - opts.glint);
+        if (g < 0.06) col = WHITE;
+      }
+      p.dot(x, y, col, opts.a ?? 1);
+    }
+  }
+}
+
 export function create(o) {
   const C = fit(o.palette, 8), R = new Rng(o.seed), SPAN = o.span, big = !!o.big, floor = () => 0;
   const ps = new Particles({ rng: R, ground: floor, sparks: [C[7], C[6], C[5], C[4]], haze: C[5] });
   const bits = new Bits({ ground: floor }), lights = new Lights();
   const heightAt = (x) => o.from + (o.height - o.from) * clamp((x + SPAN / 2) / SPAN);
-  const blades = [];
+  // Orientation : dans tous les sens (droit, avant, arrière), plus couchés pour les petits.
+  const angle = (k) => (R.chance(0.5) ? 1 : -1) * R.range(0, 0.25 + 0.6 * k);
+  const crystals = [];
   if (big) {
-    // la grande lame, un peu après le milieu, droite et à peine penchée vers l'avant
     const H = o.height;
-    blades.push({ dx: SPAN * 0.08, h: H, w: SPAN * 0.42, lean: H * 0.06, back: false, delay: 0, jag: 0.55, main: true });
-    blades.push({ dx: SPAN * 0.36, h: H * 0.42, w: SPAN * 0.2, lean: H * 0.2, back: true, delay: 0.03, jag: 0.4 });
-    blades.push({ dx: SPAN * 0.42, h: H * 0.3, w: SPAN * 0.18, lean: H * 0.16, back: false, delay: 0.045, jag: -1 });
-    blades.push({ dx: -SPAN * 0.22, h: H * 0.36, w: SPAN * 0.22, lean: H * 0.12, back: true, delay: 0.025, jag: 0.45 });
-    blades.push({ dx: -SPAN * 0.38, h: H * 0.24, w: SPAN * 0.18, lean: H * 0.05, back: false, delay: 0.035, jag: -1 });
+    crystals.push({ dx: SPAN * 0.04, len: H, hw: SPAN * 0.14, ang: 0.08, back: false, delay: 0, main: true });
+    // couronne en éventail autour du grand
+    for (const [dx, k, a, back] of [[-0.3, 0.46, -0.7, true], [-0.18, 0.62, -0.38, false], [0.24, 0.58, 0.42, false], [0.36, 0.42, 0.78, true],
+      [-0.4, 0.3, -1.0, false], [0.44, 0.3, 1.05, false], [0.02, 0.36, -0.15, true]]) {
+      crystals.push({ dx: SPAN * dx, len: H * k * R.range(0.9, 1.08), hw: SPAN * R.range(0.07, 0.1), ang: a + R.range(-0.08, 0.08), back, delay: R.range(0.02, 0.05) });
+    }
   } else {
-    // lames serrées sur toute la largeur : une rangée de devant, une rangée plus sombre derrière, décalée
-    // (éclats massifs, larges comme des dalles de glace : le croquis, pas des brins d'herbe)
-    for (let x = -SPAN / 2 + 4; x <= SPAN / 2 - 2; x += R.range(7, 9.5)) {
-      const H = heightAt(x) * R.range(0.75, 1.02);
-      blades.push({ dx: x, h: H, w: R.range(8, 11), lean: H * R.range(-0.04, 0.16), back: false, delay: R.range(0, 0.035), jag: R.chance(0.7) ? R.range(0.35, 0.6) : -1 });
+    // devant : cristaux serrés, plus massifs ; derrière : une rangée plus sombre, décalée
+    for (let x = -SPAN / 2 + 3; x <= SPAN / 2 - 1; x += R.range(6, 8)) {
+      const H = heightAt(x) * R.range(0.7, 1.05);
+      crystals.push({ dx: x, len: H, hw: R.range(2.8, 4), ang: angle(R.next()), back: false, delay: R.range(0, 0.035) });
     }
-    for (let x = -SPAN / 2 + 8; x <= SPAN / 2 + 1; x += R.range(8, 11)) {
-      const H = heightAt(x) * R.range(0.9, 1.18);
-      blades.push({ dx: x, h: H, w: R.range(7, 10), lean: H * R.range(0.1, 0.24), back: true, delay: R.range(0.01, 0.045), jag: R.chance(0.6) ? R.range(0.35, 0.6) : -1 });
+    for (let x = -SPAN / 2 + 5; x <= SPAN / 2 + 1; x += R.range(6, 8)) {
+      const H = heightAt(x) * R.range(0.85, 1.2);
+      crystals.push({ dx: x, len: H, hw: R.range(2.5, 3.5), ang: angle(R.next()) * 0.8, back: true, delay: R.range(0.01, 0.045) });
     }
-    // la plus haute du segment, au bout : elle dépasse un peu et prend le reflet
-    const top = blades.filter((b) => !b.back).reduce((a, b) => (b.dx > a.dx ? b : a));
-    top.h = Math.max(top.h, o.height * 1.05);
+    // le plus haut du segment, vers le bout, presque droit : il prend le reflet
+    const top = crystals.filter((c) => !c.back).reduce((a, c) => (c.dx > a.dx ? c : a));
+    top.len = Math.max(top.len, o.height * 1.05);
+    top.ang = R.range(-0.12, 0.2);
     top.main = true;
   }
-  const mainBlade = blades.find((b) => b.main) || blades[0];
+  const mainC = crystals.find((c) => c.main) || crystals[0];
   let t = 0, burst = false, broke = false;
-  const pose = (b) => {
-    const g = ease.outBack(clamp((t - b.delay) / RISE), 2.2);
-    return { g, x: b.dx, tx: b.dx + b.lean * g, ty: -b.h * g, white: t - b.delay < 0.045 || (t >= FLASH && t < SHATTER) };
-  };
+  const grow = (c) => ease.outBack(clamp((t - c.delay) / RISE), 2.2);
+  const tipOf = (c) => { const g = grow(c); return [c.dx + Math.sin(c.ang) * c.len * g, -Math.cos(c.ang) * c.len * g]; };
   return {
     update(dt) {
       t += dt;
       if (!burst) {
         burst = true;
-        // il perce : éclats projetés, givre qui fuse au ras du sol, lumière
         for (let i = 0; i < (big ? 14 : 7); i++) {
-          bits.add({ kind: B.SHARD, x: R.range(-SPAN / 2, SPAN / 2), y: -1, vx: R.range(-60, 110), vy: -R.range(70, big ? 260 : 170), g: 0.9, drag: 0.6, bounce: 0.3, life: R.range(0.35, 0.7), a: R.range(0, 6.28), va: R.range(-10, 10), s: R.range(1, big ? 2.4 : 1.7), ramp: C });
+          bits.add({ kind: B.SHARD, x: R.range(-SPAN / 2, SPAN / 2), y: -1, vx: R.range(-100, 100), vy: -R.range(70, big ? 260 : 170), g: 0.9, drag: 0.6, bounce: 0.3, life: R.range(0.35, 0.7), a: R.range(0, 6.28), va: R.range(-10, 10), s: R.range(1, big ? 2.4 : 1.7), ramp: C });
         }
-        for (let i = 0; i < (big ? 5 : 3); i++) ps.spawn(P.VAPOUR, R.range(-SPAN / 2, SPAN / 2), -R.range(0, 3), R.range(-20, 50), -R.range(2, 12), R.range(0.35, 0.6), C[6], R.range(1.6, big ? 3 : 2.4));
-        for (let i = 0; i < (big ? 6 : 2); i++) ps.spawn(P.FLAKE, R.range(-SPAN / 2, SPAN / 2), -R.range(2, o.height * 0.6), R.range(-20, 40), -R.range(20, 70), R.range(0.4, 0.8), R.chance(0.5) ? WHITE : C[6], R.range(0.5, 1.1));
+        for (let i = 0; i < (big ? 5 : 3); i++) ps.spawn(P.VAPOUR, R.range(-SPAN / 2, SPAN / 2), -R.range(0, 3), R.range(-40, 40), -R.range(2, 12), R.range(0.35, 0.6), C[6], R.range(1.6, big ? 3 : 2.4));
+        for (let i = 0; i < (big ? 6 : 2); i++) ps.spawn(P.FLAKE, R.range(-SPAN / 2, SPAN / 2), -R.range(2, o.height * 0.6), R.range(-30, 30), -R.range(20, 70), R.range(0.4, 0.8), R.chance(0.5) ? WHITE : C[6], R.range(0.5, 1.1));
         lights.add(0, -o.height * 0.4, o.height + 14, C[5], big ? 0.9 : 0.6, 0.22);
       }
       if (!broke && t >= SHATTER) {
         broke = true;
-        for (const b of blades) {
-          const s = pose(b);
-          for (let i = 0; i < 1 + b.h / 7; i++) {
+        for (const c of crystals) {
+          const [tx, ty] = tipOf(c);
+          for (let i = 0; i < 1 + c.len / 7; i++) {
             const u = R.next();
-            bits.add({ kind: R.chance(0.2) ? B.CHUNK : B.SHARD, x: s.x + (s.tx - s.x) * u + R.range(-1.5, 1.5), y: s.ty * u, vx: R.range(-60, 80), vy: -R.range(30, 150), g: 0.9, drag: 0.6, bounce: 0.3, life: R.range(0.15, 0.24), a: R.range(0, 6.28), va: R.range(-12, 12), s: R.range(1, 2.2), ramp: C });
+            bits.add({ kind: R.chance(0.25) ? B.CHUNK : B.SHARD, x: c.dx + (tx - c.dx) * u, y: ty * u, vx: R.range(-80, 80), vy: -R.range(30, 150), g: 0.9, drag: 0.6, bounce: 0.3, life: R.range(0.15, 0.24), a: R.range(0, 6.28), va: R.range(-12, 12), s: R.range(1, 2.2), ramp: C });
           }
         }
         for (let i = 0; i < 3; i++) ps.spawn(P.VAPOUR, R.range(-SPAN / 2, SPAN / 2), -R.range(2, o.height * 0.7), R.range(-20, 20), -R.range(4, 14), R.range(0.14, 0.22), C[6], R.range(1.4, 2.2));
@@ -112,22 +151,23 @@ export function create(o) {
       }
       if (t < SHATTER) {
         for (const pass of [0, 1]) {
-          for (const b of blades) {
-            if ((pass === 0) !== !!b.back) continue;
-            const s = pose(b);
-            if (s.g <= 0) continue;
-            const jx = t >= FLASH - 0.12 && t < FLASH ? (Math.floor(t * 40 + b.dx) % 2 ? 1 : 0) : 0;
-            const gl = (t - GLINT - (b.dx + SPAN / 2) / SPAN * 0.12) / 0.22;
-            blade(p, s.x + jx, 0, s.tx + jx, s.ty, b.w, C, { white: s.white, jag: b.jag, dim: b.back ? 1 : 0, glint: gl >= 0 && gl <= 1 ? gl : -1 });
+          for (const c of crystals) {
+            if ((pass === 0) !== !!c.back) continue;
+            const g = grow(c);
+            if (g <= 0) continue;
+            const jx = t >= FLASH - 0.12 && t < FLASH ? (Math.floor(t * 40 + c.dx) % 2 ? 1 : 0) : 0;
+            const white = t - c.delay < 0.045 || (t >= FLASH && t < SHATTER);
+            const gl = (t - GLINT - (c.dx + SPAN / 2) / SPAN * 0.12) / 0.22;
+            prism(p, c.dx + jx, c.len * g, c.hw, c.ang, C, { white, dim: c.back ? 1 : 0, glint: gl >= 0 && gl <= 1 ? gl : -1 });
           }
         }
         const pop = clamp(1 - t / 0.15), wh = t >= FLASH;
         p.glow(SPAN * 0.1, -o.height * 0.45, o.height * 0.9 + SPAN * 0.4, C[4], 0.12 + 0.36 * pop + (wh ? 0.4 : 0));
         if (pop > 0) p.glow(0, -2, SPAN * 0.5, WHITE, 0.4 * pop);
-        // étoile au sommet de la plus haute lame pendant le reflet
-        const m = pose(mainBlade);
+        // étoile au sommet du plus haut cristal pendant le reflet
+        const [mx, my] = tipOf(mainC);
         const k = (t - GLINT - 0.1) / 0.16;
-        if (k >= 0 && k <= 1) sparkle(p, m.tx, m.ty + 1, (big ? 3 : 2) + 3 * Math.sin(k * Math.PI), WHITE, C[5]);
+        if (k >= 0 && k <= 1) sparkle(p, mx, my + 1, (big ? 3 : 2) + 3 * Math.sin(k * Math.PI), WHITE, C[5]);
       }
       bits.draw(p);
       ps.draw(p);

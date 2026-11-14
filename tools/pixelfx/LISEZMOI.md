@@ -66,7 +66,7 @@ Sans les images, `CourantAir.js` retombe sur l'ancien rendu (image étirée et t
 
 ## Traînée de glace de l'ours polaire
 
-- `polar-spike.js` : un segment de lames serrées qui monte d'une hauteur à l'autre (croquis du 2026-11-14).
+- `polar-spike.js` : un segment de cristaux de glace (prismes à six pans) serrés, orientés dans tous les sens, qui monte d'une hauteur à l'autre (croquis du 2026-11-14).
 - `node tools/pixelfx/export_glace.mjs` : cinq segments de la rangée (hauteurs croissantes) et le gros pic du
   bout, 20 images chacun, dans `assets/vfx/glace_frames/`, et `src/data/glace_fx.js` (lu par BootScene et par
   `ursideSpikeArt`, src/entities/Ursides.js). Posés bord à bord, ils font une traînée continue.
