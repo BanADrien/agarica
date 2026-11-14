@@ -694,6 +694,16 @@ function ursideFxDraw(scene, now) {
 // ---------------------------------------------------------------------------
 // Ours polaire : pics de glace
 // ---------------------------------------------------------------------------
+// Art des pics (2026-11-14 : l'ancien dessin par code était « atroce ») : effet
+// pixelfx `ice/polar-spike` rendu en images (GLACE_FX, src/data/glace_fx.js,
+// tools/pixelfx/export_glace.mjs) -- le pic perce le sol dans un éclair blanc
+// avec des éclats et du givre, scintille, puis vole en éclats. Une image par
+// 50 ms, jouée d'après l'âge du pic. Sans ces images : le dessin par code.
+function ursideSpikeArt(scene, big) {
+  const c = typeof GLACE_FX !== 'undefined' ? GLACE_FX[big ? 'gros' : 'petit'] : null;
+  return c && scene.textures.exists(`glace-${big ? 'gros' : 'petit'}-0`) ? c : null;
+}
+
 // Texture d'un pic, dessinée en « gros pixels » : 1 case du canvas = 2 px
 // d'écran (image affichée à l'échelle 2, filtre net). Silhouette en dents
 // irrégulières, contour sombre, corps bleu clair, arête blanche, ombre.
@@ -781,11 +791,15 @@ function ursideCastIceSpikes(scene, player, now) {
     groundY = top;
     const w = (big ? T.bigW : T.spikeW) * size;
     const h = (big ? T.bigH : T.spikeH) * size;
-    const img = scene.add.image(x, top, ursideSpikeTexture(scene, big)).setOrigin(0.5, 1)
-      .setScale(URSIDE_PX * size).setDepth(CHARACTER_DEPTH + 1).setVisible(false);
+    const art = ursideSpikeArt(scene, big);
+    const img = art
+      ? scene.add.image(x, top, `glace-${big ? 'gros' : 'petit'}-0`).setOrigin(art.ox / art.w, art.oy / art.h)
+        .setScale(size).setFlipX(dir < 0).setDepth(CHARACTER_DEPTH + 1).setVisible(false)
+      : scene.add.image(x, top, ursideSpikeTexture(scene, big)).setOrigin(0.5, 1)
+        .setScale(URSIDE_PX * size).setDepth(CHARACTER_DEPTH + 1).setVisible(false);
     img.lookRole = 'fx';
     const spike = {
-      img, x, y: top, w, h, big, index: i, castId, dir, hits,
+      img, art, x, y: top, w, h, big, index: i, castId, dir, hits,
       bornAt: now + i * T.spikeEveryMs, damage: big ? 2 : 1, popped: false, hitDone: false,
       rect: new Phaser.Geom.Rectangle(x - w / 2, top - h, w, h),
     };
@@ -814,8 +828,9 @@ function ursideSpikesUpdate(scene, now) {
     if (!s.popped) {
       s.popped = true;
       img.setVisible(true);
-      // Éclats de glace et mottes au pied du pic qui perce le sol.
-      const n = s.big ? 10 : 5;
+      // Éclats de glace et mottes au pied du pic qui perce le sol (dessin par
+      // code seulement : l'art pixelfx a ses propres éclats).
+      const n = s.art ? 0 : s.big ? 10 : 5;
       for (let i = 0; i < n; i++) {
         ursideFxAdd(scene, {
           x: s.x + (Math.random() - 0.5) * s.w, y: s.y - 4, w: 4, h: 4,
@@ -827,16 +842,23 @@ function ursideSpikesUpdate(scene, now) {
       else if (s.index === 0) juiceShake(scene, 'light');
       playSfx('ice_spike', { big: s.big });
     }
+    if (s.art) {
+      // Art pixelfx : l'image de son âge (l'effet dure meltMs).
+      const prefix = s.big ? 'glace-gros-' : 'glace-petit-';
+      img.setTexture(prefix + Math.min(s.art.frames - 1, Math.floor((age / T.meltMs) * s.art.frames)));
+    }
     // Le pic SORT du sol puis y rentre : image rognée par le bas, par crans
     // d'une case (2 px d'écran) -- jamais étirée ni fondue.
     const rise = Math.min(1, age / T.riseMs);
     const meltStart = T.meltMs - 220;
     const sink = age > meltStart ? (age - meltStart) / 220 : 0;
     const shown = Math.max(0, Math.round(texH * rise * (1 - sink)));
-    img.setCrop(0, 0, img.width, shown);
-    img.y = s.y + (texH - shown) * img.scaleY;
-    // Fonte : le pic clignote par crans juste avant de rentrer.
-    img.setVisible(!(age > meltStart - 180 && age <= meltStart && Math.floor(age / 45) % 2 === 0));
+    if (!s.art) {
+      img.setCrop(0, 0, img.width, shown);
+      img.y = s.y + (texH - shown) * img.scaleY;
+      // Fonte : le pic clignote par crans juste avant de rentrer.
+      img.setVisible(!(age > meltStart - 180 && age <= meltStart && Math.floor(age / 45) % 2 === 0));
+    }
     // Dégâts : pendant la sortie du pic, une fois par ennemi (liste `hits` du
     // lancer : le jeton de damageEnemy ne retient que le DERNIER coup). Un
     // ennemi prend au plus un petit pic par lancer, et le gros compte double.

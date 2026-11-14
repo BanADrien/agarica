@@ -63,3 +63,9 @@ La case se répète sans raccord en largeur et en hauteur. Elle ne contient que 
 vent (ils se tracent, ondulent, s'enroulent, s'effacent) ; la montée est le défilement fait par le
 jeu, plus rapide au plan avant qu'au plan du fond. Le jeu ajoute un voile de lumière sous les filets.
 Sans les images, `CourantAir.js` retombe sur l'ancien rendu (image étirée et traits).
+
+## Pics de glace de l'ours polaire
+
+- `polar-spike.js` : l'effet (un amas de lames qui perce le sol, scintille, puis vole en éclats).
+- `node tools/pixelfx/export_glace.mjs` : petit et gros pic, 20 images chacun, dans `assets/vfx/glace_frames/`,
+  et `src/data/glace_fx.js` (lu par BootScene et par `ursideSpikeArt`, src/entities/Ursides.js).

@@ -193,6 +193,13 @@ class BootScene extends Phaser.Scene {
         for (let i = 0; c && i < c.frames; i++) this.load.image(`fracas-${part}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
       }
     }
+    // Pics de glace de l'ours polaire (pixelfx, tools/pixelfx/export_glace.mjs).
+    if (typeof GLACE_FX !== 'undefined') {
+      for (const part of ['petit', 'gros']) {
+        const c = GLACE_FX[part];
+        for (let i = 0; c && i < c.frames; i++) this.load.image(`glace-${part}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
+      }
+    }
     // Ennemi Crapaud (langue-attaque, voir Crapaud.js), généré depuis
     // assets/sprites/image.png via tools/crop_crapaud.py -- PAS
     // split_spritesheet.py habituel : ce script-là centre chaque frame
@@ -538,6 +545,14 @@ class BootScene extends Phaser.Scene {
   }
 
   static applyPixelFixedFilter(scene) {
+    if (typeof GLACE_FX !== 'undefined') {
+      for (const part of ['petit', 'gros']) {
+        const c = GLACE_FX[part];
+        for (let i = 0; c && i < c.frames; i++) {
+          if (scene.textures.exists(`glace-${part}-${i}`)) scene.textures.get(`glace-${part}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+      }
+    }
     for (let i = 0; i < ARCHE_PORTAIL_FRAMES; i++) {
       if (scene.textures.exists(`arche-portail-${i}`)) scene.textures.get(`arche-portail-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
