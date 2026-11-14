@@ -5907,6 +5907,29 @@ function freezeWorldBodies(scene, playerFalling = false) {
 // --- Son : points d'accroche vides (le projet n'a pas d'audio) -------------
 // Brancher un son plus tard : SFX_HOOKS[id] = (id, opts) => … (ou '*').
 const SFX_HOOKS = {};
+
+// Moteur de son (2026-11-14) : joue les sons listés dans AUDIO_SFX (src/data/audio_sfx.js),
+// chargés par BootScene. Recettes du guide gamedev « audio-design » : un fichier tiré au hasard
+// parmi les variantes, hauteur qui varie un peu, écart minimal entre deux lectures du même son
+// (une rangée de pics ne fait pas dix fois le même bruit superposé), volume « Effets sonores »
+// des options (menuOptions().sfxVolume, 0 à 1). Un id sans son listé : rien, comme avant.
+const SFX_LAST_PLAY = new Map();
+SFX_HOOKS['*'] = (id, opts) => {
+  const def = typeof AUDIO_SFX !== 'undefined' ? AUDIO_SFX[id] : null;
+  const game = typeof window !== 'undefined' ? window.__game : null;
+  if (!def || !def.files || !def.files.length || !game || !game.sound) return;
+  const now = performance.now();
+  if (now - (SFX_LAST_PLAY.get(id) || -Infinity) < (def.cooldownMs ?? 40)) return;
+  SFX_LAST_PLAY.set(id, now);
+  const keys = def.files.map((f, n) => `sfx-${id}-${n}`).filter((k) => game.cache.audio.exists(k));
+  if (!keys.length) return;
+  const master = typeof menuOptions === 'function' ? (menuOptions().sfxVolume ?? 0.8) : 0.8;
+  const volume = (def.volume ?? 1) * (opts.volume ?? 1) * master;
+  if (volume <= 0) return;
+  const jitter = def.pitch ?? 0.05;
+  game.sound.play(keys[Math.floor(Math.random() * keys.length)], { volume, rate: 1 + (Math.random() * 2 - 1) * jitter });
+};
+
 function playSfx(id, opts = {}) {
   const hook = SFX_HOOKS[id] || SFX_HOOKS['*'];
   if (!hook) return;

@@ -23,13 +23,14 @@ const K = 2, FPS = fx.meta.fps;
 // Largeur d'un segment (px de l'effet) : l'écart entre deux pics (32) et 2 de chevauchement de chaque côté.
 const SPAN = 36;
 // Hauteurs (px de l'effet ; x2 à l'écran) : elles montent d'un segment à l'autre, jusqu'au gros pic.
-const LADDER = [10, 13, 16, 19, 22, 26];
+// (même hauteur moyenne partout : les tailles varient d'un cristal à l'autre, pas d'un segment à l'autre)
+const LADDER = [17, 17, 17, 17, 17, 17];
 const parts = {};
 for (let k = 0; k < 5; k++) {
   const H = LADDER[k + 1];
   parts[k] = { w: SPAN + Math.ceil(H * 1.8) + 12, h: Math.ceil(H * 1.25) + 26, opts: { span: SPAN, from: LADDER[k], height: H, big: false, seed: 4 + k } };
 }
-parts.gros = { w: 140, h: 94, opts: { span: 40, from: LADDER[5], height: 58, big: true, seed: 11 } };
+parts.gros = { w: 110, h: 94, opts: { span: 34, from: LADDER[5], height: 56, big: true, seed: 11 } };
 for (const c of Object.values(parts)) { c.ox = Math.round(c.w / 2); c.oy = c.h - 12; }
 
 mkdirSync(out, { recursive: true });

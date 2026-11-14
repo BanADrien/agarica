@@ -10,12 +10,12 @@ const GLACE_FX = {
    "prefix": "glace_0",
    "frames": 20,
    "fps": 20,
-   "w": 144,
-   "h": 86,
-   "ox": 72,
-   "oy": 62,
+   "w": 158,
+   "h": 96,
+   "ox": 80,
+   "oy": 72,
    "span": 72,
-   "height": 26
+   "height": 34
   },
   {
    "key": "glace-1",
@@ -23,12 +23,12 @@ const GLACE_FX = {
    "prefix": "glace_1",
    "frames": 20,
    "fps": 20,
-   "w": 154,
-   "h": 92,
-   "ox": 78,
-   "oy": 68,
+   "w": 158,
+   "h": 96,
+   "ox": 80,
+   "oy": 72,
    "span": 72,
-   "height": 32
+   "height": 34
   },
   {
    "key": "glace-2",
@@ -36,12 +36,12 @@ const GLACE_FX = {
    "prefix": "glace_2",
    "frames": 20,
    "fps": 20,
-   "w": 166,
-   "h": 100,
-   "ox": 84,
-   "oy": 76,
+   "w": 158,
+   "h": 96,
+   "ox": 80,
+   "oy": 72,
    "span": 72,
-   "height": 38
+   "height": 34
   },
   {
    "key": "glace-3",
@@ -49,12 +49,12 @@ const GLACE_FX = {
    "prefix": "glace_3",
    "frames": 20,
    "fps": 20,
-   "w": 176,
-   "h": 108,
-   "ox": 88,
-   "oy": 84,
+   "w": 158,
+   "h": 96,
+   "ox": 80,
+   "oy": 72,
    "span": 72,
-   "height": 44
+   "height": 34
   },
   {
    "key": "glace-4",
@@ -62,12 +62,12 @@ const GLACE_FX = {
    "prefix": "glace_4",
    "frames": 20,
    "fps": 20,
-   "w": 190,
-   "h": 118,
-   "ox": 96,
-   "oy": 94,
+   "w": 158,
+   "h": 96,
+   "ox": 80,
+   "oy": 72,
    "span": 72,
-   "height": 52
+   "height": 34
   }
  ],
  "gros": {
@@ -76,11 +76,11 @@ const GLACE_FX = {
   "prefix": "glace_gros",
   "frames": 20,
   "fps": 20,
-  "w": 280,
+  "w": 220,
   "h": 188,
-  "ox": 140,
+  "ox": 110,
   "oy": 164,
-  "span": 80,
-  "height": 116
+  "span": 68,
+  "height": 112
  }
 };

@@ -8,6 +8,15 @@ class OptionsScene extends MenuOverlayScene {
     super('OptionsScene');
   }
 
+  // Volume des effets sonores : 0 à 100 %, par pas de 10 % (Entrée : fait le tour).
+  stepSfx(step, wrap = false) {
+    let v = Math.round(((menuOptions().sfxVolume ?? 0.8) + step) * 10) / 10;
+    if (wrap && v > 1) v = 0;
+    menuSetOption('sfxVolume', Math.max(0, Math.min(1, v)));
+    if (typeof playSfx === 'function') playSfx('menu_move');
+    // (le menu se redessine tout seul après chaque action, cf. MenuOverlayScene)
+  }
+
   create() {
     const fromTitle = this.callerKey === 'TitleScene';
     const items = [
@@ -41,7 +50,13 @@ class OptionsScene extends MenuOverlayScene {
         onLeft: () => this.toggleVisualFx(), onRight: () => this.toggleVisualFx(),
       },
       { label: 'Musique', disabled: true, value: () => 'bientôt' },
-      { label: 'Effets sonores', disabled: true, value: () => 'bientôt' },
+      {
+        // Volume des effets sonores (moteur de son, LevelKit : SFX_HOOKS['*']), par pas de 10 %.
+        label: 'Effets sonores',
+        value: () => `◂ ${Math.round((menuOptions().sfxVolume ?? 0.8) * 100)} % ▸`,
+        action: () => this.stepSfx(0.1, true),
+        onLeft: () => this.stepSfx(-0.1), onRight: () => this.stepSfx(0.1),
+      },
       { label: 'Voir les contrôles', value: () => '›', action: () => menuOpenChild(this, 'ControlsScene') },
     ];
     if (fromTitle) {

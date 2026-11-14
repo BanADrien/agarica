@@ -123,6 +123,10 @@ const OWLBEAR_TUNING = {
   // « lourd » à lancer et à arrêter : accélération et frein en l'air bien plus
   // doux (750 et 130, contre 1500 et 500), sans coup de frein au demi-tour.
   jumpVelocity: -640,
+  // Flottement au sommet (guide « platformer ») : gravité x0,5 tant que Saut est
+  // tenu et |vy| < 40 % de la vitesse de départ.
+  apexGravity: 0.5,
+  apexBand: 0.4,
   airMaxSpeed: 300,
   airAcceleration: 750,
   airDrag: 130,

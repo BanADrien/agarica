@@ -2052,8 +2052,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
             ursideOwlbearSlamFx(this, this.skillHitboxRect);
           }
         }
-        juiceShake(this.scene, 'medium');
-        playSfx('ours_slam');
+        // Palier « gros » du guide gamedev « game-feel » : secousse forte et court
+        // arrêt sur image à l'impact (le choc se sent même sans ennemi touché).
+        juiceShake(this.scene, 'heavy');
+        if (typeof juiceHitStop === 'function') juiceHitStop(this.scene, 70);
+        playSfx(this.activeSkillId === 'owlbear_slam' ? 'owlbear_slam' : 'ours_slam');
       }
     }
     if (this.skillHitboxRect && now >= this.skillActiveUntil) this.skillHitboxRect = null;
@@ -2445,6 +2448,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // gravité normale, sans le surplus de chute -- un vrai vol plané.
     const falling = this.body.velocity.y > 0 && this.form !== 'eagle' && !this.vine && !this.vineFlight;
     this.body.gravity.y = falling ? this.fallGravityBonus : 0;
+    // Ours-hibou : flottement au sommet du saut (guide gamedev « platformer » :
+    // demi-gravité tant que Saut est tenu et que la vitesse verticale reste sous
+    // ~40 % de celle du départ). Il plane un instant en haut : on vise mieux.
+    if (this.airJumpForm === 'owlbear' && !onGround && this.keys.jump.isDown && typeof OWLBEAR_TUNING !== 'undefined'
+      && Math.abs(this.body.velocity.y) < Math.abs(OWLBEAR_TUNING.jumpVelocity) * OWLBEAR_TUNING.apexBand) {
+      this.body.gravity.y = -this.scene.physics.world.gravity.y * (1 - OWLBEAR_TUNING.apexGravity);
+    }
 
     // Descente en piqué : S maintenu remplace le plané par une accélération
     // franche vers le bas (gravité additionnelle, pas une vitesse imposée

@@ -35,7 +35,9 @@ if [ "${1:-}" = "--apercu" ]; then APERCU="${2:?dossier des aperçus}"; mkdir -p
 # `scale` d'une entrée du manifeste.
 echelle() { node -e "const vm=require('vm'),c={};vm.createContext(c);vm.runInContext(require('fs').readFileSync('src/data/asset_manifest.js','utf8')+';this.s=ASSET_MANIFEST[\"$1\"].scale',c);console.log(c.s)"; }
 # Facteur = 1 / (échelle x k), à deux décimales.
-facteur() { awk -v s="$1" -v k="${2:-1}" 'BEGIN { printf "%.2f", 1 / (s * k) }'; }
+# Grain : GRAIN px d'écran par pixel dessiné (2 depuis le 2026-11-14 : à 1, les ours étaient « trop détaillés »).
+GRAIN=2
+facteur() { awk -v s="$1" -v k="${2:-1}" -v g="$GRAIN" 'BEGIN { printf "%.2f", g / (s * k) }'; }
 # Échelle d'une image de transformation : Agarica (83 px pour 250 dessinés) + part du chemin.
 transfo() { awk -v s="$1" -v p="$2" 'BEGIN { a = 83 / 250; printf "%.4f", a + (s - a) * p }'; }
 

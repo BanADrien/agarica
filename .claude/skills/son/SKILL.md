@@ -57,11 +57,12 @@ ligne de commande).
    puis `openverse.py noter` (pour un son uisfx : `--origine "uisfx" --licence "CC0 1.0"
    --source https://uisfx.com`).
 
-## Branchement dans le jeu (reste à faire)
+## Branchement dans le jeu
 
-Le jeu appelle déjà `playSfx(id, opts)` partout, mais `SFX_HOOKS` (`src/utils/LevelKit.js`) est
-vide : il n'y a ni chargement des fichiers ni moteur de son. Ranger un fichier ne le fait donc
-pas encore entendre. Identifiants appelés (à rafraîchir par `grep -rn "playSfx(" src/`) :
+Moteur en place depuis le 2026-11-14 : `SFX_HOOKS['*']` (`src/utils/LevelKit.js`) joue les sons
+listés dans `src/data/audio_sfx.js` (`AUDIO_SFX`, chargés par BootScene), variantes au hasard,
+hauteur qui varie, écart minimal entre deux lectures, volume « Effets sonores » des options.
+Un son rangé n'est entendu qu'une fois ajouté à `AUDIO_SFX` (`files`, `volume`, `pitch`, `cooldownMs`). Identifiants appelés (à rafraîchir par `grep -rn "playSfx(" src/`) :
 
 - **Joueur** : `jump` `jump_air` `land` `pogo` `slash` `slash_obstacle` `hit_blocked`
   `player_hurt` `heart_lost` `heart_up` `energy_full` `flight_takeoff` `feather_shot`

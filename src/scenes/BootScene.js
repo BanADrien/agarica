@@ -193,6 +193,12 @@ class BootScene extends Phaser.Scene {
         for (let i = 0; c && i < c.frames; i++) this.load.image(`fracas-${part}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
       }
     }
+    // Sons (AUDIO_SFX, src/data/audio_sfx.js) : une clé `sfx-<id>-<n>` par fichier.
+    if (typeof AUDIO_SFX !== 'undefined') {
+      for (const [id, def] of Object.entries(AUDIO_SFX)) {
+        (def.files || []).forEach((file, n) => this.load.audio(`sfx-${id}-${n}`, file));
+      }
+    }
     // Pics de glace de l'ours polaire (pixelfx, tools/pixelfx/export_glace.mjs).
     if (typeof GLACE_FX !== 'undefined') {
       for (const c of [...GLACE_FX.rangee, GLACE_FX.gros]) {

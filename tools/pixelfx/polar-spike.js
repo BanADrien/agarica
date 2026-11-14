@@ -84,27 +84,26 @@ export function create(o) {
   const angle = (k) => (R.chance(0.5) ? 1 : -1) * R.range(0, 0.25 + 0.6 * k);
   const crystals = [];
   if (big) {
+    // le bout : un BLOC serré (retour du 2026-11-14 : l'éventail était trop dispersé) -- un grand cristal
+    // dressé, et des cristaux pressés contre lui, à peine ouverts, presque tous dans sa moitié basse
     const H = o.height;
-    crystals.push({ dx: SPAN * 0.04, len: H, hw: SPAN * 0.14, ang: 0.08, back: false, delay: 0, main: true });
-    // couronne en éventail autour du grand
-    for (const [dx, k, a, back] of [[-0.3, 0.46, -0.7, true], [-0.18, 0.62, -0.38, false], [0.24, 0.58, 0.42, false], [0.36, 0.42, 0.78, true],
-      [-0.4, 0.3, -1.0, false], [0.44, 0.3, 1.05, false], [0.02, 0.36, -0.15, true]]) {
-      crystals.push({ dx: SPAN * dx, len: H * k * R.range(0.9, 1.08), hw: SPAN * R.range(0.07, 0.1), ang: a + R.range(-0.08, 0.08), back, delay: R.range(0.02, 0.05) });
+    crystals.push({ dx: SPAN * 0.02, len: H, hw: SPAN * 0.15, ang: 0.06, back: false, delay: 0, main: true });
+    for (const [dx, k, a, back] of [[-0.14, 0.72, -0.2, true], [0.16, 0.66, 0.24, true], [-0.22, 0.5, -0.36, false],
+      [0.24, 0.46, 0.4, false], [-0.06, 0.4, -0.1, false], [0.1, 0.34, 0.18, false], [-0.3, 0.3, -0.55, false], [0.32, 0.28, 0.6, false]]) {
+      crystals.push({ dx: SPAN * dx, len: H * k * R.range(0.92, 1.06), hw: SPAN * R.range(0.08, 0.11), ang: a + R.range(-0.06, 0.06), back, delay: R.range(0.02, 0.05) });
     }
   } else {
-    // devant : cristaux serrés, plus massifs ; derrière : une rangée plus sombre, décalée
+    // la rangée : cristaux serrés de tailles VARIÉES tout du long (retour du 2026-11-14 : pas de montée
+    // progressive), dans tous les sens ; derrière, une rangée plus sombre décalée
+    const size = () => o.height * (R.chance(0.3) ? R.range(1.0, 1.35) : R.range(0.45, 0.85));
     for (let x = -SPAN / 2 + 3; x <= SPAN / 2 - 1; x += R.range(6, 8)) {
-      const H = heightAt(x) * R.range(0.7, 1.05);
-      crystals.push({ dx: x, len: H, hw: R.range(2.8, 4), ang: angle(R.next()), back: false, delay: R.range(0, 0.035) });
+      crystals.push({ dx: x, len: size(), hw: R.range(2.8, 4), ang: angle(R.next()), back: false, delay: R.range(0, 0.035) });
     }
     for (let x = -SPAN / 2 + 5; x <= SPAN / 2 + 1; x += R.range(6, 8)) {
-      const H = heightAt(x) * R.range(0.85, 1.2);
-      crystals.push({ dx: x, len: H, hw: R.range(2.5, 3.5), ang: angle(R.next()) * 0.8, back: true, delay: R.range(0.01, 0.045) });
+      crystals.push({ dx: x, len: size() * 1.05, hw: R.range(2.5, 3.5), ang: angle(R.next()) * 0.8, back: true, delay: R.range(0.01, 0.045) });
     }
-    // le plus haut du segment, vers le bout, presque droit : il prend le reflet
-    const top = crystals.filter((c) => !c.back).reduce((a, c) => (c.dx > a.dx ? c : a));
-    top.len = Math.max(top.len, o.height * 1.05);
-    top.ang = R.range(-0.12, 0.2);
+    // le plus haut du segment prend le reflet
+    const top = crystals.filter((c) => !c.back).reduce((a, c) => (c.len > a.len ? c : a));
     top.main = true;
   }
   const mainC = crystals.find((c) => c.main) || crystals[0];
