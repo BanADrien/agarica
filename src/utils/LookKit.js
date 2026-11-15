@@ -983,7 +983,14 @@ function lookGradeTileTextures(st, keys) {
       if (!st.scene.textures.exists(key) || st.gradedTiles.has(key)) continue;
       const src = st.scene.textures.get(key).source[0];
       const gt = src && src.glTexture;
-      if (!gt || typeof gt.update !== 'function' || !src.image || src.isCanvas || src.isRenderTexture) continue;
+      // Textures fabriquées sur un canevas : ignorées, SAUF les cases du jeu
+      // de tuiles fabriquées par LevelKit (case sans son coin sous une herbe
+      // de bord, case assemblée par quarts : atlasTileUnderGrass,
+      // atlasCompositeTile). Sans elles, ces cases gardaient la terre brune
+      // d'origine à côté des cases ré-étalonnées (retour de l'utilisateur du
+      // 2026-11-15 : « pourquoi le sol a des teintes différentes ? »).
+      const atlasCanvas = src && src.isCanvas && typeof AUTOTILE_ATLAS_PREFIX !== 'undefined' && key.startsWith(AUTOTILE_ATLAS_PREFIX);
+      if (!gt || typeof gt.update !== 'function' || !src.image || (src.isCanvas && !atlasCanvas) || src.isRenderTexture) continue;
       const w = src.width;
       const h = src.height;
       const cv = document.createElement('canvas');
