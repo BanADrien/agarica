@@ -409,9 +409,9 @@ async function kainatiStartFight(scene, st) {
   st.fightActive = true;
   st.starting = false;
   if (firstTime) {
-    // Règle des lianes (Player.js, 2026-11-09) : singe (double saut), puis
-    // Z/↑ pour s'accrocher ; sans ↑, on passe au travers.
-    kainatiToast(scene, "Ses grosses attaques balaient le sol : [Espace] deux fois sous une liane, puis [↑]", 5200);
+    // Règle des lianes (Player.js, 2026-11-14) : singe (double saut), l'accroche
+    // est automatique près d'une liane.
+    kainatiToast(scene, "Ses grosses attaques balaient le sol : [Espace] deux fois sous une liane pour t'y accrocher", 5200);
   }
 }
 

@@ -384,7 +384,9 @@ function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], bac
     camLow,
   } : null;
   if (largeTrees) addProceduralForest(scene, height, levelWidth, canopyView && !treeBase ? [] : avoidRanges, canopyView, treesAtScreenBottom, treeBase);
-  if (!floatingBackground && groundPlants) addProceduralGroundPlants(scene, height, levelWidth, avoidRanges);
+  // 2026-11-15 : plus AUCUNE touffe de premier plan au bas de l'écran, dans tout le jeu (demande de
+  // l'utilisateur). addProceduralGroundPlants reste défini, sans appel ; les lianes suspendues du haut
+  // (addCaveCeiling) ne changent pas.
 }
 
 // ===========================================================================
@@ -4064,7 +4066,12 @@ function scatterUndergrowthOnRun(scene, gxStart, gxEnd, gy, isOpen, water, avoid
   };
 
   const frameOf = (variant) => scene.textures.getFrame(`${SOUS_BOIS_TEXTURE_PREFIX}${variant}`);
-  const place = (x, variant, scale) => addUndergrowthImage(scene, x, baseY, variant, scale, Math.random() < 0.5);
+  // Chaque touffe posée est cassable à l'épée (Cassables.js) ; pas celles des totems.
+  const place = (x, variant, scale) => {
+    const img = addUndergrowthImage(scene, x, baseY, variant, scale, Math.random() < 0.5);
+    if (typeof decorBreakRegisterUndergrowth === 'function') decorBreakRegisterUndergrowth(scene, img, variant);
+    return img;
+  };
 
   // Placement "garanti" : toutes les variantes dans un ordre aléatoire, à une
   // position libre tirée au hasard sur le tronçon, plutôt qu'à la position
@@ -4966,6 +4973,136 @@ function syncEdgeHints(scene) {
 // appli plutôt qu'au niveau moteur).
 let currentLevelScene = null;
 
+// Ambiance sonore de zone (2026-11-14) : une boucle par type de décor, montée en
+// fondu à l'arrivée, coupée en fondu au départ. Clé de zone `ambience` pour
+// forcer un id (ou `false` : silence). Les fichiers : ids `amb_*` d'AUDIO_SFX.
+// Volume : réglage « Effets sonores », un peu sous les bruitages.
+const ZONE_AMBIENCE_BY_BACKGROUND = {
+  fond_foret_flottante: 'amb_foret_jour', fond_bosquet: 'amb_foret_jour', fond_grand_arbre: 'amb_foret_vent',
+  fond_foret_sombre: 'amb_foret_nuit', fond_foret_corrompue: 'amb_foret_corrompue', fond_trou_sombre: 'amb_grotte',
+  fond_monde_spirituel: 'amb_spirituel', fond_arene_ghilt: 'amb_arene',
+};
+
+// Décors dont le sol est couvert de feuilles mortes (demande du 2026-11-14 : forêt sombre).
+const ZONE_LEAF_STEPS = ['fond_foret_sombre', 'fond_foret_corrompue'];
+const ZONE_AMBIENCE_CALLS = { amb_foret_jour: 'amb_oiseau', amb_foret_vent: 'amb_oiseau', amb_foret_nuit: 'amb_chouette' };
+
+// Musique de fond par zone (2026-11-14) : une boucle selon le décor (ids `mus_*` d'AUDIO_SFX,
+// générées avec ACE-Step, E:/sons/ace). Elle CONTINUE d'une zone à l'autre tant que le décor
+// garde la même musique ; sinon l'ancienne s'éteint en fondu et la nouvelle monte. Clé de zone
+// `music` pour forcer un id (ou `false` : silence). Volume : réglage « Musique » des options.
+const ZONE_MUSIC_BY_BACKGROUND = {
+  // (le premier piano est passé à la zone finale, clé `music: 'mus_final'` de bosquet_retour_data.js ;
+  // la forêt sombre a sa version plus douce)
+  fond_foret_sombre: 'mus_foret_sombre', fond_foret_corrompue: 'mus_foret_corrompue',
+  fond_bosquet: 'mus_bosquet', fond_foret_flottante: 'mus_iles', fond_grand_arbre: 'mus_arbre',
+};
+
+function musicMasterVolume() {
+  return (typeof menuOptions === 'function' ? (menuOptions().musicVolume ?? 80) : 80) / 100;
+}
+
+// Fondu hors scène (les tweens d'une scène meurent avec elle) : par pas de 50 ms.
+function musicFade(game, snd, to, ms, done) {
+  // Volume suivi à la main (`snd.__vol`) : relu sur le son juste après un réglage, il renvoie encore
+  // l'ancienne valeur (le fondu partait alors de 1 : départ à plein volume, puis descente).
+  const from = snd.__vol ?? 0;
+  const t0 = performance.now();
+  if (snd.__fade) clearInterval(snd.__fade);
+  snd.__fade = setInterval(() => {
+    const k = Math.min(1, (performance.now() - t0) / ms);
+    // Montée douce : très lente au début, puis elle s'installe (courbe en carré) ; descente linéaire.
+    const e = to > from ? k * k : k;
+    snd.__vol = from + (to - from) * e;
+    try { snd.setVolume(snd.__vol); } catch (e) { k === 1 || clearInterval(snd.__fade); }
+    if (k >= 1) { clearInterval(snd.__fade); snd.__fade = null; if (done) done(); }
+  }, 50);
+}
+
+function stopZoneMusic(game, ms = 2500) {
+  const cur = game && game.__music;
+  if (!cur) return;
+  game.__music = null;
+  musicFade(game, cur.snd, 0, ms, () => { try { cur.snd.stop(); cur.snd.destroy(); } catch (e) { /* déjà détruit */ } });
+}
+
+function startZoneMusic(scene, data) {
+  try {
+    const game = scene.game;
+    const bg = data && data.background && typeof data.background === 'object' ? data.background.id : data && data.background;
+    const id = data && data.music !== undefined ? data.music : ZONE_MUSIC_BY_BACKGROUND[bg];
+    const def = id && typeof AUDIO_SFX !== 'undefined' ? AUDIO_SFX[id] : null;
+    const cur = game.__music;
+    if (cur && cur.id === id) return;                 // même musique : elle continue
+    if (cur) stopZoneMusic(game);
+    if (!def) return;
+    // Une des variantes, au hasard.
+    const keys = def.files.map((f, n) => `sfx-${id}-${n}`).filter((k) => game.cache.audio.exists(k));
+    if (!keys.length) return;
+    const snd = game.sound.add(keys[Math.floor(Math.random() * keys.length)], { loop: true });
+    snd.play();
+    // Volume 0 posé APRÈS coup (un `volume: 0` dans la config est ignoré par Phaser : la musique
+    // partait à plein volume puis redescendait -- c'était ça, le départ « brusque »).
+    snd.setVolume(0);
+    snd.__vol = 0;
+    game.__music = { id, snd, base: def.volume ?? 0.5 };
+    // Entrée en douceur (retour du 2026-11-15 : « trop brusque ») : 7 s de montée progressive.
+    musicFade(game, snd, game.__music.base * musicMasterVolume(), 7000);
+  } catch (e) { /* pas de musique : la zone reste sans */ }
+}
+
+// Réglage « Musique » changé dans les options : appliqué tout de suite.
+function refreshMusicVolume(game) {
+  const cur = game && game.__music;
+  if (cur && !cur.snd.__fade) { cur.snd.__vol = cur.base * musicMasterVolume(); try { cur.snd.setVolume(cur.snd.__vol); } catch (e) { /* rien */ } }
+}
+
+// Un pas, quelle que soit la forme (Agarica, loup, grizzly, toute forme future) :
+// le son de pas de la forme (`id`), plus la couche du sol de la zone -- feuilles
+// mortes en forêt sombre (scene.__stepLeaves). Tous les pas passent par ici.
+function playStepSfx(scene, id) {
+  playSfx(id);
+  if (scene && scene.__stepLeaves) playSfx('step_leaves');
+}
+
+function startZoneAmbience(scene, data) {
+  try {
+    const bg = data && data.background && typeof data.background === 'object' ? data.background.id : data && data.background;
+    // Sol de feuilles mortes : les pas y froissent des feuilles (Player, `step_leaves`).
+    // Clé de zone `leafSteps` pour forcer oui / non.
+    scene.__stepLeaves = data && data.leafSteps !== undefined ? !!data.leafSteps : ZONE_LEAF_STEPS.includes(bg);
+    const id = data && data.ambience !== undefined ? data.ambience : (ZONE_AMBIENCE_BY_BACKGROUND[bg] || 'amb_foret_nuit');
+    const def = id && typeof AUDIO_SFX !== 'undefined' ? AUDIO_SFX[id] : null;
+    const key = `sfx-${id}-0`;
+    if (!def || !scene.sound || !scene.cache.audio.exists(key)) return;
+    const master = (typeof menuOptions === 'function' ? (menuOptions().sfxVolume ?? 80) : 80) / 100;
+    const target = (def.volume ?? 0.5) * master;
+    const snd = scene.sound.add(key, { loop: true });
+    snd.play();
+    snd.setVolume(0);
+    snd.__vol = 0;
+    musicFade(scene.game, snd, target, 2500);   // montée douce, volume suivi à la main (cf. musicFade)
+    scene.__ambience = snd;
+    // Cris d'animaux : PAS dans la boucle (retour du 2026-11-14 : oiseaux trop
+    // forts et permanents) mais un cri isolé de temps en temps, toutes les 8 à
+    // 14 s, discret (ZONE_AMBIENCE_CALLS).
+    const call = ZONE_AMBIENCE_CALLS[id];
+    let timer = null;
+    const next = () => {
+      timer = scene.time.delayedCall(8000 + Math.random() * 6000, () => {
+        if (!(typeof isWorldFrozen === 'function' && isWorldFrozen(scene))) playSfx(call);
+        next();
+      });
+    };
+    if (call) next();
+    scene.events.once('shutdown', () => {
+      if (timer) timer.remove();
+      if (snd.__fade) clearInterval(snd.__fade);
+      try { snd.stop(); snd.destroy(); } catch (e) { /* déjà détruit */ }
+    });
+  } catch (e) { /* pas de son : la zone reste muette */ }
+}
+
 function buildLevelFromData(scene, data, sceneData) {
   // État « juice » de la visite précédente (émetteurs, HUD) : objets déjà
   // détruits avec la scène, repartir de zéro.
@@ -5064,6 +5201,7 @@ function buildLevelFromData(scene, data, sceneData) {
   // Réutilisée d'une visite à l'autre (même instance de scène, cf.
   // __transitioningAway plus haut) : repartir d'une liste vide.
   scene.__undergrowthPlants = [];
+  scene.__breakDecor = [];   // petits décors cassables de la visite (Cassables.js)
   if (data.decor !== false) addUndergrowth(scene, data);
   scene.ground = scene.physics.add.staticGroup();
   // Premier visuel du sol principal : repère pour glisser juste derrière lui
@@ -5194,6 +5332,8 @@ function buildLevelFromData(scene, data, sceneData) {
   // (donc forcément une frame fantôme d'une zone quittée) est ignorée sans
   // toucher à aucun objet potentiellement détruit.
   currentLevelScene = scene;
+  startZoneAmbience(scene, data);
+  startZoneMusic(scene, data);
   // `scene.restart()` / sortie de zone : sans ça, update() tournerait sur
   // l'ancien joueur détruit tant que la nouvelle visite n'a pas fini de se
   // construire (resolveZoneData est asynchrone).
@@ -5347,6 +5487,7 @@ function buildLevelFromData(scene, data, sceneData) {
     // ombre (décision du 2026-10-28) ; seules les lumières l'éclairent.
     img.lookRole = 'prop';
     scene.props.push(img);
+    if (typeof decorBreakRegisterProp === 'function') decorBreakRegisterProp(scene, img, p.type);
   }
 
   // Retour utilisateur : "rajoute le feu de camp dans les element
@@ -5702,7 +5843,7 @@ function drawHud(scene) {
     // Indisponible (encore en cooldown -- couvre transfo+attaque, cf.
     // tryActivateSkill -- OU pas assez d'énergie) : case grisée plutôt que
     // masquée, pour que le joueur voie TOUJOURS ce qu'il a d'équipé.
-    const unavailable = !def || now < player.skillCooldownEndTime || player.energy < def.cost;
+    const unavailable = !def || now < player.skillCooldownEndTime || player.energy < (typeof player.skillCost === 'function' ? player.skillCost(skillId) : def.cost);
     const alpha = def && unavailable ? HUD_SKILL_UNAVAILABLE_ALPHA : 1;
     const s = HUD_SKILL_SIZE * juiceHudSkillScale(scene, i);
     g.fillStyle(def ? def.hudColor : HUD_SKILL_EMPTY_COLOR, alpha);
@@ -5785,7 +5926,13 @@ function updateLevelFromData(scene, time, delta) {
           }
           return;
         }
-        if (damageEnemy(scene, enemy, { kind: 'skill', skillId, player: scene.player, token })) {
+        // Fracas de l'ours brun et de l'ours-hibou : 1 dégât (2026-11-15) ; `damage` n'est lu que par les
+        // ennemis qui comptaient 2 pour toute compétence (Ghil't).
+        // Il passe par ursideDamage (Ursides.js) : +1 avec le passif des ursidés (palier 5), et la griffe
+        // de l'ours brun, comptée à part, ne le fait pas frapper deux fois.
+        const one = (skillId === 'ours' || skillId === 'owlbear_slam') && typeof ursideDamage === 'function';
+        if (one ? ursideDamage(scene, enemy, { kind: 'skill', skillId, player: scene.player }, token, 1)
+          : damageEnemy(scene, enemy, { kind: 'skill', skillId, player: scene.player, token })) {
           scene.player.gainEnergy(ENERGY_PER_HIT);
         }
       });
@@ -5912,7 +6059,7 @@ const SFX_HOOKS = {};
 // chargés par BootScene. Recettes du guide gamedev « audio-design » : un fichier tiré au hasard
 // parmi les variantes, hauteur qui varie un peu, écart minimal entre deux lectures du même son
 // (une rangée de pics ne fait pas dix fois le même bruit superposé), volume « Effets sonores »
-// des options (menuOptions().sfxVolume, 0 à 1). Un id sans son listé : rien, comme avant.
+// des options (menuOptions().sfxVolume, 0 à 100 %). Un id sans son listé : rien, comme avant.
 const SFX_LAST_PLAY = new Map();
 SFX_HOOKS['*'] = (id, opts) => {
   const def = typeof AUDIO_SFX !== 'undefined' ? AUDIO_SFX[id] : null;
@@ -5923,7 +6070,8 @@ SFX_HOOKS['*'] = (id, opts) => {
   SFX_LAST_PLAY.set(id, now);
   const keys = def.files.map((f, n) => `sfx-${id}-${n}`).filter((k) => game.cache.audio.exists(k));
   if (!keys.length) return;
-  const master = typeof menuOptions === 'function' ? (menuOptions().sfxVolume ?? 0.8) : 0.8;
+  // sfxVolume : 0 à 100 (%, MENU_OPTIONS_DEFAULTS, MenuKit).
+  const master = (typeof menuOptions === 'function' ? (menuOptions().sfxVolume ?? 80) : 80) / 100;
   const volume = (def.volume ?? 1) * (opts.volume ?? 1) * master;
   if (volume <= 0) return;
   const jitter = def.pitch ?? 0.05;
@@ -6811,6 +6959,9 @@ function juiceUpdateCameraLook(scene, dt) {
   if (zc && zc.cfg && zc.cfg.lookAheadX) return;
   if (typeof isWorldFrozen === 'function' && isWorldFrozen(scene)) return;
   const vx = p.body.velocity.x;
+  // À l'arrêt, le regard ne bouge plus (2026-11-14 : sinon le décor continuait de
+  // glisser ~2 s après l'arrêt d'Agarica, le temps que le décalage se résorbe).
+  if (Math.abs(vx) < 30) return;
   const facing = p.facingDir >= 0 ? 1 : -1;
   const run = Phaser.Math.Clamp((Math.abs(vx) - 30) / 330, 0, 1);
   const want = -facing * JUICE_LOOK_AHEAD * (0.3 + 0.7 * run);

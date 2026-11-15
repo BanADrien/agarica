@@ -642,9 +642,8 @@ CUTSCENES.fs1_rencontre = [
     { who: 'agarica', text: 'Qui parle ? … Une araignée ?!' },
     { who: 'xara', text: "Xara. Et toi, la druidesse qu'on vient de mettre dehors." },
   ] },
-  // La petite araignée qui s'incline devant Xara se voit : pas de texte.
-  { call: (scene) => acte1Fs1LittleSpider(scene) },
-  { wait: 900 },
+  // (2026-11-15 : la petite araignée qui passait ici devant Xara est retirée, demande de l'utilisateur ;
+  // acte1Fs1LittleSpider reste défini plus bas, sans appel.)
   { say: [
     { who: 'agarica', text: "Je veux quand même sauver le bosquet. Trouver d'où vient la mousse." },
   ] },
@@ -697,6 +696,23 @@ const ACTE1_TALISMAN_RING_DIAM = 197;
 function acte1TalismanGlow(scene) {
   const p = scene.player;
   if (!p) return;
+  // 2026-11-15 : effet refait avec pixelfx (talisman-awaken.js, LOUP_FX.talisman) : éclat ambre,
+  // trois anneaux, feuilles dorées, braises. 30 images à 20 i/s, qui suivent Agarica (poitrine).
+  // Sans ces images : les anneaux d'avant, ci-dessous.
+  const fx = typeof LOUP_FX !== 'undefined' ? LOUP_FX.talisman : null;
+  if (fx && scene.textures.exists('loupfx-talisman-0')) {
+    if (!scene.anims.exists('loupfx-talisman')) {
+      scene.anims.create({ key: 'loupfx-talisman', frameRate: fx.fps, repeat: 0,
+        frames: Array.from({ length: fx.frames }, (_, i) => ({ key: `loupfx-talisman-${i}` })) });
+    }
+    const spr = scene.add.sprite(p.x, p.y - 40, 'loupfx-talisman-0').setOrigin(fx.ox / fx.w, fx.oy / fx.h).setDepth(1040);
+    spr.lookRole = 'fx';
+    const follow = () => { if (spr.active && scene.player) spr.setPosition(scene.player.x, scene.player.y - 40); };
+    scene.events.on('update', follow);
+    spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => { scene.events.off('update', follow); spr.destroy(); });
+    spr.play('loupfx-talisman');
+    return;
+  }
   const art = scene.textures.exists(ACTE1_TALISMAN_RING_FRAME);
   const base = 36 / ACTE1_TALISMAN_RING_DIAM;
   for (let i = 0; i < 3; i++) {

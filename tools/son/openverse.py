@@ -30,6 +30,16 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# Certificats : ceux du système (Windows) quand `truststore` est installé
+# (pip install truststore). Sans lui, la liste de Python peut être périmée
+# (2026-11-14 : « certificate has expired » sur cdn.freesound.org alors que
+# Windows l'accepte). La vérification reste entière dans les deux cas.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 RACINE = Path(__file__).resolve().parents[2]
 BIBLIOTHEQUE = RACINE / "assets" / "audio"
 REGISTRE = BIBLIOTHEQUE / "CREDITS.md"
@@ -99,6 +109,15 @@ def ffmpeg():
     trouve = glob.glob(os.path.join(local, "Microsoft", "WinGet", "Packages", "Gyan.FFmpeg*", "*", "bin", "ffmpeg.exe"))
     if trouve:
         return trouve[0]
+    # sans winget : le FFmpeg du paquet pip imageio-ffmpeg (pip install imageio-ffmpeg), ou sa copie dans ~/bin
+    perso = Path.home() / "bin" / "ffmpeg.exe"
+    if perso.is_file():
+        return str(perso)
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        pass
     stop("FFmpeg introuvable (winget install Gyan.FFmpeg, puis rouvrir le terminal)")
 
 

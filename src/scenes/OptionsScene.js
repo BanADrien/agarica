@@ -8,13 +8,21 @@ class OptionsScene extends MenuOverlayScene {
     super('OptionsScene');
   }
 
-  // Volume des effets sonores : 0 à 100 %, par pas de 10 % (Entrée : fait le tour).
+  // Volume des effets sonores : 0 à 100 (%, comme MENU_OPTIONS_DEFAULTS), par pas de 10 (Entrée : fait le tour).
   stepSfx(step, wrap = false) {
-    let v = Math.round(((menuOptions().sfxVolume ?? 0.8) + step) * 10) / 10;
-    if (wrap && v > 1) v = 0;
-    menuSetOption('sfxVolume', Math.max(0, Math.min(1, v)));
+    let v = Math.round(((menuOptions().sfxVolume ?? 80) + step) / 10) * 10;
+    if (wrap && v > 100) v = 0;
+    menuSetOption('sfxVolume', Math.max(0, Math.min(100, v)));
     if (typeof playSfx === 'function') playSfx('menu_move');
     // (le menu se redessine tout seul après chaque action, cf. MenuOverlayScene)
+  }
+
+  // Volume de la musique : 0 à 100, par pas de 10 (Entrée : fait le tour), appliqué tout de suite.
+  stepMusic(step, wrap = false) {
+    let v = Math.round(((menuOptions().musicVolume ?? 80) + step) / 10) * 10;
+    if (wrap && v > 100) v = 0;
+    menuSetOption('musicVolume', Math.max(0, Math.min(100, v)));
+    if (typeof refreshMusicVolume === 'function') refreshMusicVolume(this.game);
   }
 
   create() {
@@ -49,13 +57,19 @@ class OptionsScene extends MenuOverlayScene {
         action: () => this.toggleVisualFx(),
         onLeft: () => this.toggleVisualFx(), onRight: () => this.toggleVisualFx(),
       },
-      { label: 'Musique', disabled: true, value: () => 'bientôt' },
+      {
+        // Volume de la musique de fond (startZoneMusic, LevelKit), par pas de 10 %.
+        label: 'Musique',
+        value: () => `◂ ${Math.round(menuOptions().musicVolume ?? 80)} % ▸`,
+        action: () => this.stepMusic(10, true),
+        onLeft: () => this.stepMusic(-10), onRight: () => this.stepMusic(10),
+      },
       {
         // Volume des effets sonores (moteur de son, LevelKit : SFX_HOOKS['*']), par pas de 10 %.
         label: 'Effets sonores',
-        value: () => `◂ ${Math.round((menuOptions().sfxVolume ?? 0.8) * 100)} % ▸`,
-        action: () => this.stepSfx(0.1, true),
-        onLeft: () => this.stepSfx(-0.1), onRight: () => this.stepSfx(0.1),
+        value: () => `◂ ${Math.round(menuOptions().sfxVolume ?? 80)} % ▸`,
+        action: () => this.stepSfx(10, true),
+        onLeft: () => this.stepSfx(-10), onRight: () => this.stepSfx(10),
       },
       { label: 'Voir les contrôles', value: () => '›', action: () => menuOpenChild(this, 'ControlsScene') },
     ];

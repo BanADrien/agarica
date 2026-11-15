@@ -162,7 +162,7 @@ const ASSET_MANIFEST = {
       slam: { row: 2, frames: 4, fps: 10, repeat: 0 },
       transform: { row: 3, frames: 4, fps: 20, repeat: 0 },
     },
-    scale: 0.5032,
+    scale: 0.4605,
     facing: "right",
     placeholder: { w: 130, h: 84, color: 0x7a6a8c, label: "Ours-hibou" },
     sheets: [

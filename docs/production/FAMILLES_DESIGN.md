@@ -15,8 +15,9 @@ Ce système reprend l'idée des « têtes » de totem (voir la mémoire du proje
   camp.
 - **Passif des ursidés : Robustesse.**
   - 2 ursidés équipés : +1 cœur max.
-  - 3 : les fracas et impacts d'ours sont plus larges.
-  - 4 : Agarica ne recule plus quand elle prend un coup.
+  - 3 : les compétences d'ursidé (ours, panda, ours polaire) coûtent 30 % d'énergie en moins.
+  - 5 : +1 dégât pour tous les coups d'ursidé (griffe et fracas de l'ours, grizzly, ours-hibou, pics de glace).
+  - (Paliers refaits le 2026-11-15 ; avant : 3 = fracas plus larges, 4 = aucun recul.)
 - **Images** : provisoires, à partir de l'ours actuel recoloré, effets dessinés par code ou
   avec pixelfx. Un prompt d'images est préparé en plus pour les vraies feuilles.
 

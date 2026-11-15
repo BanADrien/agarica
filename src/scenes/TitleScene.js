@@ -32,6 +32,16 @@ class TitleScene extends Phaser.Scene {
     this.secretBuffer = '';
     menuNoteSaveProgress();
     fadeInScene(this);
+    // Musique du menu (2026-11-15 : « The Village Dawn », fournie par l'utilisateur, mise en boucle) ; elle
+    // remplace celle de la zone qu'on quitte, avec la même montée en douceur.
+    // Au tout premier affichage, le navigateur n'a pas encore décodé les sons (il attend un clic ou une
+    // touche) : on réessaie deux fois par seconde tant qu'on est sur le titre et qu'elle n'est pas partie.
+    const tryMenuMusic = () => {
+      if (typeof startZoneMusic !== 'function' || this.__transitioningAway) return;   // (minuterie de la scène : s'arrête avec elle)
+      startZoneMusic(this, { music: 'mus_menu' });
+      if (!(this.game.__music && this.game.__music.id === 'mus_menu')) this.time.delayedCall(500, tryMenuMusic);
+    };
+    tryMenuMusic();
 
     const paintedBg = this.textures.exists('titre-fond');
     if (paintedBg) {
@@ -65,9 +75,7 @@ class TitleScene extends Phaser.Scene {
     else this.buildCharacters(width, height);
     this.buildLogo(width);
 
-    this.footer = this.add.text(width - 14, height - 10, TITLE_FOOTER, {
-      fontFamily: STORY_UI.serif, fontSize: '12px', fontStyle: 'italic', color: '#a99bd6', padding: { x: 4, y: 3 },
-    }).setOrigin(1, 1).setDepth(1100).setAlpha(0.8);
+    // (mention « Pour Agarica, avec tendresse » retirée du bas du menu, 2026-11-14)
     this.hint = this.add.text(width / 2, height - 22, '', {
       fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.textSoft,
       backgroundColor: '#15101fcc', padding: { x: 10, y: 4 },
@@ -197,7 +205,7 @@ class TitleScene extends Phaser.Scene {
     const { width } = this.scale;
     this.logo.setVisible(true).setAlpha(1).setPosition(width / 2, 112).setScale(0.86);
     this.characters.setVisible(true);
-    this.hint.setVisible(true).setText('↑ ↓ : choisir   ·   Entrée : valider   ·   souris aussi');
+    this.hint.setVisible(false);   // (2026-11-15 : plus d'aide « ↑ ↓ : choisir… » sous le menu principal)
 
     const summary = menuSaveSummary();
     const items = [];
@@ -268,11 +276,7 @@ class TitleScene extends Phaser.Scene {
     // Formes obtenues : icônes si l'art existe, sinon pastilles nommées.
     let fx = x + pad;
     const fy = y + 132;
-    if (!s.forms.length) {
-      c.add(this.add.text(fx, fy - 8, 'Aucune forme… pour l\'instant', {
-        fontFamily: 'sans-serif', fontSize: '12px', fontStyle: 'italic', color: STORY_UI.textSoft,
-      }));
-    }
+    // (2026-11-15 : plus de « Aucune forme… pour l'instant » ni de ligne « n compétence · n objet »)
     for (const f of s.forms) {
       const key = [`form-icon-${f.type}`, f.type === 'monkey' ? 'item-form_icone_singe' : null]
         .find((k) => k && this.textures.exists(k));
@@ -289,11 +293,8 @@ class TitleScene extends Phaser.Scene {
         fx += t.width + 6;
       }
     }
-    const extra = [];
-    if (s.skills.length) extra.push(`${s.skills.length} compétence${s.skills.length > 1 ? 's' : ''}`);
-    if (s.items) extra.push(`${s.items} objet${s.items > 1 ? 's' : ''}`);
     const date = menuFormatDate(s.savedAt);
-    c.add(this.add.text(x + pad, y + h - 30, [extra.join(' · '), date ? `Sauvé le ${date}` : ''].filter(Boolean).join('\n'), {
+    c.add(this.add.text(x + pad, y + h - 30, date ? `Sauvé le ${date}` : '', {
       fontFamily: 'sans-serif', fontSize: '11px', color: STORY_UI.textSoft, lineSpacing: 2,
     }).setOrigin(0, 0.5));
     return c;

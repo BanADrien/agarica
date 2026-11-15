@@ -9,8 +9,8 @@
 // table est faite pour en recevoir d'autres (ajouter `passive` + `tiers`).
 //
 // Ce fichier ne fait que COMPTER et décrire. Les effets sont appliqués là où
-// ils vivent : cœur max et recul dans Player (recomputeTotemBonuses,
-// hitByEnemy), taille des fracas dans Player.beginSkill et Ursides.js.
+// ils vivent : cœur max dans Player (recomputeTotemBonuses), coût des compétences
+// dans Player.skillCost, dégâts en plus dans ursideDamage (Ursides.js).
 
 // `tiers` : paliers dans l'ordre croissant. `stats` : ce que le palier ajoute
 // (additionné par familyPassiveStats) ; `text` : affiché au feu de camp.
@@ -20,9 +20,11 @@ const ANIMAL_FAMILIES = {
     color: 0xffcf8f,
     passive: 'Robustesse',
     tiers: [
+      // Paliers refaits le 2026-11-15 (demande de l'utilisateur) ; avant : 3 -> fracas plus larges
+      // (bearSize), 4 -> aucun recul (steadfast). Player lit encore ces deux champs : absents, sans effet.
       { count: 2, text: '+1 cœur', stats: { hearts: 1 } },
-      { count: 3, text: 'fracas plus larges', stats: { bearSize: 0.25 } },
-      { count: 4, text: 'aucun recul sous les coups', stats: { steadfast: true } },
+      { count: 3, text: "compétences d'ursidé moins chères (−30 %)", stats: { bearCost: 0.3 } },
+      { count: 5, text: '+1 dégât pour les ursidés', stats: { bearDamage: 1 } },
     ],
   },
   canides: { label: 'Canidés', color: 0x7dfcd8 },
@@ -94,9 +96,9 @@ function familyTierCount(familyId, count) {
 }
 
 // Somme des effets des paliers actifs, toutes familles confondues :
-// { hearts, bearSize, steadfast }. Lu par Player.recomputeTotemBonuses.
+// { hearts, bearCost, bearDamage, … }. Lu par Player.recomputeTotemBonuses.
 function familyPassiveStats(player) {
-  const stats = { hearts: 0, bearSize: 0, steadfast: false };
+  const stats = { hearts: 0, bearSize: 0, steadfast: false, bearCost: 0, bearDamage: 0 };
   const counts = familyCounts(player);
   for (const [id, n] of Object.entries(counts)) {
     const fam = ANIMAL_FAMILIES[id];

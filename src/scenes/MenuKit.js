@@ -22,7 +22,6 @@ const CREDITS_SECTIONS = [
 ];
 const CREDITS_CLOSING = 'Joyeux anniversaire ✦';
 const TITLE_SUBTITLE = 'La mousse et la lune — démo';
-const TITLE_FOOTER = 'Pour Agarica, avec tendresse ✦';
 
 // Écran « Contrôles » (vérifié dans Player.js / StoryKit.js / LevelKit.js).
 const CONTROLS_GROUPS = [
@@ -35,9 +34,9 @@ const CONTROLS_GROUPS = [
       // Saut à hauteur variable (2026-11-09) : relâcher tôt = petit saut.
       { keys: ['Espace'], text: "Sauter (bref : petit saut ; 2e appui en l'air : Singe ou Aigle)" },
       // « Maj » partout dans les aides (STYLE_DIALOGUES.md), plus « Shift ».
-      // Maj tenue = Loup même à l'arrêt ; ↑ = prise de liane (2026-11-09).
+      // Maj tenue = Loup même à l'arrêt ; prise de liane automatique (2026-11-14).
       { keys: ['Maj'], text: 'Loup tant que tu tiens, même à l\'arrêt (double appui ← / → : courir)' },
-      { keys: ['Z', '↑'], text: 'Viser vers le haut · Singe : s\'accrocher à une liane' },
+      { keys: ['Z', '↑'], text: 'Viser vers le haut · Sur une liane : grimper' },
       { keys: ['S', '↓'], text: "Viser en bas (en l'air : rebond ; Loup : coup de patte) · piqué de l'Aigle · lâcher une liane" },
     ],
   },
@@ -47,6 +46,7 @@ const CONTROLS_GROUPS = [
       { keys: ['K'], alt: ['Clic'], text: "Attaquer où l'on vise · en Loup : coup de croc" },
       { keys: ['E'], text: 'Parler, examiner, interagir' },
       { keys: ['A', 'F', 'R'], text: 'Compétences (coûtent de l\'énergie)' },
+      { keys: ['X'], text: 'Forme mythique : Grande Ourse, 30 s (un ursidé équipé)' },
     ],
   },
   {
@@ -64,7 +64,7 @@ const CONTROLS_FORMS_NOTE = 'Les formes viennent toutes seules : Maj = Loup, 2e 
   + '(même en tombant d\'un rebord ; sans forme aérienne, un seul saut), eau = Pieuvre. '
   + 'Feu de camp : E pour t\'asseoir (soin, sauvegarde), E encore pour son menu.';
 // Rappel discret affiché en jeu si l'option est activée.
-const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Maj loup · E agir · A F R compétences · I sac · Échap pause';
+const CONTROLS_HINT_LINE = '←→/QD bouger · Espace sauter · Z/S viser · K attaquer · Maj loup · E agir · A F R compétences · X mythique · I sac · Échap pause';
 
 // ---------------------------------------------------------------------------
 // Chapitres : point de départ de chaque grande région, avec l'état cohérent
@@ -425,7 +425,8 @@ class MenuList {
     this.highlight.once('destroy', () => breathe.remove());
   }
 
-  // Surbrillance (fond rose, feuille + fleur) à la hauteur `y`.
+  // Surbrillance (fond rose) à la hauteur `y`. (2026-11-15 : la petite feuille et la fleur à gauche sont
+  // retirées, demande de l'utilisateur.)
   drawHighlight(y) {
     const g = this.highlight;
     g.clear();
@@ -434,10 +435,6 @@ class MenuList {
     g.fillRoundedRect(hx + 6, y - 17, this.width - 12, 34, 10);
     g.lineStyle(1.5, STORY_UI.pink, 0.45);
     g.strokeRoundedRect(hx + 6, y - 17, this.width - 12, 34, 10);
-    g.fillStyle(STORY_UI.vineLight, 1);
-    g.fillEllipse(hx + 20, y, 12, 6);
-    g.fillStyle(STORY_UI.pink, 1);
-    g.fillCircle(hx + 27, y, 3.5);
   }
 
   refresh() {

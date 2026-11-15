@@ -10,6 +10,8 @@ const BOSQUET_RETOUR_DATA = {
   zoneName: "Bosquet d'Émeraude",
   zoneSub: 'Le retour',
   background: 'fond_bosquet',
+  // Musique de la zone finale : le piano (choix de l'utilisateur, 2026-11-14), pas celle du bosquet.
+  music: 'mus_final',
   // Premier plan (touffes du bas, lianes suspendues) réservé à la forêt sombre.
   foregroundPlants: false,
   levelWidth: 1920,

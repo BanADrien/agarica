@@ -1107,8 +1107,8 @@ const STORY_FORM_INFO = {
   // Sans forme aérienne, Agarica n'a qu'un saut : c'est la forme qui donne le double saut.
   hasEagleForm: { type: 'eagle', name: "Forme de l'aigle", desc: '[Espace] deux fois : plus haut, puis tu planes.' },
   // Lianes : seule Agarica devenue singe s'y accroche (cf. Player.js).
-  // Prise sur appui de Z/↑ depuis le 2026-11-09 (plus d'accroche automatique).
-  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: '[Espace] deux fois : tu deviens singe. [↑] près d\'une liane : tu t\'y accroches.' },
+  // Accroche automatique depuis le 2026-11-14 (0,3 s de délai après avoir quitté une liane).
+  hasMonkeyForm: { type: 'monkey', name: 'Forme du singe', desc: '[Espace] deux fois : tu deviens singe. Près d\'une liane, tu t\'y accroches tout seul.' },
   hasOctopusForm: { type: 'octopus', name: 'Forme de la pieuvre', desc: 'Tu nages dans l\'eau.' },
 };
 
@@ -1480,8 +1480,10 @@ function storyDrawHudArt(scene) {
   if (!art.cases) art.cases = [];
   HUD_SKILL_LABELS.forEach((label, i) => {
     const id = player.skillSlots[i];
-    const def = id && typeof SKILL_DEFS !== 'undefined' ? SKILL_DEFS[id] : null;
-    const key = def ? storyHudSkillIconKey(id) : null;
+    // Forme mythique (Mythiques.js) : les trois cases montrent SES compétences, pas celles équipées.
+    const myth = player.mythic && scene.textures.exists(`ursa-icone-${i}`);
+    const def = myth ? { cost: 0 } : id && typeof SKILL_DEFS !== 'undefined' ? SKILL_DEFS[id] : null;
+    const key = myth ? `ursa-icone-${i}` : def ? storyHudSkillIconKey(id) : null;
     const has = !!key && scene.textures.exists(key);
     const cx = HUD_MARGIN + HUD_SKILL_SIZE / 2 + i * (HUD_SKILL_SIZE + HUD_SKILL_GAP);
     const text = scene.hudSkillTexts && scene.hudSkillTexts[i];
@@ -1530,7 +1532,8 @@ function storyDrawHudArt(scene) {
     const pop = typeof juiceHudSkillScale === 'function' ? juiceHudSkillScale(scene, i) : 1;
     slot.icon.setPosition(cx, skillY).setScale((HUD_ART_SKILL_SIZE / Math.max(slot.icon.width, slot.icon.height)) * pop);
     // Même règle que drawHud : grisée en recharge ou sans assez d'énergie.
-    const unavailable = scene.time.now < player.skillCooldownEndTime || player.energy < def.cost;
+    const unavailable = myth ? scene.time.now < player.mythic.cds[i] : scene.time.now < player.skillCooldownEndTime
+      || player.energy < (typeof player.skillCost === 'function' ? player.skillCost(player.skillSlots[i]) : def.cost);
     slot.icon.setAlpha(unavailable ? HUD_SKILL_UNAVAILABLE_ALPHA : 1);
     // Pastille peinte (18 px) un peu plus près de la case que le rond
     // dessiné : elle reste dans la bande du HUD que les bulles et les

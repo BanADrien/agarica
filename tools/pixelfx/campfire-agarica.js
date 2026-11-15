@@ -40,17 +40,19 @@ const BIG_LAYERS = [[1, 1, 6], [0.8, 0.9, 5], [0.62, 0.78, 4], [0.44, 0.6, 3], [
 
 // the fire: [x, base, height (share of o.height), half-width, back row?]
 const TONGUES = [
-  [-7.5, -7, 0.42, 1.8, 1],
-  [7.5, -7, 0.46, 1.8, 1],
-  [-3, -9, 0.78, 2.0, 1],
-  [3.2, -9, 0.82, 2.0, 1],
-  [-12, -3, 0.14, 1.3, 0],
-  [12.5, -3, 0.16, 1.3, 0],
-  [-9.5, -4.5, 0.3, 1.9, 0],
-  [9.5, -4.5, 0.34, 1.9, 0],
-  [-5, -6, 0.6, 2.6, 0],
-  [5.2, -6, 0.66, 2.6, 0],
-  [0, -7, 1, 3.4, 0],
+  // Bases descendues de 3 à 4 px (retour du 2026-11-14 : il manquait des pixels entre le haut des bûches et le
+  // pied des flammes) : le feu part maintenant du bois.
+  [-7.5, -3.5, 0.46, 1.9, 1],
+  [7.5, -3.5, 0.5, 1.9, 1],
+  [-3, -5, 0.84, 2.2, 1],
+  [3.2, -5, 0.88, 2.2, 1],
+  [-12, -1.5, 0.16, 1.3, 0],
+  [12.5, -1.5, 0.18, 1.3, 0],
+  [-9.5, -2, 0.33, 2.0, 0],
+  [9.5, -2, 0.37, 2.0, 0],
+  [-5, -2.5, 0.65, 2.8, 0],
+  [5.2, -2.5, 0.71, 2.8, 0],
+  [0, -3, 1.06, 3.6, 0],
 ];
 
 // a log from its near end (x0, y0) to its far end, radius r, drawn between u0 and u1 along it: a 1 px dark rim,
@@ -148,7 +150,7 @@ export function draw(p, t, o) {
   for (const L of LOGS) log(p, L, W, H, CROSS, 1, t, S + 11);
   for (let i = 0; i < T.length; i++) if (T[i].back) tongueAt(i);
   // flames licking up off the burning wood
-  looped(t, D, 90, S + 210, (r) => ({ x: r.range(-10, 10), y: -r.range(3, 8), vx: r.range(-5, 5), vy: -r.range(20, 40), life: r.range(0.16, 0.3), s: r.range(1, 1.8), f: r.next() }), (q, age) => {
+  looped(t, D, 90, S + 210, (r) => ({ x: r.range(-10, 10), y: -r.range(0, 6), vx: r.range(-5, 5), vy: -r.range(20, 40), life: r.range(0.16, 0.3), s: r.range(1, 1.8), f: r.next() }), (q, age) => {
     const [x, y] = drift(q.x, q.y, q.vx, q.vy, age, 0, -95, 5, 3.2);
     firePuff(p, x, y, 1 - age / q.life, q.s, q.f, H);
   });

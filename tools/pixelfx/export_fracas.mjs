@@ -31,13 +31,17 @@ const parts = {
   griffe: { w: Math.ceil(cw), h: Math.ceil(ch), ox: Math.round(-cx), oy: Math.round(-cy), seconds: O.clawTime },
 };
 
+// Fracas ENFLAMMÉ (2026-11-15) : les deux mêmes parties en couleurs de feu (poussière -> flammes, pierres
+// calcinées, griffe incandescente), jouées quand le passif des ursidés de palier 5 est actif. Mêmes cadres,
+// fichiers fracas_<partie>_feu_<i>.png, entrées `impact_feu` et `griffe_feu`.
+const FEU = { dust: ["#8a1c08", "#e8501a", "#ffa436", "#fff0a8"], stone: "#3a1c14", claw: ["#b3200a", "#ff7a1a", "#ffd65a", "#ffffff"] };
 mkdirSync(out, { recursive: true });
-for (const f of readdirSync(out)) if (/^fracas_(impact|griffe)_\d+\.png$/.test(f)) unlinkSync(resolve(out, f));
+for (const f of readdirSync(out)) if (/^fracas_(impact|griffe)(_feu)?_\d+\.png$/.test(f)) unlinkSync(resolve(out, f));
 const data = { px: K };
-for (const [part, c] of Object.entries(parts)) {
+for (const [base, c] of Object.entries(parts)) for (const [part, extra] of [[base, {}], [`${base}_feu`, FEU]]) {
   const n = Math.max(1, Math.round(c.seconds * FPS));
   for (let i = 0; i < n; i++) {
-    const inst = core.createFx(fx, { x: c.ox, y: c.oy, part });
+    const inst = core.createFx(fx, { x: c.ox, y: c.oy, part: base, ...extra });
     // milieu de la case de temps : la première image montre déjà l'éclair, la dernière n'est pas vide
     const steps = Math.round(((i + 0.5) / FPS) * 120);
     for (let s = 0; s < steps; s++) inst.update(1 / 120);

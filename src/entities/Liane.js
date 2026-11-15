@@ -27,7 +27,7 @@ const VINE_FREE_DAMPING = 1.4; // liane lâchée : revient vite au repos
 const VINE_MAX_ANGLE = 0.96; // ~55°
 const VINE_GRAB_MAX_ANGLE = 1.35; // ~77°
 const VINE_MAX_OMEGA = 4.2;
-const VINE_REGRAB_COOLDOWN_MS = 350; // même liane, juste après l'avoir lâchée
+const VINE_REGRAB_COOLDOWN_MS = 300; // même liane, juste après l'avoir lâchée
 // Lâcher avec Espace = LE saut du singe (retour utilisateur : « le singe ne
 // part pas assez loin ») : vitesse horizontale du balancement × 1,45, jamais
 // moins de VINE_RELEASE_MIN_VX (lâcher presque à l'arrêt : petit bond quand

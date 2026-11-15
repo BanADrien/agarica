@@ -11,7 +11,7 @@
 // `grizzly`, `ours_hibou`, `panda`, `ours_polaire`, et `ours_brun` qui remplace
 // l'ancien ours de la compétence « ours », cf. PROMPT_CODEX_14.md). Tailles à
 // l'écran fixées par l'utilisateur, en longueur de l'animal à quatre pattes :
-// ours-hibou 160 px, grizzly 145 (réduits le 2026-11-14 : 190 et 170 étaient
+// ours-hibou 146 px (160 avant le 2e retour du 2026-11-14), grizzly 145 (réduits le 2026-11-14 : 190 et 170 étaient
 // trop gros en jeu), ours polaire 165, ours brun 150, panda 150
 // (`scale` du manifeste ; échelles par image : URSIDE_FRAME_K ci-dessous).
 // REPLI, seulement si une feuille manque : l'ANCIEN ours (`ours-0` à `ours-5`,
@@ -90,9 +90,12 @@ function ursideLegacyBearNeeded() {
 
 const GRIZZLY_TUNING = {
   // Il part moins vite que le loup (396) et le dépasse au bout de l'élan.
-  startSpeed: 230,
+  // (2026-11-15 : « plus lent au début de la course » : départ à 150 au lieu de 230, et montée en
+  // courbe -- `rampCurve` -- qui reste lente au début puis rattrape ; même vitesse de pointe, même durée)
+  startSpeed: 150,
   topSpeed: 470,
   rampMs: 1500,
+  rampCurve: 1.6,
   acceleration: 1700,
   // Charge au-delà de 85 % de la vitesse max (~400 px/s).
   chargeRatio: 0.85,
@@ -127,7 +130,11 @@ const OWLBEAR_TUNING = {
   // tenu et |vy| < 40 % de la vitesse de départ.
   apexGravity: 0.5,
   apexBand: 0.4,
-  airMaxSpeed: 300,
+  // (2026-11-14, 2e retour : le double saut doit l'envoyer plus loin vers l'avant)
+  // `jumpForward` : élan horizontal donné d'un coup au 2e saut, dans le sens
+  // tenu (ou celui où il regarde) ; vitesse de pointe en l'air relevée d'autant.
+  jumpForward: 380,
+  airMaxSpeed: 380,
   airAcceleration: 750,
   airDrag: 130,
   // Pattes dans l'herbe : le bas visible de l'image est déjà posé sur la ligne
@@ -150,8 +157,12 @@ const POLAR_TUNING = {
   cost: 40,
   // Dressé (signal lisible) avant que la glace parte.
   rearMs: 450,
-  spikes: 5,
-  reach: 320,
+  // Traînée (2026-11-14 : raccourcie d'un tiers, 5 -> 3 segments de 64 px) qui
+  // part `startGap` px devant le centre de l'ours, plus sous lui.
+  // (puis encore -1/4 : 192 -> 144 ; les segments se chevauchent un peu plus)
+  spikes: 3,
+  reach: 144,
+  startGap: 50,
   spikeEveryMs: 70,
   // Largeur de la zone de dégâts d'un pic, et hauteurs (le gros : deux fois).
   spikeW: 28,
@@ -464,6 +475,8 @@ function ursideFormTransfo(scene, formId, reverse) {
 // feuille : `charge` en charge, `run` en course, `jump` en l'air. Provisoire :
 // une seule image -- le galop est rendu par un balancement du corps.
 function ursideGrizzlyPose(p, now, s) {
+  // Forme mythique : la Grande Ourse a ses propres poses (marche, sprint, saut, attaque : Mythiques.js).
+  if (p.mythic && typeof mythicUrsaPose === 'function' && mythicUrsaPose(p, now, s)) return;
   const sc = p.scene;
   const speed = Math.abs(p.body.velocity.x);
   if (hasManifestArt(sc, 'grizzly', 'run')) {
@@ -539,19 +552,28 @@ function ursideGrizzlyRun(p, now, s) {
   const dt = Math.min(50, p.scene.game.loop.delta || 16);
   const vx = p.body.velocity.x;
   const speed = Math.abs(vx);
-  const allowed = T.startSpeed + (T.topSpeed - T.startSpeed) * p.grizzlyRamp;
+  const allowed = T.startSpeed + (T.topSpeed - T.startSpeed) * Math.pow(p.grizzlyRamp, T.rampCurve || 1);
   const pushing = s.dir !== 0 && Math.sign(vx) === s.dir && speed >= allowed * 0.9 - 6;
   if (pushing) {
     if (s.onGround) p.grizzlyRamp = Math.min(1, p.grizzlyRamp + dt / T.rampMs);
   } else if (s.dir === 0 || Math.sign(vx) === -s.dir || speed < T.startSpeed * 0.5) {
     p.grizzlyRamp = Math.max(0, p.grizzlyRamp - dt / 180);
   }
+  // Sons (2026-11-14, « juicy ») : un pas lourd par foulée au sol, plus serrés
+  // avec la vitesse (≈ 300 ms au départ, 170 ms en charge).
+  if (s.onGround && speed > 60 && now >= (p.grizzlyStepAt || 0)) {
+    p.grizzlyStepAt = now + Math.max(170, Math.min(360, 69000 / speed));
+    playStepSfx(p.scene, 'grizzly_step');
+  }
   const charging = speed >= T.topSpeed * T.chargeRatio;
-  if (charging && !p.grizzlyCharging) p.grizzlyChargeId = (p.grizzlyChargeId || 0) + 1;
+  if (charging && !p.grizzlyCharging) {
+    p.grizzlyChargeId = (p.grizzlyChargeId || 0) + 1;
+    playSfx('grizzly_whoosh');   // il passe en charge : l'air siffle
+  }
   p.grizzlyCharging = charging;
   if (charging) p.grizzlyChargeDir = vx >= 0 ? 1 : -1;
   if (charging) ursideChargeFx(p, now, s);
-  return { acceleration: T.acceleration, maxSpeed: T.startSpeed + (T.topSpeed - T.startSpeed) * p.grizzlyRamp };
+  return { acceleration: T.acceleration, maxSpeed: T.startSpeed + (T.topSpeed - T.startSpeed) * Math.pow(p.grizzlyRamp, T.rampCurve || 1) };
 }
 
 // Contact d'un ennemi avec le grizzly EN CHARGE (overlap joueur / ennemis de
@@ -569,7 +591,8 @@ function ursideChargeContact(scene, player, enemy) {
   if (typeof enemy.blocksHit === 'function' && enemy.blocksHit(source)) return false;
   const now = scene.time.now;
   if (enemy.heavy) {
-    damageEnemy(scene, enemy, { ...source, token: `charge-${player.grizzlyChargeId}` });
+    // Le grizzly fait 2 dégâts (2026-11-15).
+    ursideDamage(scene, enemy, source, `charge-${player.grizzlyChargeId}`, 2);
     player.grizzlyCrash(now, dir, { enemy });
     return true;
   }
@@ -578,9 +601,10 @@ function ursideChargeContact(scene, player, enemy) {
     enemy.defeat();
     juiceOnEnemyHit(scene, enemy, source);
   } else {
-    damageEnemy(scene, enemy, { ...source, token: `charge-${player.grizzlyChargeId}-${now}` });
+    ursideDamage(scene, enemy, source, `charge-${player.grizzlyChargeId}-${now}`, 2);
   }
   player.gainEnergy(ENERGY_PER_HIT);
+  playSfx('grizzly_hit');   // il traverse l'ennemi
   ursideBurst(scene, ex, (enemy.body ? enemy.body.center.y : enemy.y - 30), { color: 0xffe9a8, count: 10, power: 1.1 });
   juiceShake(scene, 'light');
   return true;
@@ -607,7 +631,7 @@ function ursideFxState(scene) {
 // Morceau : { x, y, w, h, color, vx, vy, gy, born, ms, shrink }.
 function ursideFxAdd(scene, part) {
   const st = ursideFxState(scene);
-  if (st.parts.length > 260) st.parts.shift();
+  if (st.parts.length > 900) st.parts.shift();   // (260 avant le feu du grizzly, qui en pose beaucoup)
   st.parts.push({ vx: 0, vy: 0, gy: 0, shrink: true, born: scene.time.now, ms: 300, w: 4, h: 4, color: 0xffffff, ...part });
 }
 
@@ -646,16 +670,92 @@ function ursideGroundWave(scene, x, y, width, { color = 0xd8b890, dark = 0x8a6a4
 
 // Charge du grizzly : traits de vitesse derrière lui, mottes sous les pattes,
 // léger tremblement de l'écran.
+// --- Passif des ursidés, palier 5 : effets changés (2026-11-15) ---------------------------------
+// Vrai quand le passif « +1 dégât » est actif : la glace de l'ours polaire devient noire, les fracas
+// de l'ours brun et de l'ours-hibou s'enflamment, le grizzly charge enveloppé de feu.
+function ursideEmpowered(player) {
+  return !!player && (player.bearDamageBonus || 0) > 0;
+}
+
+const URSIDE_FIRE = { hot: [0xffffff, 0xfff3b0], mid: [0xffd45a, 0xff9a2a], edge: [0xff5a1a, 0xc8280c] };
+
+// Flammes qui montent d'une bande de sol (fracas enflammé).
+function ursideFlames(scene, x0, x1, y, count = 22) {
+  for (let i = 0; i < count; i++) {
+    const t = Math.random();
+    const band = t < 0.2 ? URSIDE_FIRE.hot : t < 0.65 ? URSIDE_FIRE.mid : URSIDE_FIRE.edge;
+    ursideFxAdd(scene, {
+      x: x0 + Math.random() * (x1 - x0), y: y - 2 - Math.random() * 10, w: i % 3 ? 4 : 6, h: i % 3 ? 6 : 8,
+      color: band[i % 2], vx: (Math.random() - 0.5) * 50, vy: -70 - Math.random() * 170, gy: -120,
+      born: scene.time.now + Math.random() * 160, ms: 320 + Math.random() * 360,
+    });
+  }
+}
+
+// Boîte des pixels VISIBLES du sprite du joueur, en coordonnées du monde (le cadre de l'image a de la
+// marge : getBounds seul est trop grand). Repli : getBounds.
+function ursideVisibleBox(p) {
+  const b = p.getBounds();
+  const tb = typeof textureOpaqueBox === 'function' ? textureOpaqueBox(p.scene, p.texture.key) : null;
+  if (!tb || !tb.w || !tb.h) return b;
+  const sx = b.width / tb.w, sy = b.height / tb.h;
+  const x0 = p.flipX ? tb.w - tb.x1 : tb.x0;
+  return new Phaser.Geom.Rectangle(b.x + x0 * sx, b.y + tb.y0 * sy, (tb.x1 - tb.x0) * sx, (tb.y1 - tb.y0) * sy);
+}
+
+// Grizzly « rentrée dans l'atmosphère » : la gaine de feu est un dessin pixel art en boucle de 8 images
+// (pixelfx `fire/grizzly-reentry`, GRIZZLY_FEU_FX, tools/pixelfx/export_grizzly_feu.mjs), posé par-dessus
+// l'ours et centré sur son corps VISIBLE : coiffe nette au museau, deux flammèches effilées le long du dos
+// et du ventre. (Essais écartés le 2026-11-15 : carrés tirés au hasard, « trop chargés, pas propres » ;
+// dessin de Codex, prompt n°17, « horrible » -- sa feuille reste dans assets/vfx/grizzly_feu_codex.png.)
+function ursideGrizzlyFire(p, now) {
+  const sc = p.scene;
+  if (typeof GRIZZLY_FEU_FX === 'undefined' || !sc.textures.exists('grizzlyfeu-0')) return;
+  const c = GRIZZLY_FEU_FX;
+  const dir = p.grizzlyChargeDir || 1;
+  let spr = sc.__grizzlyFire;
+  if (!spr || !spr.active || spr.scene !== sc) {
+    spr = sc.__grizzlyFire = sc.add.image(0, 0, 'grizzlyfeu-0').setDepth(CHARACTER_DEPTH + 2);
+    spr.lookRole = 'fx';
+  }
+  const box = ursideVisibleBox(p);
+  const frame = Math.floor((now / 1000) * c.fps) % c.frames;
+  const ox = c.ox / c.w;
+  // positions rondes à 2 px : le dessin reste sur la grille des gros pixels
+  spr.setTexture(`grizzlyfeu-${frame}`).setVisible(true).setFlipX(dir < 0)
+    .setOrigin(dir > 0 ? ox : 1 - ox, c.oy / c.h)
+    .setPosition(Math.round(box.centerX / 2) * 2, Math.round((box.bottom - c.bodyH / 2) / 2) * 2);
+  sc.__grizzlyFireAt = now;
+  // Quelques braises lâchées loin derrière.
+  if (now >= (p.grizzlyStreakAt || 0)) {
+    p.grizzlyStreakAt = now + 70;
+    ursideFxAdd(sc, {
+      x: box.centerX - dir * (box.width / 2 + 90 + Math.random() * 50), y: box.centerY + (Math.random() - 0.5) * box.height,
+      w: 4, h: 4, color: URSIDE_FIRE.edge[(Math.random() * 2) | 0], vx: dir * 60, vy: -20 - Math.random() * 50, ms: 220 + Math.random() * 200,
+    });
+  }
+}
+
+// La gaine disparaît dès que le grizzly ne charge plus (appelée à chaque image par ursideUpdateHook).
+function ursideGrizzlyFireTick(scene, now) {
+  const spr = scene.__grizzlyFire;
+  if (spr && spr.active && spr.visible && now - (scene.__grizzlyFireAt || 0) > 60) spr.setVisible(false);
+}
+
 function ursideChargeFx(p, now, s) {
   const sc = p.scene;
   const dir = p.grizzlyChargeDir || 1;
-  if (now >= (p.grizzlyLineAt || 0)) {
+  const fire = ursideEmpowered(p);
+  if (fire) ursideGrizzlyFire(p, now);
+  // (traits de vitesse blancs : pas avec la gaine de feu, qui les remplace)
+  if (!fire && now >= (p.grizzlyLineAt || 0)) {
     p.grizzlyLineAt = now + 28;
     for (let i = 0; i < 2; i++) {
       const len = 22 + Math.floor(Math.random() * 5) * 8;
       ursideFxAdd(sc, {
         x: p.x - dir * (20 + Math.random() * 60) - (dir > 0 ? len : 0), y: p.y - 8 - Math.floor(Math.random() * 34) * 2,
-        w: len, h: i === 0 ? 4 : 2, color: Math.random() < 0.3 ? 0xffd08a : 0xffffff, vx: -dir * 300, ms: 120 + Math.random() * 80, shrink: false,
+        w: len, h: i === 0 ? 4 : 2, color: Math.random() < 0.3 ? 0xffd08a : 0xffffff,
+        vx: -dir * 300, ms: 120 + Math.random() * 80, shrink: false,
       });
     }
   }
@@ -792,7 +892,7 @@ function ursideCastIceSpikes(scene, player, now) {
   for (let i = 0; i < total; i++) {
     const big = i === total - 1;
     // Le gros pic : une demi-enjambée après le 5e, au bout de la rangée.
-    const x = player.x + dir * (i < T.spikes ? step * (i + 1) : step * T.spikes + step * 0.55);
+    const x = player.x + dir * (T.startGap * size + (i < T.spikes ? step * (i + 1) : step * T.spikes + step * 0.55));
     const top = ursideGroundTopAt(scene, x, groundY, T.stepUp, T.stepDown);
     if (top === null || ursideWallAt(scene, x, top)) break;
     groundY = top;
@@ -803,14 +903,17 @@ function ursideCastIceSpikes(scene, player, now) {
     const h = (art ? art.height : big ? T.bigH : T.spikeH) * size;
     // Segment centré entre ce pic et le précédent : ils se touchent bord à bord.
     const sx = art && !big ? x - dir * step / 2 : x;
+    // Glace noire (passif des ursidés de palier 5) : mêmes images, autre palette.
+    const dark = !!(art && art.noir && ursideEmpowered(player) && scene.textures.exists(`${art.noir}-0`));
+    const artKey = art ? (dark ? art.noir : art.key) : null;
     const img = art
-      ? scene.add.image(sx, top, `${art.key}-0`).setOrigin(art.ox / art.w, art.oy / art.h)
+      ? scene.add.image(sx, top, `${artKey}-0`).setOrigin(art.ox / art.w, art.oy / art.h)
         .setScale(size).setFlipX(dir < 0).setDepth(CHARACTER_DEPTH + 1).setVisible(false)
       : scene.add.image(x, top, ursideSpikeTexture(scene, big)).setOrigin(0.5, 1)
         .setScale(URSIDE_PX * size).setDepth(CHARACTER_DEPTH + 1).setVisible(false);
     img.lookRole = 'fx';
     const spike = {
-      img, art, x, y: top, w, h, big, index: i, castId, dir, hits,
+      img, art, artKey, dark, x, y: top, w, h, big, index: i, castId, dir, hits,
       bornAt: now + i * T.spikeEveryMs, damage: big ? 2 : 1, popped: false, hitDone: false,
       rect: new Phaser.Geom.Rectangle(sx - w / 2, top - h, w, h),
     };
@@ -830,7 +933,9 @@ function ursideSpikesUpdate(scene, now) {
   st.spikes = st.spikes.filter((s) => {
     const age = now - s.bornAt;
     if (age < 0) return true;
-    if (age >= T.meltMs || !s.img.active) {
+    // Durée : celle des images pixelfx (la brume s'attarde après les éclats), sinon meltMs.
+    const life = s.art ? (s.art.frames / s.art.fps) * 1000 : T.meltMs;
+    if (age >= life || !s.img.active) {
       if (s.img.active) s.img.destroy();
       return false;
     }
@@ -851,11 +956,15 @@ function ursideSpikesUpdate(scene, now) {
       }
       if (s.big) juiceShake(scene, 'medium');
       else if (s.index === 0) juiceShake(scene, 'light');
-      playSfx('ice_spike', { big: s.big });
+      // un pic : craquement de glace + éclats + pas dans la neige ; le gros du bout, plus fort
+      playSfx(s.big ? 'ice_spike_big' : 'ice_spike');
+      // gros pic : en plus, la glace qui craque puis casse (demande du 2026-11-15)
+      if (s.big) playSfx('ice_big_crack');
+      if (s.big) playSfx('ice_big_boom');   // et un « poum » grave quand il sort (demande du 2026-11-15)
     }
     if (s.art) {
-      // Art pixelfx : l'image de son âge (l'effet dure meltMs).
-      img.setTexture(`${s.art.key}-${Math.min(s.art.frames - 1, Math.floor((age / T.meltMs) * s.art.frames))}`);
+      // Art pixelfx : l'image de son âge (une image par 1/fps s).
+      img.setTexture(`${s.artKey || s.art.key}-${Math.min(s.art.frames - 1, Math.floor((age / 1000) * s.art.fps))}`);
     }
     // Le pic SORT du sol puis y rentre : image rognée par le bas, par crans
     // d'une case (2 px d'écran) -- jamais étirée ni fondue.
@@ -887,7 +996,10 @@ function ursideSpikesUpdate(scene, now) {
         done.add(enemy);
         const base = { kind: 'skill', skillId: 'ours_polaire', player, x: s.x, y: s.y };
         let hit = false;
-        for (let k = 0; k < s.damage; k++) hit = damageEnemy(scene, enemy, { ...base, token: `ice-${s.castId}-${s.index}-${k}` }) || hit;
+        // Passif des ursidés, palier 5 : +1 sur la TRAÎNÉE seulement (1 -> 2) ; le gros pic reste à 2,
+        // soit 4 en tout pour un ennemi pris par les deux (réglage de l'utilisateur, 2026-11-15).
+        const dmg = s.damage + (s.big ? 0 : (player.bearDamageBonus || 0));
+        for (let k = 0; k < dmg; k++) hit = damageEnemy(scene, enemy, { ...base, token: `ice-${s.castId}-${s.index}-${k}` }) || hit;
         if (hit) player.gainEnergy(ENERGY_PER_HIT);
       }
     }
@@ -905,6 +1017,13 @@ function ursideSpikesUpdate(scene, now) {
 // `canActivate(player)` (sinon ni effet ni coût), `onStart(player, now)`,
 // `family` (zone agrandie par le palier 3 des ursidés), `cardLabel`.
 SKILL_DEFS.ours.family = 'ursides';
+// Sons de l'ours brun (2026-11-14, « juicy ») : sa patte fend l'air juste avant
+// le fracas (ours_slam, le « boum »), puis la terre et les pierres retombent
+// (ours_debris, Player à l'impact). Horloge lue par ursideSkillTick. (Le
+// grognement à la transformation a été retiré à la demande de l'utilisateur.)
+SKILL_DEFS.ours.onStart = (player, now) => {
+  player.oursSwingAt = (player.skillHitboxActivateAt || now) - 170;
+};
 
 const URSIDE_SKILL_BODY = (scale) => transfoBodyConfig(OURS_FRAME_WIDTH, OURS_FRAME_HEIGHT, scale);
 
@@ -936,6 +1055,9 @@ SKILL_DEFS.panda = {
   onStart(player, now) {
     player.pandaHealAt = player.skillAttackEndTime - 60;
     player.pandaMunchAt = player.skillTransitionEndTime + 80;
+    // Sons : elle s'assied, puis croque (deux bouchées), puis le soin.
+    player.pandaSitAt = player.skillTransitionEndTime;
+    player.pandaCrunchAt = player.skillTransitionEndTime + 160;
   },
 };
 
@@ -1083,7 +1205,19 @@ function ursideEnsureSkillArt(scene, def) {
 // Horloges des compétences d'ours (début de Player.update, avant les poses).
 function ursideSkillTick(player, now) {
   const sc = player.scene;
+  if (player.oursSwingAt && now >= player.oursSwingAt) {
+    player.oursSwingAt = 0;
+    playSfx('ours_swing');
+  }
   if (player.pandaHealAt) {
+    if (player.pandaSitAt && now >= player.pandaSitAt) {
+      player.pandaSitAt = 0;
+      playSfx('panda_sit');
+    }
+    if (player.pandaCrunchAt && now >= player.pandaCrunchAt) {
+      playSfx('panda_crunch');
+      player.pandaCrunchAt = now + 330 < player.pandaHealAt - 120 ? now + 330 : 0;
+    }
     // Miettes de pousse pendant qu'elle mâche.
     if (now >= (player.pandaMunchAt || 0) && now < player.pandaHealAt) {
       player.pandaMunchAt = now + 110;
@@ -1113,6 +1247,9 @@ function ursideSkillTick(player, now) {
     const dir = player.facingDir >= 0 ? 1 : -1;
     // Il retombe : secousse, gerbe de givre sous les pattes, puis la glace part.
     juiceShake(sc, 'medium');
+    playSfx('polar_slam');   // l'ours retombe lourdement sur la neige
+    playSfx('polar_quake');  // le sol gelé tremble et craque le temps que les cristaux sortent
+    playSfx('polar_grince'); // la glace grince et couine en poussant (demande du 2026-11-15)
     ursideGroundWave(sc, player.x + dir * 30, player.body.bottom, 90, { color: 0xf2fdff, dark: 0x8fd4ff });
     ursideCastIceSpikes(sc, player, now);
   }
@@ -1134,7 +1271,9 @@ function ursideFracasReady(scene, part) {
 
 // Joue une partie de l'effet, ancrée en (x, y) ; `dir` < 0 : retournée ;
 // `size` : agrandie (palier 3 des ursidés). Vrai si l'effet est parti.
-function ursidePlayFracas(scene, part, x, y, { dir = 1, size = 1 } = {}) {
+function ursidePlayFracas(scene, part, x, y, { dir = 1, size = 1, angle = 0, fire = false } = {}) {
+  // `fire` : la version enflammée (passif des ursidés de palier 5), si ses images sont là.
+  if (fire && ursideFracasReady(scene, `${part}_feu`)) part = `${part}_feu`;
   if (!ursideFracasReady(scene, part)) return false;
   const c = FRACAS_FX[part];
   const key = `fracas-${part}`;
@@ -1148,7 +1287,7 @@ function ursidePlayFracas(scene, part, x, y, { dir = 1, size = 1 } = {}) {
   // Image retournée : Phaser la retourne dans son cadre, pas autour de son
   // origine -- l'ancrage passe donc de l'autre côté.
   const ox = c.ox / c.w;
-  spr.setOrigin(dir >= 0 ? ox : 1 - ox, c.oy / c.h).setFlipX(dir < 0);
+  spr.setOrigin(dir >= 0 ? ox : 1 - ox, c.oy / c.h).setFlipX(dir < 0).setAngle(angle);
   spr.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => spr.destroy());
   spr.play(key);
   return true;
@@ -1158,18 +1297,93 @@ function ursidePlayFracas(scene, part, x, y, { dir = 1, size = 1 } = {}) {
 // poussière et pierres sur la largeur RÉELLE de la zone (`rect`), et pour
 // l'ours brun la traînée de sa patte. Faux sans les images (Player retombe
 // alors sur l'ancien effet).
+// --- Ours brun : coup de griffe + fracas (2026-11-15) -------------------------------------------
+// Hauteur des pieds au-dessus du sol au-delà de laquelle le fracas ne part plus (repère tracé par
+// l'utilisateur sur une capture : à peu près la poitrine du mannequin).
+const OURS_FRACAS_MAX_HEIGHT = 47;   // 70 au départ ; baissé d'un tiers le 2026-11-15 (« il touche encore le sol de trop haut »)
+const OURS_CLAW_MS = 120;        // durée de la zone du coup de griffe
+const OURS_CLAW_REACH = 34;      // elle dépasse l'avant de l'ours de tant de px
+
+// Dessus du sol le plus proche SOUS `y` autour de `x` (centre, un peu devant, un peu derrière), ou null.
+function ursideGroundBelow(scene, x, y) {
+  if (typeof openGroundTilesAt !== 'function') return null;
+  let best = null;
+  for (const dx of [0, -22, 22]) {
+    for (const t of openGroundTilesAt(scene, x + dx)) {
+      const top = t.body ? t.body.top : t.y - t.displayHeight / 2;
+      if (top >= y - 8 && (best === null || top < best)) best = top;
+    }
+  }
+  return best;
+}
+
+// Appelée à l'instant où le coup de l'ours brun porte (Player.update). Pose la zone du coup de griffe
+// (player.oursClaw, lue par ursideUpdateHook) et dit si le fracas au sol a lieu ; si oui, la zone du
+// fracas (player.skillHitboxRect) est reposée SUR le sol, sous l'ours là où il est maintenant.
+function ursideBrownBearStrike(player, now) {
+  const sc = player.scene;
+  const dir = player.facingDir >= 0 ? 1 : -1;
+  const b = player.getBounds();
+  const w = b.width / 2 + OURS_CLAW_REACH;
+  const token = `oursclaw-${player.skillActiveUntil}`;
+  player.oursClaw = {
+    rect: new Phaser.Geom.Rectangle(dir > 0 ? b.centerX : b.centerX - w, b.y - 10, w, b.height + 10),
+    until: now + OURS_CLAW_MS, token,
+  };
+  const feet = player.body ? player.body.bottom : player.y;
+  const grounded = player.onGround || (player.body && (player.body.blocked.down || player.body.touching.down));
+  const groundY = grounded ? feet : ursideGroundBelow(sc, player.x, feet);
+  const slam = groundY != null && groundY - feet <= OURS_FRACAS_MAX_HEIGHT;
+  const rect = player.skillHitboxRect;
+  if (slam && rect) {
+    rect.x = player.x - rect.width / 2;
+    rect.y = groundY - rect.height;
+  }
+  if (!slam) {
+    // Pas de fracas : la traînée de la patte seule, et les boss hors du groupe d'ennemis (qui n'écoutent
+    // que l'événement « player-skill ») reçoivent quand même le coup de griffe.
+    if (ursideFracasReady(sc, 'griffe') && hasManifestArt(sc, 'ours_brun', 'slam')) {
+      ursidePlayFracas(sc, 'griffe', player.x, player.y, { dir, fire: ursideEmpowered(player) });
+    }
+    sc.events.emit('player-skill', { skillId: 'ours', rect: player.oursClaw.rect, token });
+  }
+  return slam;
+}
+
+// Un coup qui vaut `n` dégâts : `n` appels à damageEnemy (les ennemis comptent 1 par coup reçu), chacun
+// avec `damage: n` pour ceux qui lisent ce champ (Ghil't, protégé ensuite par sa courte invulnérabilité).
+// Un seul passage par ennemi et par `token`.
+// Passif des ursidés, palier 5 : +1 dégât (player.bearDamageBonus), ajouté ici pour tous leurs coups.
+function ursideDamage(scene, enemy, source, token, n, { bonus = true } = {}) {
+  if (!enemy) return false;
+  // jetons récents de CET ennemi (plusieurs coups d'ours peuvent se croiser : griffe + fracas)
+  const seen = enemy.__ursideTokens || (enemy.__ursideTokens = []);
+  if (seen.includes(token)) return false;
+  seen.push(token);
+  if (seen.length > 8) seen.shift();
+  if (bonus) n += (source && source.player && source.player.bearDamageBonus) || 0;
+  // damageEnemy ne retient que le DERNIER jeton reçu : on le lui rend ensuite, sinon un autre coup en
+  // cours (le fracas au sol, relu à chaque image) frapperait une seconde fois.
+  const prev = enemy.__lastHitToken;
+  let hit = false;
+  for (let k = 0; k < n; k++) hit = damageEnemy(scene, enemy, { ...source, damage: n, token: `${token}#${k}` }) || hit;
+  // (rendu seulement si ce n'était pas un de NOS jetons : sinon on réveillerait un coup déjà compté)
+  enemy.__lastHitToken = prev;
+  return hit;
+}
+
 function ursideSlamFx(player, rect) {
   const sc = player.scene;
   if (!rect || !ursideFracasReady(sc, 'impact')) return false;
-  ursidePlayFracas(sc, 'impact', rect.centerX, rect.bottom, { size: rect.width / URSIDE_FRACAS_BASE_WIDTH });
-  // (même facteur pour l'anneau : palier 3 des ursidés, totems)
-  const size = rect.width / URSIDE_FRACAS_BASE_WIDTH;
+  // Passif des ursidés de palier 5 : fracas enflammé (ours brun et ours-hibou), flammes qui montent du sol.
+  const fire = ursideEmpowered(player);
+  ursidePlayFracas(sc, 'impact', rect.centerX, rect.bottom, { size: rect.width / URSIDE_FRACAS_BASE_WIDTH, fire });
+  if (fire) ursideFlames(sc, rect.x, rect.right, rect.bottom, Math.round(rect.width / 9));
   if (player.activeSkillId === 'ours') {
-    // Le fracas de l'ours brun est le pouvoir du talisman : son anneau ambre
-    // dessiné reste (le même qu'avant, cf. spawnFx 'slam' dans LevelKit).
-    juiceShockRing(sc, rect.centerX, rect.bottom - 6, { size: 230 * size, ms: 380, color: 0xffe2b0, flat: 0.28, variant: 'talisman' });
+    // (2026-11-14 : l'anneau ambre du talisman est retiré, à la demande de
+    // l'utilisateur -- le fracas pixelfx suffit.)
     if (hasManifestArt(sc, 'ours_brun', 'slam')) {
-      ursidePlayFracas(sc, 'griffe', player.x, player.y, { dir: player.facingDir >= 0 ? 1 : -1 });
+      ursidePlayFracas(sc, 'griffe', player.x, player.y, { dir: player.facingDir >= 0 ? 1 : -1, fire });
     }
   }
   return true;
@@ -1183,9 +1397,21 @@ function ursideOwlbearSlamFx(player, rect) {
 
 // Percussion du grizzly : éclats au point de contact, pierres et poussière au
 // pied de ce qu'il percute (même effet que le fracas, en plus petit).
-function ursideCrashFx(player, x, y) {
+function ursideCrashFx(player, x, y, { wallDir = 0 } = {}) {
   const sc = player.scene;
-  const stones = ursidePlayFracas(sc, 'impact', x, player.body.bottom, { size: 0.7 * (player.bearSizeMultiplier || 1) });
+  // Contre un mur (`wallDir` : côté du mur, 1 = à droite) : l'effet, dessiné pour
+  // jaillir d'un sol, est tourné d'un quart de tour et part DU MUR, à hauteur du
+  // choc (retour du 2026-11-14 : il sortait du sol sous le grizzly). Contre un
+  // ennemi : au sol, à ses pieds, comme avant.
+  const size = 0.7 * (player.bearSizeMultiplier || 1);
+  // Contre un mur, l'effet tourné ne doit pas dépasser le grizzly : sa largeur
+  // (devenue sa hauteur) suit celle du corps (retour du 2026-11-14 : trop haut et
+  // trop large), centrée sur le corps et sans plonger dans le sol.
+  const wallSize = Math.min(size, (player.body.height * 1.7) / FRACAS_FX.impact.w);
+  const wallY = Math.min(player.body.center.y, player.body.bottom - FRACAS_FX.impact.ox * wallSize * 0.9);
+  const stones = wallDir
+    ? ursidePlayFracas(sc, 'impact', x, wallY, { size: wallSize, angle: wallDir > 0 ? -90 : 90, fire: ursideEmpowered(player) })
+    : ursidePlayFracas(sc, 'impact', x, player.body.bottom, { size, fire: ursideEmpowered(player) });
   ursideBurst(sc, x, y, { count: stones ? 6 : 14, power: 1.3, colors: [0xffffff, 0xffd08a, 0xc9a878, 0x8a6a48] });
   juiceShake(sc, 'heavy');
   juiceHitStop(sc, 70);
@@ -1206,10 +1432,28 @@ function ursideUpdateHook(scene, time) {
         if (!enemy || enemy.defeated || !enemy.active) continue;
         const target = typeof enemy.getMeleeBounds === 'function' ? enemy.getMeleeBounds() : enemy.getBounds();
         if (!Phaser.Geom.Intersects.RectangleToRectangle(imp.rect, target)) continue;
-        if (damageEnemy(scene, enemy, { kind: 'charge', player: p, x: p.x, y: p.y, token: imp.token })) p.gainEnergy(ENERGY_PER_HIT);
+        // 2 dégâts, comme la charge ; l'ennemi percuté (même jeton) n'est pas frappé une seconde fois.
+        if (ursideDamage(scene, enemy, { kind: 'charge', player: p, x: p.x, y: p.y }, imp.token, 2)) p.gainEnergy(ENERGY_PER_HIT);
       }
     }
   }
+  // Coup de griffe de l'ours brun (ursideBrownBearStrike) : 1 dégât à ce qui est devant lui, avec son
+  // propre jeton -- le fracas au sol, s'il a lieu, compte en plus (zone de la compétence, LevelKit).
+  if (p && p.active && p.oursClaw) {
+    const claw = p.oursClaw;
+    if (now >= claw.until) {
+      p.oursClaw = null;
+    } else if (scene.enemies) {
+      for (const enemy of scene.enemies.getChildren().slice()) {
+        if (!enemy || enemy.defeated || !enemy.active) continue;
+        const target = typeof enemy.getMeleeBounds === 'function' ? enemy.getMeleeBounds() : enemy.getBounds();
+        if (!Phaser.Geom.Intersects.RectangleToRectangle(claw.rect, target)) continue;
+        // (la griffe reste à 1 dégât, même avec le passif de palier 5 : décision du 2026-11-15)
+        if (ursideDamage(scene, enemy, { kind: 'skill', skillId: 'ours', player: p, x: p.x, y: p.y }, claw.token, 1, { bonus: false })) p.gainEnergy(ENERGY_PER_HIT);
+      }
+    }
+  }
+  ursideGrizzlyFireTick(scene, now);
   ursideSpikesUpdate(scene, now);
   ursideFxDraw(scene, now);
 }

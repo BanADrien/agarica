@@ -21,6 +21,20 @@ jeu. Comment trouver ou fabriquer un son : skill `son` (`.claude/skills/son/SKIL
   accès réseau est le téléchargement des modèles (Hugging Face).
 - Place prise sur ce PC : environ 3,1 Go (FFmpeg 0,7, earshot 1,1, modèles 1,1, cache uv 0,25).
 
+## L'atelier des sons
+
+```
+python tools/son/atelier.py        # puis ouvrir http://localhost:8791
+```
+Une page pour écouter chaque son du jeu (liste tirée des `playSfx` de src/), en fabriquer un
+(recettes : fracas lourd, coup de poing, charge, glace, soin magique, saut…, bouton « Varier »),
+en chercher un enregistré sur Openverse (CC0), le retoucher (coupe à la souris, hauteur, punch,
+grave, brillance, couche sourde, claquement, écho court, fondu ; bouton « Rendre juicy ») puis
+le ranger : « Remplacer le son » ou « Ajouter comme variante ». L'atelier écrit le fichier
+`assets/audio/sfx/<id>.ogg`, sa ligne de `CREDITS.md` et l'entrée d'`AUDIO_SFX` (volume en jeu,
+variation de hauteur, écart minimal, numéro `v` contre le cache). Recharger le jeu ensuite.
+Il lui faut FFmpeg (sur le PATH, dans `~/bin`, ou `pip install imageio-ffmpeg`).
+
 ## Commandes utiles
 
 ```

@@ -20,6 +20,33 @@ installation sur un autre PC : `docs/production/SON_OUTILS.md`. Tout se lance de
   licence, page ou commande).
 - Tu n'entends pas : ne dis jamais comment sonne un fichier sans une lecture d'earshot, et cite-la.
 
+## Meilleure source : Stable Audio Open en local (2026-11-14)
+
+Génère un bruitage d'après une phrase, sur la RTX 5060 (8 Go : une prise à la fois).
+`E:\sons\sao\.venv\Scripts\python.exe -I E:\sons\sao\genere.py E:\sons\sao\prompts.json [noms] --n 8`
+(prompts en anglais, détaillés, finissant par « punchy video game sound effect » ; modèle et jeton
+Hugging Face dans `E:\sons\hf`). Puis earshot classe les prises (match + alts, realness, describe :
+attaque < 50 ms), on range la meilleure. Pour les ours, ces prises ont battu Openverse et Sonniss
+partout, sauf le croquant du panda (lu « os qui cassent »). Licence : Stability AI Community
+(gratuit sous 1 M$ de revenus annuels).
+
+## Source principale : la banque Sonniss GDC (accord de l'utilisateur, 2026-11-14)
+
+Bruitages professionnels dans `E:/sons/sonniss/lib` (bundles GDC 2024 + 2026), index `E:/sons/sonniss/index.json`.
+Licence Sonniss : libre de droits, usage commercial et jeux, crédit non obligatoire ; interdit de
+revendre les sons seuls ou d'entraîner une IA avec. C'est la seule exception au « CC0 uniquement ».
+Ligne de CREDITS.md quand même (fichier d'origine, bibliothèque, « Sonniss GDC »).
+L'utilisateur ne veut ni choisir ni retoucher : trouver, assembler, faire écouter par earshot,
+refaire jusqu'à ce que le son corresponde à l'action, puis ranger directement.
+
+## L'atelier des sons (l'outil de l'utilisateur)
+
+`python tools/son/atelier.py` puis http://localhost:8791 : l'utilisateur y écoute chaque son du
+jeu, en fabrique (recettes : fracas, coup, glace, soin…), en cherche sur Openverse (CC0), le
+retouche (coupe, punch, grave, couche sourde, claquement, écho, bouton « Rendre juicy ») et le
+range en un clic (fichier, ligne de CREDITS.md, entrée d'AUDIO_SFX avec son numéro `v`). Le
+proposer dès qu'il veut écouter, régler ou changer des sons : c'est lui qui choisit à l'oreille.
+
 ## Les commandes
 
 | Besoin | Commande |

@@ -330,13 +330,10 @@ const AGARICA_ANIM_ROWS = [
   { name: 'idle', row: 0, count: 6 },
   { name: 'run', row: 2, count: 6 },
 ];
-// Marche : feuille dédiée (assets/sprites/agarica_walk.png), remplace
-// l'ancienne marche empruntée à agarica.png (juste 2 poses en alternance,
-// la ligne dédiée de la feuille d'origine rendait bizarre avec ses poses de
-// transition intermédiaires). La feuille fournit 5 poses mais la 5e est un
-// quasi-doublon de la 1re (redondante vu que l'anim boucle déjà dessus) :
-// seules les 4 premières sont chargées/utilisées, en cycle simple.
-const AGARICA_WALK_FRAME_INDICES = [0, 1, 2, 3];
+// Marche : 8 poses dessinées par Codex (prompt n°15, assets/sprites/agarica_marche.png), converties au grain
+// et à la palette d'Agarica par tools/import_marche_codex.py (2026-11-15 ; les 4 anciennes images sont
+// gardées dans assets/sprites/_marche_avant_codex/). Un cycle = deux pas (contact, appui, passage, poussée, x2).
+const AGARICA_WALK_FRAME_INDICES = [0, 1, 2, 3, 4, 5, 6, 7];
 const ANIM_IDLE_KEY = 'agarica-idle';
 const ANIM_WALK_KEY = 'agarica-walk';
 const HUMAN_SCALE = 0.24;
@@ -420,7 +417,12 @@ const SLASH_ARCS = {
   // flottaient devant elle une fois le loup ramené à sa taille de course.
   // 2026-11-11 : crocs retournés (charnière côté loup, cf. drawBiteFx) et avancés de 60 à 76 :
   // la charnière tombait sinon sur la tête du loup et la cachait.
-  bite: { cx: 76, cy: -32, w: 64, h: 52 },
+  // 2026-11-15 : croc dessiné par Codex (prompt n°16, tools/import_loup_codex.py : deux rangées de dents de
+  // loup vues de côté). `w` = 61 : l'image active (183 px opaques) est affichée à 1/3 pile, soit 1 px d'écran
+  // par pixel dessiné ; avancé à 88 : la charnière tombe au bout du museau.
+  // (réduit de 20 % le 2026-11-15, « bien mais un peu grand » : w 77 -> 61, et reculé de 88 à 81 pour que
+  // la charnière reste au bout du museau)
+  bite: { cx: 81, cy: -32, w: 61, h: 44 },
   // Coup de patte du Loup vers le bas (slashDir = 'paw', en l'air + S/↓) :
   // sous ses pattes, à peine en avant ; griffes dessinées par code dans ce
   // rectangle (cf. drawPawClaws), qui est aussi la zone qui touche.
@@ -450,8 +452,9 @@ const BITE_VFX_ACTIVE_FRAMES = [1, 2];
 // pèse sans propulser. En l'air, rien : un saut d'élan garde sa portée (ravins).
 const WOLF_BITE_GROUND_SPEED = 0.8;
 // Rebond (« pogo ») : un coup vers le bas qui touche un ennemi, un amas de
-// mousse ou un danger relance Agarica vers le haut (~140 px).
-const POGO_VELOCITY = -600;
+// mousse ou un danger relance Agarica vers le haut (~90 px ; ~140 px et -600 avant le 2026-11-15 :
+// « le pogo propulse trop haut »).
+const POGO_VELOCITY = -480;
 // Croissant dessiné par code tant que l'art `vfx_slash` n'existe pas (palette
 // du jeu : vert lunaire, cœur blanc, liseré rose).
 const SLASH_COLORS = { glow: 0x5fd88f, body: 0x9fffd0, core: 0xe8fff2, edge: 0xffb3e0 };
@@ -974,6 +977,8 @@ const JUMP_CUT_VY = 240;
 // liane, ou en le tenant en passant. Un appui fait jusqu'à ce délai AVANT
 // d'arriver à portée compte encore (appui un poil trop tôt).
 const VINE_GRAB_BUFFER_MS = 200;
+// Délai après avoir quitté une liane avant de pouvoir en reprendre une (n'importe laquelle).
+const VINE_ANY_REGRAB_MS = 300;
 // Juice (visuel seul) : couleurs des éclats de transformation par forme.
 const FORM_FX_COLORS = {
   agarica: 0xff9fc9, wolf: 0x7dfcd8, eagle: 0xfff1c0, monkey: 0xa8e07a, octopus: 0x9fe3ff,
@@ -2039,7 +2044,19 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       // coup ne toucherait rien (LevelKit la lit après cet update).
       if (now >= this.skillActiveUntil) this.skillActiveUntil = now + 1;
       // Juice : l'impact du fracas (poussière des deux côtés, onde au sol).
-      if (this.skillHitboxId === 'ours') {
+      // Ours brun (2026-11-15) : DEUX coups distincts. Le coup de griffe, devant lui, part toujours
+      // (1 dégât). Le fracas au sol (1 dégât) ne part que s'il est au sol ou à moins de
+      // OURS_FRACAS_MAX_HEIGHT du sol : lancé de plus haut, il ne « tape » plus un sol qu'il ne touche pas.
+      // Un ennemi devant lui, près du sol, prend donc les deux.
+      let oursSlam = true;
+      if (this.skillHitboxId === 'ours' && this.activeSkillId === 'ours' && typeof ursideBrownBearStrike === 'function') {
+        oursSlam = ursideBrownBearStrike(this, now);
+      }
+      if (this.skillHitboxId === 'ours' && !oursSlam) {
+        // En l'air, trop haut : la griffe seule (sa traînée, un choc léger), aucun fracas.
+        this.skillHitboxRect = null;
+        juiceShake(this.scene, 'light');
+      } else if (this.skillHitboxId === 'ours') {
         // Poussière, pierres et traînée de la patte : images pixelfx, à part de
         // l'ours et sur la largeur RÉELLE de la zone (ursideSlamFx, Ursides.js).
         // Sans elles : l'ancien effet par code.
@@ -2057,6 +2074,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         juiceShake(this.scene, 'heavy');
         if (typeof juiceHitStop === 'function') juiceHitStop(this.scene, 70);
         playSfx(this.activeSkillId === 'owlbear_slam' ? 'owlbear_slam' : 'ours_slam');
+        if (this.activeSkillId === 'ours') playSfx('ours_debris');   // terre et pierres qui retombent
       }
     }
     if (this.skillHitboxRect && now >= this.skillActiveUntil) this.skillHitboxRect = null;
@@ -2087,7 +2105,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    const attackJustPressed = Phaser.Input.Keyboard.JustDown(this.attackKey) || this.attackPointerJustDown;
+    // Aucune attaque pendant un double saut (demande de l'utilisateur, 2026-11-14) :
+    // ni dague, ni morsure, ni plume de l'aigle tant que le 2e saut est en l'air.
+    const inDoubleJump = this.jumpsUsed >= 2 && !(this.body.blocked.down || this.body.touching.down);
+    const attackJustPressed = !inDoubleJump
+      && (Phaser.Input.Keyboard.JustDown(this.attackKey) || this.attackPointerJustDown);
     this.attackPointerJustDown = false;
     if (attackJustPressed && this.form === 'eagle' && now >= this.attackCooldownEndTime) {
       // Forme Aigle : pas de dague en vol, une plume tirée en diagonale vers
@@ -2107,6 +2129,9 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       });
       spawnFx(this.scene, 'feathers', this.x, this.y - 40, { count: 2, power: 0.8 });
       playSfx('feather_shot');
+    } else if (attackJustPressed && this.mythic && typeof mythicAttack === 'function') {
+      // Forme mythique : SON attaque (Grande Ourse : coup de patte, Mythiques.js).
+      mythicAttack(this, now);
     } else if (attackJustPressed && !this.isAttacking && this.form !== 'octopus' && !this.vine
       && this.form !== 'grizzly' && !skillRooted && now >= this.attackCooldownEndTime) {
       // (Grizzly : pas de morsure, sa charge est son attaque -- K est ignoré.)
@@ -2220,16 +2245,20 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (sprinting) this.sprintForm = groundForm;
     // Grizzly : l'élan monte en courant (cf. ursideGrizzlyRun) ; au-delà du
     // seuil, c'est la charge. Hors de sa course : ni élan ni charge.
-    const grizzlyRun = sprinting && groundForm === 'grizzly' && typeof ursideGrizzlyRun === 'function'
+    // (Forme mythique -- Mythiques.js : ni élan ni charge du grizzly, elle a sa propre course.)
+    const grizzlyRun = sprinting && groundForm === 'grizzly' && !this.mythic && typeof ursideGrizzlyRun === 'function'
       ? ursideGrizzlyRun(this, now, { dir: left && !right ? -1 : right && !left ? 1 : 0, onGround }) : null;
     if (!grizzlyRun) {
       this.grizzlyCharging = false;
       this.grizzlyRamp = 0;
     }
-    const acceleration = grizzlyRun ? grizzlyRun.acceleration : sprinting ? this.wolfAcceleration : this.moveAcceleration;
+    // Forme mythique : sa vitesse et son sprint (Maj tenue), quelle que soit la forme au sol équipée.
+    const mythicRun = this.mythic && !swimming && typeof mythicMove === 'function'
+      ? mythicMove(this, now, { sprinting: shiftHeld, dir: left && !right ? -1 : right && !left ? 1 : 0, onGround }) : null;
+    const acceleration = mythicRun ? mythicRun.acceleration : grizzlyRun ? grizzlyRun.acceleration : sprinting ? this.wolfAcceleration : this.moveAcceleration;
     const webSlowed = this.inWeb && !sprinting;
     const biteSlow = onGround && this.slashDir === 'bite' ? WOLF_BITE_GROUND_SPEED : 1;
-    const maxSpeed = biteSlow * (grizzlyRun ? grizzlyRun.maxSpeed : sprinting ? this.wolfMaxSpeed
+    const maxSpeed = biteSlow * (mythicRun ? mythicRun.maxSpeed : grizzlyRun ? grizzlyRun.maxSpeed : sprinting ? this.wolfMaxSpeed
       : webSlowed ? this.moveMaxSpeed * this.webSlowMultiplier : this.moveMaxSpeed);
 
     // Ours-hibou en l'air : plus rapide, mais lent à lancer et à freiner (OWLBEAR_TUNING).
@@ -2246,6 +2275,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.setAccelerationX(0);
     }
+    // Pas (2026-11-14) : Agarica et le loup, au sol, rythmés par la vitesse
+    // (≈ 300 ms en marchant, plus serrés en courant). Le grizzly a les siens (Ursides).
+    if (onGround && !swimming && !grizzlyRun && !this.skillTransformActive && Math.abs(this.body.velocity.x) > 50
+      && now >= (this.stepSfxAt || 0)) {
+      const v = Math.abs(this.body.velocity.x);
+      const wolf = sprinting && groundForm === 'wolf';
+      this.stepSfxAt = now + Math.max(wolf ? 140 : 210, Math.min(420, (wolf ? 52000 : 62000) / v));
+      playStepSfx(this.scene, wolf ? 'step_wolf' : 'step');   // + feuilles mortes selon la zone
+    }
 
     // Ours-hibou : il retombe après son 2e saut -> fracas (compétence interne
     // `owlbear_slam`, Ursides.js), seulement après une vraie chute depuis le
@@ -2253,6 +2291,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.airJumpForm === 'owlbear') {
       if (!onGround) {
         this.owlbearTopY = Math.min(this.owlbearTopY, this.y);
+        if (!this.owlbearFallSfx && this.body.velocity.y > 150) {
+          this.owlbearFallSfx = true;
+          playSfx('owlbear_fall');   // il redescend : l'air siffle
+        }
       } else if (!swimming && !this.skillTransformActive && typeof OWLBEAR_TUNING !== 'undefined'
         && this.y - this.owlbearTopY >= OWLBEAR_TUNING.minFall) {
         this.beginSkill('owlbear_slam', now);
@@ -2300,9 +2342,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         this.body.maxVelocity.set(VINE_BODY_MAX_SPEED, VINE_BODY_MAX_SPEED);
       }
     } else if (monkeyActive && !onGround && this.airJumpForm === 'monkey' && typeof findGrabbableVine === 'function'
-      && (upHeld || now - this.upPressedAt <= VINE_GRAB_BUFFER_MS)) {
-      // Prise SUR APPUI de Z/↑ (ou tenu en passant), plus automatique : un
-      // singe qui passe près d'une liane sans rien demander la traverse.
+      && now - this.vineReleasedAt >= VINE_ANY_REGRAB_MS) {
+      // Prise AUTOMATIQUE (demande de l'utilisateur, 2026-11-14) : plus besoin de
+      // tenir Z/↑, le singe s'accroche à la liane qu'il croise. En échange, après
+      // avoir quitté une liane, aucune prise pendant VINE_ANY_REGRAB_MS (0,3 s),
+      // quelle que soit la liane -- sinon il se raccrocherait aussitôt.
       const vine = findGrabbableVine(this.scene, this, now);
       if (vine) {
         this.grabVine(vine, now);
@@ -2346,6 +2390,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         jumpActed = true;
         this.jumpCutArmed = true;
         this.jumpBufferedAt = -Infinity;
+      } else if (!swimming && this.mythic && this.jumpsUsed < 2 && typeof mythicAirJump === 'function') {
+        // Forme mythique : SON saut en l'air (Grande Ourse : elle lance une étoile et s'y téléporte).
+        this.jumpsUsed = 2;
+        jumpActed = true;
+        juiceJump = 'air';
+        this.wolfJumpCarry = false;
+        mythicAirJump(this, now, left && !right ? -1 : right && !left ? 1 : (this.facingDir >= 0 ? 1 : -1));
       } else if (!swimming && airForm === 'monkey' && this.jumpsUsed < 2) {
         // Saut court du singe = LE double saut : transforme en singe (cf.
         // sélection de forme plus bas) et rend les lianes accrochables. Même
@@ -2375,6 +2426,15 @@ class Player extends Phaser.Physics.Arcade.Sprite {
           this.setVelocityY(typeof OWLBEAR_TUNING !== 'undefined' ? OWLBEAR_TUNING.jumpVelocity : this.monkeyJumpVelocity);
           this.wolfJumpCarry = false;
           this.owlbearTopY = this.y;
+          // Élan vers l'avant : le 2e saut le projette (sens tenu, sinon celui où il regarde).
+          if (typeof OWLBEAR_TUNING !== 'undefined' && OWLBEAR_TUNING.jumpForward) {
+            const fwd = left && !right ? -1 : right && !left ? 1 : (this.facingDir >= 0 ? 1 : -1);
+            this.body.maxVelocity.x = Math.max(this.body.maxVelocity.x, OWLBEAR_TUNING.airMaxSpeed);
+            this.setVelocityX(fwd * OWLBEAR_TUNING.jumpForward);
+          }
+          // Sons : la prise d'appui et le corps qui fend l'air ; la chute siffle ensuite (plus bas).
+          playSfx('owlbear_jump');
+          this.owlbearFallSfx = false;
         } else {
           this.setVelocityY(this.jumpVelocity);
         }
@@ -2490,7 +2550,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setDrag(this.waterDrag, this.waterDrag);
     }
 
-    if (swimming) {
+    if (this.mythic && !swimming) {
+      // Forme mythique (Mythiques.js) : toujours l'ours, au sol comme en l'air ; ses images remplacent
+      // celles du grizzly dans ursideGrizzlyPose.
+      this.setForm('grizzly');
+    } else if (swimming) {
       this.setForm('octopus');
     } else if (this.vine) {
       this.setForm('monkey');
@@ -3141,7 +3205,18 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // Entièrement pilotée par SKILL_DEFS (coût/durée/forme de zone/teinte/
   // échelle) : ajouter une compétence future = ajouter une entrée à cette
   // table, sans toucher à cette méthode.
+  // Coût réel d'une compétence : celui de sa fiche, réduit pour les ursidés par leur passif de
+  // palier 3 (bearCostMultiplier). Lu aussi par le HUD (case grisée quand l'énergie manque).
+  skillCost(skillId) {
+    const def = SKILL_DEFS[skillId];
+    const base = (def && def.cost) || 0;
+    const ursid = typeof animalFamily === 'function' && animalFamily('skill', skillId) === 'ursides';
+    return ursid ? Math.round(base * (this.bearCostMultiplier ?? 1)) : base;
+  }
+
   tryActivateSkill(slotIndex, now) {
+    // Forme mythique : les trois touches lancent SES compétences (Mythiques.js), pas celles équipées.
+    if (this.mythic && typeof mythicSkill === 'function') { mythicSkill(this, slotIndex, now); return; }
     const skillId = this.skillSlots[slotIndex];
     if (!skillId || now < this.skillCooldownEndTime) return;
     const def = SKILL_DEFS[skillId];
@@ -3155,12 +3230,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       if (refused && def.denyText && typeof showToast === 'function') showToast(this.scene, def.denyText, 1400);
       return;
     }
-    if (this.energy < def.cost) {
+    const cost = this.skillCost(skillId);
+    if (this.energy < cost) {
       // Retour visuel : la barre d'énergie tremble (juice, HUD).
       juiceHudDeny(this.scene);
       return;
     }
-    this.energy -= def.cost;
+    this.energy -= cost;
     juiceHudSkillPop(this.scene, slotIndex);
     playSfx(`skill_${skillId}`);
     this.scene.registry.set('energy', this.energy);
@@ -3289,11 +3365,14 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     // `heartUpgrades`, cf. heartUpgradeCount dans SecretKit.js).
     const upgrades = typeof heartUpgradeCount === 'function' ? heartUpgradeCount() : 0;
     // Passifs de famille (cf. Familles.js), comptés sur les animaux ÉQUIPÉS.
-    // Ursidés : 2 -> +1 cœur, 3 -> fracas d'ours plus larges, 4 -> plus de
-    // recul sous les coups. Sans ours équipé en plus : rien ne change.
+    // Ursidés (paliers du 2026-11-15) : 2 -> +1 cœur, 3 -> compétences d'ursidé moins
+    // chères (skillCost), 5 -> +1 dégât pour les ursidés (bearDamageBonus, lu par
+    // ursideDamage dans Ursides.js). Sans ours équipé en plus : rien ne change.
     const fam = typeof familyPassiveStats === 'function' ? familyPassiveStats(this) : { hearts: 0, bearSize: 0, steadfast: false };
     this.bearSizeMultiplier = 1 + (fam.bearSize || 0);
     this.knockbackImmune = !!fam.steadfast;
+    this.bearCostMultiplier = 1 - (fam.bearCost || 0);
+    this.bearDamageBonus = fam.bearDamage || 0;
     this.familySig = typeof familyTeamSignature === 'function' ? familyTeamSignature(this) : null;
     this.maxHearts = HEART_MAX + bonus.heartBonus + storyHeartBonus + upgrades + (fam.hearts || 0);
     this.maxEnergy = ENERGY_MAX + bonus.energyBonus;
@@ -3359,7 +3438,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.grizzlyImpact = {
       rect: new Phaser.Geom.Rectangle(x, b.bottom - h, w, h), until: now + T.impactMs, token: `charge-${this.grizzlyChargeId}`,
     };
-    ursideCrashFx(this, dir > 0 ? b.right : b.left, b.center.y);
+    ursideCrashFx(this, dir > 0 ? b.right : b.left, b.center.y, { wallDir: opts.enemy ? 0 : dir });
     this.scene.events.emit('grizzly-crash', { player: this, dir, enemy: opts.enemy || null });
   }
 
@@ -4203,9 +4282,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   startSlashVfx() {
     const sc = this.scene;
     const id = this.slashDir === 'bite' ? BITE_VFX_ID : 'vfx_slash';
-    if (!hasManifestArt(sc, id, this.slashDir)) return;
+    // Coup de patte : ses griffes pixelfx (LOUP_FX.griffes) passent par le même sprite.
+    const paw = this.slashDir === 'paw' && sc.textures.exists('loupfx-griffes-0');
+    if (!paw && !hasManifestArt(sc, id, this.slashDir)) return;
     if (!this.slashSprite || !this.slashSprite.active) {
-      this.slashSprite = sc.add.sprite(this.x, this.y, manifestFrameKey(id, this.slashDir, 0))
+      this.slashSprite = sc.add.sprite(this.x, this.y, paw ? 'loupfx-griffes-0' : manifestFrameKey(id, this.slashDir, 0))
         .setOrigin(0.5, 0.5).setDepth(this.depth + 1).setVisible(false);
     }
   }
@@ -4219,12 +4300,29 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (!g || !g.active || !this.active) return;
     g.clear();
     const spr = this.slashSprite && this.slashSprite.active ? this.slashSprite : null;
+    // (les griffes ancrent le sprite en haut : origine remise au centre pour les autres coups)
+    if (spr && this.slashDir !== 'paw') spr.setOrigin(0.5, 0.5);
     const now = this.scene.time.now;
     const t = now - this.slashStart;
     const after = t - SLASH_WINDUP_MS - SLASH_ACTIVE_MS;
     // Coup de patte du loup : griffes tracées dès l'élan, de haut en bas,
     // complètes à mi-phase active (zone qui touche = phase active seulement).
     if (this.isAttacking && this.slashDir === 'paw' && after < SLASH_FADE_MS) {
+      // Art de Codex (prompt n°16, LOUP_FX.griffes) : 5 images, mêmes instants que le croc (élan,
+      // 2 actives, 2 d'effacement), ancrées en haut du rectangle du coup. Sinon : tracé par code.
+      const fxc = typeof LOUP_FX !== 'undefined' ? LOUP_FX.griffes : null;
+      if (spr && fxc && this.scene.textures.exists('loupfx-griffes-0')) {
+        const frame = after >= 0 ? (after < SLASH_FADE_MS / 2 ? 3 : 4)
+          : t < SLASH_WINDUP_MS ? 0 : (t - SLASH_WINDUP_MS < SLASH_ACTIVE_MS / 2 ? 1 : 2);
+        const r = this.getSlashRect('paw');
+        const f = this.slashFacing;
+        spr.setTexture(`loupfx-griffes-${frame}`).setVisible(true).setScale(1).setAlpha(1).setFlipX(f < 0)
+          .setOrigin(f < 0 ? 1 - fxc.ox / fxc.w : fxc.ox / fxc.w, fxc.oy / fxc.h)
+          // à l'AVANT de la zone qui touche, pas au milieu (demande du 2026-11-15) : le bord avant des
+          // griffes (28 px devant leur ancrage) tombe sur le bord avant du rectangle
+          .setPosition(r.centerX + f * (r.width / 2 - 28), r.y);
+        return;
+      }
       if (spr) spr.setVisible(false);
       const reach = Phaser.Math.Clamp(t / (SLASH_WINDUP_MS + SLASH_ACTIVE_MS / 2), 0, 1);
       const a = after < 0 ? (t < SLASH_WINDUP_MS ? 0.8 : 1) : 0.7 * (1 - after / SLASH_FADE_MS);

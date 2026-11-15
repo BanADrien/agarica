@@ -1,16 +1,8 @@
-// Écran de fin de la démo (BosquetRetourScene, et l'ancienne Zone5 de test) :
-// « Fin de la démo — à suivre », crédits courts et le mot d'anniversaire
-// (c'est un jeu-cadeau, cf. CLAUDE.md). Agarica et Xara restent dans la
-// clairière comme avant. Une touche ramène à l'écran-titre. Textes ajustables.
-const END_TITLE = 'Fin de la démo';
-const END_SUBTITLE = 'À suivre…';
-// (Geralt vient de dire que Ghil't n'était pas la source : pas de redite ici.)
-const END_BODY_LINES = [
-  'La source de la mousse est toujours là, quelque part.',
-  "Et Xara n'a pas tout dit.",
-];
-const END_CREDITS = 'Legend of Agarica — fait main pour Agarica, druidesse du Cercle de la Lune';
-const END_SIGNOFF = 'Joyeux anniversaire, Agarica.';
+// Écran de fin de la démo (BosquetRetourScene, et l'ancienne Zone5 de test).
+// Demande de l'utilisateur du 2026-11-14 : plus de clairière, de crédits ni de
+// mot d'anniversaire -- seulement le fond de l'écran-titre et « Démo terminée ».
+// Une touche ramène à l'écran-titre.
+const END_TITLE = 'Démo terminée';
 
 class EndScreenScene extends Phaser.Scene {
   constructor() {
@@ -19,56 +11,23 @@ class EndScreenScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-    const groundY = height - GROUND_TILE_SIZE / 2;
     this.__transitioningAway = false;
-
     this.cameras.main.fadeIn(600, 13, 11, 26);
 
-    // Clairière finale : même décor lunaire que les zones, mais fixe.
-    addMoonlitDecor(this, width, height, width);
-    setupDebugToggle(this);
-    ensureGroundHitboxTexture(this);
-    this.ground = this.physics.add.staticGroup();
-    fillGroundTiles(this.ground, 0, width, groundY);
-    this.add.rectangle(0, 0, width, height - 70, 0x0d0b1a, 0.45).setOrigin(0);
+    // Même fond que l'écran-titre (TitleScene) : image peinte, couvrant l'écran.
+    if (this.textures.exists('titre-fond')) {
+      const bg = this.add.image(width / 2, height / 2, 'titre-fond');
+      bg.setScale(Math.max(width / bg.width, height / bg.height));
+    } else {
+      addMoonlitDecor(this, width, height, width);
+    }
+    this.add.rectangle(0, 0, width, height, 0x0d0b1a, 0.35).setOrigin(0);
 
-    this.player = new Player(this, width / 2, height - 100);
-    this.xara = new Xara(this, this.player);
-    this.physics.add.collider(this.player, this.ground);
-
-    const title = this.add.text(width / 2, 58, END_TITLE, {
-      fontFamily: STORY_UI.serif, fontSize: '48px', fontStyle: 'bold', color: '#ffe9f5',
-      stroke: '#15101f', strokeThickness: 7, padding: { x: 24, y: 20 },
+    const title = this.add.text(width / 2, height / 2 - 10, END_TITLE, {
+      fontFamily: STORY_UI.serif, fontSize: '56px', fontStyle: 'bold', color: '#ffe9f5',
+      stroke: '#15101f', strokeThickness: 8, padding: { x: 24, y: 20 },
     }).setOrigin(0.5);
-    title.setShadow(0, 0, '#ff9fc9', 18, true, true);
-
-    this.add.text(width / 2, 104, END_SUBTITLE, {
-      fontFamily: STORY_UI.serif, fontSize: '22px', fontStyle: 'italic', color: '#c9b8f0',
-    }).setOrigin(0.5);
-
-    this.add.text(width / 2, 148, END_BODY_LINES.join('\n'), {
-      fontFamily: STORY_UI.serif, fontSize: '18px', color: '#e8d9ff', align: 'center', lineSpacing: 10,
-    }).setOrigin(0.5, 0);
-
-    this.add.text(width / 2, 262, END_CREDITS, {
-      fontFamily: 'sans-serif', fontSize: '13px', color: STORY_UI.textSoft, align: 'center',
-      wordWrap: { width: width - 200 },
-    }).setOrigin(0.5);
-
-    const signoff = this.add.text(width / 2, 310, END_SIGNOFF, {
-      fontFamily: STORY_UI.serif, fontSize: '28px', fontStyle: 'bold', color: '#ff9fc9',
-      stroke: '#15101f', strokeThickness: 5,
-    }).setOrigin(0.5).setAlpha(0);
-    this.tweens.add({ targets: signoff, alpha: 1, duration: 1200, delay: 1200 });
-    // Juice : lucioles et pétales roses qui tombent doucement (fin de démo).
-    if (typeof menuAddFireflies === 'function') menuAddFireflies(this, 22, { depth: 5 });
-    this.time.addEvent({
-      delay: 380, loop: true,
-      callback: () => spawnFx(this, 'petal', Phaser.Math.Between(20, width - 20), -10, {
-        count: 1, angle: [70, 110], speed: [15, 50], lifespan: [2800, 3600],
-      }),
-    });
-    this.tweens.add({ targets: title, y: title.y - 4, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    title.setShadow(0, 0, '#15101f', 12, true, true);
 
     const prompt = this.add.text(width / 2, height - 26, 'Une touche : retour au titre', {
       fontFamily: 'sans-serif', fontSize: '14px', color: STORY_UI.textSoft,
@@ -81,9 +40,5 @@ class EndScreenScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => {
       this.input.keyboard.once('keydown', () => goToScene(this, 'TitleScene'));
     });
-  }
-
-  update(time, delta) {
-    this.xara.update(time, delta);
   }
 }

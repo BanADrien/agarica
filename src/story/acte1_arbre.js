@@ -195,6 +195,8 @@ function arbreMossDecor(scene, x, y, w, flip = false) {
       img.y = storyStandY(scene, x, y) + 2;
     }
     storyPutBehindPlayer(scene, img);
+    // Frappable à l'épée, repousse en 5 à 7 s (Cassables.js).
+    if (typeof decorBreakRegisterMoss === 'function') decorBreakRegisterMoss(scene, img);
     return img;
   }
   const g = scene.add.graphics({ x, y });
@@ -355,7 +357,7 @@ CUTSCENES.racines_cime = cutsceneBulles([
 // visite joue `racines_singe_eveil` à la place (et coche ce déclencheur).
 CUTSCENES.racines_cime_singe = cutsceneBulles([
   'Prends de l\'élan, et lâche quand la liane remonte.',
-], { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 });
+], { text: "[Espace] deux fois près d'une liane : tu t'y accroches · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 });
 
 // Totem du singe allumé (E, clé de zone `totems` -> addAbilityShrine, comme
 // le loup et l'aigle) : la forme est donnée sur-le-champ, avec l'éclat et la
@@ -363,7 +365,7 @@ CUTSCENES.racines_cime_singe = cutsceneBulles([
 // lianes, APRÈS la bannière (~2,6 s, même délai que le loup en forêt
 // sombre 2) : la route des lianes de la cime mène à l'arène.
 // La bannière « Forme Singe » vient de s'afficher : seule l'aide des lianes suit.
-CUTSCENES.racines_singe_eveil = cutsceneBulles([], { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 }, 2600);
+CUTSCENES.racines_singe_eveil = cutsceneBulles([], { text: "[Espace] deux fois près d'une liane : tu t'y accroches · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 }, 2600);
 
 // Le totem lui-même est une donnée de zone (`totems`, grand_arbre_racines_data.js) :
 // art `totem_monkey_lit` tant que la forme attend, puis `totem_monkey_dim` une
@@ -572,7 +574,7 @@ CUTSCENES.esprit_arrivee = [
   { say: [
     espritDit('Suis-moi, de liane en liane.'),
   ] },
-  { toast: { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
+  { toast: { text: "[Espace] deux fois près d'une liane : tu t'y accroches · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
 ];
 
 CUTSCENES.esprit_fin = [
@@ -665,7 +667,7 @@ CUTSCENES.epreuve_intro = [
   { camera: { x: 1250, y: 120, ms: 1700 } },
   { wait: 900 },
   { cameraFollow: true },
-  { toast: { text: "[Espace] deux fois, puis [↑] près d'une liane : t'accrocher · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
+  { toast: { text: "[Espace] deux fois près d'une liane : tu t'y accroches · [←] [→] : balancer · [Espace] : lâcher", ms: 5600 } },
 ];
 
 // (Les pierres et leur ombre ont déjà été apprises dans les racines.)

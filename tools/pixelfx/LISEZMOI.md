@@ -23,6 +23,7 @@ pixelfx avant le rendu : plus rien à copier à la main.
 | `root-portal.js` : portail de l'arche de racines | `node tools/pixelfx/export_portail.mjs assets/decors/elements/portail_frames` : 24 images 440x300 | jouées par-dessus l'arche ouverte (`arbreGlowPassage`, src/story/acte1_arbre.js) |
 | `updraft.js` : courant d'air ascendant | `node tools/pixelfx/export_courant.mjs assets/vfx/courant_frames` : 2 plans x 24 cases 256x256 | mosaïque qui défile vers le haut (`src/entities/CourantAir.js`) |
 | `bear-slam.js` : fracas de l'ours (poussière, pierres, traînée de la patte) | `node tools/pixelfx/export_fracas.mjs` : 16 images 352x200 (`fracas_impact_<i>`) + 5 images 160x186 (`fracas_griffe_<i>`) | `assets/vfx/fracas_frames/`, jouées à l'impact du fracas de l'ours brun, à l'atterrissage de l'ours-hibou et à la percussion du grizzly (`ursidePlayFracas`, src/entities/Ursides.js) |
+| `wolf-bite.js` : croc du loup (deux rangées de dents de loup vues de côté, grain de l'arc de la dague) ; `wolf-claws.js` : griffes du coup de patte ; `talisman-awaken.js` : éveil du talisman de l'ours (`wolf-swipe.js` : essai de coup de griffes, non retenu) | `node tools/pixelfx/export_loup.mjs` : 30 images du talisman (le croc et les griffes du jeu viennent de Codex, `tools/import_loup_codex.py` ; `--loup` remet ceux de pixelfx) ; écrit `src/data/loup_fx.js` | `assets/vfx/vfx_croc_frames/` (ancienne morsure Codex gardée dans `assets/_pixelfix_originals/vfx/vfx_croc_codex/`), `assets/vfx/loup_frames/` ; jouées par `drawSlashArc` (Player.js) et `acte1TalismanGlow` (acte1.js) |
 
 Pour l'arc et le feu, copier ensuite les images du dossier de rendu dans le dossier du jeu.
 Les originaux IA sont dans `assets/_pixelfix_originals/` ; `node tools/pixelfix.js restore
@@ -70,3 +71,4 @@ Sans les images, `CourantAir.js` retombe sur l'ancien rendu (image étirée et t
 - `node tools/pixelfx/export_glace.mjs` : cinq segments de la rangée (hauteurs croissantes) et le gros pic du
   bout, 20 images chacun, dans `assets/vfx/glace_frames/`, et `src/data/glace_fx.js` (lu par BootScene et par
   `ursideSpikeArt`, src/entities/Ursides.js). Posés bord à bord, ils font une traînée continue.
+| `grizzly-reentry.js` : gaine de feu du grizzly en charge (passif des ursidés de palier 5 ; boucle de 8 images). Le dessin de Codex essayé à la place (`tools/import_grizzly_feu_codex.py`) a été refusé : ne pas relancer cet import | `node tools/pixelfx/export_grizzly_feu.mjs` : images dans `assets/vfx/ursides_feu/`, réglages lus dans `src/data/grizzly_feu_fx.js` |

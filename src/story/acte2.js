@@ -1086,6 +1086,7 @@ function a2ClairiereTouffes(scene, cx, radius, levelWidth) {
       // Plaques : coulures 2 px sous la base, enfoncées de 3 px (manifest).
       setVisibleBottomY(img, footY + (plaque ? 3 : 2));
       storyPutBehindPlayer(scene, img);
+      if (typeof decorBreakRegisterMoss === 'function') decorBreakRegisterMoss(scene, img);   // frappable, repousse
       continue;
     }
     if (!drawn) drawn = scene.add.graphics();
@@ -1798,6 +1799,7 @@ function a2MakeMossTufts(scene, xs) {
         setVisibleBottomY(bent, foot);
         storyPutBehindPlayer(scene, bent);
       }
+      if (typeof decorBreakRegisterMoss === 'function') decorBreakRegisterMoss(scene, img, [bent]);   // frappable, repousse
       return { g: img, bent, bendK: 0, x, phase: i * 0.7, size: i % 3 };
     }
     // Pied 2 px sous la ligne de marche (cf. GROUND_STAND_SINK), planté dans l'herbe.

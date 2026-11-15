@@ -18,6 +18,17 @@ class BootScene extends Phaser.Scene {
   preload() {
     this.createLoadingScreen();
     BootScene.watchPixelFixed(this);
+    // Musique du menu dès l'écran de chargement (demande du 2026-11-15) : son fichier est demandé en
+    // premier et elle part dès qu'il est prêt, sans attendre la fin du chargement ; l'écran-titre la
+    // garde (même musique : elle continue). Tant que le joueur n'a ni cliqué ni appuyé sur une touche,
+    // le navigateur retient le son : elle part alors à ce moment-là.
+    const menuMus = typeof AUDIO_SFX !== 'undefined' ? AUDIO_SFX.mus_menu : null;
+    if (menuMus && menuMus.files && menuMus.files[0]) {
+      this.load.audio('sfx-mus_menu-0', { type: 'ogg', url: menuMus.files[0] + (menuMus.v ? `?v=${menuMus.v}` : '') });
+      this.load.once('filecomplete-audio-sfx-mus_menu-0', () => {
+        if (typeof startZoneMusic === 'function') startZoneMusic(this, { music: 'mus_menu' });
+      });
+    }
     // Îles lointaines découpées une à une (tools/cut_iles.py) : chacune flotte
     // à son rythme dans le ciel (cf. addFarLayers, option `floating`).
     if (typeof ILES_SETS !== 'undefined') {
@@ -188,21 +199,45 @@ class BootScene extends Phaser.Scene {
     // poussière et pierres de l'impact, traînée du coup de patte. Nombre
     // d'images lu dans FRACAS_FX (src/data/fracas_fx.js, écrit par le rendu).
     if (typeof FRACAS_FX !== 'undefined') {
-      for (const part of ['impact', 'griffe']) {
+      for (const part of ['impact', 'griffe', 'impact_feu', 'griffe_feu']) {
         const c = FRACAS_FX[part];
         for (let i = 0; c && i < c.frames; i++) this.load.image(`fracas-${part}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
       }
     }
     // Sons (AUDIO_SFX, src/data/audio_sfx.js) : une clé `sfx-<id>-<n>` par fichier.
+    // `v` (écrit par l'atelier des sons) : un son remplacé n'est pas ressorti du cache.
     if (typeof AUDIO_SFX !== 'undefined') {
       for (const [id, def] of Object.entries(AUDIO_SFX)) {
-        (def.files || []).forEach((file, n) => this.load.audio(`sfx-${id}-${n}`, file));
+        const v = def.v ? `?v=${def.v}` : '';
+        (def.files || []).forEach((file, n) => this.load.audio(`sfx-${id}-${n}`, { type: 'ogg', url: file + v }));
       }
     }
     // Pics de glace de l'ours polaire (pixelfx, tools/pixelfx/export_glace.mjs).
     if (typeof GLACE_FX !== 'undefined') {
       for (const c of [...GLACE_FX.rangee, GLACE_FX.gros]) {
         for (let i = 0; c && i < c.frames; i++) this.load.image(`${c.key}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
+        // glace noire (passif des ursidés de palier 5)
+        for (let i = 0; c && c.noir && i < c.frames; i++) this.load.image(`${c.noir}-${i}`, `${c.dir}/${c.noirPrefix}_${i}.png`);
+      }
+    }
+    // Grande Ourse, forme mythique (tools/make_ursa.py) : les poses du grizzly repeintes, mêmes cadres.
+    // Clé = 'ursa-' + la clé de l'image du grizzly qu'elle remplace (cf. ursideGrizzlyPose).
+    for (const [anim, n] of [['run', 4], ['charge', 4], ['jump', 3]]) {
+      for (let i = 0; i < n; i++) this.load.image(`ursa-grizzly-${anim}-${i}`, `assets/sprites/ursa_frames/ursa_${anim}_${i}.png`);
+    }
+    // ses poses d'attaque (celles du fracas de l'ours brun, repeintes) et ses icônes du HUD
+    for (let i = 0; i < 6; i++) this.load.image(`ursa-attack-${i}`, `assets/sprites/ursa_frames/ursa_attack_${i}.png`);
+    for (const n of ['0', '1', '2', 'x']) this.load.image(`ursa-icone-${n}`, `assets/sprites/ursa_frames/ursa_icone_${n}.png`);
+    // Gaine de feu du grizzly en charge (pixelfx, tools/pixelfx/export_grizzly_feu.mjs).
+    if (typeof GRIZZLY_FEU_FX !== 'undefined') {
+      const c = GRIZZLY_FEU_FX;
+      for (let i = 0; i < c.frames; i++) this.load.image(`grizzlyfeu-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
+    }
+    // Griffes du loup et éveil du talisman (pixelfx, tools/pixelfx/export_loup.mjs).
+    if (typeof LOUP_FX !== 'undefined') {
+      for (const id of ['griffes', 'talisman']) {
+        const c = LOUP_FX[id];
+        for (let i = 0; c && i < c.frames; i++) this.load.image(`loupfx-${id}-${i}`, `${c.dir}/${c.prefix}_${i}.png`);
       }
     }
     // Ennemi Crapaud (langue-attaque, voir Crapaud.js), généré depuis
@@ -554,6 +589,29 @@ class BootScene extends Phaser.Scene {
       for (const c of [...GLACE_FX.rangee, GLACE_FX.gros]) {
         for (let i = 0; c && i < c.frames; i++) {
           if (scene.textures.exists(`${c.key}-${i}`)) scene.textures.get(`${c.key}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+          if (c.noir && scene.textures.exists(`${c.noir}-${i}`)) scene.textures.get(`${c.noir}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        }
+      }
+    }
+    for (const [anim, n] of [['run', 4], ['charge', 4], ['jump', 3]]) {
+      for (let i = 0; i < n; i++) {
+        const k = `ursa-grizzly-${anim}-${i}`;
+        if (scene.textures.exists(k)) scene.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
+    }
+    for (const k of ['ursa-attack-0', 'ursa-attack-1', 'ursa-attack-2', 'ursa-attack-3', 'ursa-attack-4', 'ursa-attack-5', 'ursa-icone-0', 'ursa-icone-1', 'ursa-icone-2', 'ursa-icone-x']) {
+      if (scene.textures.exists(k)) scene.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+    if (typeof GRIZZLY_FEU_FX !== 'undefined') {
+      for (let i = 0; i < GRIZZLY_FEU_FX.frames; i++) {
+        if (scene.textures.exists(`grizzlyfeu-${i}`)) scene.textures.get(`grizzlyfeu-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
+      }
+    }
+    if (typeof LOUP_FX !== 'undefined') {
+      for (const id of ['griffes', 'talisman']) {
+        const c = LOUP_FX[id];
+        for (let i = 0; c && i < c.frames; i++) {
+          if (scene.textures.exists(`loupfx-${id}-${i}`)) scene.textures.get(`loupfx-${id}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);
         }
       }
     }
@@ -566,7 +624,7 @@ class BootScene extends Phaser.Scene {
       }
     }
     if (typeof FRACAS_FX !== 'undefined') {
-      for (const part of ['impact', 'griffe']) {
+      for (const part of ['impact', 'griffe', 'impact_feu', 'griffe_feu']) {
         const c = FRACAS_FX[part];
         for (let i = 0; c && i < c.frames; i++) {
           if (scene.textures.exists(`fracas-${part}-${i}`)) scene.textures.get(`fracas-${part}-${i}`).setFilter(Phaser.Textures.FilterMode.NEAREST);

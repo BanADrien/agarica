@@ -70,3 +70,9 @@ const config = {
 };
 
 window.__game = new Phaser.Game(config);
+// `?muet` dans l'adresse : aucun son (onglets de test ouverts par l'assistant : demande de l'utilisateur du
+// 2026-11-15, « arrête de mettre du son sur ce que tu ouvres »).
+if (new URLSearchParams(window.location.search).has('muet')) {
+  window.__game.events.once('ready', () => { window.__game.sound.mute = true; });
+  if (window.__game.sound) window.__game.sound.mute = true;
+}

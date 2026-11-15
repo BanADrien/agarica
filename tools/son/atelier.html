@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atelier des sons</title>
+<style>
+  :root { --fond:#15121c; --panneau:#211c2b; --bord:#3a3247; --texte:#efe6d6; --doux:#a99fb6; --accent:#f2b84b; --vert:#7fd06a; --rouge:#ef6b6b; --bleu:#7fb8e6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--fond); color:var(--texte); font:14px/1.4 system-ui, sans-serif; }
+  header { padding:10px 16px; border-bottom:1px solid var(--bord); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; color:var(--accent); }
+  header span { color:var(--doux); }
+  main { display:grid; grid-template-columns:260px 1fr; min-height:calc(100vh - 46px); }
+  #liste { border-right:1px solid var(--bord); overflow:auto; max-height:calc(100vh - 46px); }
+  #filtre { width:calc(100% - 16px); margin:8px; padding:6px 8px; background:var(--panneau); border:1px solid var(--bord); color:var(--texte); border-radius:4px; }
+  .id { padding:6px 12px; cursor:pointer; display:flex; gap:8px; align-items:center; }
+  .id:hover { background:var(--panneau); }
+  .id.actif { background:#2f2740; border-left:3px solid var(--accent); }
+  .pastille { width:8px; height:8px; border-radius:50%; background:#4a4057; flex:none; }
+  .pastille.on { background:var(--vert); }
+  .id small { color:var(--doux); display:block; font-size:11px; }
+  #zone { min-width:0; padding:14px 18px; overflow:auto; max-height:calc(100vh - 46px); }
+  section { background:var(--panneau); border:1px solid var(--bord); border-radius:6px; padding:12px 14px; margin-bottom:14px; }
+  section h2 { font-size:15px; margin:0 0 10px; color:var(--accent); }
+  button { background:#3a3150; color:var(--texte); border:1px solid #574a70; border-radius:4px; padding:6px 10px; cursor:pointer; font:inherit; }
+  button:hover { background:#4a3f66; }
+  button.fort { background:#8a5a12; border-color:#c48a2a; }
+  button.fort:hover { background:#a56c18; }
+  button.juicy { background:#7a2f6a; border-color:#b34f9c; }
+  button:disabled { opacity:.45; cursor:default; }
+  .rangee { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0; }
+  .curseurs { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:6px 18px; margin:8px 0; }
+  .curseurs label { display:grid; grid-template-columns:110px 1fr 46px; gap:6px; align-items:center; font-size:13px; }
+  .curseurs output { color:var(--doux); text-align:right; font-variant-numeric:tabular-nums; }
+  input[type=range] { width:100%; accent-color:var(--accent); }
+  canvas { width:100%; max-width:100%; height:90px; background:#100d16; border:1px solid var(--bord); border-radius:4px; display:block; cursor:ew-resize; }
+  .fichier { display:flex; gap:8px; align-items:center; margin:4px 0; }
+  .fichier code { color:var(--bleu); }
+  .onglets { display:flex; gap:4px; margin-bottom:10px; }
+  .onglets button.actif { background:var(--accent); color:#1b1408; border-color:var(--accent); }
+  #resultats { max-height:260px; overflow:auto; }
+  .res { display:flex; gap:8px; align-items:center; padding:3px 0; border-bottom:1px solid #2c2538; }
+  .res span { flex:1; }
+  .res small { color:var(--doux); }
+  .aide { color:var(--doux); font-size:12px; }
+  #toast { position:fixed; bottom:16px; right:16px; background:#2d5a25; padding:10px 14px; border-radius:6px; display:none; max-width:420px; }
+  #toast.err { background:#6a2525; }
+  .vide { color:var(--doux); font-style:italic; }
+  @media (max-width:760px) { main { grid-template-columns:1fr; } #liste { max-height:220px; border-right:0; border-bottom:1px solid var(--bord); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Atelier des sons</h1>
+  <span>Choisis un son à gauche · fabrique-le ou cherche-le · rends-le juicy · range-le. Puis recharge le jeu.</span>
+</header>
+<main>
+  <nav id="liste"><input id="filtre" placeholder="Filtrer (ex. ours, saut)"><div id="ids"></div></nav>
+  <div id="zone">
+    <section id="actuel">
+      <h2 id="titre">—</h2>
+      <div id="fichiers"></div>
+      <div class="rangee"><button id="jouerJeu">▶ Jouer comme en jeu (3 fois)</button><span class="aide">variante au hasard, hauteur qui varie, volume réglé</span></div>
+      <div class="curseurs">
+        <label>Volume en jeu <input type="range" id="r-volume" min="0" max="1.5" step="0.05"><output></output></label>
+        <label>Variation hauteur <input type="range" id="r-pitch" min="0" max="0.3" step="0.01"><output></output></label>
+        <label>Écart min. (ms) <input type="range" id="r-cooldownMs" min="0" max="500" step="10"><output></output></label>
+      </div>
+      <button id="garderReglages">Enregistrer ces réglages</button>
+    </section>
+
+    <section>
+      <h2>1. Une source</h2>
+      <div class="onglets"><button data-onglet="synth" class="actif">Fabriquer</button><button data-onglet="openverse">Chercher un enregistrement (CC0)</button></div>
+      <div id="o-synth">
+        <div class="rangee" id="presets"></div>
+        <div class="curseurs" id="synthCurseurs"></div>
+        <div class="rangee"><button id="varier">🎲 Varier</button><span class="aide">même recette, un peu différente à chaque clic</span></div>
+      </div>
+      <div id="o-openverse" hidden>
+        <div class="rangee"><input id="requete" placeholder="en anglais : heavy impact, ice crack, magic heal…" style="flex:1;padding:6px 8px;background:#100d16;border:1px solid var(--bord);color:var(--texte);border-radius:4px"><label class="aide"><input type="checkbox" id="court" checked> courts</label><button id="chercher">Chercher</button></div>
+        <div id="resultats"><p class="aide">Sons enregistrés, licence CC0 uniquement (Openverse / Freesound). Clique ▶ pour l'écouter et le charger dans la retouche.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Retouche — <span id="nomSource" class="aide">aucune source</span></h2>
+      <canvas id="onde" width="1200" height="180"></canvas>
+      <p class="aide">Glisse les bords orange pour couper le début et la fin.</p>
+      <div class="rangee">
+        <button id="ecouter" class="fort">▶ Écouter</button>
+        <button id="juicy" class="juicy">✨ Rendre juicy</button>
+        <button id="neutre">Remettre à zéro</button>
+      </div>
+      <div class="curseurs" id="retouche"></div>
+    </section>
+
+    <section>
+      <h2>3. Ranger dans le jeu</h2>
+      <div class="rangee">
+        <button id="remplacer" class="fort" disabled>Remplacer le son</button>
+        <button id="variante" disabled>Ajouter comme variante</button>
+        <span class="aide">Variante : le jeu tire au hasard entre plusieurs fichiers (moins répétitif).</span>
+      </div>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+const SR = 44100;
+let etat = { sons: [] }, courant = null, source = null, rendu = null, lecture = null;
+
+function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => { t.style.display = 'none'; }, err ? 6000 : 3500); }
+async function api(chemin, corps) {
+  const r = await fetch(chemin, corps ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corps) } : {});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.erreur || r.status);
+  return j;
+}
+function jouer(buf, { rate = 1, volume = 1 } = {}) {
+  if (AC.state === 'suspended') AC.resume();
+  const s = AC.createBufferSource(); s.buffer = buf; s.playbackRate.value = rate;
+  const g = AC.createGain(); g.gain.value = volume; s.connect(g).connect(AC.destination); s.start();
+  return s;
+}
+const dB = (d) => Math.pow(10, d / 20);
+
+// ------------------------------------------------------------------ curseurs
+function curseurs(conteneur, defs, valeurs, change) {
+  conteneur.innerHTML = '';
+  for (const [k, nom, min, max, pas, fmt] of defs) {
+    const l = document.createElement('label');
+    l.innerHTML = `${nom} <input type="range" min="${min}" max="${max}" step="${pas}"><output></output>`;
+    const i = l.querySelector('input'), o = l.querySelector('output');
+    i.value = valeurs[k]; o.textContent = fmt(+i.value);
+    i.addEventListener('input', () => { valeurs[k] = +i.value; o.textContent = fmt(+i.value); change(); });
+    conteneur.appendChild(l);
+  }
+}
+const pc = (v) => Math.round(v * 100) + ' %', hz = (v) => Math.round(v) + ' Hz', s2 = (v) => v.toFixed(2) + ' s', db = (v) => (v > 0 ? '+' : '') + v + ' dB';
+
+// ------------------------------------------------------------------ synthèse
+// Une recette = couches mêlées : ton qui glisse, bruit filtré, coup sourd grave, cristaux (partiels
+// aigus), arpège (notes qui montent), grain (saturation). Tout rendu hors temps réel.
+const PRESETS = {
+  'Fracas lourd': { dur: .7, wave: 'sine', tone: .8, f0: 160, f1: 38, sweep: .3, att: .002, dec: .45, noise: .75, nfilt: 'lowpass', nc0: 3200, nc1: 180, nq: .7, natt: .001, ndec: .4, sub: .9, subDec: .5, shim: 0, shimF: 2000, shimN: 5, shimSpread: .1, shimDec: .3, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0, 4, 7, 12], crunch: .25 },
+  'Coup de poing': { dur: .3, wave: 'triangle', tone: .7, f0: 240, f1: 70, sweep: .08, att: .001, dec: .14, noise: .6, nfilt: 'bandpass', nc0: 2000, nc1: 500, nq: 1, natt: .001, ndec: .09, sub: .5, subDec: .18, shim: 0, shimF: 2000, shimN: 5, shimSpread: .1, shimDec: .3, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: .15 },
+  'Charge / choc': { dur: .55, wave: 'sawtooth', tone: .4, f0: 95, f1: 40, sweep: .3, att: .002, dec: .35, noise: .85, nfilt: 'lowpass', nc0: 1800, nc1: 150, nq: .8, natt: .002, ndec: .35, sub: .75, subDec: .4, shim: 0, shimF: 2000, shimN: 5, shimSpread: .1, shimDec: .3, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: .4 },
+  'Glace / cristal': { dur: .7, wave: 'sine', tone: 0, f0: 400, f1: 400, sweep: .1, att: .001, dec: .1, noise: .5, nfilt: 'highpass', nc0: 5000, nc1: 2500, nq: .7, natt: .001, ndec: .07, sub: .15, subDec: .12, shim: .85, shimF: 2300, shimN: 8, shimSpread: .14, shimDec: .4, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: 0 },
+  'Soin magique': { dur: 1.1, wave: 'triangle', tone: 0, f0: 400, f1: 400, sweep: .1, att: .001, dec: .1, noise: 0, nfilt: 'highpass', nc0: 5000, nc1: 3000, nq: .7, natt: .001, ndec: .1, sub: 0, subDec: .1, shim: .35, shimF: 3200, shimN: 6, shimSpread: .45, shimDec: .35, arp: .7, arpF: 523, arpStep: .08, arpDec: .45, notes: [0, 4, 7, 12, 16], crunch: 0 },
+  'Saut': { dur: .2, wave: 'square', tone: .45, f0: 280, f1: 720, sweep: .12, att: .002, dec: .15, noise: .15, nfilt: 'highpass', nc0: 3000, nc1: 3000, nq: .7, natt: .001, ndec: .04, sub: 0, subDec: .1, shim: 0, shimF: 2000, shimN: 5, shimSpread: .1, shimDec: .3, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: 0 },
+  'Atterrissage': { dur: .18, wave: 'sine', tone: .3, f0: 120, f1: 60, sweep: .06, att: .001, dec: .08, noise: .6, nfilt: 'lowpass', nc0: 1200, nc1: 250, nq: .7, natt: .001, ndec: .08, sub: .4, subDec: .1, shim: 0, shimF: 2000, shimN: 5, shimSpread: .1, shimDec: .3, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: 0 },
+  'Coup d\'épée': { dur: .3, wave: 'sine', tone: 0, f0: 400, f1: 400, sweep: .1, att: .001, dec: .1, noise: .8, nfilt: 'bandpass', nc0: 900, nc1: 4500, nq: 2.2, natt: .05, ndec: .16, sub: 0, subDec: .1, shim: .2, shimF: 3800, shimN: 3, shimSpread: .02, shimDec: .12, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: 0 },
+  'Ramasser': { dur: .35, wave: 'square', tone: 0, f0: 400, f1: 400, sweep: .1, att: .001, dec: .1, noise: 0, nfilt: 'highpass', nc0: 5000, nc1: 3000, nq: .7, natt: .001, ndec: .1, sub: 0, subDec: .1, shim: .2, shimF: 4000, shimN: 3, shimSpread: .15, shimDec: .2, arp: .5, arpF: 988, arpStep: .055, arpDec: .14, notes: [0, 7, 12], crunch: 0 },
+  'Dégât': { dur: .3, wave: 'sawtooth', tone: .55, f0: 420, f1: 110, sweep: .16, att: .001, dec: .2, noise: .45, nfilt: 'bandpass', nc0: 2200, nc1: 700, nq: 1, natt: .001, ndec: .12, sub: .3, subDec: .12, shim: 0, shimF: 2000, shimN: 5, shimSpread: .1, shimDec: .3, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: .5 },
+  'Menu': { dur: .1, wave: 'sine', tone: .5, f0: 880, f1: 900, sweep: .05, att: .001, dec: .06, noise: 0, nfilt: 'highpass', nc0: 5000, nc1: 3000, nq: .7, natt: .001, ndec: .05, sub: 0, subDec: .1, shim: 0, shimF: 2000, shimN: 5, shimSpread: .1, shimDec: .3, arp: 0, arpF: 660, arpStep: .07, arpDec: .3, notes: [0], crunch: 0 },
+};
+let recette = null, nomRecette = '';
+const SYNTH_CURSEURS = [
+  ['dur', 'Durée', .05, 2, .01, s2], ['tone', 'Ton', 0, 1, .01, pc], ['f0', 'Ton : départ', 30, 2000, 1, hz], ['f1', 'Ton : arrivée', 20, 2000, 1, hz],
+  ['dec', 'Ton : tenue', .02, 1.5, .01, s2], ['noise', 'Bruit', 0, 1, .01, pc], ['nc0', 'Bruit : couleur', 100, 9000, 10, hz], ['ndec', 'Bruit : tenue', .02, 1.5, .01, s2],
+  ['sub', 'Coup sourd', 0, 1, .01, pc], ['shim', 'Cristaux', 0, 1, .01, pc], ['shimF', 'Cristaux : hauteur', 500, 6000, 10, hz], ['arp', 'Arpège', 0, 1, .01, pc],
+  ['arpF', 'Arpège : note', 200, 2000, 1, hz], ['crunch', 'Grain', 0, 1, .01, pc],
+];
+function env(ctx, amp, t0, att, dec) {
+  const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t0);
+  if (amp <= 0) return g;
+  g.gain.exponentialRampToValueAtTime(amp, t0 + Math.max(.001, att));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + Math.max(.001, att) + Math.max(.01, dec));
+  return g;
+}
+function bruit(ctx, dur) {
+  const b = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return b;
+}
+function courbe(k) {
+  const n = 1024, c = new Float32Array(n), a = 1 + k * 30;
+  for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(a * x) / Math.tanh(a); }
+  return c;
+}
+async function synthetiser(p) {
+  const ctx = new OfflineAudioContext(1, Math.ceil(SR * (p.dur + .05)), SR);
+  const bus = ctx.createGain();
+  if (p.crunch > 0) { const w = ctx.createWaveShaper(); w.curve = courbe(p.crunch); bus.connect(w).connect(ctx.destination); } else bus.connect(ctx.destination);
+  if (p.tone > 0) {
+    const o = ctx.createOscillator(); o.type = p.wave; o.frequency.setValueAtTime(p.f0, 0);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, p.f1), Math.max(.01, p.sweep));
+    o.connect(env(ctx, p.tone, 0, p.att, p.dec)).connect(bus); o.start(0); o.stop(p.dur);
+  }
+  if (p.noise > 0) {
+    const n = ctx.createBufferSource(); n.buffer = bruit(ctx, p.dur);
+    const f = ctx.createBiquadFilter(); f.type = p.nfilt; f.Q.value = p.nq;
+    f.frequency.setValueAtTime(p.nc0, 0); f.frequency.exponentialRampToValueAtTime(Math.max(30, p.nc1), Math.max(.01, p.ndec + p.natt));
+    n.connect(f).connect(env(ctx, p.noise, 0, p.natt, p.ndec)).connect(bus); n.start(0);
+  }
+  if (p.sub > 0) {
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(115, 0); o.frequency.exponentialRampToValueAtTime(40, .18);
+    o.connect(env(ctx, p.sub, 0, .003, p.subDec)).connect(bus); o.start(0); o.stop(p.dur);
+  }
+  if (p.shim > 0) {
+    const ratios = [1, 1.49, 2.01, 2.68, 3.2, 3.97, 4.56, 5.3, 6.1];
+    for (let i = 0; i < p.shimN; i++) {
+      const t = Math.random() * p.shimSpread, o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.value = p.shimF * ratios[i % ratios.length] * (0.97 + Math.random() * .06);
+      o.connect(env(ctx, p.shim / Math.sqrt(p.shimN), t, .002, p.shimDec * (0.6 + Math.random() * .8))).connect(bus); o.start(t); o.stop(p.dur);
+    }
+  }
+  if (p.arp > 0) {
+    p.notes.forEach((st, i) => {
+      const t = i * p.arpStep, o = ctx.createOscillator(); o.type = p.wave === 'square' ? 'square' : 'triangle';
+      o.frequency.value = p.arpF * Math.pow(2, st / 12);
+      o.connect(env(ctx, p.arp * (p.wave === 'square' ? .5 : 1), t, .004, p.arpDec)).connect(bus); o.start(t); o.stop(p.dur);
+    });
+  }
+  return ctx.startRendering();
+}
+function choisirRecette(nom) {
+  nomRecette = nom; recette = JSON.parse(JSON.stringify(PRESETS[nom]));
+  document.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('actif', b.textContent === nom));
+  curseurs($('#synthCurseurs'), SYNTH_CURSEURS, recette, () => refaireSynth(false));
+  refaireSynth(true);
+}
+let synthTimer;
+function refaireSynth(jouerApres) {
+  clearTimeout(synthTimer);
+  synthTimer = setTimeout(async () => {
+    const buf = await synthetiser(recette);
+    chargerSource(buf, { type: 'synth', nom: nomRecette, reglages: resumeRecette() }, `synthèse « ${nomRecette} »`, true);
+    if (jouerApres) ecouter();
+  }, 90);
+}
+function resumeRecette() {
+  return SYNTH_CURSEURS.map(([k]) => `${k}=${+(+recette[k]).toFixed(3)}`).join(' ') + ` wave=${recette.wave} nfilt=${recette.nfilt}`;
+}
+
+// ------------------------------------------------------------------ retouche (« rendre juicy »)
+const RETOUCHE = {
+  vitesse: 1, punch: 30, grave: 0, brillance: 0, sourd: 0, claque: 0, echo: 0, fondu: 40,
+};
+const NEUTRE = { ...RETOUCHE }, JUICY = { punch: 60, grave: 4, brillance: 2, sourd: .35, claque: .3, echo: .12, fondu: 70 };
+const RETOUCHE_CURSEURS = [
+  ['vitesse', 'Hauteur / vitesse', .5, 2, .01, (v) => '×' + v.toFixed(2)], ['punch', 'Punch', 0, 100, 1, (v) => v + ''],
+  ['grave', 'Grave', -12, 12, 1, db], ['brillance', 'Brillance', -12, 12, 1, db], ['sourd', 'Couche sourde', 0, 1, .01, pc],
+  ['claque', 'Claquement', 0, 1, .01, pc], ['echo', 'Écho court', 0, .6, .01, pc], ['fondu', 'Fondu de fin', 0, 400, 5, (v) => v + ' ms'],
+];
+let debut = 0, fin = 1;
+async function traiter(buf, e) {
+  const d0 = Math.max(0, debut), d1 = Math.min(buf.duration, Math.max(d0 + .02, fin));
+  const len = (d1 - d0) / e.vitesse, queue = e.echo > 0 ? .35 : .02;
+  const ctx = new OfflineAudioContext(1, Math.ceil(SR * (len + queue)), SR);
+  const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = e.vitesse;
+  const pousse = ctx.createGain(); pousse.gain.value = dB(e.punch * .16);
+  const bas = ctx.createBiquadFilter(); bas.type = 'lowshelf'; bas.frequency.value = 180; bas.gain.value = e.grave;
+  const haut = ctx.createBiquadFilter(); haut.type = 'highshelf'; haut.frequency.value = 4500; haut.gain.value = e.brillance;
+  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -6 - e.punch * .24; comp.ratio.value = 1 + e.punch * .11;
+  comp.attack.value = .004; comp.release.value = .12; comp.knee.value = 6;
+  const fondu = ctx.createGain(); fondu.gain.setValueAtTime(1, 0);
+  if (e.fondu > 0) { fondu.gain.setValueAtTime(1, Math.max(0, len - e.fondu / 1000)); fondu.gain.linearRampToValueAtTime(0.0001, len); }
+  src.connect(pousse).connect(bas).connect(haut).connect(comp).connect(fondu).connect(ctx.destination);
+  if (e.sourd > 0) {
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(120, 0); o.frequency.exponentialRampToValueAtTime(42, .16);
+    o.connect(env(ctx, e.sourd, 0, .003, .3)).connect(bas); o.start(0); o.stop(len);
+  }
+  if (e.claque > 0) {
+    const n = ctx.createBufferSource(); n.buffer = bruit(ctx, .03);
+    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2500;
+    n.connect(f).connect(env(ctx, e.claque, 0, .001, .018)).connect(comp); n.start(0);
+  }
+  if (e.echo > 0) {
+    const dl = ctx.createDelay(1); dl.delayTime.value = .065; const fb = ctx.createGain(); fb.gain.value = .35;
+    const mouille = ctx.createGain(); mouille.gain.value = e.echo;
+    fondu.connect(dl); dl.connect(fb).connect(dl); dl.connect(mouille).connect(ctx.destination);
+  }
+  src.start(0, d0, d1 - d0);
+  const out = await ctx.startRendering(), d = out.getChannelData(0);
+  let crete = 0; for (let i = 0; i < d.length; i++) crete = Math.max(crete, Math.abs(d[i]));
+  if (crete > 0) { const k = .89 / crete; for (let i = 0; i < d.length; i++) d[i] *= k; }   // crête à -1 dB : le volume se règle en jeu
+  return out;
+}
+function resumeRetouche() {
+  return RETOUCHE_CURSEURS.map(([k]) => `${k}=${RETOUCHE[k]}`).join(' ') + ` coupe=${debut.toFixed(2)}-${fin.toFixed(2)}s`;
+}
+let retoucheTimer;
+function refaireRendu() {
+  clearTimeout(retoucheTimer);
+  retoucheTimer = setTimeout(async () => { if (source) { rendu = await traiter(source.buf, RETOUCHE); dessiner(); } }, 60);
+}
+function chargerSource(buf, meta, nom, garderCoupe) {
+  source = { buf, meta };
+  if (!garderCoupe || fin > buf.duration || fin === 1 && debut === 0) { debut = 0; fin = Math.min(buf.duration, 3); }
+  if (garderCoupe && meta.type === 'synth') { debut = 0; fin = buf.duration; }
+  $('#nomSource').textContent = nom;
+  $('#remplacer').disabled = $('#variante').disabled = !courant;
+  refaireRendu(); dessiner();
+}
+async function ecouter() {
+  if (!source) return toast('Choisis d\'abord une source (étape 1).', true);
+  rendu = await traiter(source.buf, RETOUCHE);
+  if (lecture) try { lecture.stop(); } catch (e) {}
+  lecture = jouer(rendu);
+}
+
+// ------------------------------------------------------------------ forme d'onde et coupe
+const toile = $('#onde'), g2 = toile.getContext('2d');
+function dessiner() {
+  const W = toile.width, H = toile.height; g2.clearRect(0, 0, W, H);
+  if (!source) return;
+  const d = source.buf.getChannelData(0), dur = source.buf.duration, pas = Math.max(1, Math.floor(d.length / W));
+  g2.fillStyle = '#5c8fbf';
+  for (let x = 0; x < W; x++) {
+    let lo = 1, hi = -1; for (let i = x * pas; i < Math.min(d.length, (x + 1) * pas); i++) { const v = d[i]; if (v < lo) lo = v; if (v > hi) hi = v; }
+    g2.fillRect(x, H / 2 - hi * H / 2, 1, Math.max(1, (hi - lo) * H / 2));
+  }
+  const xa = debut / dur * W, xb = fin / dur * W;
+  g2.fillStyle = 'rgba(0,0,0,.55)'; g2.fillRect(0, 0, xa, H); g2.fillRect(xb, 0, W - xb, H);
+  g2.fillStyle = '#f2b84b'; g2.fillRect(xa - 2, 0, 4, H); g2.fillRect(xb - 2, 0, 4, H);
+  g2.fillStyle = '#efe6d6'; g2.font = '22px system-ui'; g2.fillText(`${(fin - debut).toFixed(2)} s gardées sur ${dur.toFixed(2)} s`, 10, 26);
+}
+let prise = null;
+toile.addEventListener('pointerdown', (ev) => {
+  if (!source) return;
+  const r = toile.getBoundingClientRect(), t = (ev.clientX - r.left) / r.width * source.buf.duration;
+  prise = Math.abs(t - debut) < Math.abs(t - fin) ? 'debut' : 'fin';
+  toile.setPointerCapture(ev.pointerId); bouger(ev);
+});
+toile.addEventListener('pointermove', (ev) => prise && bouger(ev));
+toile.addEventListener('pointerup', () => { if (prise) { prise = null; refaireRendu(); } });
+function bouger(ev) {
+  const r = toile.getBoundingClientRect(), dur = source.buf.duration;
+  const t = Math.max(0, Math.min(dur, (ev.clientX - r.left) / r.width * dur));
+  if (prise === 'debut') debut = Math.min(t, fin - .02); else fin = Math.max(t, debut + .02);
+  dessiner();
+}
+
+// ------------------------------------------------------------------ WAV
+function wav(buf) {
+  const d = buf.getChannelData(0), n = d.length, ab = new ArrayBuffer(44 + n * 2), v = new DataView(ab);
+  const ecr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  ecr(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); ecr(8, 'WAVE'); ecr(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, buf.sampleRate, true); v.setUint32(28, buf.sampleRate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); ecr(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, d[i])) * 32767, true);
+  let bin = ''; const u = new Uint8Array(ab);
+  for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// ------------------------------------------------------------------ sons du jeu
+function afficherListe() {
+  const f = $('#filtre').value.toLowerCase(), box = $('#ids'); box.innerHTML = '';
+  for (const s of etat.sons) {
+    if (f && !(s.id + ' ' + s.nom).toLowerCase().includes(f)) continue;
+    const el = document.createElement('div'); el.className = 'id' + (courant && courant.id === s.id ? ' actif' : '');
+    el.innerHTML = `<i class="pastille ${s.def ? 'on' : ''}"></i><div>${s.nom}${s.nom !== s.id ? `<small>${s.id}</small>` : ''}</div>`;
+    el.onclick = () => choisirSon(s.id); box.appendChild(el);
+  }
+}
+const cacheJeu = new Map();
+async function bufferJeu(fichier, v) {
+  const cle = fichier + '?' + v;
+  if (!cacheJeu.has(cle)) cacheJeu.set(cle, fetch('/jeu/' + fichier + '?v=' + v).then((r) => r.arrayBuffer()).then((a) => AC.decodeAudioData(a)));
+  return cacheJeu.get(cle);
+}
+function choisirSon(id) {
+  courant = etat.sons.find((s) => s.id === id);
+  afficherListe();
+  $('#titre').textContent = `${courant.nom}  ·  ${courant.id}`;
+  const def = courant.def, box = $('#fichiers'); box.innerHTML = '';
+  if (!def) box.innerHTML = '<p class="vide">Muet pour l\'instant : fabrique ou cherche un son ci-dessous, puis « Remplacer le son ».</p>';
+  else for (const f of def.files) {
+    const l = document.createElement('div'); l.className = 'fichier';
+    l.innerHTML = `<button>▶</button><code>${f}</code><button title="Charger dans la retouche">✎ Retoucher</button><button title="Enlever ce fichier">✕</button>`;
+    const [b1, b2, b3] = l.querySelectorAll('button');
+    b1.onclick = async () => jouer(await bufferJeu(f, def.v || 0), { volume: def.volume ?? 1 });
+    b2.onclick = async () => chargerSource(await bufferJeu(f, def.v || 0), { type: 'jeu', fichier: f }, f, false);
+    b3.onclick = async () => { if (!confirm(`Enlever ${f} du jeu ?`)) return; try { await api('/api/retirer', { id: courant.id, fichier: f }); await recharger(); toast('Enlevé.'); } catch (e) { toast(e.message, true); } };
+    box.appendChild(l);
+  }
+  for (const k of ['volume', 'pitch', 'cooldownMs']) {
+    const i = $('#r-' + k), o = i.nextElementSibling;
+    const defauts = { volume: .8, pitch: .05, cooldownMs: 40 };
+    i.value = def && def[k] != null ? def[k] : defauts[k];
+    const fmt = k === 'volume' || k === 'pitch' ? pc : (v) => v + ' ms';
+    o.textContent = fmt(+i.value); i.oninput = () => { o.textContent = fmt(+i.value); };
+    i.disabled = !def;
+  }
+  $('#garderReglages').disabled = $('#jouerJeu').disabled = !def;
+  $('#remplacer').disabled = $('#variante').disabled = !source;
+  $('#variante').disabled = !source || !def;
+}
+$('#jouerJeu').onclick = async () => {
+  const def = courant && courant.def; if (!def) return;
+  const vol = +$('#r-volume').value, ecart = +$('#r-pitch').value;
+  for (let n = 0; n < 3; n++) {
+    const f = def.files[Math.floor(Math.random() * def.files.length)];
+    setTimeout(async () => jouer(await bufferJeu(f, def.v || 0), { volume: vol * .8, rate: 1 + (Math.random() * 2 - 1) * ecart }), n * 380);
+  }
+};
+$('#garderReglages').onclick = async () => {
+  try {
+    await api('/api/reglages', { id: courant.id, volume: +$('#r-volume').value, pitch: +$('#r-pitch').value, cooldownMs: +$('#r-cooldownMs').value });
+    await recharger(); toast('Réglages enregistrés. Recharge le jeu pour les entendre.');
+  } catch (e) { toast(e.message, true); }
+};
+async function ranger(mode) {
+  if (!courant || !source) return;
+  rendu = await traiter(source.buf, RETOUCHE);
+  // un son du jeu retouché garde l'origine de sa ligne du registre (le serveur la recopie)
+  const meta = source.meta.type === 'openverse' ? source.meta
+    : source.meta.type === 'jeu' ? { type: 'retouche', fichier: source.meta.fichier }
+      : { type: 'synth', nom: source.meta.nom || '?', reglages: source.meta.reglages || '' };
+  try {
+    const r = await api('/api/ranger', { id: courant.id, mode, wav: wav(rendu), source: meta, retouche: resumeRetouche() });
+    await recharger(); toast(`Rangé : ${r.fichier}. Recharge le jeu pour l'entendre.`);
+  } catch (e) { toast(e.message, true); }
+}
+$('#remplacer').onclick = () => ranger('remplacer');
+$('#variante').onclick = () => ranger('variante');
+async function recharger() {
+  etat = await api('/api/etat');
+  if (courant) choisirSon(courant.id); else afficherListe();
+}
+
+// ------------------------------------------------------------------ Openverse
+async function chercher() {
+  const q = $('#requete').value.trim(); if (!q) return;
+  const box = $('#resultats'); box.innerHTML = '<p class="aide">Recherche…</p>';
+  try {
+    const r = await api('/api/chercher?q=' + encodeURIComponent(q) + '&court=' + ($('#court').checked ? 1 : 0));
+    box.innerHTML = r.resultats.length ? '' : '<p class="vide">Rien. Essaie d\'autres mots anglais.</p>';
+    for (const s of r.resultats) {
+      const l = document.createElement('div'); l.className = 'res';
+      l.innerHTML = `<button>▶</button><span>${s.titre.replace(/</g, '&lt;')} <small>· ${s.duree ? s.duree.toFixed(1) + ' s' : '?'} · ${s.auteur.replace(/</g, '&lt;')}</small></span>`;
+      l.querySelector('button').onclick = async (ev) => {
+        ev.target.textContent = '…';
+        try {
+          const a = await fetch('/api/apercu/' + s.id); if (!a.ok) throw new Error((await a.json()).erreur);
+          const buf = await AC.decodeAudioData(await a.arrayBuffer());
+          chargerSource(buf, { type: 'openverse', ref: s.id }, `« ${s.titre} » de ${s.auteur} (CC0)`, false);
+          ecouter();
+        } catch (e) { toast('Aperçu impossible : ' + e.message, true); }
+        ev.target.textContent = '▶';
+      };
+      box.appendChild(l);
+    }
+    if (r.reste) box.insertAdjacentHTML('beforeend', `<p class="aide">Recherches restantes aujourd'hui : ${r.reste}</p>`);
+  } catch (e) { box.innerHTML = ''; toast(e.message, true); }
+}
+$('#chercher').onclick = chercher;
+$('#requete').addEventListener('keydown', (e) => e.key === 'Enter' && chercher());
+
+// ------------------------------------------------------------------ démarrage
+document.querySelectorAll('.onglets button').forEach((b) => b.onclick = () => {
+  document.querySelectorAll('.onglets button').forEach((x) => x.classList.toggle('actif', x === b));
+  $('#o-synth').hidden = b.dataset.onglet !== 'synth'; $('#o-openverse').hidden = b.dataset.onglet !== 'openverse';
+});
+for (const nom of Object.keys(PRESETS)) {
+  const b = document.createElement('button'); b.textContent = nom; b.onclick = () => choisirRecette(nom); $('#presets').appendChild(b);
+}
+$('#varier').onclick = () => {
+  if (!recette) return choisirRecette(Object.keys(PRESETS)[0]);
+  const base = PRESETS[nomRecette];
+  for (const [k] of SYNTH_CURSEURS) if (typeof base[k] === 'number' && base[k] > 0) recette[k] = +(base[k] * (0.82 + Math.random() * .36)).toFixed(3);
+  curseurs($('#synthCurseurs'), SYNTH_CURSEURS, recette, () => refaireSynth(false));
+  refaireSynth(true);
+};
+const majRetouche = () => curseurs($('#retouche'), RETOUCHE_CURSEURS, RETOUCHE, refaireRendu);
+$('#juicy').onclick = () => { Object.assign(RETOUCHE, JUICY); majRetouche(); ecouter(); };
+$('#neutre').onclick = () => { Object.assign(RETOUCHE, NEUTRE); majRetouche(); ecouter(); };
+$('#ecouter').onclick = ecouter;
+$('#filtre').addEventListener('input', afficherListe);
+majRetouche();
+recharger().then(() => { if (etat.sons.length) choisirSon(etat.sons[0].id); });
+</script>
+</body>
+</html>

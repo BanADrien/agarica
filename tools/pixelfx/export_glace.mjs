@@ -30,16 +30,20 @@ for (let k = 0; k < 5; k++) {
   const H = LADDER[k + 1];
   parts[k] = { w: SPAN + Math.ceil(H * 1.8) + 12, h: Math.ceil(H * 1.25) + 26, opts: { span: SPAN, from: LADDER[k], height: H, big: false, seed: 4 + k } };
 }
-parts.gros = { w: 110, h: 94, opts: { span: 34, from: LADDER[5], height: 56, big: true, seed: 11 } };
+// (2026-11-14 : le bout raccourci, 56 -> 42, « un peu trop grand »)
+parts.gros = { w: 110, h: 86, opts: { span: 34, from: LADDER[5], height: 42, big: true, seed: 11 } };
 for (const c of Object.values(parts)) { c.ox = Math.round(c.w / 2); c.oy = c.h - 12; }
 
+// Glace NOIRE (2026-11-15) : la même traînée dans une palette presque noire à reflets violets, jouée quand
+// le passif des ursidés de palier 5 est actif. Mêmes cadres, fichiers glacenoire_<k>_<i>.png, clé `noir`.
+const NOIR = ["#030207", "#07060f", "#0e0b1c", "#17122e", "#241b48", "#3a2c74", "#6a55c0", "#c2b2ff"];
 mkdirSync(out, { recursive: true });
-for (const f of readdirSync(out)) if (/^glace_\w+_\d+\.png$/.test(f)) unlinkSync(resolve(out, f));
+for (const f of readdirSync(out)) if (/^glace(noire)?_\w+_\d+\.png$/.test(f)) unlinkSync(resolve(out, f));
 const data = { px: K, rangee: [] };
 for (const [part, c] of Object.entries(parts)) {
   const n = Math.round(fx.meta.duration * FPS);
-  for (let i = 0; i < n; i++) {
-    const inst = core.createFx(fx, { x: c.ox, y: c.oy, ...c.opts });
+  for (const [name, extra] of [["glace", {}], ["glacenoire", { palette: NOIR }]]) for (let i = 0; i < n; i++) {
+    const inst = core.createFx(fx, { x: c.ox, y: c.oy, ...c.opts, ...extra });
     const steps = Math.round(((i + 0.5) / FPS) * 120);
     for (let s = 0; s < steps; s++) inst.update(1 / 120);
     const frame = core.createFrame(c.w, c.h);
@@ -51,9 +55,9 @@ for (const [part, c] of Object.entries(parts)) {
       const a = ((y / K | 0) * c.w + (x / K | 0)) * 4, b = (y * c.w * K + x) * 4;
       big[b] = small[a]; big[b + 1] = small[a + 1]; big[b + 2] = small[a + 2]; big[b + 3] = small[a + 3];
     }
-    writeFileSync(`${out}/glace_${part}_${i}.png`, encodePNG(c.w * K, c.h * K, big));
+    writeFileSync(`${out}/${name}_${part}_${i}.png`, encodePNG(c.w * K, c.h * K, big));
   }
-  const entry = { key: `glace-${part}`, dir, prefix: `glace_${part}`, frames: n, fps: FPS, w: c.w * K, h: c.h * K, ox: c.ox * K, oy: c.oy * K,
+  const entry = { key: `glace-${part}`, dir, prefix: `glace_${part}`, noir: `glacenoire-${part}`, noirPrefix: `glacenoire_${part}`, frames: n, fps: FPS, w: c.w * K, h: c.h * K, ox: c.ox * K, oy: c.oy * K,
     // largeur et hauteur visibles de la glace (px d'écran) : zone de dégâts du jeu
     span: c.opts.span * K, height: Math.round(c.opts.height * K) };
   if (part === "gros") data.gros = entry;
