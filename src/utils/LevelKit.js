@@ -3802,17 +3802,13 @@ const AUTOTILE_ATLAS_GRASS = {
 // coins INTÉRIEURS, les C les variantes « minces » du 9-slice) :
 //  1. Case de surface (pas de voisin N dans S) AVEC un voisin S dans S ET au
 //     moins un voisin E ou O dans S -> B (les « cases B »).
-//  2. Région R = S privé des cases B (les surfaces minces -- plateforme sans
-//     dessous, haut de colonne -- restent donc dans R). Une case de R n'a
-//     pour voisins QUE des cases de R : tout ce qui est hors de R (case B
-//     comprise) compte comme EXPOSÉ. Avec n/s/e/o/no/ne/so/se = voisin ∈ R :
-//       !n && !s : !o && !e -> C4 ; !o -> C1 ; !e -> C3 ; sinon C2
-//       sinon !o && !e : !n -> C5 ; !s -> C7 ; sinon C6
-//       !n && !o -> A1 ; !n && !e -> A3 ; !s && !o -> A7 ; !s && !e -> A9
-//       !n -> A2
-//       !s -> !no -> D1 ; !ne -> D2 ; sinon A8
-//       !o -> A4 ; !e -> A6
-//       intérieur : !no -> D6 ; !ne -> D5 ; !so -> D4 ; !se -> D3 ; sinon A5
+//  2. Les autres cases sont décrites coin par coin (depuis le 2026-11-15, cf.
+//     le corps de la fonction) : une case B au-dessus compte comme du vide,
+//     toute case pleine compte sur les côtés, en dessous et en diagonale. Si
+//     les 4 coins correspondent à une case dessinée (A1..A9, C1..C7, D1..D6 :
+//     AUTOTILE_ATLAS_BY_CODE), on la prend ; sinon la case est assemblée à
+//     partir de quarts de ces cases (atlasCompositeTile). Les surfaces minces
+//     (plateforme sans dessous, haut de colonne) gardent leurs cases C.
 //  3. Herbe sur TOUTE case sans voisin N dans S : H3 (grass_left) sans voisin
 //     O dans S, H4 (grass_right) sans voisin E dans S, les deux
 //     (grass_single) si aucun des deux, sinon H1 (grass_mid).
@@ -3828,28 +3824,84 @@ function atlasTileFor(solid, gx, gy) {
     grass = !w && !e ? 'single' : !w ? 'left' : !e ? 'right' : 'mid';
   }
   if (isB(gx, gy)) return { tile: 'B', grass };
-  const inR = (x, y) => inS(x, y) && !isB(x, y);
-  const n = inR(gx, gy - 1);
-  const s = inR(gx, gy + 1);
-  const e = inR(gx + 1, gy);
-  const o = inR(gx - 1, gy);
-  let tile;
-  if (!n && !s) tile = !o && !e ? 'C4' : !o ? 'C1' : !e ? 'C3' : 'C2';
-  else if (!o && !e) tile = !n ? 'C5' : !s ? 'C7' : 'C6';
-  else if (!n && !o) tile = 'A1';
-  else if (!n && !e) tile = 'A3';
-  else if (!s && !o) tile = 'A7';
-  else if (!s && !e) tile = 'A9';
-  else if (!n) tile = 'A2';
-  else if (!s) tile = !inR(gx - 1, gy - 1) ? 'D1' : !inR(gx + 1, gy - 1) ? 'D2' : 'A8';
-  else if (!o) tile = 'A4';
-  else if (!e) tile = 'A6';
-  else if (!inR(gx - 1, gy - 1)) tile = 'D6';
-  else if (!inR(gx + 1, gy - 1)) tile = 'D5';
-  else if (!inR(gx - 1, gy + 1)) tile = 'D4';
-  else if (!inR(gx + 1, gy + 1)) tile = 'D3';
-  else tile = 'A5';
-  return { tile, grass };
+  // 2026-11-15 (retour de l'utilisateur : « il manque des types de case dans
+  // certains cas ») : la case est décrite COIN PAR COIN. Avant, une chaîne de
+  // règles choisissait UNE case dessinée et ignorait le reste : une colonne
+  // entre deux cases B gardait ses bords verticaux en plein bloc, et une case
+  // à deux coins rentrants n'en montrait qu'un.
+  // Voisins : au-dessus, une case B compte comme du VIDE (règle de
+  // l'utilisateur : la couche de B, puis les A repartent d'un bord haut) ;
+  // sur les côtés, en dessous et en diagonale, toute case pleine compte, B
+  // compris (plus de bord vertical dessiné contre une case B voisine).
+  // Case prise entre deux cases B, sous une colonne : elle fait partie de la
+  // même couche de surface (la rangée d'en dessous repart d'un bord haut sur
+  // toute sa largeur, sans trou sous la colonne).
+  const isCap = (x, y) => isB(x, y) || (inS(x, y) && isB(x - 1, y) && isB(x + 1, y));
+  const n = inS(gx, gy - 1) && !isCap(gx, gy - 1);
+  const s = inS(gx, gy + 1);
+  const o = inS(gx - 1, gy);
+  const e = inS(gx + 1, gy);
+  // État d'un coin d'après son voisin vertical, horizontal et diagonal :
+  // C = coin sortant, H = bord horizontal, V = bord vertical, I = coin
+  // rentrant, F = plein. Du côté d'une case B voisine, un coin plein ou
+  // rentrant prend la matière de B (état « B ») : la couche claire de surface
+  // continue sous la colonne, au lieu d'un carré d'intérieur sombre collé à
+  // une case B.
+  const q = (v, h, d, besideB) => {
+    const st = !v && !h ? 'C' : !v ? 'H' : !h ? 'V' : !d ? 'I' : 'F';
+    return besideB && (st === 'F' || st === 'I') ? 'B' : st;
+  };
+  const bO = isB(gx - 1, gy);
+  const bE = isB(gx + 1, gy);
+  const code = q(n, o, inS(gx - 1, gy - 1), bO) + q(n, e, inS(gx + 1, gy - 1), bE)
+    + q(s, o, inS(gx - 1, gy + 1), bO) + q(s, e, inS(gx + 1, gy + 1), bE);
+  // Une case dessinée par l'utilisateur quand elle correspond exactement ;
+  // sinon une case assemblée à partir de quarts de ses cases (`q-<code>`,
+  // cf. atlasCompositeTile).
+  return { tile: AUTOTILE_ATLAS_BY_CODE[code] || `q-${code}`, grass };
+}
+
+// Les 22 cases dessinées, décrites par l'état de leurs 4 coins (haut-gauche,
+// haut-droite, bas-gauche, bas-droite ; cf. `q` dans atlasTileFor).
+const AUTOTILE_ATLAS_BY_CODE = {
+  CHVF: 'A1', HHFF: 'A2', HCFV: 'A3', VFVF: 'A4', FFFF: 'A5', FVFV: 'A6', VFCH: 'A7', FFHH: 'A8', FVHC: 'A9',
+  CHCH: 'C1', HHHH: 'C2', HCHC: 'C3', CCCC: 'C4', CCVV: 'C5', VVVV: 'C6', VVCC: 'C7',
+  IFHH: 'D1', FIHH: 'D2', FFFI: 'D3', FFIF: 'D4', FIFF: 'D5', IFFF: 'D6',
+  BBBB: 'B',
+};
+// Case où prendre chaque quart selon son état, dans l'ordre haut-gauche,
+// haut-droite, bas-gauche, bas-droite.
+const AUTOTILE_ATLAS_QUAD_SOURCE = {
+  C: ['A1', 'A3', 'A7', 'A9'],
+  H: ['A2', 'A2', 'A8', 'A8'],
+  V: ['A4', 'A6', 'A4', 'A6'],
+  I: ['D6', 'D5', 'D4', 'D3'],
+  F: ['A5', 'A5', 'A5', 'A5'],
+  B: ['B', 'B', 'B', 'B'],
+};
+
+// Case assemblée (`q-<code>`) : chaque quart de 12 px est copié de la case
+// dessinée qui a ce coin dans cet état. Aucun pixel inventé : on ne fait que
+// recombiner les dessins de tuiles.png. Renvoie la clé de texture.
+function atlasCompositeTile(scene, tile) {
+  const key = `${AUTOTILE_ATLAS_PREFIX}${tile}`;
+  if (!tile.startsWith('q-') || scene.textures.exists(key)) return key;
+  const T = AUTOTILE_ATLAS_SOURCE_TILE;
+  const half = T / 2;
+  const code = tile.slice(2);
+  const tex = scene.textures.createCanvas(key, T, T);
+  if (!tex) return `${AUTOTILE_ATLAS_PREFIX}A5`;
+  const ctx = tex.getContext();
+  for (let i = 0; i < 4; i++) {
+    const src = `${AUTOTILE_ATLAS_PREFIX}${AUTOTILE_ATLAS_QUAD_SOURCE[code[i]][i]}`;
+    if (!scene.textures.exists(src)) continue;
+    const sx = (i % 2) * half;
+    const sy = Math.floor(i / 2) * half;
+    ctx.drawImage(scene.textures.get(src).getSourceImage(), sx, sy, half, half, sx, sy, half, half);
+  }
+  tex.refresh();
+  tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  return key;
 }
 
 // Case de terre sous une herbe de BORD (grass_left / grass_right /
@@ -3863,7 +3915,8 @@ function atlasTileFor(solid, gx, gy) {
 // ne change pas. Renvoie la clé de texture (celle d'origine si rien à faire).
 const AUTOTILE_ATLAS_CORNER_COLUMNS = 6; // colonnes examinées depuis chaque bord exposé
 function atlasTileUnderGrass(scene, tile, grass) {
-  const base = `${AUTOTILE_ATLAS_PREFIX}${tile}`;
+  // Case assemblée : fabriquée ici si elle n'existe pas encore.
+  const base = atlasCompositeTile(scene, tile);
   if (!grass || grass === 'mid') return base;
   const key = `${base}:${grass}`;
   if (scene.textures.exists(key)) return key;
