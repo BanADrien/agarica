@@ -1,0 +1,25 @@
+Commande d'une image pour « Legend of Agarica » : une PLANCHE DE PROPOSITIONS pour le sol du bosquet et de la forêt sombre (les deux premières zones du jeu).
+
+CONTEXTE
+Le sol actuel de ces zones est un jeu de tuiles fait main (assets/decors/tuiles.png, rendu en jeu dans docs/production/controles/sol_foret/ref_jeu_actuel.png). L'utilisateur trouve qu'il « dénote un peu du jeu » : une terre brune unie, trop claire et trop plate à côté des décors et des fonds, qui sont en pixel art sombre, violet nuit et vert lunaire. Il demande de le refaire en mieux. Avant de dessiner tout le jeu de tuiles, il veut choisir parmi TROIS DESIGNS DIFFÉRENTS.
+
+RÈGLES
+- N'écris qu'UN fichier : docs/production/controles/sol_foret/propositions.png. Ne touche à aucun autre fichier (ni assets/, ni src/). Ne lance aucun import. Ne fais ni commit ni push.
+- Fond transparent (alpha réel). Aucun texte, aucune lettre, aucun chiffre, aucune flèche, aucun cadre.
+
+RÉFÉRENCES À JOINDRE
+- docs/production/controles/sol_foret/ref_jeu_actuel.png : le jeu aujourd'hui dans la forêt sombre (le sol à remplacer, les décors, le fond, Agarica).
+- assets/decors/tuiles.png : le jeu de tuiles actuel, à remplacer.
+- Les sols des autres zones du jeu, pour la finition et le grain de pixel à égaler : assets/decors/tuiles_ecorce_frames/dirt_t.png, dirt_c.png, dirt_tl.png ; assets/decors/tuiles_corrompues_frames/dirt_t.png, dirt_c.png.
+- Un décor et un fond de la forêt sombre, pour la palette : assets/decors/fonds/fond_foret_sombre.png.
+
+Prompt :
+Design proposal sheet for the ground tiles of the first zones (a druid grove and a dark forest at night) of 'Legend of Agarica', a 2D side-scrolling dark-fantasy platformer. Art style: chunky readable PIXEL ART matching the reference tiles of the other zones (same pixel grain, dark outlines, 3-4 tone shading), seen strictly from the side. World palette: night forest in deep violet, indigo and teal, with luminous moonlit-green accents (#8fe3b8) and tiny touches of rose pink; the ground must sit in that night palette and be DARKER than the characters so they stand out, never a flat bright brown.
+Canvas 1536 x 1024 px, fully transparent background, exactly ONE row of THREE terrain samples in three invisible cells of 512 px, at least 40 px of empty space between samples. Each sample is the SAME test shape so the three designs can be compared: a solid block of ground about 4 tiles wide and 3 tiles tall, with a one-tile step up on its left, a one-tile-wide pillar rising one tile above the top on its right, and a one-tile notch cut under its right side (an overhang). So each sample shows: the walkable top with its grass or moss, the left and right sides, the underside, outer corners, inner corners and the fill inside. The top surface is a flat straight walkable line. Tiles are square and must look like they repeat seamlessly.
+THREE COMPLETELY DIFFERENT DESIGNS, different materials, colors and motifs:
+Sample A (left) - DARK FOREST SOIL: deep violet-brown earth packed with big rounded pebbles and a few thin pale roots, darker toward the inside, a top fringe of dark green grass whose longest blades have moonlit-green tips.
+Sample B (middle) - HUMUS AND ROOTS: almost black violet humus in soft layers, thick twisted tree roots showing on the sides and corners, a thick cushion of deep teal moss spilling over the top edge, a few tiny glowing cyan mushrooms on the top.
+Sample C (right) - ANCIENT MOSSY STONE: old carved blocks and slabs of grey-violet stone with dark joints and small cracks, patches of moss and short ivy on the top, one or two faint moon-shaped engravings; the ruins of a druid grove.
+Output: one PNG, 1536 x 1024 px, transparent background, exactly three terrain samples in one row, clearly three different materials.
+
+À la fin, réponds en deux lignes en français : le fichier écrit, sa taille en pixels, et si les trois échantillons sont bien distincts.
