@@ -639,15 +639,33 @@ class EditeurScene extends Phaser.Scene {
       return;
     }
     const outil = E.etat.outil;
-    if (outil && (outil.outil === 'peindre' || outil.outil === 'effacer')) {
-      if (!E.modifiable()) return;
-      this.trait = { couche: outil.couche, efface: droit || outil.outil === 'effacer', cases: new Map(), dernier: null };
-      this.peindreVers(m.x, m.y);
+    // Clic droit = la gomme, TOUJOURS le même geste (retour de l'utilisateur du
+    // 2026-11-15 : « c'est pas les mêmes touches pour suppr un sol et un
+    // élément genre eau, c'est pas pratique »). Il enlève ce qui est sous le
+    // curseur : l'élément s'il y en a un (eau, créature, décor…), sinon le
+    // sol, et on peut alors glisser pour effacer d'autres cases. Dans le vide :
+    // il range l'outil en main, sinon désélectionne (comme avant).
+    if (droit) {
+      const cible = this.elementSous(m.x, m.y);
+      if (cible) {
+        if (E.modifiable()) { E.selectionner(cible.genre, cible.index); E.supprimerSelection(); }
+        return;
+      }
+      const peint = outil && (outil.outil === 'peindre' || outil.outil === 'effacer');
+      const couche = this.coucheDeSol(m.x, m.y, peint ? outil.couche : null);
+      if (couche || peint) {
+        if (!E.modifiable()) return;
+        this.trait = { couche: couche || outil.couche, efface: true, cases: new Map(), dernier: null };
+        this.peindreVers(m.x, m.y);
+        return;
+      }
+      if (outil) E.choisirOutil(null); else E.selectionner(null);
       return;
     }
-    if (droit) {
-      // Clic droit : range l'outil en main, sinon désélectionne.
-      if (outil) E.choisirOutil(null); else E.selectionner(null);
+    if (outil && (outil.outil === 'peindre' || outil.outil === 'effacer')) {
+      if (!E.modifiable()) return;
+      this.trait = { couche: outil.couche, efface: outil.outil === 'effacer', cases: new Map(), dernier: null };
+      this.peindreVers(m.x, m.y);
       return;
     }
     // Poignée de l'élément sélectionné.
@@ -740,6 +758,35 @@ class EditeurScene extends Phaser.Scene {
       const o = this.objetDe(gl.genre, gl.index);
       if (o) { o.x = gl.objet.x; o.y = gl.objet.y; }
     }
+  }
+
+  // Couche de sol qui a une case sous le point : celle de l'outil de peinture
+  // en main si elle en a une, sinon le sol, sinon le sol de second plan.
+  coucheDeSol(x, y, preferee = null) {
+    const d = Editeur.etat.donnees;
+    if (!d) return null;
+    const gx = Math.floor(x / ED_CASE);
+    const gy = Math.floor(y / ED_CASE);
+    const a = (couche) => Array.isArray(d[couche]) && d[couche].some((c) => Array.isArray(c) && c[0] === gx && c[1] === gy);
+    const ordre = [preferee, 'groundCells', 'groundBackCells'].filter(Boolean);
+    return ordre.find(a) || null;
+  }
+
+  // Touche Suppr sans rien de sélectionné : même gomme que le clic droit, sur
+  // ce qui est sous le curseur (un élément, sinon la case de sol). Renvoie
+  // vrai si quelque chose a été enlevé.
+  effacerSousCurseur() {
+    const E = Editeur;
+    const p = this.pointeur;
+    if (!this.pret || !p || !p.dedans || !E.modifiable()) return false;
+    const cible = this.elementSous(p.x, p.y);
+    if (cible) {
+      E.selectionner(cible.genre, cible.index);
+      return E.supprimerSelection();
+    }
+    const couche = this.coucheDeSol(p.x, p.y);
+    if (!couche) return false;
+    return E.peindre(couche, true, [[Math.floor(p.x / ED_CASE), Math.floor(p.y / ED_CASE)]]);
   }
 
   // Ligne de cases entre le dernier point peint et (x, y) : un trait rapide ne laisse pas de trous.

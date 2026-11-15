@@ -39,6 +39,7 @@ mais il prévient en rouge : rien n'est écrit dans le jeu, le travail reste en 
 | le régler | panneau de droite : taille, vie, sens, contenu d'un coffre… |
 | régler à la souris | tirer les ronds verts : bornes de patrouille, bas d'une liane, coin d'un rectangle, bouts d'une branche |
 | le copier / l'enlever | `Ctrl + D` / `Suppr` (ou les boutons en bas du panneau) |
+| effacer n'importe quoi | **clic droit** dessus : un élément (eau, créature, décor…) ou une case de sol ; en glissant, on efface d'autres cases de sol. `Suppr` sans rien de choisi fait la même chose sous le curseur |
 | peindre le sol | onglet Terrain, « Peindre le sol », clic glissé ; **clic droit glissé : effacer** |
 | annuler / refaire | `Ctrl + Z` / `Ctrl + Y` |
 | zoomer | molette (100 % = la vue exacte du jeu ; bouton ⛶ : toute la zone) |

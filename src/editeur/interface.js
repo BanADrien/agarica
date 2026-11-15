@@ -116,13 +116,14 @@ const EditeurInterface = (() => {
       ligne('Molette', 'zoomer'),
       ligne('Espace + glisser', 'déplacer la vue (ou clic du milieu, ou glisser dans le vide)'),
       ligne('Flèches', 'déplacer la vue, ou pousser l\'élément choisi'),
-      ligne('Suppr', 'enlever l\'élément choisi'),
+      ligne('Clic droit', 'la gomme : enlève ce qui est sous le curseur, un élément (eau, créature, décor…) ou le sol ; glisser pour effacer plus de sol'),
+      ligne('Suppr', 'enlever l\'élément choisi, sinon ce qui est sous le curseur'),
       ligne('Ctrl + Z / Ctrl + Y', 'annuler / refaire'),
       ligne('Ctrl + D', 'copier l\'élément choisi'),
       ligne('Ctrl + S', 'enregistrer dans le jeu'),
       ligne('Ctrl + Entrée', 'jouer la zone'),
       ligne('Échap', 'ranger l\'outil, puis désélectionner'),
-      ligne('Clic droit', 'effacer le sol (outil de peinture), sinon ranger l\'outil'),
+      ligne('Clic droit dans le vide', 'ranger l\'outil en main'),
       h('p.ed-menu-note', {}, 'Le sol : deux cases ne doivent jamais se toucher seulement par un coin. L\'éditeur le signale en rouge.'),
     );
     el.panneauAide.hidden = !el.panneauAide.hidden;
@@ -614,7 +615,12 @@ const EditeurInterface = (() => {
       if (ctrl && e.key.toLowerCase() === 'y') { e.preventDefault(); E.refaire(); return; }
       if (ctrl && e.key.toLowerCase() === 'd') { e.preventDefault(); E.dupliquerSelection(); return; }
       if (ctrl || e.altKey) return;
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); E.supprimerSelection(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        // L'élément choisi ; sinon ce qui est sous le curseur (élément ou case de sol).
+        if (!E.supprimerSelection() && E.scene && E.scene.effacerSousCurseur) E.scene.effacerSousCurseur();
+        return;
+      }
       if (e.key === 'Escape') {
         const sc = E.scene;
         if (sc && (sc.glisse || sc.trait)) sc.annulerGeste();
