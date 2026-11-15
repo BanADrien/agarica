@@ -1,9 +1,14 @@
-// Mode édition (voir EditorScene.js) : index.html?editor affiche la barre
-// d'outils HTML (#editor-ui, cachée par défaut) par-dessus le canvas et
-// fait router BootScene vers EditorScene une fois les assets chargés, au
-// lieu de l'écran-titre normal (cf. fin de BootScene.create()).
-const EDITOR_MODE = new URLSearchParams(window.location.search).has('editor');
-if (EDITOR_MODE) {
+// Mode édition : `index.html?editor` ouvre le NOUVEL éditeur de niveaux (src/editeur/, interface HTML
+// autour du canvas, cf. docs/production/EDITEUR_V2_DESIGN.md) ; `?editor=ancien` garde l'ancien
+// (EditorScene.js, panneau #editor-ui), accessible tant que le nouveau n'est pas validé. Dans les deux cas
+// BootScene saute l'écran-titre et lance la scène 'EditorScene' une fois les images chargées.
+const EDITOR_PARAM = new URLSearchParams(window.location.search).get('editor');
+const EDITOR_MODE = EDITOR_PARAM !== null;
+const EDITEUR_ANCIEN = EDITOR_PARAM === 'ancien';
+// (Si un fichier du nouvel éditeur manque, l'ancien prend le relais plutôt qu'une page vide.)
+const EDITEUR_NOUVEAU = EDITOR_MODE && !EDITEUR_ANCIEN && typeof EditeurEcriture !== 'undefined' && typeof editeurIcone === 'function'
+  && typeof Editeur !== 'undefined' && typeof EDITEUR_SCENES !== 'undefined' && typeof EditeurInterface !== 'undefined';
+if (EDITOR_MODE && !EDITEUR_NOUVEAU) {
   document.body.classList.add('editor-mode');
   document.getElementById('editor-ui').style.display = 'block';
 }
@@ -68,6 +73,14 @@ const config = {
     IleDuGardienScene, MaraisBrumesScene, RacinesSuspenduesScene, NidCoconsScene, CanopeeMaladeScene,
   ],
 };
+
+if (EDITEUR_NOUVEAU) {
+  // Le nouvel éditeur prend la place de l'ancien sous la clé 'EditorScene' (relais vers sa propre scène) ;
+  // zones photographiées et interface posée AVANT la création du jeu (le canvas naît dans la page de l'éditeur).
+  config.scene = config.scene.filter((s) => s !== EditorScene).concat(EDITEUR_SCENES);
+  Editeur.demarrer();
+  EditeurInterface.demarrer();
+}
 
 window.__game = new Phaser.Game(config);
 // `?muet` dans l'adresse : aucun son (onglets de test ouverts par l'assistant : demande de l'utilisateur du

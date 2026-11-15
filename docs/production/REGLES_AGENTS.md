@@ -24,7 +24,10 @@ conflit, le brief l'emporte.
 - Ne touche pas à `assets.zip`, ni à `CLAUDE.md`, ni à `docs/production/PRIORITES.md`.
 - Ne modifie que les fichiers que ton brief te donne. S'il en faut un autre, dis-le dans ton
   compte rendu au lieu de le faire.
-- N'utilise pas `tools/dev_server.py` (son bouton Save réécrit les fichiers de zone).
+- Le serveur du projet est `tools/dev_server.py` (sans cache ; il reçoit les enregistrements de
+  l'éditeur et réécrit alors les fichiers de zone). Pour tester l'éditeur, lance-le TOUJOURS vers
+  un dossier temporaire : `python tools/dev_server.py <port> --donnees <dossier>`. N'enregistre
+  jamais dans `src/data/` pendant un test.
 - N'arrête pas le serveur du port 8000 (celui de l'utilisateur) et ne t'en sers pas.
 
 ## Tests

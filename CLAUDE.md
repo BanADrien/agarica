@@ -92,8 +92,16 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   `docs/production/REGLES_AGENTS.md` (un brief y renvoie au lieu de les repeter).
 - **Tests** : `python tools/playtest.py --port 88xx --scene ForetSombre1Scene --flags
   xaraMet=true --keys "ArrowRight:1500" --js "…" --shot x.png` (Edge headless, code de
-  sortie 1 si erreur JS). Ne pas utiliser `tools/dev_server.py` pour tester : son Save
-  réécrit les fichiers de zone.
+  sortie 1 si erreur JS). Dans un test automatique, ne jamais cliquer « Enregistrer » de
+  l'éditeur sur le serveur du projet : il réécrit les fichiers de zone (tester vers un dossier
+  temporaire avec `python tools/dev_server.py <port> --donnees <dossier>`).
+- **Éditeur de niveaux (nouveau, 2026-11-15)** : `python tools/dev_server.py 8000` (sans cache +
+  enregistrement) puis `index.html?editor` ; ancien éditeur : `?editor=ancien`. Code dans
+  `src/editeur/` (catalogue des éléments = table de données), essais dans `tools/editeur_essais/`,
+  conception `docs/production/EDITEUR_V2_DESIGN.md`, mode d'emploi `EDITEUR_MODE_EMPLOI.md`.
+  Enregistrer réécrit `src/data/<zone>_data.js` (copie de secours dans `src/data/_backup/`) :
+  les fichiers de zone ne sont plus forcément écrits à la main. Lot 1 fait ; lots 2 (Monde,
+  Passages) et 3 (Histoire, déclencheurs) à faire.
 - **Pixel art (pixel-fixer)** : `tools/pixel-fixer` est un sous-module git (dépôt
   BanADrien/pixel-fixer, `git submodule update --init` puis `npm install` dedans ; mise à
   jour : `git submodule update --remote tools/pixel-fixer`). `node tools/pixelfix.js anim

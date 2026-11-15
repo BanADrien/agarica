@@ -590,6 +590,19 @@
   <script src="src/scenes/RacinesSuspenduesScene.js"></script>
   <script src="src/scenes/NidCoconsScene.js"></script>
   <script src="src/scenes/CanopeeMaladeScene.js"></script>
+  <!-- Nouvel éditeur de niveaux (index.html?editor ; ?editor=ancien garde l'ancien) : ses fichiers ne sont
+       chargés que dans ce mode (docs/production/EDITEUR_MODE_EMPLOI.md). L'heure dans l'adresse : toujours relus. -->
+  <script>
+    (function () {
+      var q = new URLSearchParams(location.search);
+      if (!q.has('editor') || q.get('editor') === 'ancien') return;
+      var t = '?t=' + Date.now();
+      document.write('<link rel="stylesheet" href="src/editeur/editeur.css' + t + '">');
+      ['ecriture', 'catalogue', 'noyau', 'scene', 'interface'].forEach(function (f) {
+        document.write('<script src="src/editeur/' + f + '.js' + t + '"><\/script>');
+      });
+    })();
+  </script>
   <script src="src/main.js"></script>
   <!-- En local seulement : purge UNE FOIS le cache du navigateur pour les scripts du jeu, puis recharge.
        Avant le serveur sans cache (tools/serveur_sans_cache.py, 2026-11-15), le navigateur gardait des

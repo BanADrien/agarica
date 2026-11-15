@@ -1579,6 +1579,37 @@ Rien dans l'histoire ne débloque encore ces ours : sans eux, le jeu se joue com
   débloque tout et pose une équipe d'ours ; la sauvegarde trouvée à l'entrée est remise en sortant
   (`zoneOursProtectSave`). Ennemi `mannequin` (immobile, inoffensif, PV affichés, se remonte seul).
 
+### Éditeur de niveaux v2, lot 1 (`src/editeur/`, 2026-11-15, rétro-compatible)
+Conception : `EDITEUR_V2_DESIGN.md` ; mode d'emploi : `EDITEUR_MODE_EMPLOI.md`. `index.html?editor` ouvre le nouvel
+éditeur, `?editor=ancien` l'ancien (`EditorScene.js`, inchangé). Ses fichiers ne sont chargés que dans ce mode
+(balise `document.write` d'`index.html`) ; le jeu normal ne les lit jamais.
+
+- **Fichiers** : `catalogue.js` (TABLE de données : onglets, genres d'éléments, vignettes, réglages, icônes),
+  `ecriture.js` (zone -> texte JavaScript, comparaison stricte), `noyau.js` (zone ouverte, historique, brouillon,
+  contrôles, enregistrement, Jouer), `scene.js` (affichage et souris), `interface.js` (HTML), `editeur.css`.
+- **Ajouter un élément à l'éditeur** : une ligne dans `catalogue.js`. Vignette = `{ id, onglet, groupe, nom, genre,
+  image, modele }` (`EDITEUR_ELEMENTS_FIXES`, ou les listes `EDITEUR_CREATURES` / `EDITEUR_ANIMAUX` /
+  `EDITEUR_PERSONNAGES` ; les décors viennent seuls de `DECOR_SECTIONS`, les objets à ramasser d'`ITEM_INFO`). Une
+  nouvelle clé de zone = un genre dans `EDITEUR_GENRES` : `{ nom, geo, champs: [{ cle, nom, type, … }] }`, `geo` étant
+  une géométrie de `EDITEUR_GEOS` (scene.js : `pieds`, `centre`, `rectCoin`, `liane`, `cases`…).
+- **Affichage** : `EditeurScene` appelle `buildLevelFromData` sur une copie de la zone sans `script`, `triggers`,
+  `zoneName`, `helpText`, musique ni `requires` / `forbids`, puis fige le monde (`currentLevelScene = null`,
+  `__storyFreeze`, physique en pause après 0,6 s). Reconstruite (`scene.restart()`) après chaque modification.
+- **Enregistrement** : `POST /__editeur/enregistrer` de `tools/dev_server.py` (`python tools/dev_server.py 8000` : sans
+  cache + enregistrement). Seule l'instruction `const NOM_DATA = {…};` du fichier est remplacée (en-tête et constantes
+  voisines gardés), après copie de secours dans `src/data/_backup/`. Toutes les clés ressortent dans leur ordre, le sol
+  en `groundRow(...)` ; avant d'écrire, l'éditeur relit le fichier tel qu'il serait (`essai: true`) et le compare à la
+  zone, clé par clé. Zone qu'il ne saurait pas réécrire à l'identique (fonction, nombre non fini, fichier qui retouche
+  la constante après sa déclaration) : lecture seule, avec la raison. Brouillon : `localStorage`,
+  `agarica-editeur-v2:brouillon:<zone>`. `--donnees DOSSIER` : essais sans toucher à `src/data/`.
+- **Jouer** : lance la vraie scène de la zone. En mode éditeur seulement, `noyau.js` remplace deux fonctions globales
+  du moteur : `resolveZoneData` (rend la zone de l'éditeur, et les brouillons des autres zones) et `writeSaveData`
+  (ne fait rien : la sauvegarde du joueur est lue, jamais réécrite). `Échap` : retour à l'éditeur, registre vidé.
+- **Contrôles en direct** : même test que `DIAG_JS` de `tools/verif.py` (cases qui ne se touchent que par un coin,
+  même exception `DIAGONALES_ACCEPTEES`), élément posé dans le sol ou hors de la zone.
+- Lots 2 et 3 (onglets Monde, Passages, Histoire) : place réservée dans `EDITEUR_ONGLETS` (`bientot: true`) ; les clés
+  `exits`, `entries`, `triggers`, `checkpoints`, `playerSpawn` sont gardées telles quelles en attendant.
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |
