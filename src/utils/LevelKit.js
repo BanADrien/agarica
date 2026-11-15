@@ -3852,6 +3852,57 @@ function atlasTileFor(solid, gx, gy) {
   return { tile, grass };
 }
 
+// Case de terre sous une herbe de BORD (grass_left / grass_right /
+// grass_single). Ces herbes ont un coin arrondi, la case un coin carré : 3
+// pixels de terre dépassaient au-dessus de l'herbe, en haut du côté exposé
+// (retour de l'utilisateur du 2026-11-15 : « les herbes ne recouvrent pas
+// tous les blocs de terre sur le rebord »). On ne retouche ni l'herbe ni
+// tuiles.png (dessins de l'utilisateur) : on fabrique une copie de la case
+// où ces pixels sont effacés, colonne par colonne, du haut de la case jusqu'au
+// premier pixel d'herbe. La terre s'arrête donc pile sous l'herbe. La hitbox
+// ne change pas. Renvoie la clé de texture (celle d'origine si rien à faire).
+const AUTOTILE_ATLAS_CORNER_COLUMNS = 6; // colonnes examinées depuis chaque bord exposé
+function atlasTileUnderGrass(scene, tile, grass) {
+  const base = `${AUTOTILE_ATLAS_PREFIX}${tile}`;
+  if (!grass || grass === 'mid') return base;
+  const key = `${base}:${grass}`;
+  if (scene.textures.exists(key)) return key;
+  const spec = AUTOTILE_ATLAS_GRASS[grass];
+  const grassKey = `${AUTOTILE_ATLAS_PREFIX}${spec.file}`;
+  if (!scene.textures.exists(base) || !scene.textures.exists(grassKey) || !scene.textures.createCanvas) return base;
+  const T = AUTOTILE_ATLAS_SOURCE_TILE;
+  const tileImg = scene.textures.get(base).getSourceImage();
+  const grassImg = scene.textures.get(grassKey).getSourceImage();
+  // Alpha de l'herbe, lu une fois sur un canevas de travail.
+  const work = document.createElement('canvas');
+  work.width = grassImg.width;
+  work.height = grassImg.height;
+  const wctx = work.getContext('2d');
+  wctx.drawImage(grassImg, 0, 0);
+  const alpha = wctx.getImageData(0, 0, work.width, work.height).data;
+  const grassAt = (x, y) => {
+    const gx = x - spec.dx; // l'herbe est décalée de `dx` par rapport à la case
+    if (gx < 0 || gx >= work.width || y < 0 || y >= work.height) return false;
+    return alpha[(y * work.width + gx) * 4 + 3] > 0;
+  };
+  const tex = scene.textures.createCanvas(key, T, T);
+  if (!tex) return base;
+  const ctx = tex.getContext();
+  ctx.drawImage(tileImg, 0, 0);
+  const columns = [];
+  if (grass === 'left' || grass === 'single') for (let x = 0; x < AUTOTILE_ATLAS_CORNER_COLUMNS; x++) columns.push(x);
+  if (grass === 'right' || grass === 'single') for (let x = T - AUTOTILE_ATLAS_CORNER_COLUMNS; x < T; x++) columns.push(x);
+  for (const x of columns) {
+    let y = 0;
+    while (y < work.height && !grassAt(x, y)) y += 1;
+    // Colonne jamais couverte par l'herbe : on la laisse (ce n'est pas un coin).
+    if (y > 0 && y < work.height) ctx.clearRect(x, 0, 1, y);
+  }
+  tex.refresh();
+  tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  return key;
+}
+
 // Équivalent de renderAutotileGrid pour la disposition 'atlas' (mêmes
 // paramètres, même valeur de retour, même hitbox d'une case par cellule et
 // mêmes faces internes désactivées). Différences : hitbox dont le haut est
@@ -3893,7 +3944,8 @@ function renderAtlasAutotileGrid(scene, groundGroup, cells, options = {}) {
     }
     // Case d'une branche : le corps ci-dessus, l'image est celle de la branche.
     if (options.noArt && options.noArt.has(gridCellKey(gx, gy))) continue;
-    const img = scene.add.image(cx, cy, `${AUTOTILE_ATLAS_PREFIX}${tile}`)
+    // Sous une herbe de bord : la case sans son coin qui dépassait de l'herbe.
+    const img = scene.add.image(cx, cy, atlasTileUnderGrass(scene, tile, grass))
       .setDisplaySize(GROUND_TILE_SIZE, GROUND_TILE_SIZE);
     if (isBackLayer) img.setTint(AUTOTILE_BACKLAYER_TINT).setAlpha(AUTOTILE_BACKLAYER_ALPHA);
     // Rendu de cohésion (LookKit) : corps de la case (masse sombre) ou sol de
