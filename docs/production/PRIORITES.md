@@ -19,6 +19,13 @@ d'autre. Un point terminé et commité sort de la liste ; l'historique Git le ga
 2026-11-10 : cadrage racines ↔ arène, écrans 120/144 Hz (à vérifier), entrée « Objets »
 du feu de camp retirée (doublon de l'inventaire).
 
+## Mission en cours : Monde V2 (demandée le 2026-11-16)
+
+Refaire toutes les zones : jeu plus gros, non linéaire, verrous vus avant la clé, sols (ours
+brun) et murs (grizzly) cassables, totems des formes qui n'en ont pas, zones cachées « SECRET ».
+Plan : `PLAN_MONDE_V2.md`. Étape en cours : le plan attend tes 5 décisions. Les lots A, B et C
+de la vague 3 (P3) sont absorbés par cette mission.
+
 ## P1 : gêne tous les joueurs
 
 Rien pour l'instant. Les diagonales vides du sol sont corrigées (forêts sombres 1 et 2) ;
