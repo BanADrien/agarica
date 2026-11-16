@@ -1,9 +1,16 @@
 ---
 name: codex-images
-description: Générer soi-même les images d'un lot de Legend of Agarica en lançant Codex sans fenêtre, puis les contrôler, les passer dans pixel-fixer et les montrer. À utiliser dès qu'un prompt d'images (docs/production/PROMPT_CODEX_n.md) est prêt ou qu'une image est à régénérer, au lieu de demander à l'utilisateur de coller le prompt dans VS Code.
+description: Générer soi-même les images de Legend of Agarica qui ne sont PAS des sprites de personnage (décors, tuiles, effets, icônes, interface, planches de lot) en lançant Codex sans fenêtre, puis les contrôler, les passer dans pixel-fixer et les montrer. Pour un sprite de personnage, d'animal, d'ennemi ou de boss, utiliser plutôt le skill pixel-art-forge.
 ---
 
 # Générer les images avec Codex, sans passer par l'utilisateur
+
+**Sprites de personnages, animaux, ennemis, boss : skill `pixel-art-forge`** (outil de
+l'utilisateur, sous-module `.claude/skills/pixel-art-forge`, dépôt BanADrien/asset-generator ;
+décision du 2026-11-16 : il remplace ce skill pour les sprites). Il fait 6 directions par essai,
+deux juges et des notes calées sur celles de l'utilisateur. Sur le PC « adrie », le Python de
+pgAdmin qu'il cite n'existe pas : utiliser `python -I` (Python 3.13 avec Pillow). Ce skill-ci
+reste pour le reste : décors, tuiles, effets, icônes, interface, lots du prompt Codex.
 
 Méthode validée par l'utilisateur le 2026-11-12 (« garde la méthode »). Codex utilise SON
 compte et son quota : on avance par petits essais, on ne régénère pas pour rien.

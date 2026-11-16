@@ -1,3 +1,6 @@
 [submodule "tools/pixel-fixer"]
 	path = tools/pixel-fixer
 	url = https://github.com/BanADrien/pixel-fixer.git
+[submodule ".claude/skills/pixel-art-forge"]
+	path = .claude/skills/pixel-art-forge
+	url = https://github.com/BanADrien/asset-generator.git
