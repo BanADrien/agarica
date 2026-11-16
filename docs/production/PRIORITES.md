@@ -24,7 +24,9 @@ du feu de camp retirée (doublon de l'inventaire).
 Refaire toutes les zones : jeu plus gros, non linéaire, verrous vus avant la clé, sols (ours
 brun) et murs (grizzly) cassables, totems des formes qui n'en ont pas, zones cachées « SECRET ».
 Plan refait de zéro le 2026-11-16 (33 zones, ordre libre après le loup) : `PLAN_MONDE_V2.md`,
-carte `monde_v2/carte.png`, contrôle `python tools/monde_v2.py`. Étape en cours : validation de la carte. Les lots A, B et C
+carte `monde_v2/carte.png`, contrôle `python tools/monde_v2.py`. Carte validée le 2026-11-16 (« construis, mais garde l'ancienne version ») : ancienne version
+gardée (tag `demo-v1-avant-monde-v2`, branche `feature/demo-histoire`), travail sur la branche
+`monde-v2`. Étape en cours : 2, les pièces de jeu (`MONDE_V2_PIECES.md`), puis les zones en blocs. Les lots A, B et C
 de la vague 3 (P3) sont absorbés par cette mission.
 
 ## P1 : gêne tous les joueurs
