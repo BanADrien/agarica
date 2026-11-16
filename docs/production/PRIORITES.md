@@ -23,7 +23,8 @@ du feu de camp retirée (doublon de l'inventaire).
 
 Refaire toutes les zones : jeu plus gros, non linéaire, verrous vus avant la clé, sols (ours
 brun) et murs (grizzly) cassables, totems des formes qui n'en ont pas, zones cachées « SECRET ».
-Plan : `PLAN_MONDE_V2.md`. Étape en cours : le plan attend tes 5 décisions. Les lots A, B et C
+Plan refait de zéro le 2026-11-16 (33 zones, ordre libre après le loup) : `PLAN_MONDE_V2.md`,
+carte `monde_v2/carte.png`, contrôle `python tools/monde_v2.py`. Étape en cours : validation de la carte. Les lots A, B et C
 de la vague 3 (P3) sont absorbés par cette mission.
 
 ## P1 : gêne tous les joueurs
