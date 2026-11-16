@@ -1,7 +1,8 @@
 # Monde V2 : la nouvelle carte, conçue de zéro
 
 Version du 2026-11-16, après « on peut rien faire de bien sur une base bancale, refais tout un plan,
-toute une carte de 0 ». Rien ne part des zones actuelles ; seuls les mécaniques, les personnages et
+toute une carte de 0 », puis « je veux beaucoup plus de zones intermédiaires de pure exploration »
+(15 zones ajoutées dans la forêt sombre, sous la forêt, le grand arbre, les escarpements et le ciel). Rien ne part des zones actuelles ; seuls les mécaniques, les personnages et
 l'art des biomes sont repris. Rien n'est encore changé dans le jeu.
 
 **Fichiers :**
@@ -13,6 +14,8 @@ l'art des biomes sont repris. Rien n'est encore changé dans le jeu.
 **Tes réponses du 2026-11-16 :**
 - trame souple : on peut déplacer des événements, le fond de l'histoire reste ;
 - durée visée : environ 1 h 30 pour l'histoire, plus 1 h de secrets ;
+- plus de zones de pure exploration : 3 à 4 de plus dans chacune des quatre régions qui suivent le
+  bosquet ;
 - formes obligatoires : « au plus naturel », mais surtout pas une ligne droite ;
 - bosquet : retour en cachette.
 
@@ -21,8 +24,8 @@ l'art des biomes sont repris. Rien n'est encore changé dans le jeu.
 1. **Chaque zone a une raison d'exister** : une scène de l'histoire, une forme à obtenir, un verrou à
    montrer, un raccourci ou une récompense. Aucune zone de remplissage ; les fiches du § 7 donnent la
    raison de chacune.
-2. **On voit le verrou avant d'avoir la clé.** Chaque forme obligatoire est vue fermée dans 2 à
-   7 zones avant d'être obtenue (mesuré par le script, § 9). Xara commente chaque passage fermé.
+2. **On voit le verrou avant d'avoir la clé.** Chaque capacité obligatoire est vue fermée dans 3 à
+   13 zones avant d'être obtenue (mesuré par le script, § 9). Xara commente chaque passage fermé.
 3. **On se sert d'une forme tout de suite** :
    - la sortie de la tanière du loup demande le loup ;
    - le combat de Kainati se joue dans les lianes, juste après le totem du singe ;
@@ -98,7 +101,11 @@ Le crapaud reste hors du monde, comme tu l'as dit.
 
 ![Carte du monde V2](monde_v2/carte.png)
 
-- **33 zones** : 21 sur le chemin de l'histoire, 8 facultatives et 4 zones cachées.
+- **48 zones** : 25 sur le chemin de l'histoire, 19 facultatives et 4 zones cachées.
+- **15 zones de pure exploration** ont été ajoutées (marquées ✚ dans les fiches) :
+  - 4 sont **sur le chemin**, entre deux étapes de l'histoire : fourrés, boyaux, éboulis, mer de
+    nuages ;
+  - 11 sont **des boucles** qui relient deux chemins, avec une récompense au bout.
 - **8 régions** : Bosquet, Forêt sombre, Sous la forêt, Grand arbre, Escarpements et ciel, Marais,
   Forêt corrompue, Profondeurs.
 - La géographie se tient :
@@ -108,26 +115,28 @@ Le crapaud reste hors du monde, comme tu l'as dit.
   - la falaise des escarpements surplombe le marais ;
   - la corruption s'étend à l'est et descend dans les profondeurs ;
   - la plante pousse sur un rocher au-dessus de la corruption, la seule chose qu'elle ne touche pas.
-- Une case de la carte vaut un écran (960 × 576 px). L'ensemble fait environ 170 écrans, contre
+- Une case de la carte vaut un écran (960 × 576 px). L'ensemble fait environ 215 écrans, contre
   environ 100 aujourd'hui.
 
 ## 5. Le parcours : un ordre libre
 
 ```
-Prologue (bosquet) ── bannissement ── lisière ── carrefour (Xara) ── galeries ── LOUP
-                                                                                  │
-            ┌───────────────────┬────────────────────┬───────────────────┬────────┘
-            ▼                   ▼                    ▼                   ▼
-   SINGE (arbre, Kainati)   AIGLE (escarpements)   GRIZZLY (tanière     Morgat, 1re visite
-            │                   │                   des ours)            (facultative)
-            │                   ▼                    │                   │
-            │              PLANTE (jardin, Amanite)  │                   │
-            │                   ▼                    │                   │
-            │              RÉPULSIF (Morgat) ◄───────┼───────────────────┘
-            ▼                   ▼                    ▼
-            └───────► FORÊT CORROMPUE (mousse + grizzly + singe) ◄─┘
-                                ▼
-                 Ghil't (défaite) ── profondeurs : PAPILLON ── Ghil't soigné ── fin
+Prologue (bosquet) ── lisière ── fourrés ── carrefour (Xara) ── galeries ── boyaux ── LOUP
+                                                                                       │
+          ┌────────────────────┬──────────────────────┬───────────────────┬────────────┘
+          ▼                    ▼                      ▼                   ▼
+   SINGE (arbre,        AIGLE (éboulis,         GRIZZLY (tanière     Morgat, 1re visite
+   Kainati)             escarpements)           des ours)            (facultative)
+          │                    ▼                      │                   │
+          │             mer de nuages                 │                   │
+          │                    ▼                      │                   │
+          │             PLANTE (jardin, Amanite)      │                   │
+          │                    ▼                      │                   │
+          │             RÉPULSIF (Morgat) ◄───────────┼───────────────────┘
+          ▼                    ▼                      ▼
+          └──────────► FORÊT CORROMPUE (mousse + grizzly + singe)
+                               ▼
+              Ghil't (défaite) ── profondeurs : PAPILLON ── Ghil't soigné ── fin
 ```
 
 Après le loup, il y a quatre buts dans l'ordre qu'on veut. La forêt corrompue demande les trois formes
@@ -135,88 +144,104 @@ et le répulsif. Le script le vérifie : le singe, l'aigle et le grizzly ne dema
 
 Trois exemples de parties :
 - **Par l'arbre** : loup → racines → tronc → cime (singe) → îles → on tombe aux escarpements (aigle) →
-  jardin (plante) → marais → Morgat (répulsif) → mur de pierre fermé → retour à la tanière des ours
+  mer de nuages → jardin (plante) → marais → Morgat (répulsif) → mur de pierre fermé → retour à la tanière des ours
   (grizzly) → forêt corrompue.
-- **Par la falaise** : loup → escarpements (aigle) → îles → jardin (plante) → Morgat → mur de pierre →
+- **Par la falaise** : loup → éboulis → escarpements (aigle) → îles → mer de nuages → jardin (plante) → Morgat → mur de pierre →
   tanière des ours → forêt corrompue : il faut des lianes → retour à l'arbre (singe) → forêt corrompue.
 - **Le curieux** : loup → il casse aussitôt le sol de la tanière (grizzly) → les caves du bosquet
   (panda, le père) → le reste.
 
 Durée estimée, au premier passage :
-- **histoire** : 109 minutes, plus les allers-retours, soit 1 h 45 à 2 h ; un peu au-dessus de ton
-  1 h 30 ;
-- **facultatif** : 35 minutes de zones, plus les cœurs, les papillons et les retours, soit environ 1 h.
+- **histoire** : 117 minutes, plus les allers-retours, soit environ 2 h 10. C'est au-dessus de ton
+  1 h 30, à cause des 4 zones d'exploration ajoutées sur le chemin ;
+- **facultatif** : 70 minutes de zones, plus les cœurs, les papillons et les retours, soit environ
+  1 h 30.
 
 Ce sont des estimations : on resserrera au chronomètre pendant la construction en blocs.
 
 ## 6. Ce qu'on trouve
 
-- **Cœurs** : on part avec 3, et il y a **7 graines de cœur**, chacune derrière une capacité
+Chaque zone d'exploration a au moins une récompense.
+
+- **Cœurs** : on part avec 3, et il y a **8 graines de cœur**, chacune derrière une capacité
   différente :
 
   | Où | Ce qu'il faut |
   |---|---|
-  | lisière | loup |
+  | sentiers perdus | loup |
   | source | second saut, en revenant par les caves |
   | cercle de lune | second saut |
   | tronc | grizzly |
   | nid de Maexxna | ours-hibou |
-  | lac englouti | pieuvre |
+  | rivière souterraine | pieuvre |
+  | mer de nuages | aigle |
   | puits des cocons | papillon |
 
   Le passif des ursidés en ajoute un.
-- **Papillons perdus de Morgat : 9**, au plus un par zone, chacun derrière un petit détour.
-  - Tous les 3 papillons, la compétence du papillon gagne un niveau.
+- **Papillons perdus de Morgat : 12**, au plus un par zone, presque tous dans les zones
+  d'exploration.
+  - Tous les 3 papillons, la compétence du papillon gagne un niveau (4 niveaux).
   - Morgat les reconnaît : ce sont les siens, partis chercher des plantes.
+- **Coffres d'Éclats de lune : 14**, souvent derrière une capacité obtenue plus tard. Les Éclats
+  s'achètent chez **Tamarin**, le marchand, qui s'installe au carrefour quand on revient avec le loup.
+  On en gagne aussi sur les ennemis.
 - **Cartes** :
   - Geralt en donne 4 (forêt et dessous, arbre, marais, forêt corrompue), Kainati celle du ciel ;
   - le bosquet est connu dès le départ ;
   - les profondeurs restent sans carte.
 - **Feux de camp : 9** : village, carrefour, racines, cime, îles, tanière des ours, hutte, cœur corrompu,
   profondeurs.
-- **Éclats de lune** :
-  - on en gagne sur les ennemis et dans les coffres (fond du bassin de la source : pieuvre ;
-    sous la dalle des racines : ours-hibou) ;
-  - **Tamarin**, le marchand, s'installe au carrefour quand on revient avec le loup.
 
 ## 7. Les zones, une par une
 
 Taille en écrans (largeur × hauteur). « Vu » : les verrous qu'on y voit avant d'avoir la clé.
+✚ : zone de pure exploration ajoutée.
 
 ### Bosquet d'Émeraude : prologue, retour en cachette, épilogue
 
 | Zone | Pourquoi elle existe | Vu, sorties |
 |---|---|---|
 | **Le village** (4×1) | Prologue : marcher, sauter, couper les ronces de mousse à la dague. Le père confie le talisman de l'ours. Feu de camp. On y revient pour l'épilogue. | Sorties vers la source (ouest), les hauts (en haut) et la porte de l'Est. Après le bannissement, tout est barré jusqu'à la fin. |
-| **La source** (2×2) | Le bassin est étouffé par la mousse : on casse un sol fissuré avec l'ours pour libérer l'eau. C'est le tutoriel de l'ours, et l'eau qui recoule est la récompense. Premier petit monstre de mousse. | Dès le prologue, on voit : un cœur sur une corniche trop haute (second saut), le fond du bassin où l'eau s'engouffre (pieuvre : un coffre), une porte barrée vers les caves. |
+| **La source** (2×2) | Le bassin est étouffé par la mousse : on casse un sol fissuré avec l'ours pour libérer l'eau. C'est le tutoriel de l'ours, et l'eau qui recoule est la récompense. Premier petit monstre de mousse. | Dès le prologue, on voit : un cœur sur une corniche trop haute (second saut), le fond du bassin où l'eau s'engouffre (pieuvre : coffre, et la rivière souterraine), une porte barrée vers les caves. |
 | **Les hauts du bosquet** (2×2) | La nuit, Agarica voit Amanite monter au sanctuaire : vol de l'idole, mensonge, découverte, bannissement. On y apprend le petit saut. | Se rouvre après la fin. |
-| **Les caves du bosquet** (4×1, facultatif) | Le retour en cachette, par le mur fissuré des galeries (grizzly). On entend le père défendre sa fille à travers le plancher. Sur l'autel des anciens guérisseurs, le talisman du panda. Papillon 9. | On débarre de l'intérieur la porte de la source : elle redevient visitable (cœur, coffre). |
+| **Les caves du bosquet** (4×1, facultatif) | Le retour en cachette, par le mur fissuré des champignonnières (grizzly) ou par la rivière (pieuvre). On entend le père défendre sa fille à travers le plancher. Sur l'autel des anciens guérisseurs, le talisman du panda. Papillon 12. | On débarre de l'intérieur la porte de la source : elle redevient visitable. |
 
 ### Forêt sombre
 
 | Zone | Pourquoi elle existe | Vu, sorties |
 |---|---|---|
-| **La lisière** (3×1) | Bannie, seule, la nuit : premiers vrais combats (loups sanguinaires). La porte de l'Est est barrée derrière soi. | Un cœur de l'autre côté d'un ravin trop large (loup). |
-| **Le carrefour** (3×2) | La clairière centrale, où l'on repasse souvent. Rencontre de Xara, feu de camp, plus tard Tamarin. Au loin dans le ciel, le rocher de lune où brille la plante. | Le grand ravin à l'est (loup) et la corniche de la canopée (second saut). Le sol sonne creux : Xara le fait remarquer, on le casse avec l'ours et on descend aux galeries. |
-| **Les ravins** (3×1) | Après le loup : longs sauts, pistes et plateformes cachées. Geralt et son combat ridicule : carte de la forêt. Papillon 2, par les plateformes cachées. | Bloc SECRET : terre meuble (canidé). On repart vers les racines. |
-| **La canopée et le cercle de lune** (6×1, facultatif) | Les branches au-dessus du carrefour, jusqu'au tronc : un raccourci. Le cercle de lune : pierres levées et fresque des formes, l'histoire du Cercle de la Lune. Cœur, papillon 4. | Des plateformes fantômes montent vers le nid du hibou (loup puis second saut). |
-| **Le nid du hibou** (2×2, facultatif) | Un nid géant dans les hautes branches, avec le totem de l'ours-hibou. On en sort en cassant la dalle du nid en retombant : premier usage. | — |
+| **La lisière** (3×1) | Bannie, seule, la nuit : premiers vrais combats (loups sanguinaires). La porte de l'Est est barrée derrière soi. | Un coffre de l'autre côté d'un ravin trop large (loup). On peut grimper vers les hautes futaies. |
+| ✚ **Les hautes futaies** (2×3, facultatif) | Une montée sur des troncs couchés au-dessus de la lisière, pour qui veut grimper dès le début. En haut, le premier panorama : le grand arbre au loin, et la lueur de la plante encore plus loin. Le joueur voit tout de suite qu'il y a un monde à explorer. Coffre au sommet par les plateformes cachées (loup). | Le haut rejoint la canopée (second saut). |
+| ✚ **Les fourrés** (3×2, chemin) | Entre la lisière et le carrefour, sur deux étages : un sentier bas sous les ronces, un sentier haut dans les branches. On y apprend à fouiller : une haie de ronces cède à la dague et cache le papillon 1. | Coffre sur la haute branche (second saut). Bloc SECRET : terre meuble dans un talus (canidé). Un puits de champignons descend aux champignonnières ; on le remonte avec le second saut. |
+| **Le carrefour** (3×3) | La clairière centrale, où l'on repasse souvent. Rencontre de Xara, feu de camp, plus tard Tamarin. | Le grand ravin à l'est (loup), la corniche de la canopée (second saut), les sentiers perdus au nord-est. Le sol sonne creux : Xara le fait remarquer, on le casse avec l'ours et on descend aux galeries. |
+| ✚ **Les sentiers perdus** (5×2, facultatif) | Un labyrinthe de sentiers. On y entre dès le début, mais les fausses pistes ramènent au carrefour : c'est le loup qui « distingue une fausse piste d'une vraie ». Avec lui, les empreintes montrent la vraie piste, vers un cœur au centre et vers le pied du tronc : un second chemin vers l'arbre. | La vraie piste (loup). |
+| **Les ravins** (4×1) | Après le loup : longs sauts, pistes et plateformes cachées. Geralt et son combat ridicule : carte de la forêt. | On repart vers les racines. |
+| **La canopée et le cercle de lune** (7×1, facultatif) | Les branches au-dessus de la forêt, des futaies jusqu'aux branches basses de l'arbre. Le cercle de lune : pierres levées et fresque des formes, l'histoire du Cercle de la Lune. Cœur. | Des plateformes fantômes montent vers le bois des toiles (loup). |
+| ✚ **Le bois des toiles** (3×2, facultatif) | Des arbres couverts de toiles, où l'on avance lentement entre les fils. Les araignées s'écartent devant Xara sans qu'elle explique pourquoi : un indice de son secret. Le papillon 2 est pris dans une toile. | Le nid du hibou plus haut (second saut). |
+| **Le nid du hibou** (2×2, facultatif) | Un nid géant dans les plus hautes branches, avec le totem de l'ours-hibou. On en sort en cassant la dalle du nid en retombant : premier usage. | — |
 
 ### Sous la forêt
 
 | Zone | Pourquoi elle existe | Vu, sorties |
 |---|---|---|
-| **Les galeries** (5×1) | Les tunnels sous le carrefour, avec araignées et toiles. Un escalier de racines permet de remonter au trou. | Mur fissuré à l'ouest (grizzly : les caves). Dalle gravée d'araignées (ours-hibou : nid de Maexxna). Mousse sur une niche (répulsif : papillon 1). Bloc SECRET : fente minuscule (insecte). |
-| **La tanière du loup** (2×1) | Le loup alpha garde le totem du loup. On ressort par le haut grâce aux plateformes cachées : on se sert du loup aussitôt obtenu. | Un sol fissuré (ours) mène à la tanière des ours. On peut y descendre tout de suite, et en remonter sans le loup. |
-| **La tanière des ours** (4×1) | L'ancienne tanière des ours du peuple d'Agarica : griffures et fresques. De longs sauts (loup) mènent au totem du grizzly, avec un feu de camp à côté pour changer de forme. Papillon 7. | Sortie est : un mur fissuré (grizzly) vers les racines, qu'on voit aussi depuis les racines. C'est un raccourci. |
+| ✚ **Les champignonnières** (4×1, facultatif) | Des champignons géants lumineux sous la lisière et les fourrés : une boucle entre les galeries et la surface. Papillon 3 derrière la mousse (répulsif). | Mur fissuré à l'ouest (grizzly : les caves du bosquet). Berge de la rivière (pieuvre). Le puits des fourrés, en haut (second saut). |
+| **Les galeries** (5×1) | Les tunnels sous le carrefour, avec araignées et toiles. C'est le nœud du dessous : champignonnières à l'ouest, boyaux à l'est, grotte aux cristaux en dessous. Un escalier de racines permet de remonter au trou. | Coffre derrière la mousse (répulsif). Sol fissuré vers la grotte aux cristaux (ours). |
+| ✚ **Les boyaux** (2×1, chemin) | Des tunnels étroits juste avant la tanière : on entend hurler le loup alpha, des loups tendent des embuscades. La tension monte avant le mini-boss. Coffre sous un sol fissuré. | — |
+| **La tanière du loup** (2×1) | Le loup alpha garde le totem du loup. On ressort par le haut grâce aux plateformes cachées : on se sert du loup aussitôt obtenu. | Un sol fissuré (ours) mène à la tanière des ours. On peut en remonter sans le loup. |
+| ✚ **La grotte aux cristaux** (4×2, facultatif) | Une grande grotte éclairée par des cristaux de lune, sous les galeries. Elle relie les galeries, la tanière des ours et la rivière. Papillon 4. | Dalle gravée d'araignées (ours-hibou : nid de Maexxna). Eau (pieuvre : rivière). Bloc SECRET : fente minuscule entre les cristaux (insecte). |
+| **La tanière des ours** (5×1) | L'ancienne tanière des ours du peuple d'Agarica : griffures et fresques. De longs sauts (loup) mènent au totem du grizzly, avec un feu de camp à côté pour changer de forme. On y entre par la tanière du loup ou par la grotte aux cristaux. | Sortie est : un mur fissuré (grizzly) vers les racines, qu'on voit aussi depuis les racines. C'est un raccourci. |
+| ✚ **La rivière souterraine** (10×1, facultatif) | La rivière qui part de la source du bosquet et file sous toute la forêt, à la nage (pieuvre). La pieuvre y gagne une vraie utilité : un réseau rapide entre la source, les caves, les champignonnières et la grotte aux cristaux. Cœur dans une grotte noyée. | Bloc SECRET : un siphon au courant trop fort (poisson). |
 | **Le nid de Maexxna** (2×1, facultatif) | Sous la dalle, la salle du trône d'une reine araignée. Les fresques montrent une araignée couronnée aux yeux de Xara. Xara : « Ne restons pas ici. » Cœur. | — |
 
 ### Grand arbre
 
 | Zone | Pourquoi elle existe | Vu, sorties |
 |---|---|---|
-| **Les racines** (3×3) | Le pied de l'arbre : ponts et tunnels de racines sur trois étages. Feu de camp. Geralt ne sait pas grimper : il donne la carte de l'arbre et reste en bas. L'arche de l'épreuve est ici. | Sorties : tronc (en haut), escarpements (à l'est, en haut), marais (à l'est, en bas). Lianes trop hautes (singe). Noix suspendue (pierre : papillon 3). Dalle (ours-hibou : coffre). Mur fissuré de la tanière des ours. |
-| **Le tronc** (1×4) | L'intérieur creux de l'arbre : la grande montée, avec des singes corrompus. | Porte de la canopée (second saut). Mur fissuré (grizzly : cœur). Bloc SECRET : paroi lisse (félin). |
+| **Les racines** (3×3) | Le pied de l'arbre : ponts et tunnels de racines sur trois étages. Feu de camp. Geralt ne sait pas grimper : il donne la carte de l'arbre et reste en bas. L'arche de l'épreuve est ici. | Sorties : tronc (en haut), éboulis (à l'est), marais (à l'est, en bas), racines profondes (en bas). Noix suspendue (pierre : coffre). Dalle (ours-hibou : coffre). Mur fissuré de la tanière des ours. |
+| ✚ **Les racines profondes** (3×1, facultatif) | Les racines plongent dans une eau noire, et l'on voit la mousse remonter par l'eau jusque dans l'arbre : c'est ce qui le rend malade. Papillon 5. | L'eau au bout des racines mène au lac englouti (pieuvre). |
+| **Le tronc** (1×4) | L'intérieur creux de l'arbre : la grande montée, avec des singes corrompus. | Branches basses (second saut). Village des singes. Mur fissuré (grizzly : cœur). Bloc SECRET : paroi lisse (félin). Les sentiers perdus arrivent à son pied (loup). |
+| ✚ **Les branches basses** (5×1, facultatif) | De longues branches au-dessus du vide, avec des corbeaux, entre la canopée et le tronc. Le raccourci entre la forêt et l'arbre devient un parcours. Coffre au bout de la plus longue branche. | — |
+| ✚ **Le village des singes** (3×2, facultatif) | Des huttes dans les branches, à mi-hauteur du tronc. Avant Kainati, les singes sont corrompus et attaquent ; après, ils sont amis et parlent de leur roi. Papillon 6, coffre dans la plus haute hutte (singe). | Il relie l'arbre aux escarpements par les lianes (singe) ou au plané (aigle) : une boucle entre l'arbre et la falaise. |
 | **La cime de Kainati** (3×2) | Le totem du singe s'allume, Kainati attaque. On le combat dans les lianes, on l'épargne, et il donne la carte du ciel. Feu de camp. | Lianes de la couronne vers les îles (singe). |
 | **L'épreuve du singe** (poche, facultatif) | Le monde des ancêtres, par l'arche des racines : une course de lianes sans toucher le sol, plus courte qu'aujourd'hui. Talisman du singe : la pierre. | — |
 
@@ -224,8 +249,12 @@ Taille en écrans (largeur × hauteur). « Vu » : les verrous qu'on y voit avan
 
 | Zone | Pourquoi elle existe | Vu, sorties |
 |---|---|---|
+| ✚ **L'éboulis** (2×1, chemin) | Le pied de la falaise, couvert de rochers tombés, entre les racines et les escarpements. Coffre derrière un mur fissuré (grizzly). | On peut sauter dans le marais en contrebas. |
 | **Les escarpements** (2×5) | Une falaise à l'est de l'arbre. On grimpe sans forme spéciale ; l'aire de l'aigle (totem) demande un saut de loup. D'en haut, on se laisse tomber : c'est la redescente rapide depuis le ciel. | La colonne de courant d'air vers les îles (aigle), visible dès la première visite. |
-| **Les îles flottantes** (5×2) | Les îles au-dessus des nuages : des lianes à l'ouest (depuis la cime), des courants d'air à l'est. Feu de camp pour changer entre singe et aigle. Papillon 5. | Le rocher de lune derrière un vide immense (aigle). Un courant d'air vers les nuages (pic gelé). |
+| ✚ **Les corniches aux corbeaux** (2×3, facultatif) | La face est de la falaise, avec des nids de corbeaux, qui descend jusqu'à la hutte de Morgat. Papillon 7 dans un nid. C'est une boucle : on descend librement, on remonte par le courant d'air derrière la hutte (aigle). | — |
+| **Les îles flottantes** (5×2) | Les îles au-dessus des nuages : des lianes à l'ouest (depuis la cime), des courants d'air à l'est. Feu de camp pour changer entre singe et aigle. Papillon 8. | Les ruines célestes au-dessus (singe ou aigle). La mer de nuages à l'est (aigle). |
+| ✚ **Les ruines célestes** (3×2, facultatif) | Les ruines des premiers druides, sur des rochers flottants. Une fresque raconte comment ils ont lié l'esprit des bêtes aux totems : d'où viennent les formes d'Agarica. Papillon 9, coffre de l'autel. | — |
+| ✚ **La mer de nuages** (4×1, chemin) | Avant le jardin, un parcours au plané d'un nuage à l'autre, avec des corbeaux et des courants : l'examen de l'aigle. Cœur sur le nuage le plus haut. | Le pic gelé, par un courant d'air (aigle). |
 | **Le jardin de lune** (2×1) | Le rocher où pousse la plante que la mousse évite. Amanite est là : les deux amies veulent toujours sauver la forêt, mais plus de la même façon. On prend une pousse. | Retour au plané, ou en tombant par les escarpements. |
 | **Le pic gelé** (2×2, facultatif) | Au-dessus des nuages, du givre et du silence. Talisman de l'ours polaire. | — |
 
@@ -233,15 +262,15 @@ Taille en écrans (largeur × hauteur). « Vu » : les verrous qu'on y voit avan
 
 | Zone | Pourquoi elle existe | Vu, sorties |
 |---|---|---|
-| **Le marais** (5×2) | Un bassin brumeux sous les escarpements : passerelles, crapauds, eau profonde. L'îlot du totem de la pieuvre s'atteint par les lianes (singe) ou sur la glace (ours polaire). Geralt est chez les crapauds : carte du marais. Papillon 6, au milieu de la mare. | L'eau profonde (pieuvre : lac englouti). |
+| **Le marais** (5×2) | Un bassin brumeux sous les escarpements : passerelles, crapauds, eau profonde. L'îlot du totem de la pieuvre s'atteint par les lianes (singe) ou sur la glace (ours polaire). Geralt est chez les crapauds : carte du marais. Papillon 10, au milieu de la mare. | L'eau profonde (pieuvre : lac englouti). |
 | **La hutte de Morgat** (2×2) | Une hutte pleine de papillons. Sans la plante, Morgat explique ce qu'il faut et montre le totem de poche cassé ; avec la plante, elle prépare le répulsif. Feu de camp. | Dès la première visite : le mur de mousse derrière la hutte (répulsif, qui sert aussitôt) et la barrière corrompue en dessous (papillon : puits des cocons). |
-| **Le lac englouti** (4×1, facultatif) | Sous le marais, à la nage (pieuvre) : des ruines englouties et un cœur. | Bloc SECRET : un courant trop fort à remonter (poisson). |
+| **Le lac englouti** (4×1, facultatif) | Sous le marais, à la nage (pieuvre) : des ruines englouties et un coffre. On y arrive aussi par les racines profondes. | — |
 
 ### Forêt corrompue et profondeurs
 
 | Zone | Pourquoi elle existe | Vu, sorties |
 |---|---|---|
-| **La lisière morte** (3×1) | Arbres morts et créatures corrompues. Des cadavres percés par la lance d'Amanite : elle est passée avant. Geralt donne la carte de la forêt corrompue. Papillon 8. | Un mur fissuré (grizzly), obligatoire. |
+| **La lisière morte** (3×1) | Arbres morts et créatures corrompues. Des cadavres percés par la lance d'Amanite : elle est passée avant. Geralt donne la carte de la forêt corrompue. Papillon 11. | Un mur fissuré (grizzly), obligatoire. |
 | **Le cœur corrompu** (3×2) | Des fosses de mousse mortelle sous la canopée morte, qu'on franchit par les lianes (singe). Feu de camp à l'entrée, avant Ghil't. | Le puits vers les profondeurs, fermé par des barrières corrompues (papillon). |
 | **L'antre de Ghil't** (2×1) | Premier combat : défaite imposée, la chute. Second combat : le soin au papillon. Amanite l'achève, Geralt arrive, puis l'épilogue au village. | — |
 | **Les profondeurs** (4×2) | On se réveille dans le noir parmi les papillons ; le bocal d'antidote et le totem de poche donnent le papillon. Feu de camp. On remonte en soignant des créatures et des barrières corrompues : on apprend le papillon en s'en servant. Plus bas, une racine noire qui pulse : la mousse vient de plus profond. | Sortie haute : le puits vers le cœur corrompu (papillon). |
@@ -254,10 +283,10 @@ fermée par un **bloc SECRET** : un rectangle provisoire où est écrit « SECRE
 
 | Zone | Entrée | Forme attendue |
 |---|---|---|
-| Le terrier | terre meuble, dans les ravins | un canidé qui creuse (renard ou blaireau) |
-| La fente | fente minuscule, dans les galeries | un insecte |
-| La paroi | paroi lisse, dans le tronc | un félin qui griffe |
-| Le courant | courant trop fort, au bout du lac englouti | un poisson |
+| Le terrier | terre meuble dans un talus des fourrés | un canidé qui creuse (renard ou blaireau) |
+| La fente | fente minuscule entre les cristaux de la grotte | un insecte |
+| La paroi | paroi lisse dans le tronc | un félin qui griffe |
+| Le siphon | courant trop fort dans la rivière souterraine | un poisson |
 
 ## 8. Ce qu'il faut fabriquer
 
@@ -304,7 +333,7 @@ fermée par un **bloc SECRET** : un rectangle provisoire où est écrit « SECRE
 
 `python tools/monde_v2.py` vérifie la carte avant qu'on construise quoi que ce soit. Résultat actuel :
 - **géométrie** : aucune zone ne se chevauche, et chaque passage relie deux zones qui se touchent ;
-- **fin** : atteignable depuis le bannissement. 29 zones sur 33 sont atteignables ; les 4 autres sont
+- **fin** : atteignable depuis le bannissement. 44 zones sur 48 sont atteignables ; les 4 autres sont
   les zones cachées, fermées exprès ;
 - **obligatoires** : ours brun, loup, grizzly, singe, aigle, répulsif, papillon ;
 - **prérequis** : le singe, l'aigle et le grizzly ne demandent que le loup (c'est l'ordre libre). La
@@ -313,15 +342,18 @@ fermée par un **bloc SECRET** : un rectangle provisoire où est écrit « SECRE
 
   | Capacité | Zones où on la voit avant de l'avoir |
   |---|---|
-  | loup | 4 |
-  | grizzly | 4 |
-  | singe | 7 |
-  | aigle | 5 |
-  | répulsif | 2 |
+  | loup | 8 |
+  | grizzly | 5 |
+  | singe | 13 |
+  | aigle | 11 |
+  | répulsif | 3 |
   | papillon | 4 |
 
-- **changements de forme** : la tanière des ours (loup puis grizzly), les racines et les îles (deux
-  formes aériennes) ont un feu de camp dans la zone ou à côté.
+- **changements de forme** : la tanière des ours et le tronc (loup et grizzly), les racines et les îles
+  (deux formes aériennes) ont un feu de camp dans la zone ou à côté.
+
+Le script a déjà servi : en ajoutant les zones, il a trouvé qu'une chute des sentiers perdus dans les
+ravins permettait d'atteindre l'arbre sans le loup. La chute a été retirée.
 
 Le script redessine la carte à chaque modification de `monde.json`.
 
@@ -351,6 +383,6 @@ Tout se fait sur une nouvelle branche ; la démo actuelle reste jouable en atten
 
 1. La carte et l'ordre libre (§ 4 et 5).
 2. Les 11 changements d'histoire (§ 2).
-3. La durée : environ 1 h 45 à 2 h pour l'histoire. On garde, ou on retire une zone ?
+3. La durée : environ 2 h 10 pour l'histoire et 1 h 30 de secrets. On garde, ou on raccourcit ?
 4. Les noms des zones.
 5. Les formes attendues des quatre zones cachées (§ 7).
