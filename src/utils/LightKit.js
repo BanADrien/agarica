@@ -94,6 +94,7 @@ struct Lumiere {
   vec3 position;   // x, y : repère natif affiché du sprite (y vers le bas) ; z : profondeur native
   vec3 couleur;    // couleur x intensité
   float portee;    // portée native
+  vec3 masque;     // x0, x1 (x du MONDE), actif : la lampe ne compte que d'un côté (soleil dehors)
 };
 const int kMaxLights = %LIGHT_COUNT%;
 uniform sampler2D uMainSampler;   // image du jeu (objet sans carte)
@@ -112,6 +113,9 @@ uniform vec2 uTaille;             // taille native (ou de la frame sans carte)
 uniform vec2 uTailleTex;          // taille de l'image source
 uniform vec2 uCoin;               // coin de la frame dans l'image source
 uniform vec2 uGrille, uPas;       // grille native dans la frame : coin et taille d'un pixel natif
+uniform vec3 uMondeX;             // x du monde d'un pixel natif = dot(vec3(t + 0.5, 1), uMondeX)
+uniform vec3 uAmbiance2;          // ambiance au bout du dégradé (uAmbZone)
+uniform vec3 uAmbZone;            // x0, x1 (monde), actif : ambiance uAmbiance -> uAmbiance2 en x
 varying vec2 outTexCoord;
 varying float outTexId;
 varying float outTintEffect;
@@ -137,6 +141,14 @@ vec3 normaleLisse(vec2 ts) {
   return length(acc) > 0.001 ? normalize(acc) : vec3(0.0, 0.0, 1.0);
 }
 ${FRAG_ECLAIRAGE}
+
+// Poids d'une lampe masquée selon le x du monde : 0 avant x0, 1 après x1 (ou l'inverse si x0 > x1),
+// passage doux entre les deux. Sans masque : 1 (comme avant).
+float masqueX(vec3 m, float wx) {
+  if (m.z < 0.5) return 1.0;
+  if (m.x < m.y) return smoothstep(m.x, m.y, wx);
+  return 1.0 - smoothstep(m.y, m.x, wx);
+}
 
 void main() {
   vec4 texel = vec4(outTint.bgr * outTint.a, outTint.a);
@@ -167,11 +179,14 @@ void main() {
   if (uFlip > 0.5) t.x = uTaille.x - 1.0 - ts.x;
   vec2 tc = t + 0.5;
   float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
+  // x du monde de ce pixel natif (constant sur tout le pixel : le dégradé reste en pixels)
+  float wx = dot(vec3(tc, 1.0), uMondeX);
   vec3 l = uAmbiance;
+  if (uAmbZone.z > 0.5) l = mix(uAmbiance, uAmbiance2, smoothstep(uAmbZone.x, uAmbZone.y, wx));
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
+      l += L.couleur * masqueX(L.masque, wx) * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
     }
   }
   vec4 color = vec4(base.rgb * l, base.a) * texel;
@@ -261,18 +276,42 @@ void main() {
         this.set1i('uCj', 4);
         if (actif) this.set3f('uAmbiance', lm.ambientColor.r, lm.ambientColor.g, lm.ambientColor.b);
         else this.set3f('uAmbiance', 1, 1, 1);
+        // Dégradé d'ambiance en x du monde (LightKit.ambianceZone) : sans lui, inactif (comme avant).
+        const z = actif && scene.__lumiere && scene.__lumiere.zone;
+        if (z) {
+          this.set3f('uAmbiance2', z.r, z.g, z.b);
+          this.set3f('uAmbZone', z.x0, z.x1, 1);
+        } else this.set3f('uAmbZone', 0, 1, 0);
         this.set1f('uPaliers', reg.paliers);
         this.set1f('uContre', reg.contre);
+        this._reg = reg;
       }
 
       // un appel de dessin par objet éclairé : ses lampes sont exprimées dans SON repère natif
       batchSprite(go, camera, parent) {
+        // Hors de la vue : rien à dessiner. Phaser dessinerait quand même chaque image (sans
+        // coût notable dans un lot) ; ici chaque objet coûte un appel de dessin, et une zone
+        // entièrement éclairée (sol, décors) en compte des centaines hors de l'écran.
+        if (!this.borner(go, camera)) return;
         // d'abord se lier (vide le pipeline précédent) : les uniforms ci-dessous changent le
         // programme GL, il ne faut pas que le lot en attente d'un autre pipeline le subisse
         this.manager.set(this, go);
         if (this.vertexCount > 0) this.flush();
-        this.preparer(go);
+        this.preparer(go, camera);
         super.batchSprite(go, camera, parent);
+      }
+
+      // Rectangle de l'objet dans le monde, décalé de la parallaxe (un fond à scrollFactor 0,3
+      // se voit ailleurs que sa position) ; false s'il ne touche pas la vue de la caméra.
+      borner(go, camera) {
+        const r = go.getBounds(this._rect || (this._rect = new Phaser.Geom.Rectangle()));
+        this._dx = camera ? camera.scrollX * (1 - go.scrollFactorX) : 0;
+        this._dy = camera ? camera.scrollY * (1 - go.scrollFactorY) : 0;
+        r.x += this._dx;
+        r.y += this._dy;
+        if (!camera) return true;
+        const v = camera.worldView;
+        return r.right >= v.x - 2 && r.x <= v.right + 2 && r.bottom >= v.y - 2 && r.y <= v.bottom + 2;
       }
 
       preparer(go) {
@@ -287,29 +326,55 @@ void main() {
         const flip = !!go.flipX;
         const kx = sx * fx, ky = sy * fy;                  // px du monde par pixel natif
         const k = (kx + ky) / 2;
-        const lampes = this._lampes, nb = Math.min(lampes.length, this.renderer.config.maxLights);
-        let derriere = 0;
-        for (let i = 0; i < nb; i++) {
-          const L = lampes[i];
-          m.applyInverse(L.x, L.y, this._pt);
+        const dx = this._dx || 0, dy = this._dy || 0, r = this._rect;
+        // Cartes : faites sur l'image ENTIÈRE (un fichier = une carte). Un cadre découpé dans
+        // l'image (le corps ou la langue du crapaud, cadres `corps` / `langue`) garde donc les
+        // pixels de l'image source : son coin (cx, cy) est ajouté partout. Image entière : 0.
+        const cx = e ? frame.cutX : 0, cy = e ? frame.cutY : 0;
+        // x du monde d'un pixel natif (tc = t + 0.5, repère affiché, miroir compris) :
+        // D = dx0 + tc.x * fx dans la boîte non retournée, puis la matrice de l'objet.
+        const dx0 = flip ? cx + W - gx - w * fx : gx - cx;
+        this.set3f('uMondeX', m.a * fx, m.c * fy,
+          m.a * (dx0 - go.displayOriginX) + m.c * (gy - cy - go.displayOriginY) + m.tx + dx);
+        const lampes = this._lampes, max = Math.min(lampes.length, this.renderer.config.maxLights);
+        let derriere = 0, nb = 0;
+        for (let j = 0; j < max; j++) {
+          const L = lampes[j];
+          // lampe trop loin pour toucher l'objet (distance au rectangle > portée) : ignorée
+          if (r && L.radius < Math.hypot(Math.max(r.x - L.x, 0, L.x - r.right), Math.max(r.y - L.y, 0, L.y - r.bottom))) continue;
+          // repère de l'objet : la lampe décalée de la parallaxe (même décalage que l'objet)
+          m.applyInverse(L.x - dx, L.y - dy, this._pt);
           const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
-          const tx = flip ? w - (W - D - gx) / fx : (D - gx) / fx;
-          const ty = (Dy - gy) / fy;
-          const z = (L.profondeur ?? DEFAUTS.profondeur) / k;
+          const tx = flip ? w - (cx + W - D - gx) / fx : (cx + D - gx) / fx;
+          const ty = (cy + Dy - gy) / fy;
+          // `__lumierePlan` : l'objet est À CETTE DISTANCE derrière le plan des sprites (paroi
+          // du fond, sol) ; la lampe est d'autant plus devant lui. Sans ça, une lampe à 8-14 px
+          // devant (le bon réglage pour un sprite) ne ferait sur un mur plat qu'une tache
+          // minuscule (N.L = z / distance).
+          const z = ((L.profondeur ?? DEFAUTS.profondeur) + (go.__lumierePlan || 0)) / k;
           if (z < 15) derriere = 1;
-          const nom = `uLumieres[${i}].`;
+          const nom = `uLumieres[${nb}].`;
           this.set3f(nom + 'position', tx, ty, z);
           this.set3f(nom + 'couleur', L.color.r * L.intensity, L.color.g * L.intensity, L.color.b * L.intensity);
           this.set1f(nom + 'portee', L.radius / k);
+          const mq = L.masque;
+          this.set3f(nom + 'masque', mq ? mq[0] : 0, mq ? mq[1] : 1, mq ? 1 : 0);
+          nb++;
         }
         this.set1i('uNbLumieres', nb);
+        // Objet à plat (sol, paroi, décor) : `paliersPlat` s'il est réglé. Sur une grande
+        // surface plate, 4 paliers dessinent des disques à bord dur autour de chaque lampe ;
+        // quelques paliers de plus adoucissent la flaque sans quitter le pixel art.
+        const reg = this._reg || DEFAUTS;
+        this.set1f('uPaliers', e ? reg.paliers : (reg.paliersPlat ?? reg.paliers));
         this.set1f('uCarte', e ? 1 : 0);
         this.set1f('uDerriere', derriere);
         this.set1f('uFlip', flip ? 1 : 0);
         this.set1f('uPasLisse', e && e.s > 1 ? Math.round(e.s) : 1);
         this.set2f('uTaille', w, h);
         this.set2f('uTailleTex', frame.source.width, frame.source.height);
-        this.set2f('uCoin', frame.cutX, frame.cutY);
+        // carte : pixel de l'image source entière (cf. cx, cy) ; à plat : pixel du cadre
+        this.set2f('uCoin', e ? 0 : frame.cutX, e ? 0 : frame.cutY);
         this.set2f('uGrille', gx, gy);
         this.set2f('uPas', fx, fy);
         this._textures = c;
@@ -409,6 +474,7 @@ void main() {
     const o = Object.assign({ x: 0, y: 0 }, PRESETS.blanc, preset ? PRESETS[preset] : {}, options || {});
     const L = scene.lights.addLight(o.x, o.y, o.portee, couleurDe(o.couleur), o.intensite);
     L.profondeur = o.profondeur;
+    if (o.masque) regler(L, { masque: o.masque });
     return L;
   }
 
@@ -418,11 +484,18 @@ void main() {
     return lumiere;
   }
 
-  function regler(lumiere, { couleur, intensite, portee, profondeur } = {}) {
+  // `masque: [x0, x1]` (x du monde) : la lampe n'éclaire que d'un côté, avec un passage doux
+  // entre x0 et x1 (0 avant x0, pleine après x1 ; x0 > x1 : l'inverse). Ex. le soleil, qui
+  // n'entre pas dans une grotte. `masque: null` : partout (défaut).
+  function regler(lumiere, { couleur, intensite, portee, profondeur, masque } = {}) {
     if (couleur !== undefined) lumiere.setColor(couleurDe(couleur));
     if (intensite !== undefined) lumiere.setIntensity(intensite);
     if (portee !== undefined) lumiere.setRadius(portee);
     if (profondeur !== undefined) lumiere.profondeur = profondeur;
+    if (masque !== undefined) {
+      // x0 = x1 : passage d'un pixel (smoothstep n'est pas défini sur un intervalle nul)
+      lumiere.masque = masque ? [masque[0], masque[1] === masque[0] ? masque[0] + 1 : masque[1]] : null;
+    }
     return lumiere;
   }
 
@@ -453,6 +526,177 @@ void main() {
   // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour }.
   function reglerRendu(scene, reglages) {
     if (scene.__lumiere) Object.assign(scene.__lumiere.reglages, reglages);
+  }
+
+  // ---------------------------------------------------------------- ambiance par endroit
+  // Dégradé d'ambiance en x du MONDE, calculé par pixel dans le shader : l'ambiance de la scène
+  // (LightKit.ambiance) jusqu'à x0, `couleur` après x1, un passage doux entre les deux. Une grotte
+  // qui s'ouvre au jour : chaque objet prend l'ambiance de l'endroit où il est (le fond de la
+  // grotte reste noir quand Agarica est dehors), et Agarica passe de l'une à l'autre en marchant,
+  // sans saut. `null` : plus de dégradé.
+  //   LightKit.ambianceZone(scene, { x0: 1600, x1: 2200, couleur: 0x8c8c96 });
+  function ambianceZone(scene, z) {
+    const st = scene.__lumiere;
+    if (!st) return;
+    if (!z) { st.zone = null; return; }
+    const c = Phaser.Display.Color.IntegerToColor(couleurDe(z.couleur));
+    // sens gauche -> droite ; x0 > x1 : on échange les bouts (et les couleurs)
+    if (z.x0 > z.x1) {
+      const gauche = Phaser.Display.Color.IntegerToColor(couleurDe(z.couleur));
+      const droite = scene.lights.ambientColor;
+      st.zone = { x0: z.x1, x1: z.x0, r: droite.r, g: droite.g, b: droite.b };
+      ambiance(scene, gauche.color);
+      return;
+    }
+    st.zone = { x0: z.x0, x1: Math.max(z.x1, z.x0 + 1), r: c.redGL, g: c.greenGL, b: c.blueGL };
+  }
+
+  // Ambiance (r, g, b de 0 à 1) reçue à l'abscisse x du monde : même calcul que le shader.
+  // Sert aux mesures (tests) et aux scripts qui règlent un effet sur la lumière du lieu.
+  function ambianceEn(scene, x) {
+    const lm = scene.lights, z = scene.__lumiere && scene.__lumiere.zone;
+    const a = [lm.ambientColor.r, lm.ambientColor.g, lm.ambientColor.b];
+    if (!z) return a;
+    const t = Phaser.Math.Clamp((x - z.x0) / (z.x1 - z.x0), 0, 1);
+    const s = t * t * (3 - 2 * t);
+    return [a[0] + (z.r - a[0]) * s, a[1] + (z.g - a[1]) * s, a[2] + (z.b - a[2]) * s];
+  }
+
+  // ---------------------------------------------------------------- toute la scène
+  // Classement d'un objet pour l'éclairage de toute une scène :
+  //  'ui'      interface (HUD, textes, invites) : jamais éclairée ;
+  //  'emissif' source de lumière (mélange ADD / SCREEN, ou `o.__lumiereEmissif`, ou le filtre de
+  //            la scène) : garde ses couleurs, c'est elle qui éclaire ;
+  //  'eclaire' image ou sprite : sur le pipeline (en sections s'il a des cartes, sinon à plat) ;
+  //  'autre'   type que le pipeline ne sait pas dessiner (Graphics, formes, particules, TileSprite) :
+  //            LightKit.bilan() les liste, la scène les traite à part (teinte, alpha) ou les évite.
+  function classer(o, emissif) {
+    if (o.__lumiereUi || o.type === 'Text' || o.type === 'BitmapText' || o.type === 'DynamicBitmapText') return 'ui';
+    const role = o.lookRole || (typeof lookAutoRole === 'function' ? lookAutoRole(o) : null);
+    if (role === 'ui') return 'ui';
+    // HUD (écran, 1000 et plus) ; bulles et invites posées dans le monde (1040 et plus)
+    if ((o.scrollFactorX === 0 && o.depth >= 1000) || o.depth >= 1040) return 'ui';
+    const B = Phaser.BlendModes;
+    if (o.__lumiereEmissif || o.blendMode === B.ADD || o.blendMode === B.SCREEN || (emissif && emissif(o))) return 'emissif';
+    if ((o.type === 'Image' || o.type === 'Sprite') && o.setPipeline) return 'eclaire';
+    return 'autre';
+  }
+
+  // Éclaire TOUTE la scène : chaque image et sprite du monde passe sur le pipeline (balayage
+  // maintenant puis toutes les `intervalle` images, pour ce qui naît plus tard : ennemis,
+  // effets, objets ramassés). Interface et sources de lumière exclues (cf. classer). C'est ce
+  // qui fait la vraie obscurité : rien ne reste en pleine lumière, seules les lampes éclairent.
+  //   LightKit.eclairerTout(scene, { emissif: (o) => o.texture.key.startsWith('item-fx_') });
+  // `plan(o)` (facultatif) : distance en px du monde entre l'objet et le plan des sprites (paroi
+  // du fond : grande ; sol : moyenne ; personnages : 0), cf. `__lumierePlan` dans le pipeline.
+  function eclairerTout(scene, { emissif = null, plan = null, intervalle = 30 } = {}) {
+    const st = scene.__lumiere;
+    if (!st) return;
+    st.emissif = emissif;
+    const particules = new Set();
+    const ranger = (o) => {
+      if (!o || !o.active) return;
+      // Enfant d'un conteneur (né seul puis rangé dedans, comme la barre d'énergie peinte) :
+      // classé avec son conteneur racine (l'interface reste intacte).
+      let racine = o;
+      while (racine.parentContainer) racine = racine.parentContainer;
+      if (racine !== o && classer(racine, emissif) === 'ui') return;
+      if (o.type === 'Container') { if (classer(o, emissif) !== 'ui') visiter(o.list); return; }
+      const cl = classer(o, emissif);
+      if (cl === 'eclaire' && (!o.pipeline || o.pipeline.name !== NOM_PIPELINE)) {
+        if (plan) o.__lumierePlan = plan(o) || 0;
+        eclairer(o);
+      } else if (cl === 'autre' && (o.type === 'ParticleEmitter' || o.type === 'TileSprite')) {
+        o.__lumiereAttenue = true;
+        particules.add(o);
+      }
+    };
+    const visiter = (liste) => { for (const o of liste) ranger(o); };
+    // Objets nés pendant la partie (effets, ennemis, gouttes) : rangés dès la fin de la mise à
+    // jour où ils naissent, AVANT leur premier affichage (pas une image en pleine lumière).
+    // Rangés après coup et non à l'ajout : la teinte, le mélange (ADD) sont posés juste après.
+    const nouveaux = [];
+    const ajoute = (o) => { nouveaux.push(o); };
+    let n = 0;
+    const balayer = () => {
+      if (nouveaux.length) visiter(nouveaux.splice(0));
+      if (n++ % intervalle === 0) visiter(scene.children.list);
+      // Particules ordinaires (poussière, feuilles, copeaux) et TileSprite (fil de soie de
+      // Xara) : Phaser ne les dessine pas avec un pipeline de sprite. Ils prennent la lumière
+      // ESTIMÉE là où ils sont (ambiance + lampes proches) : en opacité pour les particules
+      // (dans le noir, la poussière ne se voit pas), en teinte pour un TileSprite.
+      for (const e of particules) {
+        if (!e.active) { particules.delete(e); continue; }
+        if (e.type === 'TileSprite') {
+          if (!e.visible) continue;
+          const c = e.getCenter ? e.getCenter() : e;
+          const g = Math.round(255 * Phaser.Math.Clamp(lumiereEstimee(scene, c.x, c.y), 0, 1));
+          e.setTint((g << 16) | (g << 8) | g);
+          continue;
+        }
+        const p = e.alive && e.alive[0];
+        if (p) e.setAlpha(Math.min(1, lumiereEstimee(scene, p.x, p.y)));
+      }
+    };
+    visiter(scene.children.list);
+    scene.sys.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, ajoute);
+    scene.events.on('postupdate', balayer);
+    scene.events.once('shutdown', () => {
+      scene.events.off('postupdate', balayer);
+      scene.sys.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, ajoute);
+    });
+  }
+
+  // Lumière reçue en (x, y) du monde, à peu près (luminance 0-1+) : ambiance du lieu + chaque
+  // lampe atténuée par la distance, sur une surface plate tournée vers le spectateur un peu
+  // derrière le plan des sprites (N.L = z / distance, sans palier). Pour ce que le pipeline ne
+  // dessine pas (particules, TileSprite) et pour les mesures.
+  function lumiereEstimee(scene, x, y, plan = 40) {
+    const a = ambianceEn(scene, x);
+    let l = 0.3 * a[0] + 0.59 * a[1] + 0.11 * a[2];
+    for (const L of scene.lights.lights) {
+      const d = Math.hypot(L.x - x, L.y - y);
+      const z = (L.profondeur ?? DEFAUTS.profondeur) + plan;
+      if (d >= L.radius || !L.intensity || z <= 0) continue;
+      let w = 1;
+      if (L.masque) {
+        const [x0, x1] = L.masque, t = Phaser.Math.Clamp((x - Math.min(x0, x1)) / Math.abs(x1 - x0), 0, 1);
+        w = x0 < x1 ? t : 1 - t;
+      }
+      const c = L.color;
+      l += w * L.intensity * (1 - (d * d) / (L.radius * L.radius)) * (z / Math.hypot(d, z)) * (0.3 * c.r + 0.59 * c.g + 0.11 * c.b);
+    }
+    return l;
+  }
+
+  // Ce qui est VISIBLE à l'écran sans passer par l'éclairage, hors interface et sources de
+  // lumière : doit être vide (ou expliqué) dans une scène éclairée par eclairerTout. Renvoie
+  // [{ type, cle, profondeur, x, y }] ; sert aux tests (« aucun sprite en pleine lumière »).
+  // Ne compte pas : un Graphics vide, un émetteur sans particule (rien à l'écran), un émetteur
+  // ordinaire déjà atténué par eclairerTout.
+  function bilan(scene) {
+    const st = scene.__lumiere, cam = scene.cameras.main, v = cam.worldView, out = [];
+    const visiter = (liste, parentVisible) => {
+      for (const o of liste) {
+        if (!o || !o.active || !o.visible || !parentVisible || o.alpha === 0) continue;
+        const cl = classer(o, st && st.emissif);
+        if (o.type === 'Container') { if (cl !== 'ui') visiter(o.list, true); continue; }
+        if (cl === 'ui' || cl === 'emissif') continue;
+        if (o.pipeline && o.pipeline.name === NOM_PIPELINE) continue;
+        if (o.type === 'Graphics' && o.commandBuffer && !o.commandBuffer.length) continue;
+        if (o.__lumiereAttenue) continue;
+        if (o.type === 'ParticleEmitter' && !(o.getAliveParticleCount && o.getAliveParticleCount())) continue;
+        let b = null;
+        try { b = o.getBounds ? o.getBounds() : null; } catch (e) { b = null; }
+        if (b) {
+          const dx = cam.scrollX * (1 - (o.scrollFactorX ?? 1)), dy = cam.scrollY * (1 - (o.scrollFactorY ?? 1));
+          if (b.right + dx < v.x || b.x + dx > v.right || b.bottom + dy < v.y || b.y + dy > v.bottom) continue;
+        }
+        out.push({ type: o.type, cle: (o.texture && o.texture.key) || '', profondeur: o.depth, x: Math.round(o.x), y: Math.round(o.y) });
+      }
+    };
+    visiter(scene.children.list, true);
+    return out;
   }
 
   // ---------------------------------------------------------------- mode test (?lumiere)
@@ -491,6 +735,7 @@ void main() {
     NOM_PIPELINE, DEFAUTS, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
     chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes,
     ajouterLumiere, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
+    ambianceZone, ambianceEn, lumiereEstimee, classer, eclairerTout, bilan,
   };
 })();
 

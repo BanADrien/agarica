@@ -1646,6 +1646,30 @@ Conception : `MONDE_V2_PIECES.md`. Zone d'essai : `ZonePiecesScene` (`src/data/z
   talismans dans « À ramasser ». Champ « Apparaît » (`showIf`) des coffres, trésors et objets : les cibles de la zone
   (`EditeurListes.drapeauxCibles`).
 
+### Éclairage de toute une zone (`src/utils/LightKit.js`, 2026-11-17, rétro-compatible, opt-in)
+Mode d'emploi des sprites et du modèle : skill `eclairage-sections`. Rien ne change tant qu'une scène n'appelle pas
+`LightKit.activer` (le mode `?lumiere` est inchangé). Ajouts :
+- `LightKit.eclairerTout(scene, { emissif(o), plan(o), intervalle })` : chaque Image / Sprite du monde passe sur le
+  pipeline (cartes : en volume ; sinon à plat), y compris ce qui naît ensuite (rangé avant sa 1re image). Exclus :
+  interface (texte, `lookRole 'ui'`, HUD à l'écran, profondeur ≥ 1040) et sources (`ADD` / `SCREEN`,
+  `o.__lumiereEmissif`, filtre `emissif`). Particules ordinaires et TileSprite : lumière estimée (opacité / teinte).
+  `plan(o)` -> `o.__lumierePlan` : distance (px) derrière le plan des personnages (paroi, sol), ajoutée à la profondeur
+  des lampes pour cet objet.
+- `LightKit.ambianceZone(scene, { x0, x1, couleur })` : ambiance en dégradé selon le x du MONDE, par pixel (grotte ->
+  jour) ; `LightKit.ambianceEn(scene, x)` et `LightKit.lumiereEstimee(scene, x, y)` pour mesurer.
+- Lampe `masque: [x0, x1]` (`ajouterLumiere` / `regler`) : elle n'éclaire que d'un côté, passage doux (soleil dehors).
+- `activer(scene, { paliersPlat })` : paliers des objets sans carte (6 adoucit les flaques au sol ; défaut = `paliers`).
+- `LightKit.bilan(scene)` : ce qui est visible sans passer par la lumière (tests : doit être vide).
+- Pipeline : objets hors de la caméra non dessinés ; lampes hors de portée d'un objet ignorées ; parallaxe
+  (`scrollFactor`) prise en compte ; cadre découpé dans une image (`corps` / `langue` du crapaud) lu dans les cartes
+  de l'image entière.
+
+### Zone de test « grotte lumineuse » (`GrotteLumiereScene`, 2026-11-17)
+`src/data/grotte_lumiere_data.js` + `src/scenes/GrotteLumiereScene.js` (script `ZONE_SCRIPTS.grotte_lumiere`).
+Accès : « Zones de test » du titre (ajoutée à `LEGACY_TEST_ZONES` depuis la scène) ou `?zone=GrotteLumiereScene`.
+Réglages de lumière en tête du fichier de données (`GROTTE_LUMIERE_REGLAGES`). Loup, singe, aigle prêtés le temps de la
+visite (registre rendu à l'arrêt de la scène). Pas de sortie.
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |
