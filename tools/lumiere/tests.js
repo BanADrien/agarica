@@ -75,7 +75,12 @@ class Sprite {
     if (!this.brute) return;
     const ech = this.ech || 1;
     const passe = (p) => this.lum.get(p) >= 0.16 || this.D.get(p) <= 2 * ech;
-    const meme = (a, b) => { const u = this.brute.get(a), v = this.brute.get(b); return u.x === v.x && u.y === v.y && u.z === v.z; };
+    // même section ; grand sprite (table fine) : même direction, toutes bagues (comme carteCj)
+    const az = (u) => (Math.hypot(u.x, u.y) < 0.05 ? -2 : ((Math.round(Math.atan2(u.y, u.x) * 180 / Math.PI / 30) % 12) + 12) % 12);
+    const meme = (a, b) => {
+      const u = this.brute.get(a), v = this.brute.get(b);
+      return ech > 1 ? az(u) === az(v) : u.x === v.x && u.y === v.y && u.z === v.z;
+    };
     const vu = new Set();
     for (const p0 of this.N.keys()) {
       if (vu.has(p0) || !passe(p0)) continue;
