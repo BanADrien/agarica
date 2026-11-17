@@ -13,7 +13,14 @@
  * fait DANS la page avec le même code que tools/sections.js (tools/lumiere/coeur.js, embarqué),
  * puis l'image s'affiche sous la même lumière, avec ses cartes à télécharger. Rien n'est envoyé.
  *
+ * PROPOSITIONS (méthodes de découpage, cf. tools/lumiere/coeur.js) : `--propositions [anim...]`
+ * calcule EN MÉMOIRE chaque animation par la méthode actuelle et les propositions A, B, C (rien
+ * n'est écrit dans assets/) ; bandeau « Propositions » : sprite, méthode (boutons ou touches 1 à 4,
+ * même lumière), « les 4 côte à côte ». Animations par défaut : ANIMS de tools/lumiere/propositions.js.
+ * Le menu « Méthode » des vos images choisit le découpage du calcul fait dans la page (« les 4 » : toutes).
+ *
  * Usage :
+ *   npm run lumiere:apercu -- --propositions [anim...] [--methodes origine,A,B,C] [--out <fichier.html>]
  *   npm run lumiere:apercu                          tous les sprites préparés, une page (sélecteur)
  *   npm run lumiere:apercu -- <anim|png|dossier>... seulement ceux-là (anim = champ `anim` du
  *                    manifeste, ex. agarica_walk ; png = image du jeu ; dossier = ses frames)
@@ -88,6 +95,14 @@ function construirePage(donnees, test) {
   #p-telecharger a { color: var(--accent); margin-right: 6px; }
   .ligne-tel { color: var(--pale); }
   body.survol #perso { outline: 2px dashed var(--accent); outline-offset: -4px; }
+  #perso select { background: var(--fond); color: var(--texte); border: 1px solid var(--trait); border-radius: 4px; padding: 2px 4px; font: inherit; }
+  #props { padding: 8px 16px; border-bottom: 1px solid var(--trait); background: #1b1728; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  #props[hidden] { display: none; }
+  #props select { background: var(--fond); color: var(--texte); border: 1px solid var(--trait); border-radius: 4px; padding: 3px 6px; font: inherit; }
+  #props button { background: transparent; color: var(--texte); border: 1px solid var(--trait); border-radius: 4px; padding: 4px 12px; font: inherit; cursor: pointer; }
+  #props button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #props .pale { color: var(--pale); }
+  #props-texte { flex-basis: 100%; color: var(--pale); }
   #vue { flex: 1; width: 100%; border: 0; min-height: 0; }
 </style>
 </head>
@@ -99,10 +114,19 @@ function construirePage(donnees, test) {
   <label title="Fond uni (couleur des 4 coins) effacé depuis les bords ; un blanc enfermé, comme un œil, reste."><input type="checkbox" id="p-fond" checked> Retirer le fond</label>
   <label title="Écart de couleur accepté avec la couleur des coins (0-255)">tolérance <input type="number" id="p-tol" min="0" max="255" value="24"></label>
   <label title="Pixels de l'image par pixel dessiné. Vide = détection automatique de la grille.">Taille d'un pixel dessiné <input type="text" id="p-facteur" placeholder="auto"></label>
+  <label title="Découpage en sections : actuel (sections.py), ou une des propositions A (masses), B (matières), C (traits et bords) ; « les 4 » les calcule toutes, côte à côte.">Méthode <select id="p-methode">${[['origine', 'actuelle'], ['A', 'A - masses'], ['B', 'B - matières'], ['C', 'C - traits'], ['toutes', 'les 4']].map(([v, t]) => `<option value="${v}"${v === (donnees.propositions ? 'toutes' : 'origine') ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
   <span id="p-detecte"></span>
   <input type="file" id="p-fichier" accept="image/png,image/jpeg" multiple hidden>
   <div id="p-etat"></div>
   <div id="p-telecharger" hidden></div>
+</div>
+<div id="props" hidden>
+  <b>Propositions</b>
+  <label class="pale">Sprite <select id="props-sprite"></select></label>
+  <span id="props-boutons"></span>
+  <label class="pale"><input type="checkbox" id="props-tous"> les 4 côte à côte</label>
+  <span class="pale">touches 1 à 4 : changer de méthode, même lumière</span>
+  <div id="props-texte"></div>
 </div>
 <iframe id="vue" title="Test d'eclairage"></iframe>
 <pre id="resultat" hidden></pre>
@@ -120,8 +144,44 @@ ${test ? `window.TEST_PERSO = ${enScript(JSON.stringify(test))};` : ''}
 `;
 }
 
+// ---------------------------------------------------------------- propositions (méthodes A, B, C)
+// Chaque animation calculée en mémoire par chaque méthode (rien n'est écrit dans assets/) ; un asset
+// par méthode, dans l'ordre actuelle, A, B, C : la page passe de l'une à l'autre sous la même lumière.
+const TEXTES = {
+  origine: 'Actuelle : sections.py (neutre en aplats, parties coupées à chaque trait et chaque matière, 17 sections).',
+  A: 'A - masses : grandes masses (tête, torse, bras, jambes, cape) par l\'épaisseur du corps et l\'ombrage peint ; un dôme par masse.',
+  B: 'B - matières : une partie par morceau de matière (cheveux, visage, tunique, bras, cape, bottes), motifs gardés avec leur support ; un dôme par partie.',
+  C: 'C - traits : parties fermées par les traits, les traits en creux et les bords de couleur francs ; relief en coussin (bord arrondi, centre de face).',
+};
+function propositions(cibles, methodes, regarde) {
+  const PR = require('./propositions.js');
+  const C = require('./coeur.js');
+  const man = manifeste();
+  const enUrl = (im) => `data:image/png;base64,${PNG.encoder(im).toString('base64')}`;
+  const sprites = [];
+  for (const nom of cibles.length ? cibles : PR.ANIMS) {
+    const anim = PR.natifs(nom, man);
+    const assets = [];
+    for (const m of methodes) {
+      const t0 = Date.now();
+      const r = PR.calculer(anim, m);
+      const frames = r.frames.map((c) => {
+        const masque = new Uint8Array(c.nat.width * c.nat.height);
+        for (let p = 0; p < masque.length; p++) masque[p] = c.nat.data[p * 4 + 3] >= 128 ? 1 : 0;
+        const g = GEO.geometrie(masque, c.nat.width, c.nat.height);
+        return { images: { origine: enUrl(c.nat), neutre: enUrl(c.neu), normales: enUrl(c.nor), sections: enUrl(c.sec), cj: enUrl(c.cj), geo: enUrl({ width: g.width, height: g.height, data: g.data }) } };
+      });
+      const a = { nom: `${nom} - ${C.NOMS_METHODES[m]}`, methode: m, regarde, s: r.s };
+      assets.push(frames.length > 1 ? Object.assign(a, { frames, fps: anim.fps, vitesse: anim.vitesse }) : Object.assign(a, { images: frames[0].images }));
+      console.log(`  ${nom}, ${C.NOMS_METHODES[m]} : ${frames.length} image(s), ${Date.now() - t0} ms`);
+    }
+    sprites.push({ nom, assets });
+  }
+  return { sprites, methodes, noms: C.NOMS_METHODES, textes: TEXTES };
+}
+
 function parseArgs(argv) {
-  const a = { cibles: [], regarde: 'droite', echelle: 6, titre: '', out: '', vide: false };
+  const a = { cibles: [], regarde: 'droite', echelle: 6, titre: '', out: '', vide: false, propositions: false, methodes: ['origine', 'A', 'B', 'C'] };
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i];
     const suite = () => { if (i + 1 >= argv.length) throw new Error(`valeur manquante pour ${t}`); return argv[++i]; };
@@ -130,6 +190,8 @@ function parseArgs(argv) {
     else if (t === '--titre') a.titre = suite();
     else if (t === '--out') a.out = suite();
     else if (t === '--vide') a.vide = true;
+    else if (t === '--propositions') a.propositions = true;
+    else if (t === '--methodes') a.methodes = suite().split(',').filter((m) => ['origine', 'A', 'B', 'C'].includes(m));
     else if (t.startsWith('--')) throw new Error(`option inconnue : ${t}`);
     else a.cibles.push(t);
   }
@@ -139,6 +201,17 @@ function parseArgs(argv) {
 function main() {
   let a;
   try { a = parseArgs(process.argv.slice(2)); } catch (e) { console.error(`Erreur : ${e.message}`); return 2; }
+  if (a.propositions) {
+    let props;
+    try { props = propositions(a.cibles, a.methodes, a.regarde); } catch (e) { console.error(`Erreur : ${e.message}`); return 1; }
+    const donnees = { titre: a.titre || 'Propositions de sections', echelle: a.echelle, assets: props.sprites[0].assets, geoPad: GEO.GEO_PAD, propositions: props };
+    const out = a.out ? path.resolve(a.out) : path.join(SORTIE, 'propositions-lumiere.html');
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, construirePage(donnees));
+    console.log(`${props.sprites.length} sprite(s) x ${a.methodes.length} méthode(s)`);
+    console.log(`page : ${out}`);
+    return 0;
+  }
   const man = manifeste();
   let cles = a.vide ? [] : Object.keys(man);
   if (!cles.length && !a.vide) { console.error('Aucun sprite préparé (src/data/sections.js vide) : lancer d\'abord npm run sections'); return 1; }

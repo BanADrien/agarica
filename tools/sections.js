@@ -17,6 +17,8 @@
  *   node tools/sections.js --depuis-cj <png>...        réécrit _lumiere/<nom>_cj.png depuis
  *                    _lumiere/<nom>_cj-apercu.png retouché à la main
  *   node tools/sections.js verifier                    cartes à refaire (sprite changé depuis)
+ *   node tools/sections.js tout --methode B            refait TOUTES les cartes du manifeste (chaque
+ *                    animation en une commande, avec ses fps / vitesse ; sprites seuls un par un)
  * Sorties, dans le dossier `_lumiere/` à côté du sprite (le `_` le cache à pixelfix.js) :
  *   <nom>_natif.png     le sprite à sa résolution native (1 pixel dessiné = 1 pixel)
  *   <nom>_neutre.png    couleurs de base en aplats (une couleur par matière), contour et œil gardés
@@ -28,6 +30,11 @@
  * et le manifeste src/data/sections.js (GÉNÉRÉ : BootScene charge neutre + normales des sprites
  * qui y figurent, LightKit sait où tombe chaque pixel natif dans l'image du jeu).
  * Options :
+ *   --methode <m>    découpage : origine (défaut, sections.py), A (masses), B (matières), C (traits) ;
+ *                    A, B, C : neutre détaillé, matières séparées, parties sans miettes, table fine
+ *                    (tools/lumiere/coeur.js) ; noté `m` dans le manifeste. Grand sprite : sans effet
+ *   --vers <dossier> écrit les cartes sous <dossier>/<chemin du sprite>/_lumiere/ au lieu d'à côté
+ *                    du sprite, sans toucher au manifeste (essais)
  *   --facteur <f>    px de l'image par pixel dessiné ; défaut : `f` de src/data/pixel_fixed.js
  *                    (sprite refait par pixelfix.js), sinon 1 (sprite déjà natif)
  *   --echelle-jeu <s> image encore peinte (absente de pixel_fixed.js) : ramenée à sa taille vue en
@@ -66,7 +73,7 @@ function chargerSharp() {
 
 // ------------------------------------------------------------ calcul (tools/lumiere/coeur.js)
 const COEUR = require('./lumiere/coeur.js');
-const { N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, echelleSprite } = COEUR;
+const { N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, analyser, METHODES, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, echelleSprite } = COEUR;
 
 // ------------------------------------------------------------ images (E/S) et mode image peinte (sharp)
 async function lirePng(file) { return PNGIO.lirePng(file); }
@@ -113,8 +120,11 @@ ${lines.join('\n')}
 const empreinte = (file) => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 10);
 
 // ------------------------------------------------------------ traitements
+let VERS = '';   // --vers : dossier d'essai (cartes hors du jeu)
 function sortiesDe(file) {
-  const dir = path.join(path.dirname(file), DOSSIER), nom = path.basename(file, path.extname(file));
+  const dir = VERS ? path.join(VERS, path.relative(ROOT, path.dirname(file)), DOSSIER) : path.join(path.dirname(file), DOSSIER);
+  const nom = path.basename(file, path.extname(file));
+  if (VERS) fs.mkdirSync(dir, { recursive: true });
   const s = (suffixe) => path.join(dir, `${nom}_${suffixe}.png`);
   return { dir, nom, natif: s('natif'), neutre: s('neutre'), sections: s('sections'), n: s('n'), cj: s('cj'), cjApercu: s('cj-apercu'), apercu: s('apercu') };
 }
@@ -170,14 +180,14 @@ async function unSprite(file, o, reg, man) {
     grille = { f: 1, fx: 1, fy: 1, gx: 0, gy: 0, accord: 1 };
   }
   const ech = echelleSprite([nat]);   // grand sprite : réglages en pixels x ech (coeur.js)
-  const res = analyse(nat, o.garder, o.rampes, o.echelleJeu > 0, null, ech);
+  const res = analyser(nat, o.garder, o.rampes, o.echelleJeu > 0, null, ech, o.methode);
   const c = await ecrireCartes(nat, res, s, o, ech);
   if (ech > 1) console.log(`  grand sprite : réglages en pixels x ${ech}`);
   if (o.apercu) await ecrirePng(planche([c]), s.apercu);
   console.log(`${relOf(file)} : natif ${nat.width}x${nat.height}, 1 pixel = ${grille.f} px (pas mesuré ${grille.fx.toFixed(3)} x ${grille.fy.toFixed(3)})` +
     (grille.accord !== null ? `, grille calée à ${(100 * grille.accord).toFixed(2)} %` : '') + ` -> ${relOf(s.dir)}/${s.nom}_*.png`);
   afficherInfo(res.info);
-  man[relOf(file)] = entree(file, hd, nat, grille, s, ech > 1 ? { s: ech } : null);
+  man[relOf(file)] = entree(file, hd, nat, grille, s, Object.assign({}, ech > 1 ? { s: ech } : {}, res.fin && !(ech > 1) ? { fin: 1, m: o.methode } : {}));
 }
 
 function entree(file, hd, nat, g, s, extra) {
@@ -216,7 +226,7 @@ async function uneAnimation(files, o, reg, man) {
   const w = canv[0].width, h = canv[0].height;
   const ech = echelleSprite(canv);   // médiane des frames ; grand sprite : réglages en pixels x ech
   if (ech > 1) console.log(`  grand sprite : réglages en pixels x ${ech}`);
-  const r = sectionsAnimation(canv, o.garder, o.rampes, peint, ech);
+  const r = sectionsAnimation(canv, o.garder, o.rampes, peint, ech, o.methode);
   const res = { info: r.info }, avant = r.avant;
   const cols = [];
   let grille = null;
@@ -232,7 +242,7 @@ async function uneAnimation(files, o, reg, man) {
     // même grille pour tout le lot (pixelfix.js : grille ancrée au bas-centre, commune au lot)
     const g = { f: grille.f, fx: grille.fx, fy: grille.fy, gx: grille.gx + decal[0][0] - decal[i][0], gy: grille.gy + decal[0][1] - decal[i][1] };
     g.accord = peint ? null : accord(hds[i], canv[i], g.fx, g.fy, g.gx, g.gy);
-    man[relOf(files[i])] = entree(files[i], hds[i], canv[i], g, s, { anim: o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, ''), i, fps: o.fps, vitesse: o.vitesse, ...(ech > 1 ? { s: ech } : {}) });
+    man[relOf(files[i])] = entree(files[i], hds[i], canv[i], g, s, { anim: o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, ''), i, fps: o.fps, vitesse: o.vitesse, ...(ech > 1 ? { s: ech } : {}), ...(r.fin && !(ech > 1) ? { fin: 1, m: o.methode } : {}) });
     console.log(`  ${relOf(files[i])} -> ${relOf(s.dir)}/${s.nom}_*.png` + (g.accord !== null ? ` (grille calée à ${(100 * g.accord).toFixed(2)} %)` : ''));
   }
   if (o.apercu) await ecrirePng(planche(cols), path.join(sortiesDe(files[0]).dir, `${o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, '')}_planche.png`));
@@ -242,8 +252,8 @@ async function uneAnimation(files, o, reg, man) {
 }
 
 // carte contre-jour + son aperçu (sections.py : ecrire_cj)
-async function ecrireCj(nat, nor, neu, sorties, ech) {
-  const cj = carteCj(nat, nor, neu, ech);
+async function ecrireCj(nat, nor, neu, sorties, ech, fin) {
+  const cj = carteCj(nat, nor, neu, ech, fin);
   await ecrirePng(cj, sorties.cj);
   await ecrirePng(cjApercu(cj), sorties.cjApercu);
 }
@@ -262,12 +272,12 @@ async function depuisSections(file, man) {
   if (!fs.existsSync(s.sections)) throw new Error(`${relOf(s.sections)} absent : lancer d'abord node tools/sections.js ${relOf(file)}`);
   const e = man[relOf(file)];
   // grand sprite (s > 1) : couleurs de la table fine (3 bagues x 12 azimuts)
-  const { nor, lues } = normalesDepuisSections(await lirePng(s.sections), !!(e && e.s > 1));
+  const { nor, lues } = normalesDepuisSections(await lirePng(s.sections), !!(e && (e.s > 1 || e.fin)));
   await ecrirePng(nor, s.n);
   console.log(`${relOf(s.n)} recalculée ; sections lues : ${[...lues].sort().join(', ')}`);
   // comme sections.py : la carte contre-jour suit les nouvelles sections (retoucher
   // _cj-apercu.png APRÈS les sections, sinon la retouche est écrasée)
-  await ecrireCj(await lirePng(s.natif), nor, await lirePng(s.neutre), s, e && e.s ? e.s : 1);
+  await ecrireCj(await lirePng(s.natif), nor, await lirePng(s.neutre), s, e && e.s ? e.s : 1, !!(e && e.fin));
   console.log(`${relOf(s.cj)} recalculée`);
   if (man[relOf(file)]) man[relOf(file)].v = empreinte(file);
 }
@@ -281,6 +291,31 @@ function verifier(man) {
   }
   console.log(n ? `${n} sprite(s) à refaire` : `${Object.keys(man).length} sprite(s) à jour`);
   return n ? 1 : 0;
+}
+
+// Toutes les cartes du manifeste refaites (après le choix d'une méthode, ou un changement du calcul) :
+// chaque animation en UNE commande, frames dans l'ordre `i`, avec ses fps / vitesse ; les sprites
+// seuls un par un. Les --garder / --rampes donnés à la main autrefois ne sont pas dans le manifeste :
+// les redonner sur la ligne de commande s'il le faut (ils valent alors pour tous).
+async function tout(o, reg, man) {
+  const groupes = new Map(), seuls = [];
+  for (const [k, e] of Object.entries(man)) {
+    if (!e.anim) { seuls.push(k); continue; }
+    if (!groupes.has(e.anim)) groupes.set(e.anim, []);
+    groupes.get(e.anim).push([k, e]);
+  }
+  let echecs = 0;
+  for (const [anim, es] of groupes) {
+    es.sort((x, y) => (x[1].i || 0) - (y[1].i || 0));
+    console.log(`== ${anim} (${es.length} images)`);
+    try {
+      await uneAnimation(es.map(([k]) => path.join(ROOT, k)), Object.assign({}, o, { fps: es[0][1].fps || 12, vitesse: es[0][1].vitesse || 0, nomAnim: anim }), reg, man);
+    } catch (e) { echecs++; console.error(`${anim} : ECHEC : ${e.message}`); }
+  }
+  for (const k of seuls) {
+    try { await unSprite(path.join(ROOT, k), o, reg, man); } catch (e) { echecs++; console.error(`${k} : ECHEC : ${e.message}`); }
+  }
+  return echecs;
 }
 
 // ------------------------------------------------------------ arguments
@@ -308,6 +343,10 @@ function parseArgs(argv) {
     else if (t === '--apercu') a.o.apercu = true;
     else if (t === '--gauche') a.o.gauche = true;
     else if (t === '--sans-manifeste') a.o.sansManifeste = true;
+    else if (t === '--methode') {
+      a.o.methode = next();
+      if (!METHODES.includes(a.o.methode)) throw new Error(`méthode inconnue : ${a.o.methode} (${METHODES.join(', ')})`);
+    } else if (t === '--vers') { a.o.vers = path.resolve(next()); a.o.sansManifeste = true; }
     else if (t.startsWith('--')) throw new Error(`option inconnue : ${t}`);
     else a.inputs.push(t);
   }
@@ -330,10 +369,17 @@ async function main() {
   }
   if (argv[0] === 'verifier') return verifier(lireJs(MANIFESTE, 'SECTIONS_LUMIERE'));
   let a;
-  try { a = parseArgs(argv); } catch (e) { console.error(`Erreur : ${e.message}`); return 2; }
+  try { a = parseArgs(argv[0] === 'tout' ? argv.slice(1) : argv); } catch (e) { console.error(`Erreur : ${e.message}`); return 2; }
+  VERS = a.o.vers || '';
   const reg = lireJs(REGISTRY, 'PIXEL_FIXED');
   const man = lireJs(MANIFESTE, 'SECTIONS_LUMIERE');
   let echecs = 0;
+  if (argv[0] === 'tout') {
+    echecs = await tout(a.o, reg, man);
+    if (!a.o.sansManifeste) { ecrireManifeste(man); console.log(`manifeste : ${relOf(MANIFESTE)}`); }
+    console.log(echecs ? `${echecs} échec(s)` : 'toutes les cartes refaites');
+    return echecs ? 1 : 0;
+  }
   try {
     const files = a.inputs.flatMap(pngsDe);
     if (!files.length) throw new Error('aucune image PNG');

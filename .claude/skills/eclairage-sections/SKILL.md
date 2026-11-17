@@ -237,6 +237,43 @@ des frames d'une animation ; arrondi au centième). s = 1 : rien ne change (cart
   ou des ombres ; sur une animation, ces masses changent d'une pose à l'autre (Kainati : 63 %
   d'orientations changeantes avant lissage, 25 % après, contre 11 % avant ce changement).
 
+## Petits sprites détaillés : méthodes A, B, C (2026-11-17)
+
+Constat (Agarica au repos, 65 x 92, s = 1) : à s = 1, `analyse()` est `sections.py` tel quel ; les
+remèdes des grands sprites ne jouent que si s > 1. Résultat : neutre en aplats (21 couleurs -> 11,
+`base[ridOf]` + grains de 1-2 px absorbés), tunique rangée avec la peau (`clusterRamps()` relie
+bba083 et fadbc0 par 17 contacts, lien 0,13 > 0,06), corps de Xara pris pour un trait (couleur de
+trait = la plus FRÉQUENTE sous L* 22), sections en miettes (parties coupées à chaque trait et chaque
+matière, bombé de 3 px, ombrage peint suivi au pixel, zones de 6 px). D'où trois méthodes,
+`--methode A|B|C` (défaut : `origine`, inchangé), même `eclairage()`, modèle v16 inchangé. Socle commun :
+- traits = la plus SOMBRE des couleurs fréquentes (+ 3,5 L*) et les couleurs de trait intérieur
+  (L* < 15, presque jamais en aplat, dessinées en creux) ;
+- matières : lien gardé s'il vaut >= 40 % du meilleur lien de chacune des deux couleurs, chroma
+  comparé tel quel sous L* 25 ; puis morceaux connexes (cheveux et bottes de même rampe = 2 matières) ;
+- neutre détaillé : correction = niveau du morceau - moyenne locale (5 x 5) ; niveau mis en commun
+  entre frames (morceaux de même rampe à 6 L* près) ; correction lissée d'une frame à l'autre et
+  ignorée sous 4 L* ; couleurs prises parmi celles du morceau ; plafond 220 (188 grisait la peau) ;
+- dôme sur toute la partie, table fine, normales lissées d'une frame à l'autre AVANT l'arrondi,
+  parties >= 24 px, zones >= 8 px (dernière passe après `heriterBord`) ; carte contre-jour par
+  section EXACTE comme à s = 1 (par direction, le liseré s'élargissait : anneau allumé 36 %,
+  test 6) ; manifeste : `fin: 1, m: <méthode>`, lu par `--depuis-sections` (table fine).
+Les trois diffèrent par les PARTIES :
+- **A masses** : partage des eaux (`massesOmbrage`, bassins >= 50 px) sur l'épaisseur + l'ombrage
+  peint ; seuls le contour et les traits de 12 px ou plus coupent ; ignore les matières ;
+- **B matières** : un morceau de matière = une partie ; motif ENFERMÉ dans un autre (taches de Xara)
+  rattaché à son support ; bandes de 2 px (ceinture) fondues ; coupe aux étranglements ;
+- **C traits** : parties fermées par les traits (>= 4 px), les traits en creux (12 L* sous leurs deux
+  voisins), les bords de couleur francs (Lab >= 18) ; bouts de trait prolongés jusqu'à 4 px ; relief
+  en coussin (bord arrondi sur 1,5 à 6 px, centre de face).
+Grand sprite (s > 1) : toutes gardent la chaîne des grands sprites (cartes identiques).
+Comparer : `node tools/lumiere/propositions.js --out <dossier>` (planches + mesures : zones,
+miettes, détail, paliers qui changent d'une frame à l'autre) ; page :
+`npm run lumiere:apercu -- --propositions [anim...]` (touches 1-4, « les 4 côte à côte ») ; la page
+« vos images » a un menu Méthode. Tests 13-16 de `npm run lumiere:tests` (miettes, matières, stabilité,
+neutre détaillé, en mémoire) ; `npm run lumiere:tests -- --methode B` : toute la batterie sur des
+cartes calculées en mémoire. Régénérer après le choix : `npm run sections -- tout --methode B`
+(`--vers <dossier>` pour un essai hors du jeu).
+
 ## Le modèle en bref (v16)
 
 Lumière = ambiance + Σ couleur × intensité × palier(min(diff + cj, 1)), MULTIPLIÉE par la couleur

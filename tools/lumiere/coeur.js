@@ -933,8 +933,9 @@
     const bv = boite(val), bp = boite(poids);
     // relief = épaisseur (distance au bord du corps ou à un trait, en px : les étranglements entre
     // deux lobes, cou, poignet, aisselle, sont des cols) + ombrage à grande échelle (2 s px par écart type)
+    // c.vallees (méthode A) : traits intérieurs courts, creux d'épaisseur sans couper la masse
     const D = new Float64Array(NP).fill(1e9);
-    for (let p = 0; p < NP; p++) if (!dans[p] || barrier[p]) D[p] = 0;
+    for (let p = 0; p < NP; p++) if (!dans[p] || barrier[p] || (c.vallees && c.vallees[p])) D[p] = 0;
     for (const [y0, y1, sy, x0, x1, sx] of [[0, h, 1, 0, w, 1], [h - 1, -1, -1, w - 1, -1, -1]]) {
       for (let y = y0; y !== y1; y += sy) {
         for (let x = x0; x !== x1; x += sx) {
@@ -954,8 +955,8 @@
     const ordre = body.slice().sort((a, b) => (B[b] - B[a]) || (a - b));
     const lab = new Int32Array(NP).fill(-1), parent = [], pic = [], aire = [];
     const racine = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
-    const AMIN = Math.round(80 * s * s);
-    const plat = (r, v) => pic[r] - v < Math.max(s, 0.15 * pic[r]);   // bassin peu marqué
+    const AMIN = c.amin || Math.round(80 * s * s);
+    const plat = (r, v) => pic[r] - v < Math.max(s, (c.platRel || 0.15) * pic[r]);   // bassin peu marqué
     const bord = new Uint8Array(NP);
     for (const p of ordre) {
       const x = p % w, y = (p - x) / w, v = B[p];
@@ -1042,6 +1043,912 @@
       const k = Math.min(1, PLAFOND / (maxi.get(ridOf[p]) || 255)), c = out[p];
       neutral[p] = k >= 1 ? c : (pyRound(((c >> 16) & 255) * k) << 16) | (pyRound(((c >> 8) & 255) * k) << 8) | pyRound((c & 255) * k);
     }
+  }
+
+  // ============================================================ méthodes A, B, C (petits sprites détaillés)
+  // Constat du 2026-11-17 (Agarica au repos, 65 x 92 px, s = 1) : à s = 1, analyse() est sections.py
+  // tel quel, et les remèdes des grands sprites (neutreDetaille, massesOmbrage, dôme sur toute la
+  // partie, table fine, filtres x s) ne jouent que si s > 1. D'où :
+  //  - neutre en aplats : chaque pixel prend la couleur de base de sa rampe et les grains de 1-2 px
+  //    sont absorbés (21 couleurs -> 11 : ombrage peint des cheveux, texture de la cape, nuances et
+  //    œil du visage effacés) ;
+  //  - matières confondues : clusterRamps() relie deux couleurs dès que leur lien dépasse 0,06 avec
+  //    une teinte et une saturation voisines : la tunique beige (bba083) rejoint la peau claire
+  //    (fadbc0) par 17 contacts, et le neutre montre un torse nu ; et la couleur de trait est la plus
+  //    FRÉQUENTE sous L* 22 : tout le corps sombre de Xara (43283b, L* 20) passe pour un trait ;
+  //  - sections en miettes : parties coupées par chaque trait et chaque changement de matière, bombé
+  //    limité à 3 px, ombrage peint suivi au pixel près (2 px), 17 sections, zones de 6 px.
+  // Les méthodes A, B, C (`--methode`, réglage `methode` de la page) partagent un SOCLE :
+  //  - traits = les noirs du contour seulement (la plus SOMBRE des couleurs fréquentes) ;
+  //  - matières : deux couleurs ne se relient que si leur lien vaut au moins 40 % du meilleur lien
+  //    de chacune (tunique et peau se touchent peu, leurs ombres beaucoup), puis morceaux connexes :
+  //    cheveux et bottes de même rampe restent deux matières ;
+  //  - neutre détaillé : seul l'ombrage plus large que 2 px est retiré, dans chaque morceau de
+  //    matière (moyenne du morceau + écart à sa moyenne locale) ; détails < 10 px gardés tels quels ;
+  //    marge sous le blanc (188) comme les grands sprites ;
+  //  - dôme sur toute la partie, table fine (face + 3 bagues x 12 directions), un peu de volume
+  //    d'ensemble ; normales lissées d'une image à l'autre AVANT d'être arrondies ; parties de
+  //    24 px et zones de 8 px au moins (aucune miette).
+  // Elles diffèrent par le découpage en PARTIES :
+  //  - A « masses » : partage des eaux sur l'épaisseur du corps + l'ombrage peint (massesOmbrage),
+  //    seuls les longs traits coupent ; ignore les matières : tête, torse, bras, jambes, cape ;
+  //  - B « matières » : une partie par morceau de matière (cheveux, visage, tunique, bras, cape,
+  //    bottes), coupée aux étranglements ;
+  //  - C « traits » : parties fermées par les traits intérieurs et le contour (trous de 1-2 px
+  //    refermés), relief en coussin (bord arrondi sur 1,5 à 3,5 px, centre de face).
+  // Grand sprite (s > 1) : toutes les méthodes gardent sa chaîne (analyse()), cartes inchangées.
+  const METHODES = ['origine', 'A', 'B', 'C'];
+  const NOMS_METHODES = { origine: 'actuelle', A: 'A - masses', B: 'B - matières', C: 'C - traits' };
+  const V2 = {
+    RHO: 2,           // neutre : rayon (px) de la moyenne locale ; l'ombrage plus large est retiré
+    SEUIL_NEUTRE: 4,  // neutre : correction d'ombrage plus petite (L*) : couleur d'origine gardée
+    DET_MIN: 10,      // morceau de matière plus petit : détail (œil, boucle), couleur gardée
+    RAMP_REL: 0.4,    // lien gardé s'il vaut >= 40 % du meilleur lien de chacune des deux couleurs
+    PART_MIN: 24,     // partie plus petite : fondue dans la voisine qui la touche le plus
+    PART_MIN_C: 40,   // idem pour C
+    ZONE_MIN: 8,      // zone de section plus petite : fondue (aucune miette)
+    TRAIT_LONG: 12,   // A : trait intérieur qui coupe une masse (px)
+    TRAIT_MIN: 4,     // C : trait intérieur plus court = texture, ne coupe pas
+    MASSE_MIN: 50,    // A : bassin plus petit fondu dans son voisin (80 px pour un grand sprite)
+    CREUX: 12,        // C : écart de L* d'un pixel de trait en creux avec ses deux voisins
+    BORD: 18,         // C : écart Lab entre deux pixels voisins qui fait frontière (bord de couleur franc)
+    GAIN_COUSSIN: 1.4, // C : pente du coussin x 1,4 (plafonnée) : liseré rasant sur 2 px
+    W_GLOBAL: 0.45, W_PART: 0.75,
+    VOISIN: 140,      // A, B : masque du dôme sur les parties voisines (255 = la partie, 0 = vide)
+    // marge sous le blanc : 188 (grands sprites) grisait la peau d'Agarica (250 -> 188) ; à 220,
+    // le 2e palier (x 1,03) reste sous le blanc, seul le dernier (x 1,36) sature
+    PLAFOND: 220,
+    TEMPS: 3,         // passes de lissage des normales d'une image à l'autre
+  };
+  const estV2 = (methode, echelle) => !!methode && methode !== 'origine' && !(echelle > 1);
+
+  // Couleurs de trait : la plus SOMBRE des couleurs fréquentes (>= 1 % des pixels, L* < 12) et
+  // celles à 3,5 de L* au plus ; plus les couleurs de TRAIT INTÉRIEUR (L* < 15) : presque jamais en
+  // aplat (moins de 10 % de pixels entourés de leur couleur) et dessinées en creux (au moins 20 %
+  // de pixels plus sombres de 8 L* que leurs deux voisins d'un même axe) : traits bruns de la
+  // marche d'Agarica (291d13). Un corps sombre (Xara : 43283b, 2c1826) fait des aplats et des
+  // dégradés, pas des creux. (sections.py prenait la plus fréquente sous L* 22 : le corps de Xara
+  // devenait un trait.)
+  function traitsV2(colors, counts, L, n, col, opqList, w, h) {
+    let lineC = null;
+    const freq = Math.max(8, 0.01 * n);
+    for (const c of colors) if (L.get(c) < 12 && counts.get(c) >= freq && (lineC === null || L.get(c) < L.get(lineC))) lineC = c;
+    if (lineC === null) { lineC = colors[0]; for (const c of colors) if (L.get(c) < L.get(lineC)) lineC = c; }
+    const dark = new Set(colors.filter((c) => L.get(c) <= L.get(lineC) + 3.5));
+    const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? -1 : col[y * w + x]);
+    const plusClair = (x, y, l) => { const d = at(x, y); return d >= 0 && L.get(d) > l + 8; };
+    const plein = new Map(), creux = new Map();
+    for (const p of opqList) {
+      const c = col[p], l = L.get(c);
+      if (l >= 15 || dark.has(c)) continue;
+      const x = p % w, y = (p - x) / w;
+      if (at(x + 1, y) === c && at(x - 1, y) === c && at(x, y + 1) === c && at(x, y - 1) === c) compter(plein, c);
+      if ([[1, 0], [0, 1], [1, 1], [1, -1]].some(([dx, dy]) => plusClair(x + dx, y + dy, l) && plusClair(x - dx, y - dy, l))) compter(creux, c);
+    }
+    for (const c of colors) {
+      if (L.get(c) >= 15 || dark.has(c)) continue;
+      if ((plein.get(c) || 0) <= 0.1 * counts.get(c) && (creux.get(c) || 0) >= 0.2 * counts.get(c)) dark.add(c);
+    }
+    return dark;
+  }
+
+  // clusterRamps() + lien RELATIF : deux couleurs ne se relient que si leur lien (contacts / racine
+  // des surfaces) vaut au moins RAMP_REL fois le meilleur lien compatible de CHACUNE. Une ombre et
+  // sa lumière se touchent partout (0,4 à 1) ; deux matières voisines, seulement à leur frontière
+  // (tunique-peau d'Agarica : 0,13 contre 0,41 et 0,52 dans chacune).
+  function clusterRampsV2(colors, counts, adj, dark, prot, forced) {
+    const feat = new Map();
+    for (const c of colors) {
+      const [Lc, a, b] = lab(c);
+      feat.set(c, [Math.atan2(b, a) * (180.0 / Math.PI), Math.hypot(a, b) / Math.max(Lc, 8.0), Math.hypot(a, b)]);
+    }
+    const parent = new Map(colors.map((c) => [c, c]));
+    const find = (c) => {
+      while (parent.get(c) !== c) { parent.set(c, parent.get(parent.get(c))); c = parent.get(c); }
+      return c;
+    };
+    for (const group of forced) {
+      const g = group.filter((c) => parent.has(c));
+      for (const c of g.slice(1)) parent.set(find(c), find(g[0]));
+    }
+    const pool = colors.filter((c) => !dark.has(c) && !prot.has(c));
+    const inPool = new Set(pool);
+    const total = pool.reduce((s, c) => s + counts.get(c), 0) || 1;
+    const rare = Math.max(6, Math.trunc(0.006 * total));
+    const span = new Map(colors.map((c) => [c, [lab(c)[0], lab(c)[0]]]));
+    // teinte et saturation voisines ; dans les tons sombres (L* < 25), le rapport chroma / L* s'affole
+    // (Xara : 2c1826 et 3a2132, même violet, 1,20 contre 0,98) : on y compare le chroma lui-même
+    const compatible = (a, b) => {
+      const fa = feat.get(a), fb = feat.get(b);
+      if (fa[2] < 8 && fb[2] < 8) return true;
+      if (Math.min(lab(a)[0], lab(b)[0]) < 25) return hueDiff(fa[0], fb[0]) < 20 && Math.abs(fa[2] - fb[2]) < 12;
+      return hueDiff(fa[0], fb[0]) < 15 && Math.abs(fa[1] - fb[1]) < 0.17;
+    };
+    const pairs = [], meilleur = new Map();
+    for (const [k, v] of adj) {
+      const a = Math.floor(k / 16777216), b = k % 16777216;
+      if (!inPool.has(a) || !inPool.has(b)) continue;
+      const s = v / Math.sqrt(counts.get(a) * counts.get(b));
+      pairs.push([s, a, b]);
+      if (compatible(a, b)) for (const c of [a, b]) meilleur.set(c, Math.max(meilleur.get(c) || 0, s));
+    }
+    pairs.sort((p, q) => (q[0] - p[0]) || (q[1] - p[1]) || (q[2] - p[2]));
+    for (const [s, a, b] of pairs) {
+      if (counts.get(a) < rare || counts.get(b) < rare) continue;
+      if (s <= 0.06 || !compatible(a, b)) continue;
+      if (s < V2.RAMP_REL * Math.min(meilleur.get(a) || 0, meilleur.get(b) || 0)) continue;
+      const ra = find(a), rb = find(b);
+      if (ra === rb) continue;
+      const lo = Math.min(span.get(ra)[0], span.get(rb)[0]), hi = Math.max(span.get(ra)[1], span.get(rb)[1]);
+      if (hi - lo > RAMP_SPAN) continue;
+      parent.set(ra, rb);
+      span.set(rb, [lo, hi]);
+    }
+    const parCompte = pool.map((c, i) => [c, i]).sort((p, q) => (counts.get(p[0]) - counts.get(q[0])) || (p[1] - q[1]));
+    for (const [c] of parCompte) {
+      if (counts.get(c) >= rare) continue;
+      const best = new Map();
+      for (const [k, v] of adj) {
+        const a = Math.floor(k / 16777216), b = k % 16777216;
+        const o = a === c ? b : b === c ? a : null;
+        if (o !== null && inPool.has(o) && counts.get(o) >= rare) compter(best, find(o), v);
+      }
+      if (best.size) parent.set(find(c), plusFrequent(best)[0]);
+    }
+    const ramps = new Map();
+    for (const c of pool) {
+      const r = find(c);
+      if (!ramps.has(r)) ramps.set(r, []);
+      ramps.get(r).push(c);
+    }
+    return [...ramps.values()];
+  }
+
+  // Distance chanfrein (1 ; 1,4142) au bord d'une région : reg[p] (-1 = hors région) ; un pixel
+  // d'une autre région, du vide ou hors de l'image est un bord.
+  function distanceRegions(reg, w, h) {
+    const NP = w * h, D = new Float64Array(NP).fill(1e9);
+    for (let p = 0; p < NP; p++) if (reg[p] < 0) D[p] = 0;
+    for (const [y0, y1, sy, x0, x1, sx] of [[0, h, 1, 0, w, 1], [h - 1, -1, -1, w - 1, -1, -1]]) {
+      for (let y = y0; y !== y1; y += sy) {
+        for (let x = x0; x !== x1; x += sx) {
+          const p = y * w + x;
+          if (!D[p]) continue;
+          for (const [dx, dy, k] of [[-sx, 0, 1], [0, -sy, 1], [-sx, -sy, 1.4142], [sx, -sy, 1.4142]]) {
+            const X = x + dx, Y = y + dy;
+            const v = X < 0 || Y < 0 || X >= w || Y >= h || reg[Y * w + X] !== reg[p] ? k : D[Y * w + X] + k;
+            if (v < D[p]) D[p] = v;
+          }
+        }
+      }
+    }
+    return D;
+  }
+
+  // Pixels de `liste` sans région -> région voisine majoritaire (8 voisins), en plusieurs passes ;
+  // `prefere(p, q)` : voisins favoris (même matière) d'abord. Restes : une région chacun.
+  function remplirRegions(reg, liste, w, h, prefere) {
+    let todo = liste.filter((p) => reg[p] < 0);
+    let suivant = 0;
+    for (let p = 0; p < reg.length; p++) suivant = Math.max(suivant, reg[p] + 1);
+    for (let it = 0; it < 12 && todo.length; it++) {
+      const pose = [], rest = [];
+      for (const p of todo) {
+        const x = p % w, y = (p - x) / w;
+        const fav = new Map(), autre = new Map();
+        for (const [dx, dy] of N8) {
+          const X = x + dx, Y = y + dy;
+          if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+          const q = Y * w + X;
+          if (reg[q] >= 0) compter(prefere && prefere(p, q) ? fav : autre, reg[q]);
+        }
+        const m = fav.size ? fav : autre;
+        if (m.size) pose.push([p, plusFrequent(m)[0]]); else rest.push(p);
+      }
+      for (const [p, r] of pose) reg[p] = r;   // après la passe : pas de traînée dans un sens
+      todo = rest;
+    }
+    for (const p of todo) reg[p] = suivant++;
+  }
+
+  // Régions de moins de `mini` px fondues dans la voisine qui les touche le plus (8 voisins ; sans
+  // contact direct : à 2 px, à travers un trait), la plus petite d'abord. Renumérote 0..n-1.
+  function fondreRegions(reg, w, h, mini) {
+    const membres = new Map();
+    for (let p = 0; p < reg.length; p++) if (reg[p] >= 0) { if (!membres.has(reg[p])) membres.set(reg[p], []); membres.get(reg[p]).push(p); }
+    const contacts = (r, rayon) => {
+      const cnt = new Map();
+      for (const p of membres.get(r)) {
+        const x = p % w, y = (p - x) / w;
+        for (let dy = -rayon; dy <= rayon; dy++) {
+          for (let dx = -rayon; dx <= rayon; dx++) {
+            const X = x + dx, Y = y + dy;
+            if ((!dx && !dy) || X < 0 || Y < 0 || X >= w || Y >= h) continue;
+            const q = Y * w + X;
+            if (reg[q] >= 0 && reg[q] !== r) compter(cnt, reg[q]);
+          }
+        }
+      }
+      return cnt;
+    };
+    // tas (taille, numéro) : la plus petite d'abord ; une région qui grossit y est remise
+    const tas = [];
+    const avant = (a, b) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+    const pousser = (e) => {
+      tas.push(e);
+      for (let i = tas.length - 1; i > 0;) { const j = (i - 1) >> 1; if (!avant(tas[i], tas[j])) break; [tas[i], tas[j]] = [tas[j], tas[i]]; i = j; }
+    };
+    const tirer = () => {
+      const top = tas[0], fin = tas.pop();
+      if (tas.length) {
+        tas[0] = fin;
+        for (let i = 0; ;) {
+          const l = 2 * i + 1, r = l + 1;
+          let m = i;
+          if (l < tas.length && avant(tas[l], tas[m])) m = l;
+          if (r < tas.length && avant(tas[r], tas[m])) m = r;
+          if (m === i) break;
+          [tas[i], tas[m]] = [tas[m], tas[i]]; i = m;
+        }
+      }
+      return top;
+    };
+    for (const [r, m] of membres) if (m.length < mini) pousser([m.length, r]);
+    while (tas.length) {
+      const [n, pr] = tirer();
+      if (!membres.has(pr) || membres.get(pr).length !== n) continue;   // déjà fondue ou grossie
+      let cnt = contacts(pr, 1);
+      if (!cnt.size) cnt = contacts(pr, 2);
+      if (!cnt.size) continue;   // isolée : reste telle quelle
+      const nr = plusFrequent(cnt)[0];
+      for (const p of membres.get(pr)) reg[p] = nr;
+      membres.get(nr).push(...membres.get(pr));
+      membres.delete(pr);
+      if (membres.get(nr).length < mini) pousser([membres.get(nr).length, nr]);
+    }
+    const num = new Map();
+    for (let p = 0; p < reg.length; p++) if (reg[p] >= 0) { if (!num.has(reg[p])) num.set(reg[p], num.size); reg[p] = num.get(reg[p]); }
+    return num.size;
+  }
+
+  // Composantes 4-connexes des pixels de `liste` (et d'eux seuls) où ok(q, c) relie deux voisins
+  function composantes(liste, w, h, NP, ok) {
+    const reg = new Int32Array(NP).fill(-1), membre = new Uint8Array(NP);
+    for (const p of liste) membre[p] = 1;
+    let n = 0;
+    for (const p0 of liste) {
+      if (reg[p0] >= 0 || !ok(p0, p0)) continue;
+      reg[p0] = n;
+      const pile = [p0];
+      while (pile.length) {
+        const c = pile.pop(), x = c % w, y = (c - x) / w;
+        for (const [dx, dy] of N4) {
+          const X = x + dx, Y = y + dy;
+          if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+          const q = Y * w + X;
+          if (membre[q] && reg[q] < 0 && ok(q, c)) { reg[q] = n; pile.push(q); }
+        }
+      }
+      n++;
+    }
+    return reg;
+  }
+
+  // C : les traits intérieurs s'arrêtent souvent à 2-4 px d'un autre trait ou du contour (bras
+  // contre le torse, jambe contre jambe) ; une partie « fermée par les traits » fuirait par ces
+  // trous. Chaque bout de trait est prolongé jusqu'au trait (ou au vide) le plus proche DEVANT lui,
+  // à PONT px au plus (segment de Bresenham). Renvoie les pixels du corps à ajouter à la barrière.
+  const PONT = 4;
+  function pontsTraits(line, garde, opq, w, h) {
+    const NP = w * h, out = new Uint8Array(NP);
+    const est = (x, y) => x >= 0 && y >= 0 && x < w && y < h && line[y * w + x] && garde(y * w + x);
+    const vide = (x, y) => x < 0 || y < 0 || x >= w || y >= h || !opq[y * w + x];
+    for (let p = 0; p < NP; p++) {
+      if (!line[p] || !garde(p)) continue;
+      const x = p % w, y = (p - x) / w;
+      let nv = 0, touche = false;
+      for (const [dx, dy] of N8) { if (est(x + dx, y + dy)) nv++; if (vide(x + dx, y + dy)) touche = true; }
+      if (nv !== 1 || touche) continue;   // bout de trait intérieur : un seul voisin trait
+      // pixels du même trait à 5 pas au plus (exclus des cibles) ; direction = bout - leur centre
+      const proches = new Set([p]);
+      let front = [p];
+      for (let k = 0; k < 5; k++) {
+        const nx_ = [];
+        for (const q of front) {
+          const qx = q % w, qy = (q - qx) / w;
+          for (const [dx, dy] of N8) { const X = qx + dx, Y = qy + dy; if (est(X, Y) && !proches.has(Y * w + X)) { proches.add(Y * w + X); nx_.push(Y * w + X); } }
+        }
+        front = nx_;
+      }
+      let cx = 0, cy = 0;
+      for (const q of proches) { cx += q % w; cy += (q - (q % w)) / w; }
+      cx /= proches.size; cy /= proches.size;
+      let dx0 = x - cx, dy0 = y - cy;
+      const m = Math.hypot(dx0, dy0);
+      if (m < 0.5) continue;
+      dx0 /= m; dy0 /= m;
+      let best = null, bd = Infinity;
+      for (let ty = y - PONT; ty <= y + PONT; ty++) {
+        for (let tx = x - PONT; tx <= x + PONT; tx++) {
+          const d = Math.hypot(tx - x, ty - y);
+          if (d < 1.5 || d > PONT + 0.5 || ((tx - x) * dx0 + (ty - y) * dy0) / d < 0.5) continue;
+          const cible = vide(tx, ty) || (est(tx, ty) && !proches.has(ty * w + tx));
+          if (cible && d < bd) { bd = d; best = [tx, ty]; }
+        }
+      }
+      if (!best) continue;
+      // segment p -> cible (exclus), pixels du corps seulement
+      const n = Math.max(Math.abs(best[0] - x), Math.abs(best[1] - y));
+      for (let k = 1; k < n; k++) {
+        const X = Math.round(x + (best[0] - x) * k / n), Y = Math.round(y + (best[1] - y) * k / n);
+        if (!vide(X, Y) && !line[Y * w + X]) out[Y * w + X] = 1;
+      }
+    }
+    return out;
+  }
+
+  // B : motif = morceau ENFERMÉ dans un autre plus grand (avec le contour extérieur) et qui le touche
+  // directement sur au moins 30 % de son pourtour : taches de Xara, broderie. Il rejoint ce morceau
+  // (du plus petit au plus grand). Un morceau seulement voisin (capuche sous les cheveux, séparée
+  // du reste par des traits intérieurs) n'est pas enfermé : il reste une partie.
+  function porterMotifs(reg, body, w, h, contour) {
+    const taille = new Map(), cont = new Map(), peri = new Map();
+    for (const p of body) compter(taille, reg[p]);
+    for (const p of body) {
+      const x = p % w, y = (p - x) / w, r = reg[p];
+      for (const [dx, dy] of N4) {
+        const X = x + dx, Y = y + dy, q = Y * w + X;
+        const autre = X < 0 || Y < 0 || X >= w || Y >= h || reg[q] !== r;
+        if (!autre) continue;
+        compter(peri, r);
+        if (X >= 0 && Y >= 0 && X < w && Y < h && reg[q] >= 0) {
+          if (!cont.has(r)) cont.set(r, new Map());
+          compter(cont.get(r), reg[q]);
+        }
+      }
+    }
+    const membres = new Map();
+    for (const p of body) { if (!membres.has(reg[p])) membres.set(reg[p], []); membres.get(reg[p]).push(p); }
+    // part des pixels de r enfermés par o + contour (remplissage depuis le bord de la boîte de o)
+    const enferme = (r, o) => {
+      let x0 = w, y0 = h, x1 = -1, y1 = -1;
+      for (const p of membres.get(o)) { const x = p % w, y = (p - x) / w; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      x0--; y0--; x1++; y1++;
+      const BW = x1 - x0 + 1, BH = y1 - y0 + 1, vu = new Uint8Array(BW * BH), file = [];
+      const mur = (x, y) => x >= 0 && y >= 0 && x < w && y < h && (reg[y * w + x] === o || contour[y * w + x]);
+      const graine = (x, y) => { const k = (y - y0) * BW + x - x0; if (!vu[k] && !mur(x, y)) { vu[k] = 1; file.push(k); } };
+      for (let x = x0; x <= x1; x++) { graine(x, y0); graine(x, y1); }
+      for (let y = y0; y <= y1; y++) { graine(x0, y); graine(x1, y); }
+      for (let i = 0; i < file.length; i++) {
+        const k = file[i], x = x0 + (k % BW), y = y0 + ((k - (k % BW)) / BW);
+        if (x > x0) graine(x - 1, y);
+        if (x < x1) graine(x + 1, y);
+        if (y > y0) graine(x, y - 1);
+        if (y < y1) graine(x, y + 1);
+      }
+      let dedans = 0;
+      for (const p of membres.get(r)) {
+        const x = p % w, y = (p - x) / w;
+        if (x > x0 && x < x1 && y > y0 && y < y1 && !vu[(y - y0) * BW + x - x0]) dedans++;
+      }
+      return dedans / membres.get(r).length;
+    };
+    const parent = new Map();
+    const racine = (r) => { while (parent.has(r)) r = parent.get(r); return r; };
+    const ordre = [...taille.keys()].sort((a, b) => (taille.get(a) - taille.get(b)) || (a - b));
+    for (const r of ordre) {
+      const c = cont.get(r);
+      if (!c) continue;
+      const [o, v] = plusFrequent(c);
+      if (taille.get(o) > taille.get(r) && v / peri.get(r) >= 0.3 && racine(o) !== r && enferme(r, o) >= 0.8) parent.set(r, o);
+    }
+    for (const p of body) reg[p] = racine(reg[p]);
+  }
+
+  // B : parties de 2 px d'épaisseur au plus (ceinture, lanière, liseré) fondues dans la voisine qui
+  // les touche le plus : elles suivent le volume de ce qui les porte au lieu d'un dôme à elles
+  function fondreMinces(reg, body, w, h) {
+    const D = distanceRegions(reg, w, h), prof = new Map();
+    for (const p of body) prof.set(reg[p], Math.max(prof.get(reg[p]) || 0, D[p]));
+    const minces = new Set([...prof].filter(([, v]) => v < 2).map(([r]) => r));
+    if (!minces.size) return new Set(body.map((p) => reg[p])).size;
+    // chaque mince -> voisine non mince qui la touche le plus (8 voisins, puis à 2 px)
+    for (const r of minces) {
+      const cnt = new Map();
+      for (const rayon of [1, 2]) {
+        for (const p of body) {
+          if (reg[p] !== r) continue;
+          const x = p % w, y = (p - x) / w;
+          for (let dy = -rayon; dy <= rayon; dy++) {
+            for (let dx = -rayon; dx <= rayon; dx++) {
+              const X = x + dx, Y = y + dy;
+              if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+              const q = Y * w + X;
+              if (reg[q] >= 0 && reg[q] !== r && !minces.has(reg[q])) compter(cnt, reg[q]);
+            }
+          }
+        }
+        if (cnt.size) break;
+      }
+      if (!cnt.size) continue;
+      const nr = plusFrequent(cnt)[0];
+      for (const p of body) if (reg[p] === r) reg[p] = nr;
+    }
+    return fondreRegions(reg, w, h, 1);
+  }
+
+  // B : coupe chaque partie à ses étranglements (partage des eaux sur l'épaisseur DANS la partie ;
+  // deux bassins restent séparés si le moins haut dépasse le col de max(1 ; 30 %) et fait 40 px)
+  function couperEtranglements(reg, liste, w, h) {
+    const NP = w * h, D = distanceRegions(reg, w, h);
+    const ordre = liste.filter((p) => reg[p] >= 0).sort((a, b) => (D[b] - D[a]) || (a - b));
+    const lab_ = new Int32Array(NP).fill(-1), parent = [], pic = [], aire = [];
+    const racine = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+    const AMIN = 40;
+    const plat = (r, v) => pic[r] - v < Math.max(1, 0.3 * pic[r]);
+    const col = new Uint8Array(NP);
+    for (const p of ordre) {
+      const x = p % w, y = (p - x) / w, v = D[p];
+      const voisins = new Set();
+      for (const [dx, dy] of N4) {
+        const X = x + dx, Y = y + dy;
+        if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+        const q = Y * w + X;
+        if (lab_[q] >= 0 && reg[q] === reg[p]) voisins.add(racine(lab_[q]));
+      }
+      if (!voisins.size) { const i = parent.length; parent.push(i); pic.push(v); aire.push(1); lab_[p] = i; continue; }
+      const liste_ = [...voisins].sort((a, b) => (pic[b] - pic[a]) || (a - b));
+      let garde = [liste_[0]];
+      for (const r of liste_.slice(1)) {
+        const ok = garde.find((g) => plat(r, v) || aire[r] < AMIN || plat(g, v) || aire[g] < AMIN);
+        if (ok !== undefined) {
+          const a = racine(ok), b = racine(r);
+          if (a !== b) { parent[b] = a; aire[a] += aire[b]; pic[a] = Math.max(pic[a], pic[b]); }
+        } else garde.push(r);
+      }
+      garde = [...new Set(garde.map(racine))];
+      if (garde.length > 1) { col[p] = 1; continue; }
+      lab_[p] = garde[0]; aire[garde[0]]++;
+    }
+    const out = new Int32Array(NP).fill(-1);
+    for (const p of liste) if (lab_[p] >= 0) out[p] = racine(lab_[p]);
+    remplirRegions(out, liste.filter((p) => col[p]), w, h, (p, q) => reg[p] === reg[q]);
+    return out;
+  }
+
+  // Neutre du socle : dans chaque morceau de matière d'au moins DET_MIN px, cible = niveau du
+  // morceau + (L* du pixel - moyenne locale du morceau, rayon RHO) : l'ombrage plus large que la
+  // fenêtre part, les mèches, plis et textures restent. Couleur prise dans la rampe (palette du
+  // sprite). Petits morceaux, traits et détails : couleur d'origine. Puis marge sous le blanc.
+  // Niveau du morceau : sa moyenne, mise en commun avec les morceaux de même rampe et de moyenne
+  // voisine (groupe de 6 L* d'étendue au plus, sans chaîne) : les cheveux de toutes les frames d'une
+  // animation ont le MÊME niveau (sinon le neutre entier d'une matière change de teinte d'une frame
+  // à l'autre quand sa forme change : clignotement) ; les bottes (même rampe, 15 L* plus sombres)
+  // gardent le leur. Couleurs permises : celles du groupe (2 % de ses pixels au moins) : un morceau
+  // ne prend jamais la couleur d'une autre matière restée dans la même rampe (marche d'Agarica :
+  // peau et tunique dans une rampe, le visage devenait beige-gris).
+  function neutreV2(c) {
+    const { w, h, NP, opqList, col, ramps, L, inst, instRampe } = c;
+    const neutral = new Int32Array(NP).fill(-1);
+    for (const p of opqList) neutral[p] = col[p];
+    const nI = instRampe.length, som = new Float64Array(nI), nb = new Float64Array(nI);
+    for (const p of opqList) if (inst[p] >= 0) { som[inst[p]] += L.get(col[p]); nb[inst[p]]++; }
+    const niveau = new Float64Array(nI), groupe = new Int32Array(nI).fill(-1);
+    const parRampe = new Map();
+    for (let i = 0; i < nI; i++) {
+      if (nb[i] < V2.DET_MIN) continue;
+      if (!parRampe.has(instRampe[i])) parRampe.set(instRampe[i], []);
+      parRampe.get(instRampe[i]).push(i);
+    }
+    let ng = 0;
+    for (const liste of parRampe.values()) {
+      liste.sort((a, b) => (som[a] / nb[a] - som[b] / nb[b]) || (a - b));
+      let debut = 0;
+      for (let k = 1; k <= liste.length; k++) {
+        if (k < liste.length && som[liste[k]] / nb[liste[k]] - som[liste[debut]] / nb[liste[debut]] <= 6) continue;
+        const g = liste.slice(debut, k);
+        const m = g.reduce((s, i) => s + som[i], 0) / g.reduce((s, i) => s + nb[i], 0);
+        for (const i of g) { niveau[i] = m; groupe[i] = ng; }
+        ng++;
+        debut = k;
+      }
+    }
+    const couleursG = Array.from({ length: ng }, () => new Map()), tailleG = new Float64Array(ng);
+    for (const p of opqList) if (inst[p] >= 0 && groupe[inst[p]] >= 0) { compter(couleursG[groupe[inst[p]]], col[p]); tailleG[groupe[inst[p]]]++; }
+    const permises = couleursG.map((m, g) => [...m].filter(([, v]) => v >= 0.02 * tailleG[g]).map(([cc]) => cc).sort((a, b) => L.get(a) - L.get(b) || a - b));
+    // correction d'ombrage de chaque pixel : niveau du morceau - moyenne locale ; lissée d'une image à
+    // l'autre comme les normales (un même point du corps garde la même correction, sinon le neutre
+    // scintille) ; sous SEUIL_NEUTRE L*, le pixel garde sa couleur (le dessin n'est pas retouché pour
+    // un ombrage négligeable, et l'arrondi à la palette ne bascule pas d'une frame à l'autre)
+    const R = V2.RHO;
+    const corr = new Float64Array(NP), zero = new Float64Array(NP), garde = new Uint8Array(NP);
+    for (const p of opqList) {
+      const i = inst[p];
+      if (i < 0 || nb[i] < V2.DET_MIN) continue;
+      const x = p % w, y = (p - x) / w;
+      let s = 0, k = 0;
+      for (let dy = -R; dy <= R; dy++) {
+        for (let dx = -R; dx <= R; dx++) {
+          const X = x + dx, Y = y + dy;
+          if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+          const q = Y * w + X;
+          if (inst[q] === i) { s += L.get(col[q]); k++; }
+        }
+      }
+      corr[p] = niveau[i] - s / k;
+      garde[p] = 1;
+    }
+    if (c.cadres) {
+      const m = new Int32Array(NP).fill(-1);
+      for (const p of opqList) if (garde[p]) m[p] = instRampe[inst[p]];
+      lisserNormalesTemps(corr, zero, m, c.cadres, w, h);
+    }
+    for (const p of opqList) {
+      if (!garde[p] || Math.abs(corr[p]) < V2.SEUIL_NEUTRE) continue;
+      const cible = L.get(col[p]) + corr[p];
+      let best = col[p], bv = Math.abs(L.get(col[p]) - cible);
+      for (const cc of permises[groupe[inst[p]]]) { const v = Math.abs(L.get(cc) - cible); if (v < bv) { bv = v; best = cc; } }
+      neutral[p] = best;
+    }
+    // marge sous le blanc, par rampe (même rapport pour toutes ses couleurs : détail gardé)
+    const maxi = new Map();
+    for (const p of opqList) {
+      if (inst[p] < 0) continue;
+      const cc = neutral[p], m = Math.max((cc >> 16) & 255, (cc >> 8) & 255, cc & 255);
+      maxi.set(instRampe[inst[p]], Math.max(maxi.get(instRampe[inst[p]]) || 0, m));
+    }
+    for (const p of opqList) {
+      if (inst[p] < 0) continue;
+      const k = Math.min(1, V2.PLAFOND / (maxi.get(instRampe[inst[p]]) || 255)), cc = neutral[p];
+      if (k < 1) neutral[p] = (pyRound(((cc >> 16) & 255) * k) << 16) | (pyRound(((cc >> 8) & 255) * k) << 8) | pyRound((cc & 255) * k);
+    }
+    return neutral;
+  }
+
+  // Normales : lissées d'une image à l'autre (mêmes pixels de même matière après recalage du corps
+  // entier), AVANT d'être arrondies en sections : une orientation ne bascule plus pour un pixel.
+  function lisserNormalesTemps(nx, ny, mat, cadres, w, h) {
+    const { n, fw, gap } = cadres;
+    if (!(n > 1)) return;
+    const F = [];
+    for (let i = 0; i < n; i++) {
+      const a = new Int32Array(fw * h).fill(-1), liste = [];
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < fw; x++) {
+          const P = y * w + i * (fw + gap) + x;
+          if (mat[P] >= 0) { a[y * fw + x] = mat[P]; liste.push(y * fw + x); }
+        }
+      }
+      F.push({ a, liste });
+    }
+    const dec = new Map();
+    for (let i = 0; i < n; i++) for (const j of [pyMod(i - 1, n), pyMod(i + 1, n)]) if (!dec.has(i * n + j)) dec.set(i * n + j, meilleurDecalage(F[i].a, F[j].a, fw, h, F[i].liste, 3, 1));
+    for (let it = 0; it < V2.TEMPS; it++) {
+      const ox = Float64Array.from(nx), oy = Float64Array.from(ny);
+      for (let i = 0; i < n; i++) {
+        for (const p of F[i].liste) {
+          const x = p % fw, y = (p - x) / fw, P = y * w + i * (fw + gap) + x;
+          let sx = ox[P], sy = oy[P], sw = 1;   // poids égaux : la frame et ses deux voisines
+          for (const j of [pyMod(i - 1, n), pyMod(i + 1, n)]) {
+            const [dx, dy] = dec.get(i * n + j), X = x + dx, Y = y + dy;
+            if (X < 0 || Y < 0 || X >= fw || Y >= h || F[j].a[Y * fw + X] !== F[i].a[p]) continue;
+            const Q = Y * w + j * (fw + gap) + X;
+            sx += ox[Q]; sy += oy[Q]; sw++;
+          }
+          nx[P] = sx / sw; ny[P] = sy / sw;
+        }
+      }
+    }
+  }
+
+  // Analyse d'une image (sprite seul ou mosaïque des frames d'une animation) par la méthode A, B ou
+  // C. cadres : { n, fw, gap } si `im` est une mosaïque de n frames de fw px séparées de gap px.
+  // Même sortie qu'analyse() (+ fin : table fine).
+  function analyseV2(im, garder, rampes, tailleRef, methode, cadres) {
+    const w = im.width, h = im.height, d = im.data, NP = w * h;
+    const opq = new Uint8Array(NP), col = new Int32Array(NP).fill(-1), opqList = [];
+    for (let p = 0; p < NP; p++) if (d[p * 4 + 3] >= 128) { opq[p] = 1; opqList.push(p); col[p] = rgbInt(d, p * 4); }
+    const dans = (x, y) => x >= 0 && y >= 0 && x < w && y < h && opq[y * w + x] === 1;
+    const counts = new Map();
+    for (const p of opqList) compter(counts, col[p]);
+    const colors = [...counts.keys()];
+    const adj = new Map();
+    for (const p of opqList) {
+      const x = p % w, y = (p - x) / w;
+      for (const [dx, dy] of [[1, 0], [0, 1]]) {
+        if (!dans(x + dx, y + dy)) continue;
+        const q = (y + dy) * w + x + dx;
+        if (col[q] !== col[p]) compter(adj, Math.min(col[p], col[q]) * 16777216 + Math.max(col[p], col[q]));
+      }
+    }
+    const L = new Map(colors.map((c) => [c, lab(c)[0]]));
+    const chroma = new Map(colors.map((c) => [c, Math.hypot(lab(c)[1], lab(c)[2])]));
+    const n = opqList.length;
+    const dark = traitsV2(colors, counts, L, n, col, opqList, w, h);
+
+    // détails gardés (œil) : comme analyse()
+    const prot = new Uint8Array(NP);
+    const rare = Math.max(4, Math.trunc(0.01 * n));
+    const chromas = opqList.map((p) => chroma.get(col[p])).sort((a, b) => a - b);
+    const medC = chromas[Math.floor(n / 2)];
+    const seeds = new Set(colors.filter((c) => counts.get(c) < rare && chroma.get(c) > Math.max(45, 1.4 * medC)));
+    for (const g of garder) seeds.add(parseHex(g));
+    let front = opqList.filter((p) => seeds.has(col[p]));
+    for (const p of front) prot[p] = 1;
+    for (let it = 0; it < 2; it++) {
+      const nxt = new Set();
+      for (const p of front) {
+        const x = p % w, y = (p - x) / w;
+        for (const [dx, dy] of N8) {
+          if (!dans(x + dx, y + dy)) continue;
+          const q = (y + dy) * w + x + dx;
+          if (!prot[q] && counts.get(col[q]) < rare) nxt.add(q);
+        }
+      }
+      for (const q of nxt) prot[q] = 1;
+      front = [...nxt];
+    }
+    const pc = new Map();
+    for (const p of opqList) if (prot[p]) compter(pc, col[p]);
+    const protC = new Set([...pc].filter(([c, v]) => v === counts.get(c)).map(([c]) => c));
+    const forced = rampes.map((g) => g.split(',').filter((t) => t.trim()).map(parseHex));
+    const ramps = clusterRampsV2(colors, counts, adj, dark, protC, forced);
+    const rampOf = new Map();
+    ramps.forEach((r, i) => r.forEach((c) => rampOf.set(c, i)));
+    const line = new Uint8Array(NP);
+    for (const p of opqList) if (dark.has(col[p]) && !prot[p]) line[p] = 1;
+    const body = opqList.filter((p) => !line[p]);
+    const mat = new Int32Array(NP).fill(-1);   // matière (rampe) de chaque pixel du corps
+    for (const p of body) if (!prot[p] && rampOf.has(col[p])) mat[p] = rampOf.get(col[p]);
+
+    // morceaux de matière : composantes 4-connexes de même rampe (traits et détails exclus)
+    const inst = composantes(body, w, h, NP, (q, c) => mat[q] >= 0 && mat[q] === mat[c]);
+    const instRampe = [];
+    for (const p of body) if (inst[p] >= 0) instRampe[inst[p]] = mat[p];
+    const neutral = neutreV2({ w, h, NP, opqList, col, ramps, L, inst, instRampe, cadres });
+
+    // contour extérieur (vecteurs vers le vide) ; traits intérieurs et leur longueur
+    const oD = new Float64Array(NP), oVX = new Float64Array(NP), oVY = new Float64Array(NP);
+    nearestVectors(w, (X, Y) => !dans(X, Y), opqList, 6, oD, oVX, oVY);
+    const interieur = opqList.filter((p) => {
+      if (!line[p]) return false;
+      const x = p % w, y = (p - x) / w;
+      for (const [dx, dy] of N8) if (!dans(x + dx, y + dy)) return false;
+      return true;
+    });
+    const traitReg = composantes(interieur, w, h, NP, (q) => line[q] === 1 && oD[q] > 1.5);
+    const longueur = new Map();
+    for (const p of interieur) if (traitReg[p] >= 0) compter(longueur, traitReg[p]);
+    // barrière : traits gardés, épaissis d'1 px (8 voisins) pour fermer les trous de 1-2 px
+    const barriere = (garde) => {
+      const b = new Uint8Array(NP);
+      for (const p of opqList) {
+        if (!line[p] || !garde(p)) continue;
+        b[p] = 1;
+        const x = p % w, y = (p - x) / w;
+        for (const [dx, dy] of N8) if (dans(x + dx, y + dy)) b[(y + dy) * w + x + dx] = 1;
+      }
+      return b;
+    };
+    const exterieur = (p) => traitReg[p] < 0;   // contour et traits qui le touchent
+
+    // ---- parties
+    let part, barriereVue = null;
+    if (methode === 'A') {
+      // masses : partage des eaux sur l'épaisseur (au contour, aux longs traits ; les traits plus
+      // courts creusent sans couper) + l'ombrage peint ; seuls le contour et les longs traits coupent
+      const barrier = barriereVue = barriere((p) => exterieur(p) || longueur.get(traitReg[p]) >= V2.TRAIT_LONG);
+      const vallees = new Uint8Array(NP);
+      for (const p of opqList) if (line[p] && longueur.get(traitReg[p]) >= V2.TRAIT_MIN) vallees[p] = 1;
+      for (const p of massesOmbrage({ w, h, NP, s: 1, body, prot, col, rampOf, ramps, L, counts, barrier, vallees, amin: V2.MASSE_MIN, platRel: 0.1 })) barrier[p] = 1;
+      part = composantes(body, w, h, NP, (q) => !barrier[q]);
+      remplirRegions(part, body, w, h, (p, q) => mat[p] === mat[q]);
+    } else if (methode === 'C') {
+      // traits : régions fermées par les traits (les très courts, texture, ne coupent pas), bouts
+      // de traits prolongés jusqu'au trait ou au vide le plus proche (PONT px)
+      const garde = (p) => exterieur(p) || longueur.get(traitReg[p]) >= V2.TRAIT_MIN;
+      const barrier = barriereVue = barriere(garde);
+      // traits dessinés dans une couleur de la matière (brun foncé entre bras et torse, mèches) :
+      // pixels en CREUX, plus sombres de CREUX L* que leurs deux voisins d'un axe (trait de 1 ou 2
+      // px) ; les points isolés (texture, moins de 3 px) ne coupent pas
+      const Lp = (x, y) => (dans(x, y) ? L.get(col[y * w + x]) : null);
+      const creux = new Uint8Array(NP);
+      for (const p of body) {
+        if (prot[p]) continue;
+        const x = p % w, y = (p - x) / w, l = L.get(col[p]);
+        for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) {
+          const a = Lp(x - dx, y - dy), b = Lp(x + dx, y + dy), c2 = Lp(x + 2 * dx, y + 2 * dy);
+          if (a === null || b === null) continue;
+          if (a - l >= V2.CREUX && b - l >= V2.CREUX) { creux[p] = 1; break; }
+          if (a - l >= V2.CREUX && Math.abs(b - l) <= 4 && c2 !== null && c2 - l >= V2.CREUX) { creux[p] = 1; creux[(y + dy) * w + x + dx] = 1; break; }
+        }
+      }
+      const cc = composantes(body, w, h, NP, (q) => creux[q] === 1), tc = new Map();
+      for (const p of body) if (cc[p] >= 0) compter(tc, cc[p]);
+      const traits = Uint8Array.from(line);
+      for (const p of body) if (cc[p] >= 0 && tc.get(cc[p]) >= 3) { traits[p] = 1; barrier[p] = 1; }
+      const pts = pontsTraits(traits, (p) => !line[p] || garde(p), opq, w, h);
+      for (let p = 0; p < NP; p++) if (pts[p]) barrier[p] = 1;
+      // et les bords de couleur francs (écart Lab >= BORD) : ces sprites séparent souvent cheveux
+      // et visage, cape et tunique par la couleur seule, sans trait
+      part = composantes(body, w, h, NP, (q, c) => !barrier[q] && (q === c || dist3(lab(col[q]), lab(col[c])) < V2.BORD));
+      remplirRegions(part, body, w, h, (p, q) => mat[p] === mat[q]);
+    } else {
+      // matières : un morceau = une partie, détails rendus au morceau voisin ; un MOTIF (taches de
+      // Xara, boucle, broderie : morceau bordé surtout par un seul autre morceau, plus grand) fait
+      // partie de celui qui le porte ; puis coupe aux étranglements
+      part = Int32Array.from(inst);
+      fondreRegions(part, w, h, V2.DET_MIN);
+      remplirRegions(part, body, w, h, null);
+      const contourExt = new Uint8Array(NP);
+      for (const p of opqList) if (line[p] && exterieur(p)) contourExt[p] = 1;
+      porterMotifs(part, body, w, h, contourExt);
+      part = couperEtranglements(part, body, w, h);
+    }
+    // C : les bords de couleur francs découpent plus finement (fourrure, plis) : parties de 40 px au moins
+    let nReg = fondreRegions(part, w, h, methode === 'C' ? V2.PART_MIN_C : V2.PART_MIN);
+    // bandes minces (ceinture, lanière : 3 px d'épaisseur au plus) : suivent la partie qui les porte
+    if (methode === 'B') nReg = fondreMinces(part, body, w, h);
+
+    // ---- volume d'ensemble : silhouette floutée (comme analyse())
+    const tr = tailleRef || [w, h];
+    const gblur = Math.max(GBLUR_MIN, GBLUR_REL * Math.min(tr[0], tr[1]));
+    const gp = Math.trunc(2.5 * gblur) + 2;
+    const MW = w + 2 * gp, MH = h + 2 * gp;
+    const mask = new Uint8Array(MW * MH);
+    for (const p of opqList) { const x = p % w, y = (p - x) / w; mask[(y + gp) * MW + x + gp] = 255; }
+    const hill = flouGaussien(mask, MW, MH, gblur);
+    const gX = new Float64Array(NP), gY = new Float64Array(NP), mags = [];
+    for (const p of opqList) {
+      const x = p % w, y = (p - x) / w, X = x + gp, Y = y + gp;
+      gX[p] = -(hill[Y * MW + X + 1] - hill[Y * MW + X - 1]) / 2.0;
+      gY[p] = (hill[(Y + 1) * MW + X] - hill[(Y - 1) * MW + X]) / 2.0;
+      mags.push(Math.hypot(gX[p], gY[p]));
+    }
+    mags.sort((a, b) => a - b);
+    const gmax = mags[Math.trunc(mags.length * 0.97)] || 1.0;
+
+    // ---- relief de chaque partie. Les traits INTÉRIEURS (poils du grizzly, plis) sont rendus à la
+    // partie voisine pour le relief : sinon chacun fait un trou dans le masque flouté, et le dôme
+    // se creuse en rigoles le long de chaque trait (sections en rayures)
+    const rel = Int32Array.from(part);
+    const traitsInt = opqList.filter((p) => line[p] && !exterieur(p));
+    remplirRegions(rel, traitsInt, w, h, null);
+    let nRel = nReg;
+    for (const p of traitsInt) nRel = Math.max(nRel, rel[p] + 1);
+    const pgX = new Float64Array(NP), pgY = new Float64Array(NP);
+    const membres = Array.from({ length: nRel }, () => []);
+    for (const p of opqList) if (rel[p] >= 0) membres[rel[p]].push(p);
+    const D = distanceRegions(rel, w, h);
+    for (let r = 0; r < nRel; r++) {
+      const ms = membres[r];
+      if (!ms.length) continue;
+      let prof = 0, bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+      for (const p of ms) { const x = p % w, y = (p - x) / w; prof = Math.max(prof, D[p]); bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x); by0 = Math.min(by0, y); by1 = Math.max(by1, y); }
+      // marge : étalement du flou (3 passes de boîte) autour de la partie
+      const pad = 3 * (Math.ceil(Math.max(1.2, 0.5 * prof)) + 2) + 2;
+      const CX0 = bx0 - pad, CY0 = by0 - pad, CW = bx1 - bx0 + 1 + 2 * pad, CH = by1 - by0 + 1 + 2 * pad;
+      const H = new Float64Array(CW * CH);
+      const at = (p) => { const x = p % w, y = (p - x) / w; return (y - CY0) * CW + x - CX0; };
+      if (methode === 'C') {
+        // coussin : profil circulaire sur R px depuis le bord, centre plat (de face)
+        const R = Math.max(1.5, Math.min(6, 0.75 * prof));
+        for (const p of ms) { const t = Math.min(1, D[p] / R); H[at(p)] = R * Math.sqrt(Math.max(0, 1 - (1 - t) * (1 - t))); }
+        let pmx = 0;
+        for (const p of ms) {
+          const i = at(p);
+          const gx = -(H[i + 1] - H[i - 1]) / 2.0, gy = (H[i + CW] - H[i - CW]) / 2.0;
+          const m = Math.sqrt(1 + gx * gx + gy * gy);
+          pgX[p] = gx / m; pgY[p] = gy / m;
+          pmx = Math.max(pmx, Math.hypot(pgX[p], pgY[p]));
+        }
+        // bord ramené à 1 comme le dôme, puis x GAIN_COUSSIN (plafonné à 1) : le liseré du coussin
+        // est RASANT sur 2 px (sinon, avec une seule bague de 70° d'1 px, le contre-jour n'atteint
+        // presque jamais le dernier palier : test 11, crapaud, loup, grizzly)
+        pmx = pmx || 1.0;
+        for (const p of ms) {
+          const k = V2.GAIN_COUSSIN / pmx, m = Math.hypot(pgX[p], pgY[p]) * k;
+          const f = m > 1 ? k / m : k;
+          pgX[p] *= f; pgY[p] *= f;
+        }
+      } else {
+        // dôme sur toute la partie : masque flouté, rayon = moitié de sa profondeur. Les pixels des
+        // AUTRES parties (corps) valent VOISIN, le vide et le contour 0 : le bord est rasant contre le
+        // vide, seulement incliné contre une partie voisine (deux masses accolées, épaule et flanc du
+        // grizzly, ne font pas un pli à angle droit : sinon des rayures d'ombre et de lumière)
+        const rad = Math.max(1.2, 0.5 * prof);
+        const pm = new Uint8Array(CW * CH);
+        for (let y = Math.max(0, CY0); y < Math.min(h, CY0 + CH); y++) {
+          for (let x = Math.max(0, CX0); x < Math.min(w, CX0 + CW); x++) {
+            const q = y * w + x;
+            if (rel[q] >= 0 && rel[q] !== r) pm[(y - CY0) * CW + x - CX0] = V2.VOISIN;
+          }
+        }
+        for (const p of ms) pm[at(p)] = 255;
+        const ph = flouGaussien(pm, CW, CH, rad);
+        let pmx = 0;
+        for (const p of ms) {
+          const i = at(p);
+          pgX[p] = -(ph[i + 1] - ph[i - 1]) / 2.0;
+          pgY[p] = (ph[i + CW] - ph[i - CW]) / 2.0;
+          pmx = Math.max(pmx, Math.hypot(pgX[p], pgY[p]));
+        }
+        pmx = pmx || 1.0;
+        for (const p of ms) { pgX[p] /= pmx; pgY[p] /= pmx; }
+      }
+    }
+    const nx = new Float64Array(NP), ny = new Float64Array(NP);
+    for (const p of body) {
+      const gn = Math.hypot(gX[p], gY[p]) || 1.0;
+      const gk = V2.W_GLOBAL * Math.pow(Math.min(1.0, Math.hypot(gX[p], gY[p]) / gmax), 0.8);
+      nx[p] = gX[p] / gn * gk + V2.W_PART * pgX[p];
+      ny[p] = gY[p] / gn * gk + V2.W_PART * pgY[p];
+    }
+    if (cadres) {
+      const m = new Int32Array(NP).fill(-1);
+      for (const p of body) m[p] = mat[p] >= 0 ? mat[p] : 100000 + col[p];
+      lisserNormalesTemps(nx, ny, m, cadres, w, h);
+    }
+
+    // ---- sections (table fine), contour, traits, filtres
+    let codes = new Int32Array(NP).fill(-1);
+    const ordre = [];
+    for (const p of body) { codes[p] = quantize(nx[p], ny[p], true); ordre.push(p); }
+    const outline = new Uint8Array(NP);
+    for (const p of opqList) {
+      if (!line[p] || oD[p] > 2.3) continue;
+      outline[p] = 1;
+      const m = Math.hypot(oVX[p], oVY[p]) || 1;
+      codes[p] = quantize(oVX[p] / m, -oVY[p] / m, true);
+      ordre.push(p);
+    }
+    let pending = opqList.filter((p) => codes[p] < 0);
+    for (let it = 0; it < 6 && pending.length; it++) {
+      const pose = [], rest = [];
+      for (const p of pending) {
+        const x = p % w, y = (p - x) / w;
+        const cnt = new Map();
+        for (const [dx, dy] of N8) {
+          const X = x + dx, Y = y + dy;
+          if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+          const q = Y * w + X;
+          if (codes[q] >= 0 && !outline[q]) compter(cnt, codes[q]);
+        }
+        if (cnt.size) pose.push([p, plusFrequent(cnt)[0]]); else rest.push(p);
+      }
+      for (const [p, c] of pose) { codes[p] = c; ordre.push(p); }
+      pending = rest;
+    }
+    for (const p of pending) { codes[p] = 0; ordre.push(p); }
+    const regall = new Int32Array(NP).fill(-9);
+    for (const p of opqList) regall[p] = part[p] >= 0 ? part[p] : outline[p] ? -2 : -3;
+    codes = modeFilter(codes, ordre, w, h, regall, outline, 2);
+    codes = mergeSmall(codes, ordre, w, h, V2.ZONE_MIN, outline);
+    codes = heriterBord(codes, opq, w, h);
+    codes = sansMiettes(codes, opqList, w, h);
+
+    const base = ramps.map((r) => rampBase(r, counts));
+    const info = {
+      ramps: ramps.map((r, i) => [hexc(base[i]), r.slice().sort((a, b) => L.get(a) - L.get(b)).map(hexc)]),
+      lines: [...dark].map(hexc).sort(), protected: [...new Set(opqList.filter((p) => prot[p]).map((p) => hexc(col[p])))].sort(),
+      parts: nReg, outline, rampOf, methode,
+    };
+    // part, inst, rel, barriere : pour les vues de diagnostic (morceaux de matière, parties, relief)
+    return { opq, opqList, neutral, codes, info, fin: true, part, inst, barriere: barriereVue, rel };
+  }
+
+  // Dernière passe (après heriterBord, qui peut laisser un pixel isolé sur le bord) : plus aucune
+  // zone sous ZONE_MIN, contour compris (au plus 3 tours de mergeSmall, sans pixel gardé)
+  function sansMiettes(codes, liste, w, h) {
+    const rien = new Uint8Array(w * h);
+    for (let it = 0; it < 3; it++) codes = mergeSmall(codes, liste, w, h, V2.ZONE_MIN, rien);
+    return codes;
+  }
+
+  // Aiguillage : méthode A, B ou C sur un petit sprite, sinon analyse() (sections.py, grands sprites)
+  function analyser(im, garder, rampes, peint, tailleRef, echelle, methode, cadres) {
+    if (estV2(methode, echelle)) return analyseV2(im, garder || [], rampes || [], tailleRef, methode, cadres);
+    return analyse(im, garder || [], rampes || [], peint, tailleRef, echelle);
   }
 
   // ------------------------------------------------------------ images
@@ -1172,8 +2079,11 @@
     return cands[best];
   }
 
-  // nat : sprite natif (silhouette), nor : normales, neu : neutre (traits sombres)
-  function carteCj(nat, nor, neu, echelle) {
+  // nat : sprite natif (silhouette), nor : normales, neu : neutre (traits sombres) ;
+  // fin : sections de la table fine à s = 1 (méthodes A, B, C). La propagation y reste par section
+  // EXACTE, comme sections.py : par direction (règle des grands sprites), le liseré s'élargissait
+  // à toutes les bagues et l'anneau allumé à contre-jour dépassait 35 % (test 6, Agarica).
+  function carteCj(nat, nor, neu, echelle, fin) {   // eslint-disable-line no-unused-vars
     const s = echelle > 1 ? echelle : 1;
     const contour = CJ_CONTOUR * s, frange = aL(CJ_FRANGE, s), lisse = aL(CJ_LISSE, s), portee = CJ_PORTEE * s;
     const demi = s > 1 ? Math.pow(0.5, 1 / s) : 0.5;   // même atténuation totale sur 2 s px
@@ -1592,7 +2502,8 @@
   // Anti-clignotement : un pixel qui garde la même matière d'une frame à l'autre (après recalage du
   // corps entier, qui monte et descend en marchant) prend la direction majoritaire sur sa frame et ses
   // deux voisines (boucle).
-  function lisserTemps(codes, cols, keep, listes, w, h, echelle) {
+  // zmin : zone minimale après le vote (méthodes A, B, C : V2.ZONE_MIN ; sinon 4 s² px)
+  function lisserTemps(codes, cols, keep, listes, w, h, echelle, zmin) {
     const s = echelle > 1 ? echelle : 1;
     const n = codes.length, shifts = new Map();
     for (let i = 0; i < n; i++) {
@@ -1631,7 +2542,7 @@
         const [best, v] = plusFrequent(votes);
         if (v >= 2.0) nw[p] = best;
       }
-      out.push(mergeSmall(nw, listes[i], w, h, aS(4, s), keep[i]));
+      out.push(mergeSmall(nw, listes[i], w, h, zmin || aS(4, s), keep[i]));
     }
     return { codes: out, avant, apres: taux(out) };
   }
@@ -1671,44 +2582,48 @@
 
   // Sections d'une animation : UNE analyse sur la mosaïque des frames (mêmes matières), puis
   // lissage dans le temps (4 passes) et contour hérité. Renvoie, par frame, { opq, neutral, codes }.
-  function sectionsAnimation(canv, garder, rampes, peint, echelle) {
+  // methode : 'origine' (défaut, analyse()) ou 'A', 'B', 'C' (petits sprites, analyseV2()).
+  function sectionsAnimation(canv, garder, rampes, peint, echelle, methode) {
     const s = echelle > 1 ? echelle : 1;
     const w = canv[0].width, h = canv[0].height, gap = 24;
     const mosa = nouvelle(canv.length * (w + gap) - gap, h);
     canv.forEach((c, i) => coller(mosa, c, i * (w + gap), 0));
-    const res = analyse(mosa, garder || [], rampes || [], !!peint, [w, h], s);
+    const v2 = estV2(methode, echelle);
+    const res = analyser(mosa, garder, rampes, !!peint, [w, h], s, methode, { n: canv.length, fw: w, gap });
     const MW = mosa.width;
-    const fc = [], fn = [], fcol = [], fkeep = [], listes = [];
+    const fc = [], fn = [], fcol = [], fkeep = [], listes = [], fmo = [];
     const mat = new Map();
     res.info.ramps.forEach(([, cs], idx) => cs.forEach((c) => mat.set(parseInt(c, 16), idx)));
     canv.forEach((c, i) => {
       const x0 = i * (w + gap);
       const cd = new Int32Array(w * h).fill(-1), nd = new Int32Array(w * h).fill(-1), cl = new Int32Array(w * h).fill(-1), kp = new Uint8Array(w * h);
+      const mo = new Int32Array(w * h).fill(-1);   // morceau de matière (méthodes A, B, C ; -1 sinon)
       const liste = [];   // ordre du dict Python de la frame = ordre du set de la mosaïque
       for (const P of res.opqList) {
         const X = P % MW, y = (P - X) / MW, x = X - x0;
         if (x < 0 || x >= w) continue;
         const p = y * w + x;
         liste.push(p);
-        cd[p] = res.codes[P]; nd[p] = res.neutral[P];
+        cd[p] = res.codes[P]; nd[p] = res.neutral[P]; if (res.inst) mo[p] = res.inst[P];
         const col = rgbInt(mosa.data, P * 4);
         cl[p] = mat.has(col) ? mat.get(col) : 1000 + col;   // matière (rampe) ; lignes et détails : leur couleur
         kp[p] = res.info.outline[P];
       }
-      fc.push(cd); fn.push(nd); fcol.push(cl); fkeep.push(kp); listes.push(liste);
+      fc.push(cd); fn.push(nd); fcol.push(cl); fkeep.push(kp); listes.push(liste); fmo.push(mo);
     });
-    let r = lisserTemps(fc, fcol, fkeep, listes, w, h, s);
+    const zmin = v2 ? V2.ZONE_MIN : 0;
+    let r = lisserTemps(fc, fcol, fkeep, listes, w, h, s, zmin);
     const avant = r.avant;
-    for (let it = 0; it < 3; it++) r = lisserTemps(r.codes, fcol, fkeep, listes, w, h, s);
+    for (let it = 0; it < 3; it++) r = lisserTemps(r.codes, fcol, fkeep, listes, w, h, s, zmin);
     const opqF = listes.map((l) => { const m = new Uint8Array(w * h); for (const p of l) m[p] = 1; return m; });
-    const codesF = r.codes.map((c, i) => heriterBord(c, opqF[i], w, h));
-    return { frames: canv.map((c, i) => ({ opq: opqF[i], neutral: fn[i], codes: codesF[i] })), info: res.info, avant, apres: r.apres };
+    const codesF = r.codes.map((c, i) => (v2 ? sansMiettes(heriterBord(c, opqF[i], w, h), listes[i], w, h) : heriterBord(c, opqF[i], w, h)));
+    return { frames: canv.map((c, i) => ({ opq: opqF[i], neutral: fn[i], codes: codesF[i], fin: !!res.fin, inst: res.inst ? fmo[i] : null })), info: res.info, avant, apres: r.apres, fin: !!res.fin };
   }
 
   // Toutes les cartes d'un sprite natif analysé : neutre, sections, normales, contre-jour (+ aperçu)
   function cartes(nat, res, echelle) {
     const { neu, sec, nor } = saveMaps(nat.width, nat.height, res.opq, res.neutral, res.codes);
-    const cj = carteCj(nat, nor, neu, echelle);
+    const cj = carteCj(nat, nor, neu, echelle, res.fin);
     return { nat, neu, sec, nor, cj, cjAp: cjApercu(cj) };
   }
 
@@ -1839,12 +2754,13 @@
   // Chaîne complète d'images quelconques déjà décodées (RGBA), dans l'ordre des frames :
   // fond uni retiré, taille d'un pixel dessiné détectée (ou imposée), retour à 1 pixel par case,
   // couleurs réduites si l'image est peinte, sections, normales, carte contre-jour.
-  // reglages : { fond: true, tol: 24, facteur: 0 (= auto) }. Renvoie { f, auto, peint, messages,
-  // frames: [{ nat, neu, sec, nor, cj, cjAp, geo }] } ; erreur claire si l'image ne convient pas.
+  // reglages : { fond: true, tol: 24, facteur: 0 (= auto), methode: 'origine' | 'A' | 'B' | 'C' }.
+  // Renvoie { f, auto, peint, messages, frames: [{ nat, neu, sec, nor, cj, cjAp, geo }] } ; erreur
+  // claire si l'image ne convient pas.
   const PERSO_MAX = 400;          // px natifs au plus sur un côté (temps de calcul)
   const PERSO_COULEURS = 64;      // au-delà : image peinte, palette réduite à 32 couleurs
   function traiterImages(ims, reglages) {
-    const reg = Object.assign({ fond: true, tol: 24, facteur: 0 }, reglages || {});
+    const reg = Object.assign({ fond: true, tol: 24, facteur: 0, methode: 'origine' }, reglages || {});
     const messages = [];
     let frames = ims.map(nettoyerAlpha);
     const aDuVide = (im) => { for (let p = 0; p < im.width * im.height; p++) if (im.data[p * 4 + 3] < 128) return true; return false; };
@@ -1886,9 +2802,12 @@
     }
     const ech = echelleSprite(canv);
     if (ech > 1) messages.push(`Grand sprite : réglages en pixels multipliés par ${ech} (zones, lissages, carte contre-jour, neutre détaillé).`);
-    const res = canv.length > 1 ? sectionsAnimation(canv, [], [], peint, ech).frames : [analyse(canv[0], [], [], peint, null, ech)];
+    const methode = METHODES.includes(reg.methode) ? reg.methode : 'origine';
+    if (estV2(methode, ech)) messages.push(`Méthode ${NOMS_METHODES[methode]}.`);
+    else if (methode !== 'origine') messages.push(`Grand sprite : méthode ${methode} sans effet, chaîne des grands sprites gardée.`);
+    const res = canv.length > 1 ? sectionsAnimation(canv, [], [], peint, ech, methode).frames : [analyser(canv[0], [], [], peint, null, ech, methode)];
     return {
-      f, auto, peint, messages, s: ech,
+      f, auto, peint, messages, s: ech, methode,
       frames: canv.map((nat, i) => {
         const c = cartes(nat, res[i], ech);
         const masque = new Uint8Array(nat.width * nat.height);
@@ -1900,5 +2819,5 @@
     };
   }
 
-  return { echelleSprite, ECHELLE_REF, neutreDetaille, traiterImages, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
+  return { METHODES, NOMS_METHODES, V2, estV2, analyseV2, analyser, clusterRampsV2, traitsV2, echelleSprite, ECHELLE_REF, neutreDetaille, traiterImages, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
 });

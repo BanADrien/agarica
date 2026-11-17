@@ -12,11 +12,62 @@
   D.assets = D.assets || [];
   const perso = [];   // assets de l'utilisateur : { nom, frames: [{ cartes en data URL }] }
 
+  // Propositions (npm run lumiere:apercu -- --propositions) : D.propositions = { sprites: [{ nom,
+  // assets: un par méthode }], methodes, noms, textes }. L'iframe ne reçoit que les assets du sprite
+  // choisi ; une méthode = un asset : on change son menu « asset » (même lumière, mêmes réglages).
+  const P = D.propositions || null;
+  const choix = { sprite: 0, methode: 0, tous: false };
+  if (P) D.assets = P.sprites[0].assets;
+
   function afficher() {
+    if (P) D.assets = P.sprites[choix.sprite].assets;
     const html = MODELE.replace('/*__DONNEES__*/null', () => JSON.stringify(D).replace(/<\//g, '<\\/'));
     const vue = $('vue');
-    vue.onload = () => brancherGlisser(vue.contentDocument);
+    vue.onload = () => { brancherGlisser(vue.contentDocument); appliquerChoix(); };
     vue.srcdoc = html;
+  }
+
+  // ---------------------------------------------------------------- bandeau des propositions
+  function appliquerChoix() {
+    if (!P) return;
+    const doc = $('vue').contentDocument;
+    if (!doc) return;
+    const sel = doc.getElementById('asset'), tous = doc.getElementById('tous');
+    const n = P.sprites[choix.sprite].assets.length;
+    choix.methode = Math.min(choix.methode, n - 1);
+    if (sel && n > 1) { sel.value = String(choix.methode); sel.dispatchEvent(new Event('change')); }
+    if (tous && tous.checked !== choix.tous) { tous.checked = choix.tous; tous.dispatchEvent(new Event('change')); }
+    const a = P.sprites[choix.sprite].assets[choix.methode];
+    $('props-texte').textContent = (a && P.textes[a.methode]) || '';
+    document.querySelectorAll('#props-boutons button').forEach((b, i) => b.setAttribute('aria-pressed', i === choix.methode ? 'true' : 'false'));
+  }
+  function majBandeau() {
+    if (!P) return;
+    $('props').hidden = false;
+    const ss = $('props-sprite');
+    ss.textContent = '';
+    P.sprites.forEach((s, i) => { const o = document.createElement('option'); o.value = i; o.textContent = s.nom; ss.appendChild(o); });
+    ss.value = String(choix.sprite);
+    const box = $('props-boutons');
+    box.textContent = '';
+    P.sprites[choix.sprite].assets.forEach((a, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = `${i + 1}. ${P.noms[a.methode] || a.methode}`;
+      b.onclick = () => { choix.methode = i; appliquerChoix(); };
+      box.appendChild(b);
+    });
+  }
+  function touche(e) {
+    if (!P || e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    const k = +e.key;
+    if (k >= 1 && k <= P.sprites[choix.sprite].assets.length) { choix.methode = k - 1; appliquerChoix(); }
+  }
+  if (P) {
+    $('props-sprite').onchange = () => { choix.sprite = +$('props-sprite').value; majBandeau(); afficher(); };
+    $('props-tous').onchange = () => { choix.tous = $('props-tous').checked; appliquerChoix(); };
+    document.addEventListener('keydown', touche);
+    majBandeau();
   }
 
   // ---------------------------------------------------------------- images <-> RGBA
@@ -41,7 +92,7 @@
   // ---------------------------------------------------------------- calcul
   function reglages() {
     const f = parseFloat(String($('p-facteur').value).replace(',', '.'));
-    return { fond: $('p-fond').checked, tol: Math.max(0, Math.min(255, +$('p-tol').value || 0)), facteur: f > 0 ? f : 0 };
+    return { fond: $('p-fond').checked, tol: Math.max(0, Math.min(255, +$('p-tol').value || 0)), facteur: f > 0 ? f : 0, methode: $('p-methode').value };
   }
   const naturel = (a, b) => a.localeCompare(b, 'fr', { numeric: true });
 
@@ -54,21 +105,33 @@
     try {
       const ims = [];
       for (const f of liste) ims.push(await decoder(f));
-      const r = C.traiterImages(ims, reglages());
+      const reg = reglages();
+      const methodes = reg.methode === 'toutes' ? ['origine', 'A', 'B', 'C'] : [reg.methode];
       const nom = liste.length > 1 ? liste[0].name.replace(/[_-]?\d*\.(png|jpe?g)$/i, '') || 'animation' : liste[0].name.replace(/\.(png|jpe?g)$/i, '');
-      const frames = r.frames.map((c) => ({
-        natif: versUrl(c.nat), neutre: versUrl(c.neu), n: versUrl(c.nor), sections: versUrl(c.sec),
-        cj: versUrl(c.cj), 'cj-apercu': versUrl(c.cjAp), geo: versUrl(c.geo),
-      }));
       const images = (fr) => ({ origine: fr.natif, neutre: fr.neutre, normales: fr.n, sections: fr.sections, geo: fr.geo, cj: fr.cj });
-      const asset = frames.length > 1
-        ? { nom: `${nom} (vos images)`, frames: frames.map((fr) => ({ images: images(fr) })), fps: 12, vitesse: 0, regarde: 'droite', s: r.s }
-        : { nom: `${nom} (votre image)`, images: images(frames[0]), regarde: 'droite', s: r.s };
-      D.assets.unshift(asset);
-      perso.unshift({ nom, frames });
+      const nouveaux = [];
+      let r = null;
+      for (const m of methodes) {
+        r = C.traiterImages(ims, Object.assign({}, reg, { methode: m }));
+        const suffixe = methodes.length > 1 || m !== 'origine' ? `, ${C.NOMS_METHODES[m]}` : '';
+        const frames = r.frames.map((c) => ({
+          natif: versUrl(c.nat), neutre: versUrl(c.neu), n: versUrl(c.nor), sections: versUrl(c.sec),
+          cj: versUrl(c.cj), 'cj-apercu': versUrl(c.cjAp), geo: versUrl(c.geo),
+        }));
+        nouveaux.push(frames.length > 1
+          ? { nom: `${nom} (vos images${suffixe})`, methode: m, frames: frames.map((fr) => ({ images: images(fr) })), fps: 12, vitesse: 0, regarde: 'droite', s: r.s }
+          : { nom: `${nom} (votre image${suffixe})`, methode: m, images: images(frames[0]), regarde: 'droite', s: r.s });
+        perso.unshift({ nom: `${nom}${methodes.length > 1 || m !== 'origine' ? `_${m}` : ''}`, frames });
+      }
+      if (P) {
+        // une entrée de plus dans le menu des sprites, avec ses méthodes
+        P.sprites.unshift({ nom: `${nom} (vos images)`, assets: nouveaux });
+        choix.sprite = 0;
+        majBandeau();
+      } else D.assets.unshift(...nouveaux);
       const w = r.frames[0].nat.width, h = r.frames[0].nat.height;
-      etat([`${nom} : ${w} x ${h} pixels dessinés, 1 pixel = ${r.f} px de l'image${r.auto ? ' (détecté)' : ''}, ${frames.length} image(s), ${Math.round(performance.now() - t0)} ms.`]
-        .concat(r.messages).join(' '), false, r.messages.some((m) => /mauvais|peinte|Pas de grille/.test(m)));
+      etat([`${nom} : ${w} x ${h} pixels dessinés, 1 pixel = ${r.f} px de l'image${r.auto ? ' (détecté)' : ''}, ${r.frames.length} image(s), ${methodes.length} méthode(s), ${Math.round(performance.now() - t0)} ms.`]
+        .concat(r.messages.filter((m) => !/^Méthode/.test(m))).join(' '), false, r.messages.some((m) => /mauvais|peinte|Pas de grille/.test(m)));
       $('p-detecte').textContent = `détecté : ${r.f}`;
       telechargements();
       afficher();
@@ -105,6 +168,7 @@
   function brancherGlisser(doc) {
     if (!doc || doc.__perso) return;
     doc.__perso = true;
+    if (doc !== document) doc.addEventListener('keydown', touche);   // touches 1 à 4 dans la vue aussi
     doc.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('survol'); });
     doc.addEventListener('dragleave', () => document.body.classList.remove('survol'));
     doc.addEventListener('drop', (e) => {

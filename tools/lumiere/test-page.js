@@ -8,7 +8,8 @@
  * de tools/lumiere/sortie/ (ignoré par git).
  * Cas : un asset du jeu tel quel (grizzly, réglages automatiques), un autre en natif recollé sur
  * fond blanc et agrandi x4, la marche d'Agarica (8 images = une animation), Kainati (grand sprite,
- * réglages à l'échelle) seul et en 4 images.
+ * réglages à l'échelle) seul et en 4 images ; puis les méthodes A, B, C (petits sprites : Agarica
+ * au repos, sa marche, le grizzly), comparées au calcul de Node seulement.
  * Navigateur : variable NAVIGATEUR, sinon Edge / Chrome / Chromium aux emplacements habituels.
  * Code 0 si tout est identique, 1 sinon, 2 sans navigateur.
  */
@@ -81,6 +82,7 @@ function main() {
   const grizNat = PNG.lirePng(asset('grizzly_frames/_lumiere/grizzly_row0_2_natif.png'));
   const kai = [0, 1, 2, 3].map((i) => PNG.lirePng(asset(`kainati_frames/kainati_row0_${i}.png`)));
   const marche = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => PNG.lirePng(asset(`agarica_walk_frames/agarica_walk_${i}.png`)));
+  const repos = [0, 1, 2, 3].map((i) => PNG.lirePng(asset(`agarica_repos_frames/agarica_repos_row0_${i}.png`)));
   const cas = [
     { nom: 'grizzly du jeu (auto)', ims: [griz], reglages: {}, jeu: ['grizzly_frames/_lumiere/grizzly_row0_0'] },
     { nom: 'grizzly (pose 2) natif x4 sur fond blanc (auto)', ims: [surFondBlanc(grizNat, 4)], reglages: {}, jeu: ['grizzly_frames/_lumiere/grizzly_row0_2'] },
@@ -88,6 +90,11 @@ function main() {
     // grand sprite (s > 1) : réglages en pixels à l'échelle ; facteur 1,08 du registre imposé
     { nom: 'Kainati, grand sprite seul (facteur 1,08)', ims: [kai[0]], reglages: { facteur: 1.08 }, jeu: null },
     { nom: 'Kainati, 4 images (facteur 1,08)', ims: kai, reglages: { facteur: 1.08 }, jeu: kai.map((_, i) => `kainati_frames/_lumiere/kainati_row0_${i}`) },
+    // méthodes A, B, C (petits sprites) : navigateur = Node seulement (les cartes du jeu sont en « origine »)
+    { nom: 'Agarica au repos, 4 images, méthode A', ims: repos, reglages: { methode: 'A' }, jeu: null },
+    { nom: 'marche d\'Agarica, 8 images, méthode B', ims: marche, reglages: { methode: 'B' }, jeu: null },
+    { nom: 'Agarica au repos, 4 images, méthode C', ims: repos, reglages: { methode: 'C' }, jeu: null },
+    { nom: 'grizzly seul (auto), méthode B', ims: [griz], reglages: { methode: 'B' }, jeu: null },
   ];
   const page = construirePage({ titre: 'essai', echelle: 6, assets: [], geoPad: 10 },
     cas.map((c) => ({ nom: c.nom, reglages: c.reglages, images: c.ims.map(url) })));

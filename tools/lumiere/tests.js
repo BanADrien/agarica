@@ -8,6 +8,11 @@
  * contre-jour _cj.png pour l'arrière). Intensité AVANT paliers sauf mention.
  * Plus deux contrôles de code : le shader du jeu (src/utils/LightKit.js) est bien celui de la
  * page validée (tools/lumiere/apercu.html), et la version CPU suit le même calcul que le GLSL.
+ * Petits sprites (tests 13 à 16) : les méthodes A, B, C de coeur.js, cartes calculées en mémoire
+ * (pas de miettes, matières distinctes et neutre fidèle, stabilité d'une image à l'autre, neutre
+ * détaillé). `--sans-petits` : les sauter (plus rapide).
+ * `--methode X` : toute la batterie sur des cartes calculées en mémoire par la méthode X (rien n'est
+ * écrit) : à lancer AVANT `npm run sections -- tout --methode X`.
  * Sortie : tableau Markdown ; code 0 si tout passe, 1 sinon.
  */
 const fs = require('fs');
@@ -15,6 +20,8 @@ const path = require('path');
 const vm = require('vm');
 const CPU = require('./cpu.js');
 const { lirePng } = require('./png.js');
+const COEUR = require('./coeur.js');
+const PR = require('./propositions.js');
 const GEO = require('./geo.js');
 const LightKit = require('../../src/utils/LightKit.js');
 
@@ -135,6 +142,21 @@ function chargerSprite(url, man) {
   const cj = fs.existsSync(f('cj')) ? lirePng(f('cj')).data : null;   // sans carte : exposition 0
   // grand sprite : normale lissée échantillonnée tous les round(s) px, comme le shader
   return new Sprite({ w: n.width, h: n.height, n: n.data, neutre: neu.data, cj }, e.s > 1 ? Math.round(e.s) : 1, e.s);
+}
+
+// --methode X : mêmes sprites, cartes calculées EN MÉMOIRE par cette méthode (rien n'est écrit),
+// pour vérifier une méthode avant de refaire les cartes du jeu (npm run sections -- tout --methode X)
+const enMemoire = new Map();
+function spriteMethode(url, man, methode) {
+  const e = man[url];
+  if (!e) return null;
+  // grand sprite : les méthodes gardent sa chaîne, cartes identiques à celles du jeu (vérifié au
+  // pixel près sur Kainati) : on les lit au lieu de les recalculer (plusieurs minutes)
+  if (e.s > 1) return chargerSprite(url, man);
+  const nom = e.anim || url;
+  if (!enMemoire.has(nom)) enMemoire.set(nom, PR.calculer(PR.natifs(nom, man), methode));
+  const r = enMemoire.get(nom), c = r.frames[e.anim ? e.i || 0 : 0];
+  return new Sprite({ w: c.nor.width, h: c.nor.height, n: c.nor.data, neutre: c.neu.data, cj: c.cj.data }, r.s > 1 ? Math.round(r.s) : 1, r.s);
 }
 
 // demi-sphère analytique (normales continues), couleur moyenne
@@ -388,6 +410,69 @@ function tSymetrie() {
   return pire;
 }
 
+// ---------------------------------------------------------------- petits sprites : méthodes A, B, C
+// Cartes calculées EN MÉMOIRE par chaque méthode (les cartes du jeu ne changent pas tant qu'on ne
+// les refait pas) sur des animations détaillées : Agarica au repos (le cas signalé), en marche,
+// Xara, le loup. 13 : aucune zone de section sous V2.ZONE_MIN px (pixels clairs) ; 14 : matières
+// séparées (tunique beige et peau d'Agarica au repos dans deux matières ; corps sombre de Xara qui
+// n'est pas un « trait ») et neutre fidèle à chaque matière (luminosité moyenne de chaque morceau de
+// 30 px ou plus gardée à 10 L* près : pas de torse nu) ; 15 : stabilité d'une image à l'autre
+// (paliers reçus sous trois lampes fixes, pixels qui gardent leur couleur d'origine après recalage)
+// pas pire que la méthode actuelle + 3 points ; 16 : neutre détaillé (contraste local >= 85 % de
+// l'origine, au moins 90 % de ses couleurs).
+const PETITS = ['agarica_repos_sit', 'agarica_walk', 'xara_walk', 'loup_run'];
+function testsPetits(ajout, man, methodes) {
+  const Lm = (c) => COEUR.lab(c)[0];
+  const actuelle = new Map();
+  for (const nom of PETITS) {
+    let anim;
+    try { anim = PR.natifs(nom, man); } catch (e) { ajout('-', nom, true, `absent du manifeste : ${e.message}`); continue; }
+    const r0 = PR.calculer(anim, 'origine');
+    actuelle.set(nom, PR.stabilite(r0.frames, PR.eclairesPourStabilite(r0.frames)));
+    for (const m of methodes) {
+      const r = PR.calculer(anim, m), sujet = `${nom} (${m})`;
+      const mi = r.frames.map((c) => PR.miettes(c, COEUR.V2.ZONE_MIN));
+      const pp = mini(mi.map((x) => x.plusPetite));
+      ajout('13 pas de miettes', sujet, pp >= COEUR.V2.ZONE_MIN && maxi(mi.map((x) => x.miettes)) === 0,
+        `plus petite zone ${pp} px (>= ${COEUR.V2.ZONE_MIN}) ; ${Math.round(moyenne(mi.map((x) => x.zones)))} zones par image`);
+      // neutre fidèle : luminosité moyenne de chaque morceau de matière (origine / neutre)
+      let pire = 0, nm = 0;
+      r.frames.forEach((c, i) => {
+        const inst = r.res.frames[i].inst;
+        if (!inst) return;
+        const acc = new Map();
+        for (let p = 0; p < inst.length; p++) {
+          if (inst[p] < 0) continue;
+          if (!acc.has(inst[p])) acc.set(inst[p], [0, 0, 0]);
+          const a = acc.get(inst[p]);
+          a[0] += Lm(COEUR.rgbInt(c.nat.data, p * 4)); a[1] += Lm(COEUR.rgbInt(c.neu.data, p * 4)); a[2]++;
+        }
+        for (const [o, n, k] of acc.values()) if (k >= 30) { nm++; pire = Math.max(pire, Math.abs(o - n) / k); }
+      });
+      const ram = r.res.info.ramps.map(([, cs]) => new Set(cs));
+      const memeMatiere = (a, b) => ram.some((s) => s.has(a) && s.has(b));
+      let extra = '', ok14 = pire <= 10;
+      if (nom === 'agarica_repos_sit') {
+        const sep = !memeMatiere('bba083', 'fadbc0');
+        ok14 = ok14 && sep;
+        extra = ` ; tunique bba083 et peau fadbc0 : ${sep ? 'deux matières' : 'MÊME matière'}`;
+      }
+      if (nom === 'xara_walk') {
+        const corps = !r.res.info.lines.includes('43283b');
+        ok14 = ok14 && corps;
+        extra = ` ; corps 43283b : ${corps ? 'matière' : 'TRAIT'}`;
+      }
+      ajout('14 matières distinctes, neutre fidèle', sujet, ok14, `écart max de luminosité moyenne d'un morceau ${pire.toFixed(1)} L* (<= 10, ${nm} morceaux)${extra}`);
+      const st = PR.stabilite(r.frames, PR.eclairesPourStabilite(r.frames)), ref = actuelle.get(nom);
+      ajout('15 stabilité d\'une image à l\'autre', sujet, st <= ref + 0.03,
+        `paliers qui changent ${(100 * st).toFixed(1)} % (méthode actuelle ${(100 * ref).toFixed(1)} %, + 3 points au plus) ; neutre qui change ${(100 * PR.stabiliteNeutre(r.frames)).toFixed(1)} %`);
+      const de = PR.detail(r.frames[0]);
+      ajout('16 neutre détaillé', sujet, de.contraste >= 0.85 && de.couleurs >= 0.9 * de.couleursOrigine,
+        `contraste local ${(100 * de.contraste).toFixed(0)} % de l'origine (>= 85 %) ; ${de.couleurs} couleurs / ${de.couleursOrigine}`);
+    }
+  }
+}
+
 // ---------------------------------------------------------------- alignement du code
 function corps(src, nom) {
   const i = src.search(new RegExp(`(float|vec3|function)\\s+${nom}\\s*\\(`));
@@ -440,9 +525,14 @@ function main() {
   const ac = alignementCpu();
   ajout('0 alignement GLSL <-> CPU', 'eclairage()', ac.ok, ac.ok ? `${ac.n} appels et nombres identiques` : ac.ecart);
   const man = manifeste();
+  const argv = process.argv.slice(2);
+  const im = argv.indexOf('--methode');
+  const methode = im >= 0 ? argv[im + 1] : null;
+  if (methode && !COEUR.METHODES.includes(methode)) { console.error(`méthode inconnue : ${methode} (${COEUR.METHODES.join(', ')})`); return 2; }
   let charges = 0;
-  for (const [nom, url] of SPRITES) {
-    const sp = chargerSprite(url, man);
+  for (const [nom0, url] of SPRITES) {
+    const nom = methode ? `${nom0} [${methode}]` : nom0;
+    const sp = methode ? spriteMethode(url, man, methode) : chargerSprite(url, man);
     if (!sp) { ajout('-', nom, true, `cartes absentes (${url}) : lancer npm run sections`); continue; }
     charges++;
     for (const cote of ['gauche', 'droite', 'haut', 'bas']) {
@@ -475,6 +565,7 @@ function main() {
   }
   const sy = tSymetrie();
   ajout('3 symétrie demi-sphère', 'demi-sphère', sy < 0.02, `écart max gauche/droite en miroir ${sy.toFixed(4)}`);
+  if (!argv.includes('--sans-petits')) testsPetits(ajout, man, methode && methode !== 'origine' ? [methode] : ['A', 'B', 'C']);
   const cle = (t) => t.replace(/^(\d+)/, (m) => m.padStart(2, '0'));
   lignes.sort((a, b) => cle(a[0]).localeCompare(cle(b[0]), 'fr') || 0);
   console.log('| Test | Sujet | Résultat | Chiffre |');
