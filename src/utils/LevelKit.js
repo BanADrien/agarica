@@ -5357,6 +5357,8 @@ function buildLevelFromData(scene, data, sceneData) {
   // Xara peut être absente (`xara: false`, ou zone de l'histoire avant sa
   // rencontre) : cf. shouldSpawnXara dans StoryKit.js pour la règle.
   scene.xara = shouldSpawnXara(scene, data) ? new Xara(scene, scene.player) : null;
+  // `?lumiere` dans l'adresse : mode de test de l'éclairage par sections (src/utils/LightKit.js).
+  if (typeof LightKit !== 'undefined') LightKit.modeTest(scene);
   scene.physics.add.collider(scene.player, scene.ground);
   // Suivi historique (centré, immédiat), ou caméra de zone (`camera.vertical` :
   // zone morte + ressort, ciel qui se révèle), cf. setupZoneCamera.
