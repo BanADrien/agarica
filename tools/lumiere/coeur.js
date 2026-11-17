@@ -1480,10 +1480,14 @@
   }
 
   // Taille d'un pixel dessiné dans une image de pixel art agrandie (comme grid_reduce / pixel-fixer) :
-  // les changements de couleur tombent sur une grille de pas f. Pour chaque f (1 à 32 px, au
-  // centième) et chaque décalage, part des changements expliqués par la grille ; on garde le PLUS
-  // GRAND pas qui en explique au moins 90 % (un multiple du vrai pas n'en explique que la moitié),
-  // au milieu de son plateau. Renvoie { f, part } (f = 1 : image déjà native ou pas en pixel art).
+  // les changements de couleur tombent sur une grille de pas f. Pour chaque f (1,5 à 32 px, au
+  // centième), part p(f) des changements qui tombent sur la grille (meilleur décalage). Le vrai
+  // pas est un PIC net : p(f) >= 0,6 et au moins 1,6 fois la médiane de p autour (de 0,8 f à
+  // 1,2 f), alors qu'une grille quelconque n'attrape qu'à peu près 1 / f des changements. Les
+  // multiples k f en attrapent 1 / k, les sous-multiples f / k presque tous : on prend le plus
+  // GRAND pic dont p atteint 90 % du meilleur pic, puis le meilleur p à ±2 % (entier préféré à
+  // égalité). Aucun pic : f = 1 (image native, ou pas en pixel art).
+  // Renvoie { f, part } (part = p(f)).
   function detecterFacteur(im) {
     const w = im.width, h = im.height, d = im.data;
     const cle = (p) => (d[p * 4 + 3] < 128 ? -1 : rgbInt(d, p * 4));
@@ -1511,25 +1515,36 @@
       return best;
     };
     const scores = [];
-    for (let k = 100; k <= 3200; k++) {
+    for (let k = 150; k <= 3200; k++) {
       const f = k / 100;
       if (f > Math.max(w, h) / 3) break;
-      scores.push([f, (axe(chgX, w, f) + axe(chgY, h, f)) / total]);
+      scores.push({ f, p: (axe(chgX, w, f) + axe(chgY, h, f)) / total });
     }
-    const bons = scores.filter((s) => s[1] >= 0.9);
-    if (!bons.length) return { f: 1, part: scores.length ? scores[0][1] : 1 };
-    // plateau du plus grand pas acceptable : f contigus (au centième) qui finissent au plus grand
-    let fin = bons.length - 1, debut = fin;
-    while (debut > 0 && Math.abs(bons[debut - 1][0] - (bons[debut][0] - 0.01)) < 1e-9) debut--;
-    const plateau = bons.slice(debut, fin + 1);
-    const max = Math.max(...plateau.map((s) => s[1]));
-    const meilleurs = plateau.filter((s) => s[1] >= max - 1e-9);
+    const P = new Map(scores.map((x) => [Math.round(x.f * 100), x.p]));
+    const pics = [];
+    for (const x of scores) {
+      if (x.p < 0.6) continue;
+      const autour = [];
+      for (let k = Math.ceil(x.f * 80); k <= Math.floor(x.f * 120); k++) {
+        if (Math.abs(k / 100 - x.f) <= 0.05 * x.f || !P.has(k)) continue;
+        autour.push(P.get(k));
+      }
+      if (autour.length < 5) continue;
+      autour.sort((m, n) => m - n);
+      if (x.p >= 1.6 * autour[autour.length >> 1]) pics.push(x);
+    }
+    if (!pics.length) return { f: 1, part: 1 };
+    // les sous-multiples f / k du vrai pas expliquent aussi tout : le plus GRAND pic qui explique
+    // presque autant que le meilleur (les multiples k f, eux, n'en expliquent que 1 / k)
+    const pmax = Math.max(...pics.map((x) => x.p));
+    const base = pics.filter((x) => x.p >= 0.9 * pmax).pop();
+    const voisins = scores.filter((x) => Math.abs(x.f - base.f) <= 0.02 * base.f + 1e-9);
+    const pm = Math.max(...voisins.map((x) => x.p));
+    const entier = voisins.find((x) => Number.isInteger(x.f) && x.p >= pm - 0.01);
+    if (entier) return { f: entier.f, part: entier.p };
+    const meilleurs = voisins.filter((x) => x.p >= pm - 1e-9);
     const choix = meilleurs[Math.floor(meilleurs.length / 2)];
-    // pas entier tout proche : on le préfère (agrandissement x2, x3, x4...)
-    const entier = Math.round(choix[0]);
-    const se = scores.find((s) => Math.abs(s[0] - entier) < 1e-9);
-    if (se && se[1] >= max - 0.01) return { f: entier, part: se[1] };
-    return { f: choix[0], part: choix[1] };
+    return { f: choix.f, part: choix.p };
   }
 
   // Nombre de couleurs distinctes des pixels opaques
@@ -1548,5 +1563,69 @@
     return ims.map((im) => appliquerPalette(im, remap));
   }
 
-  return { natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
+
+  // ------------------------------------------------------------ image(s) de l'utilisateur (page d'aperçu)
+  // Chaîne complète d'images quelconques déjà décodées (RGBA), dans l'ordre des frames :
+  // fond uni retiré, taille d'un pixel dessiné détectée (ou imposée), retour à 1 pixel par case,
+  // couleurs réduites si l'image est peinte, sections, normales, carte contre-jour.
+  // reglages : { fond: true, tol: 24, facteur: 0 (= auto) }. Renvoie { f, auto, peint, messages,
+  // frames: [{ nat, neu, sec, nor, cj, cjAp, geo }] } ; erreur claire si l'image ne convient pas.
+  const PERSO_MAX = 400;          // px natifs au plus sur un côté (temps de calcul)
+  const PERSO_COULEURS = 64;      // au-delà : image peinte, palette réduite à 32 couleurs
+  function traiterImages(ims, reglages) {
+    const reg = Object.assign({ fond: true, tol: 24, facteur: 0 }, reglages || {});
+    const messages = [];
+    let frames = ims.map(nettoyerAlpha);
+    const aDuVide = (im) => { for (let p = 0; p < im.width * im.height; p++) if (im.data[p * 4 + 3] < 128) return true; return false; };
+    if (reg.fond) {
+      const r = frames.map((im) => retirerFond(im, reg.tol));
+      if (r.some((x) => x.fond)) {
+        frames = r.map((x) => x.im);
+        const c = r.find((x) => x.fond).fond;
+        messages.push(`Fond uni retiré (couleur des coins rgb(${c.join(', ')}), tolérance ${reg.tol}).`);
+      }
+    }
+    if (!frames.some(aDuVide)) {
+      messages.push('Aucune transparence et pas de fond uni à retirer : tout le cadre est pris comme sprite, le résultat sera mauvais (détourer l\'image avant, ou augmenter la tolérance).');
+    }
+    let f = reg.facteur, auto = false;
+    if (!(f > 0)) {
+      const d = detecterFacteur(frames[0]);
+      f = d.f; auto = true;
+      if (f <= 1) messages.push('Pas de grille de pixels détectée : image prise telle quelle (1 pixel = 1 pixel dessiné). Si c\'est du pixel art agrandi, indiquer la taille d\'un pixel.');
+    }
+    let canv;
+    if (frames.length > 1) canv = natifsAnimation(frames, f > 1 ? f : 0).canv;
+    else if (f > 1) canv = [natifSprite(frames[0], f).nat];
+    else {
+      const b = boite(frames[0], 1);
+      if (!b) throw new Error('image vide (aucun pixel opaque)');
+      canv = [rogner(frames[0], b)];
+    }
+    const w = canv[0].width, h = canv[0].height;
+    if (Math.max(w, h) > PERSO_MAX) {
+      throw new Error(`Sprite de ${w} x ${h} pixels dessinés : trop grand (${PERSO_MAX} au plus). Image en pixel art agrandie ? Indiquer la taille d'un pixel dessiné.`);
+    }
+    let peint = false;
+    const n = Math.max(...canv.map(compterCouleurs));
+    if (n > PERSO_COULEURS) {
+      peint = true;
+      canv = reduireCouleurs(canv, 32);
+      messages.push(`${n} couleurs : image peinte plutôt que pixel art, ramenée à 32 couleurs ; le découpage en matières peut être moins net.`);
+    }
+    const res = canv.length > 1 ? sectionsAnimation(canv, [], [], peint).frames : [analyse(canv[0], [], [], peint, null)];
+    return {
+      f, auto, peint, messages,
+      frames: canv.map((nat, i) => {
+        const c = cartes(nat, res[i]);
+        const masque = new Uint8Array(nat.width * nat.height);
+        for (let p = 0; p < masque.length; p++) masque[p] = nat.data[p * 4 + 3] >= 128 ? 1 : 0;
+        const g = GEO.geometrie(masque, nat.width, nat.height);
+        c.geo = { width: g.width, height: g.height, data: g.data };
+        return c;
+      }),
+    };
+  }
+
+  return { traiterImages, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
 });

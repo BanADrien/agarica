@@ -46,6 +46,32 @@ autre PC.
    `asset_version.js`.
 4. **En jeu** : LightKit (section suivante).
 
+## Essayer une image avant de l'intégrer (glisser-déposer)
+
+Pour juger une image (nouvelle génération Codex, sprite trouvé, retouche) sous la lumière AVANT
+de l'importer dans le jeu : `npm run lumiere:apercu -- --vide` (ou sans `--vide` pour l'avoir à
+côté des sprites du jeu), puis donner à l'utilisateur le chemin de la page
+(`tools/lumiere/sortie/...-lumiere.html`, double-clic). En haut : « Charger une image » ou
+glisser-déposer un PNG / JPG ; plusieurs fichiers déposés ensemble = une animation, dans l'ordre
+des noms (`marche_1, marche_2... marche_10`).
+- Le calcul complet se fait dans la page, avec le même code que `npm run sections`
+  (`tools/lumiere/coeur.js`, embarqué) : même résultat au pixel près que l'outil.
+- Réglages : « Retirer le fond » (fond uni = couleur des 4 coins, effacé depuis les bords ;
+  tolérance réglable ; un blanc ENFERMÉ, comme un œil, reste : un trou transparent enfermé
+  redevient donc blanc sur une image à fond blanc) ; « Taille d'un pixel dessiné » (vide =
+  détection de la grille, comme pixel-fixer ; la forcer si la détection se trompe).
+- L'image apparaît au milieu, en tête de la liste, avec les mêmes réglages de lumière que les
+  sprites du jeu ; liens pour télécharger neutre, normales, sections, carte contre-jour (et son
+  aperçu).
+- Messages de prudence : pas de transparence ni de fond uni (tout le cadre devient le sprite),
+  pas de grille détectée (image prise telle quelle), plus de 64 couleurs (image peinte, ramenée à
+  32 couleurs, matières moins nettes). Refus au-delà de 400 pixels dessinés de côté (indiquer la
+  taille d'un pixel). PNG conseillé : un JPG abîme les aplats et la grille.
+- Rien n'est envoyé sur Internet ; ne pas mettre les images d'essai de l'utilisateur dans le dépôt.
+- Contrôle du code de la page : `npm run lumiere:test-page` (Chrome / Edge sans fenêtre, variable
+  `NAVIGATEUR` sinon) : calcul du navigateur = calcul de Node = cartes du jeu, sur le grizzly, un
+  grizzly recollé sur fond blanc et agrandi x4, la marche d'Agarica.
+
 ## En jeu : LightKit (opt-in)
 
 Rien ne change tant qu'une scène n'appelle pas `LightKit.activer`. BootScene précharge les cartes
