@@ -119,6 +119,21 @@
   for (const [nom, ang] of DIRS) SECTIONS.push([nom + ' incline', hsv(ang, 0.55, 0.98), ang, TILT_INC]);
   for (const [nom, ang] of DIRS) SECTIONS.push([nom + ' rasant', hsv(ang, 0.95, 0.62), ang, TILT_RAS]);
 
+  // Grands sprites (s > 1) : 17 sections ne donnent qu'une bague intermédiaire sur un sprite de
+  // 300 px. Table FINE : la face (code 0) + 3 bagues (25, 50, 70 deg) x 12 azimuts (tous les 30 deg),
+  // codes 17 à 52. Même code couleur : teinte = direction, de pâle (peu incliné) à foncé (rasant).
+  const AZ_FIN = 12, TILTS_FIN = [[25.0, 'peu incline', 0.30, 1.0], [50.0, 'incline', 0.65, 0.92], [70.0, 'rasant', 0.95, 0.58]];
+  const NOMS_AZ = { 0: 'droite', 90: 'haut', 180: 'gauche', 270: 'bas' };
+  const FIN0 = SECTIONS.length;
+  for (const [tilt, nomT, sat, val] of TILTS_FIN) {
+    for (let k = 0; k < AZ_FIN; k++) {
+      const ang = k * 360 / AZ_FIN;
+      SECTIONS.push([`${NOMS_AZ[ang] || ang + ' deg'} ${nomT} (fin)`, hsv(ang, sat, val), ang, tilt]);
+    }
+  }
+  const CODES_17 = SECTIONS.map((_, i) => i).filter((i) => i < FIN0);
+  const CODES_FIN = [0].concat(SECTIONS.map((_, i) => i).filter((i) => i >= FIN0));
+
   function sectionNormal(code) {
     const [, , ang, tilt] = SECTIONS[code];
     if (ang === null) return [0.0, 0.0, 1.0];
@@ -127,18 +142,25 @@
   }
   const encodeNormal = (n) => n.map((c) => Math.max(0, Math.min(255, pyRound((c * 0.5 + 0.5) * 255))));
 
-  function quantize(nx, ny) {
+  function quantize(nx, ny, fin) {
     const m = Math.hypot(nx, ny);
+    if (fin) {   // face < 0,22 < 25 deg < 0,50 < 50 deg < 0,85 < 70 deg
+      if (m < 0.22) return 0;
+      const k = pyMod(pyRound(Math.atan2(ny, nx) * (180.0 / Math.PI) / (360 / AZ_FIN)), AZ_FIN);
+      return FIN0 + (m < 0.50 ? 0 : m < 0.85 ? 1 : 2) * AZ_FIN + k;
+    }
     if (m < 0.30) return 0;
     const k = pyMod(pyRound(Math.atan2(ny, nx) * (180.0 / Math.PI) / 45.0), 8);
     return m < 0.72 ? 1 + k : 9 + k;
   }
-  function nearestCode(rgb) {
+  // fin : table fine des grands sprites (sinon les 17 sections d'origine)
+  function nearestCode(rgb, fin) {
     let best = 0, bv = Infinity;
-    SECTIONS.forEach((s, i) => {
-      const v = (rgb[0] - s[1][0]) ** 2 + (rgb[1] - s[1][1]) ** 2 + (rgb[2] - s[1][2]) ** 2;
+    for (const i of fin ? CODES_FIN : CODES_17) {
+      const c = SECTIONS[i][1];
+      const v = (rgb[0] - c[0]) ** 2 + (rgb[1] - c[1]) ** 2 + (rgb[2] - c[2]) ** 2;
       if (v < bv) { bv = v; best = i; }
-    });
+    }
     return best;
   }
 
@@ -498,14 +520,19 @@
     const segm = new Int32Array(NP).fill(-9);
     for (const p of body) { inBody[p] = 1; segm[p] = prot[p] ? -1 : seg[rampOf.get(col[p])]; }
     const barrier = Uint8Array.from(line);
+    // traits épaissis d'1 px (fermer les fuites) ; grand sprite : de round(s) px (disque), les
+    // traits de fourrure, mèches et plis y ont des trous de plusieurs pixels
+    const rTrait = aL(1, s), voisTrait = [];
+    for (let dy = -rTrait; dy <= rTrait; dy++) for (let dx = -rTrait; dx <= rTrait; dx++) if ((dx || dy) && (rTrait === 1 || dx * dx + dy * dy <= rTrait * rTrait)) voisTrait.push([dx, dy]);
     for (const p of opqList) {
       if (!line[p]) continue;
       const x = p % w, y = (p - x) / w;
-      for (const [dx, dy] of N8) {
+      for (const [dx, dy] of rTrait === 1 ? N8 : voisTrait) {
         const X = x + dx, Y = y + dy;
         if (X >= 0 && Y >= 0 && X < w && Y < h && inBody[Y * w + X]) barrier[Y * w + X] = 1;
       }
     }
+    if (s > 1) for (const p of massesOmbrage({ w, h, NP, s, body, prot, col, rampOf, ramps, L, counts, barrier })) barrier[p] = 1;
     const region = new Int32Array(NP).fill(-1);
     const regOrdre = [];
     let rid = 0;
@@ -573,7 +600,7 @@
     absorb(aS(12, s));
     // pixels de la bordure épaissie : rendus à la partie voisine de même matière (sinon la plus proche)
     let todo = body.filter((p) => region[p] < 0);
-    for (let it = 0; it < 4; it++) {
+    for (let it = 0; it < aL(4, s); it++) {
       const rest = [];
       for (const p of todo) {
         const x = p % w, y = (p - x) / w;
@@ -605,6 +632,7 @@
     const nReg = rid;
     const dmax = new Float64Array(nReg);
     for (const p of body) dmax[region[p]] = Math.max(dmax[region[p]], nD[p]);
+    const dmaxPartie = s > 1 ? profondeurParties(region, body, w, h, nReg) : null;
 
     // indice d'ombrage : écart de luminance à la moyenne de la rampe, lissé dans la partie
     const rmean = [], rstd = [];
@@ -668,7 +696,9 @@
     for (let r = 0; r < nReg; r++) {
       const ms = membres[r];
       if (!ms.length) continue;
-      const rad = Math.max(1.2 * s, Math.min(3.0 * s, dmax[r] * 0.6));
+      // grand sprite : dôme sur TOUTE la partie (rayon = moitié de sa profondeur réelle), plusieurs
+      // bagues du bord vers le centre ; sinon bombé limité au bord (3 px), comme sections.py
+      const rad = dmaxPartie ? Math.max(1.2 * s, 0.5 * dmaxPartie[r]) : Math.max(1.2 * s, Math.min(3.0 * s, dmax[r] * 0.6));
       let bx0 = w, by0 = h, bx1 = -1, by1 = -1;
       for (const p of ms) { const x = p % w, y = (p - x) / w; bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x); by0 = Math.min(by0, y); by1 = Math.max(by1, y); }
       const M = gpad + 3 * (Math.ceil(rad) + 2);
@@ -702,7 +732,7 @@
       const ws = W_SHADE * (peint ? 0.6 : 1.0);           // image peinte : ombrage riche, moins suivi
       const nx = gx / gn * gk + wp * pgX[p] + ws * sh * lx;
       const ny = gy / gn * gk + wp * pgY[p] + ws * sh * ly;
-      codes[p] = quantize(nx, ny);
+      codes[p] = quantize(nx, ny, s > 1);
       ordre.push(p);
     }
     // contour extérieur : rasant, tourné vers l'extérieur ; traits intérieurs : comme leurs voisins
@@ -711,7 +741,7 @@
       if (oD[p] <= 2.3 * s) {
         outline[p] = 1;
         const m = Math.hypot(oVX[p], oVY[p]) || 1;
-        codes[p] = quantize(oVX[p] / m, -oVY[p] / m);
+        codes[p] = quantize(oVX[p] / m, -oVY[p] / m, s > 1);
         ordre.push(p);
       }
     }
@@ -827,6 +857,133 @@
       parts: new Set(body.map((p) => region[p])).size, outline, rampOf,
     };
     return { opq, opqList, neutral, codes, info };
+  }
+
+  // Profondeur maximale de chaque partie (distance 8-voisins au bord de la partie, sans plafond)
+  function profondeurParties(region, body, w, h, nReg) {
+    const D = new Int32Array(w * h).fill(-1), file = [];
+    for (const p of body) {
+      const x = p % w, y = (p - x) / w;
+      let bord = false;
+      for (const [dx, dy] of N8) {
+        const X = x + dx, Y = y + dy;
+        if (X < 0 || Y < 0 || X >= w || Y >= h || region[Y * w + X] !== region[p]) { bord = true; break; }
+      }
+      if (bord) { D[p] = 1; file.push(p); }
+    }
+    for (let k = 0; k < file.length; k++) {
+      const p = file[k], x = p % w, y = (p - x) / w;
+      for (const [dx, dy] of N8) {
+        const X = x + dx, Y = y + dy;
+        if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+        const q = Y * w + X;
+        if (D[q] < 0 && region[q] === region[p]) { D[q] = D[p] + 1; file.push(q); }
+      }
+    }
+    const out = new Float64Array(nReg);
+    for (const p of body) if (region[p] >= 0) out[region[p]] = Math.max(out[region[p]], D[p]);
+    return out;
+  }
+
+  // Masses d'un grand sprite (s > 1) : relief = ÉPAISSEUR du corps (distance chanfrein au bord ou
+  // à un trait) + OMBRAGE à grande échelle de l'original (luminance ramenée à sa matière, écart type,
+  // floutée : 3 passes de boîte de rayon 2 s, sigma ~ 3,5 s ; 2 s px par écart type). Partage des
+  // eaux du haut vers le bas : chaque lobe (tête, bras, cuisse, torse) est un bassin ; les cols
+  // (étranglements, creux d'ombre entre deux masses) deviennent des frontières de partie, comme les
+  // traits. Deux bassins fusionnent si le moins marqué est peu profond (< max(s ; 15 % de son
+  // sommet)) ou petit (< 80 s² px) : des masses assez grandes pour rester lisibles.
+  function massesOmbrage(c) {
+    const { w, h, NP, s, body, prot, col, rampOf, ramps, L, counts, barrier } = c;
+    const rm = [], rs = [];
+    ramps.forEach((r) => {
+      const tot = r.reduce((a, cc) => a + counts.get(cc), 0);
+      const m = r.reduce((a, cc) => a + L.get(cc) * counts.get(cc), 0) / tot;
+      const sd = Math.sqrt(r.reduce((a, cc) => a + (L.get(cc) - m) ** 2 * counts.get(cc), 0) / tot) || 1.0;
+      rm.push(m); rs.push(Math.max(sd, 6.0));
+    });
+    const val = new Float64Array(NP), poids = new Float64Array(NP), dans = new Uint8Array(NP);
+    for (const p of body) {
+      dans[p] = 1;
+      if (prot[p]) continue;
+      const r = rampOf.get(col[p]);
+      val[p] = (L.get(col[p]) - rm[r]) / rs[r]; poids[p] = 1;
+    }
+    const rb = Math.max(1, Math.round(2 * s));
+    const boite = (a) => {   // 3 passes horizontales puis verticales, bords à zéro
+      let t = Float64Array.from(a);
+      for (const [n, pas, lignes, lpas] of [[w, 1, h, w], [h, w, w, 1]]) {
+        for (let it = 0; it < 3; it++) {
+          const o = new Float64Array(NP);
+          for (let l = 0; l < lignes; l++) {
+            const base = l * lpas;
+            let acc = 0;
+            for (let i = -rb; i <= rb; i++) if (i >= 0 && i < n) acc += t[base + i * pas];
+            for (let i = 0; i < n; i++) {
+              o[base + i * pas] = acc / (2 * rb + 1);
+              const sort = i - rb, entre = i + rb + 1;
+              if (sort >= 0) acc -= t[base + sort * pas];
+              if (entre < n) acc += t[base + entre * pas];
+            }
+          }
+          t = o;
+        }
+      }
+      return t;
+    };
+    const bv = boite(val), bp = boite(poids);
+    // relief = épaisseur (distance au bord du corps ou à un trait, en px : les étranglements entre
+    // deux lobes, cou, poignet, aisselle, sont des cols) + ombrage à grande échelle (2 s px par écart type)
+    const D = new Float64Array(NP).fill(1e9);
+    for (let p = 0; p < NP; p++) if (!dans[p] || barrier[p]) D[p] = 0;
+    for (const [y0, y1, sy, x0, x1, sx] of [[0, h, 1, 0, w, 1], [h - 1, -1, -1, w - 1, -1, -1]]) {
+      for (let y = y0; y !== y1; y += sy) {
+        for (let x = x0; x !== x1; x += sx) {
+          const p = y * w + x;
+          if (!D[p]) continue;
+          for (const [dx, dy, k] of [[-sx, 0, 1], [0, -sy, 1], [-sx, -sy, 1.4142], [sx, -sy, 1.4142]]) {
+            const X = x + dx, Y = y + dy;
+            const v = X < 0 || Y < 0 || X >= w || Y >= h ? k : D[Y * w + X] + k;
+            if (v < D[p]) D[p] = v;
+          }
+        }
+      }
+    }
+    const B = new Float64Array(NP);
+    for (const p of body) B[p] = D[p] + 2 * s * (bp[p] > 1e-9 ? bv[p] / bp[p] : 0);
+    // partage des eaux par union-find, du plus clair au plus sombre (4 voisins)
+    const ordre = body.slice().sort((a, b) => (B[b] - B[a]) || (a - b));
+    const lab = new Int32Array(NP).fill(-1), parent = [], pic = [], aire = [];
+    const racine = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+    const AMIN = Math.round(80 * s * s);
+    const plat = (r, v) => pic[r] - v < Math.max(s, 0.15 * pic[r]);   // bassin peu marqué
+    const bord = new Uint8Array(NP);
+    for (const p of ordre) {
+      const x = p % w, y = (p - x) / w, v = B[p];
+      const voisins = new Set();
+      for (const [dx, dy] of N4) {
+        const X = x + dx, Y = y + dy;
+        if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+        const q = Y * w + X;
+        if (lab[q] >= 0) voisins.add(racine(lab[q]));
+      }
+      if (!voisins.size) { const i = parent.length; parent.push(i); pic.push(v); aire.push(1); lab[p] = i; continue; }
+      let liste = [...voisins].sort((a, b) => (pic[b] - pic[a]) || (a - b));
+      // fusion des bassins peu marqués ou petits dans le plus haut
+      let garde = [liste[0]];
+      for (const r of liste.slice(1)) {
+        const ok = garde.find((g) => plat(r, v) || aire[r] < AMIN || plat(g, v) || aire[g] < AMIN);
+        if (ok !== undefined) {
+          const a = racine(ok), b = racine(r);
+          if (a !== b) { parent[b] = a; aire[a] += aire[b]; pic[a] = Math.max(pic[a], pic[b]); }
+        } else garde.push(r);
+      }
+      garde = [...new Set(garde.map(racine))];
+      if (garde.length > 1) { bord[p] = 1; continue; }   // creux entre deux masses : frontière
+      lab[p] = garde[0]; aire[garde[0]]++;
+    }
+    const out = [];
+    for (const p of body) if (bord[p]) out.push(p);
+    return out;
   }
 
   // Grand sprite (s > 1) : le neutre en aplats effaçait le dessin (mèches, nuances). On ne retire
@@ -1034,6 +1191,12 @@
       const x = p % w, y = (p - x) / w;
       D[p] = (g.data[((y + pad) * GW + x + pad) * 4] / 16) | 0;
       sec[p] = rgbInt(nor.data, p * 4);
+      // grand sprite (table fine, 3 bagues) : l'exposition passe d'une bague à l'autre dans la même
+      // direction (la rasante continue en inclinée), sinon chaque bague étroite s'éteint tout de suite
+      if (s > 1) {
+        const nx = nor.data[p * 4] / 255 * 2 - 1, ny = nor.data[p * 4 + 1] / 255 * 2 - 1;
+        sec[p] = Math.hypot(nx, ny) < 0.05 ? -2 : pyMod(Math.round(Math.atan2(ny, nx) * 180 / Math.PI / 30), 12);
+      }
       const v = hypotPy(nor.data[p * 4] / 255 * 2 - 1, nor.data[p * 4 + 1] / 255 * 2 - 1) / 0.93;
       pente[p] = v < 0.05 ? 0.0 : Math.min(1.0, v);
       const lum = (0.3 * neu.data[p * 4] + 0.59 * neu.data[p * 4 + 1] + 0.11 * neu.data[p * 4 + 2]) / 255;
@@ -1177,13 +1340,13 @@
     return out;
   }
 
-  function normalesDepuisSections(sec) {
+  function normalesDepuisSections(sec, fin) {
     const nor = nouvelle(sec.width, sec.height), cache = new Map(), lues = new Set();
     for (let p = 0; p < sec.width * sec.height; p++) {
       nor.data.set([128, 128, 255, 0], p * 4);
       if (sec.data[p * 4 + 3] < 128) continue;
       const c = rgbInt(sec.data, p * 4);
-      if (!cache.has(c)) cache.set(c, nearestCode([(c >> 16) & 255, (c >> 8) & 255, c & 255]));
+      if (!cache.has(c)) cache.set(c, nearestCode([(c >> 16) & 255, (c >> 8) & 255, c & 255], fin));
       lues.add(SECTIONS[cache.get(c)][0]);
       const nn = encodeNormal(sectionNormal(cache.get(c)));
       nor.data.set([nn[0], nn[1], nn[2], 255], p * 4);

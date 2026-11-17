@@ -260,12 +260,13 @@ async function depuisCj(file, man) {
 async function depuisSections(file, man) {
   const s = sortiesDe(file);
   if (!fs.existsSync(s.sections)) throw new Error(`${relOf(s.sections)} absent : lancer d'abord node tools/sections.js ${relOf(file)}`);
-  const { nor, lues } = normalesDepuisSections(await lirePng(s.sections));
+  const e = man[relOf(file)];
+  // grand sprite (s > 1) : couleurs de la table fine (3 bagues x 12 azimuts)
+  const { nor, lues } = normalesDepuisSections(await lirePng(s.sections), !!(e && e.s > 1));
   await ecrirePng(nor, s.n);
   console.log(`${relOf(s.n)} recalculée ; sections lues : ${[...lues].sort().join(', ')}`);
   // comme sections.py : la carte contre-jour suit les nouvelles sections (retoucher
   // _cj-apercu.png APRÈS les sections, sinon la retouche est écrasée)
-  const e = man[relOf(file)];
   await ecrireCj(await lirePng(s.natif), nor, await lirePng(s.neutre), s, e && e.s ? e.s : 1);
   console.log(`${relOf(s.cj)} recalculée`);
   if (man[relOf(file)]) man[relOf(file)].v = empreinte(file);
