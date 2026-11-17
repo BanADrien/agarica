@@ -154,7 +154,8 @@ pixel, jamais à travers un trait).
    profondeur et en largeur, pas de bande au contour, lumière devant = N.L, contour sombre
    ≤ 1 palier, adoucissement, fidélité à +49, milieu sombre (aucun pixel d'une section non
    reliée au bord allumé par une lampe derrière). Code 1 si un test échoue : lire la ligne.
-   État au 2026-11-17 (v16) : 81 / 81 sur les cartes du jeu (dont Kainati, grand sprite).
+   État au 2026-11-17 (v16) : 80 / 81 sur les cartes du jeu ; échec connu : Kainati, test 11
+   (palier maximal 2 % des plans exposés à -49 pour un critère de 3 %).
 2. `npm run lumiere:apercu [-- <anim|png>]` : page autonome dans `tools/lumiere/sortie/`
    (ignoré par git) ; donner le chemin à l'utilisateur. Lumière à glisser, profondeur, sens,
    animation, affichage des sections / normales / carte contre-jour. `--regarde gauche` pour un sprite dessiné
@@ -194,7 +195,24 @@ des frames d'une animation ; arrondi au centième). s = 1 : rien ne change (cart
   ramenées sous 188 / 255 pour que les paliers ne saturent pas au blanc (le blanc pur de la
   fourrure devient un gris clair à l'ambiance seule) ;
 - shader : normale lissée échantillonnée tous les round(s) px ; page de test : portée jusqu'à
-  3 fois la diagonale, profondeur ± diagonale / 6.
+  3 fois la diagonale, profondeur ± diagonale / 6 ;
+- **plus de sections** (« il faut le sectionner davantage ») :
+  - table FINE : face + 3 bagues (25°, 50°, 70°) × 12 azimuts (tous les 30°), codes 17 à 52 ;
+    seuils de |n.xy| : face < 0,22 < 25° < 0,50 < 50° < 0,85 < 70° ;
+  - dôme sur TOUTE la partie : rayon du bombé = 0,5 × profondeur réelle de la partie (au lieu de
+    3 s px au plus) : plusieurs bagues du bord vers le centre ;
+  - masses : partage des eaux sur (épaisseur du corps + 2 s × ombrage flouté de l'original,
+    3 boîtes de rayon 2 s) ; les cols deviennent des frontières de partie ; fusion sous
+    max(s ; 15 % du sommet) de profondeur ou 80 s² px ;
+  - traits épaissis de round(s) px (disque) au lieu de 1, pixels rendus aux parties en 4 s passes ;
+  - carte contre-jour : propagation dans la même DIRECTION (12 azimuts), toutes bagues confondues.
+  Kainati : pixels de face 26 % -> 12 %, 17 -> 37 directions, 4 niveaux (face, 25, 50, 70°).
+  Retouche : peindre `_sections.png` avec les couleurs de la table fine (teinte = direction,
+  pâle = 25°, moyen = 50°, foncé = 70° ; `SECTIONS` de coeur.js, indices 17 à 52) ;
+  `--depuis-sections` lit la table fine quand le manifeste porte `s` > 1.
+  Limites : l'anatomie (épaule, biceps) n'est découpée que si l'original la dessine par des traits
+  ou des ombres ; sur une animation, ces masses changent d'une pose à l'autre (Kainati : 63 %
+  d'orientations changeantes avant lissage, 25 % après, contre 11 % avant ce changement).
 
 ## Le modèle en bref (v16)
 
