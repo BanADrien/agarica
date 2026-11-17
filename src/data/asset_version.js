@@ -1,2 +1,2 @@
 // GÉNÉRÉ (tools/pixelfix.js et autres outils d'images) -- ne pas modifier à la main.
-const ASSET_VERSION = '1794750369941';
+const ASSET_VERSION = '1794925990443';
