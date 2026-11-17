@@ -18,6 +18,9 @@ class BootScene extends Phaser.Scene {
   preload() {
     this.createLoadingScreen();
     BootScene.watchPixelFixed(this);
+    // Cartes d'éclairage (tools/sections.js, src/data/sections.js) : préchargées seulement ;
+    // elles ne servent qu'aux scènes qui activent LightKit.
+    if (typeof LightKit !== 'undefined') LightKit.chargerCartes(this);
     // Musique du menu dès l'écran de chargement (demande du 2026-11-15) : son fichier est demandé en
     // premier et elle part dès qu'il est prêt, sans attendre la fin du chargement ; l'écran-titre la
     // garde (même musique : elle continue). Tant que le joueur n'a ni cliqué ni appuyé sur une touche,
@@ -650,6 +653,7 @@ class BootScene extends Phaser.Scene {
   create() {
     BootScene.applyTilesetFilter(this);
     BootScene.applyPixelFixedFilter(this);
+    if (typeof LightKit !== 'undefined') LightKit.filtrerCartes(this);
     const params = new URLSearchParams(window.location.search);
 
     // Mode édition (index.html?editor, cf. main.js) : les assets sont

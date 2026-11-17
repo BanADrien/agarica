@@ -20,7 +20,8 @@ def remaining():
     todo = collections.defaultdict(list)
     for d, _, files in os.walk(os.path.join(ROOT, 'assets')):
         rel = os.path.relpath(d, ROOT).replace(os.sep, '/')
-        if rel.startswith(SKIP):
+        # _lumiere/ : cartes d'éclairage (tools/sections.js), pas des images à pixeliser
+        if rel.startswith(SKIP) or '/_lumiere' in rel:
             continue
         for f in sorted(files):
             if f.lower().endswith(('.png', '.jpg', '.webp')) and f'{rel}/{f}' not in reg:

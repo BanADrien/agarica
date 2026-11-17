@@ -1,0 +1,724 @@
+<!doctype html>
+<!-- Page d'apercu de l'eclairage par sections. COPIE du gabarit valide du skill pixel-art-forge
+     (viewer/lumiere-template.html, v16, commit 4e852ff) : ne pas la modifier ici, la recopier quand le
+     modele change, puis reporter eclairage() dans src/utils/LightKit.js et tools/lumiere/cpu.js
+     (npm run lumiere:tests verifie l'alignement). Remplie par tools/lumiere/apercu.js (DONNEES).
+     ECARTS AU GABARIT (grands sprites, a reporter dans le skill) : 1) normaleLisse() echantillonne
+     ses 5 x 5 voisins tous les uPasLisse pixels (= round(s) de l'asset, 1 pour les sprites de la
+     demo : calcul identique) ; 2) plages des reglages adaptees a l'asset affiche : portee jusqu'a
+     3 x sa diagonale (800 au moins), profondeur +- diagonale / 6 (60 au moins). -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test d'eclairage</title>
+<style>
+  :root {
+    --fond: #0d0b1a;
+    --panneau: #15121f;
+    --trait: #2a2536;
+    --texte: #d9d4e3;
+    --pale: #8f88a0;
+    --accent: #c9b27a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--fond); color: var(--texte);
+    font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--trait); display: flex; gap: 12px;
+    align-items: baseline; flex-wrap: wrap; }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; }
+  header span { color: var(--pale); font-size: 13px; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #scene { flex: 1; position: relative; min-width: 0; min-height: 320px; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  aside { width: 270px; flex: none; background: var(--panneau); border-left: 1px solid var(--trait);
+    padding: 12px 16px 20px; overflow-y: auto; }
+  fieldset { border: 0; padding: 0; margin: 0 0 14px; }
+  legend { color: var(--pale); font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 0; margin-bottom: 6px; }
+  label.r { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-bottom: 8px; }
+  label.r output { color: var(--pale); font-variant-numeric: tabular-nums; }
+  label.r input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .boutons { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  button { background: transparent; color: var(--texte); border: 1px solid var(--trait); border-radius: 4px;
+    padding: 4px 9px; font: inherit; cursor: pointer; }
+  button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+  input[type=color] { width: 30px; height: 26px; padding: 0; border: 1px solid var(--trait); background: none; }
+  select { background: var(--fond); color: var(--texte); border: 1px solid var(--trait); border-radius: 4px;
+    padding: 3px 6px; font: inherit; }
+  label.c { display: flex; gap: 8px; align-items: center; margin-bottom: 5px; }
+  label.c input { accent-color: var(--accent); }
+  .ligne { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+  .pale { color: var(--pale); font-size: 12px; }
+  p.aide { color: var(--pale); font-size: 12px; margin: 14px 0 0; }
+  #erreur { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; color: var(--pale); }
+  @media (max-width: 760px) {
+    main { flex-direction: column; }
+    #scene { min-height: 58vh; }
+    aside { width: auto; border-left: 0; border-top: 1px solid var(--trait); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="titre">Test d'eclairage</h1>
+  <span>Glisser dans la scene pour deplacer la lumiere.</span>
+</header>
+<main>
+  <div id="scene">
+    <canvas id="c"></canvas>
+    <div id="erreur">WebGL indisponible dans ce navigateur.</div>
+  </div>
+  <aside>
+    <fieldset id="bloc-assets" hidden>
+      <legend>Asset</legend>
+      <div class="ligne"><select id="asset" aria-label="Asset affiche"></select></div>
+      <label class="c"><input type="checkbox" id="tous"> <span id="tous-txt">Tous cote a cote</span></label>
+    </fieldset>
+    <fieldset id="bloc-anim" hidden>
+      <legend>Animation</legend>
+      <div class="ligne">
+        <div class="boutons">
+          <button type="button" id="prec" aria-label="Frame precedente">&lt;</button>
+          <button type="button" id="lecture">Pause</button>
+          <button type="button" id="suiv" aria-label="Frame suivante">&gt;</button>
+        </div>
+        <span class="pale" id="num-frame"></span>
+      </div>
+      <label class="r">Vitesse <output id="o-vitesse"></output>
+        <input type="range" id="vitesse" min="0.25" max="2" step="0.25" value="1"></label>
+      <label class="c"><input type="checkbox" id="marcher"> Marcher (aller-retour devant la lumiere)</label>
+      <label class="c"><input type="checkbox" id="sens"> Sens : retourner le sprite</label>
+    </fieldset>
+    <fieldset>
+      <legend>Lumiere</legend>
+      <div class="ligne">
+        <div class="boutons" id="couleurs1"></div>
+        <input type="color" id="couleur1" value="#ffb35c" aria-label="Couleur de la lumiere">
+      </div>
+      <label class="r" title="Position de la lumiere par rapport au plan du sprite : negatif = derriere (contre-jour, seuls les bords tournes vers elle s'allument), 0 = dans le plan (rasant), positif = devant.">Profondeur (&minus; derriere / + devant) <output id="o-hauteur"></output>
+        <input type="range" id="hauteur" min="-60" max="60" step="1" value="8"></label>
+      <label class="r" title="Lumiere derriere : intensite. Les SECTIONS rasantes du bord tournees dans le bon sens s'allument (couleur de la matiere x lumiere, memes paliers) ; la portee regle jusqu'ou la lumiere gagne le long du contour et vers l'interieur.">Contre-jour <output id="o-contre"></output>
+        <input type="range" id="contre" min="0" max="3" step="0.1" value="1.5"></label>
+      <label class="c"><input type="checkbox" id="ancien"> Ancienne version (v10), pour comparer</label>
+      <label class="r">Intensite <output id="o-intensite"></output>
+        <input type="range" id="intensite" min="0" max="2" step="0.05" value="1"></label>
+      <label class="r">Portee <output id="o-portee"></output>
+        <input type="range" id="portee" min="20" max="800" step="5" value="220"></label>
+      <label class="r">Lumiere ambiante <output id="o-ambiante"></output>
+        <input type="range" id="ambiante" min="0" max="1" step="0.02" value="0.36"></label>
+    </fieldset>
+    <fieldset>
+      <legend>Rendu</legend>
+      <div class="ligne"><span>Paliers</span>
+        <select id="paliers">
+          <option value="2">2</option><option value="3">3</option><option value="4" selected>4</option>
+          <option value="5">5</option><option value="0">lisse</option>
+        </select></div>
+      <div class="ligne"><span>Agrandissement <span class="pale" id="echelle-eff"></span></span>
+        <select id="echelle"></select></div>
+    </fieldset>
+    <fieldset>
+      <legend>2e lumiere</legend>
+      <label class="c"><input type="checkbox" id="l2"> Ajouter une 2e lumiere</label>
+      <div class="ligne">
+        <div class="boutons" id="couleurs2"></div>
+        <input type="color" id="couleur2" value="#9fb8ff" aria-label="Couleur de la 2e lumiere">
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Afficher a la place</legend>
+      <label class="c"><input type="checkbox" data-mode="1"> Sprite d'origine (sans eclairage)</label>
+      <label class="c"><input type="checkbox" data-mode="2"> Carte des sections</label>
+      <label class="c"><input type="checkbox" data-mode="3"> Carte de normales</label>
+      <label class="c"><input type="checkbox" data-mode="4"> Carte contre-jour (teinte = direction, clarte = exposition)</label>
+    </fieldset>
+    <p class="aide">Le sprite neutre est multiplie par la lumiere recue par chaque section
+      (normales), puis arrondi en paliers. Cote a cote : meme echelle et meme lumiere pour tous,
+      tailles relatives du jeu. Avec 2 lumieres, la plus proche du pointeur se deplace.
+      Sprite retourne : l'image est mise en miroir et la composante horizontale des normales
+      inversee, sinon la lumiere eclairerait le mauvais cote.</p>
+  </aside>
+</main>
+<script>
+const DONNEES = /*__DONNEES__*/null;
+
+(function () {
+  // DONNEES = { titre, echelle, assets: [{ nom, images: { origine, neutre, normales, sections } }] }
+  const D = DONNEES || { titre: "sprite", echelle: 6, assets: [] };
+  const $ = (id) => document.getElementById(id);
+  document.title = D.titre + " - eclairage";
+  $("titre").textContent = D.titre + " - test d'eclairage";
+
+  const canvas = $("c");
+  const gl = canvas.getContext("webgl", { premultipliedAlpha: false, antialias: false });
+  if (!gl) { $("erreur").style.display = "flex"; return; }
+
+  const VS = `
+attribute vec2 p;
+uniform vec4 uRect;     // x, y, largeur, hauteur en px ecran (y vers le bas)
+uniform vec2 uCanvas;
+void main() {
+  vec2 q = uRect.xy + p * uRect.zw;
+  gl_Position = vec4(q.x / uCanvas.x * 2.0 - 1.0, 1.0 - q.y / uCanvas.y * 2.0, 0.0, 1.0);
+}`;
+  const FS = `
+precision highp float;
+uniform sampler2D uNeutre, uNormales, uOrigine, uSections, uGeo, uCj;  // uCj : carte contre-jour (v16)
+uniform float uPad;        // marge de la texture de geometrie (px du sprite)
+uniform float uAncien;     // 1 = ancienne version v10 (deux formules devant / derriere), pour comparer
+uniform vec2 uTaille;      // taille du sprite (px du sprite)
+uniform vec2 uCanvas;      // taille du canvas (px ecran)
+uniform vec2 uOrigineEcr;  // coin haut-gauche du sprite (px ecran, y vers le bas)
+uniform float uEchelle;    // px ecran par px du sprite (entier)
+uniform float uMode;       // 0 eclaire, 1 origine, 2 sections, 3 normales, 9 disques des lumieres
+uniform float uPaliers;    // 0 = lisse
+uniform float uAmbiante, uHauteur, uPortee, uIntensite;  // uHauteur = profondeur de la lumiere devant le plan (px du sprite)
+uniform vec2 uL1, uL2;     // lumieres en px ecran
+uniform vec3 uC1, uC2;     // couleurs
+uniform float uN;          // nombre de lumieres
+uniform float uRayonDisque;
+uniform float uContre;     // force du lisere de contre-jour (lumiere derriere, z < 0)
+uniform float uPasLisse;   // ecart entre les echantillons de la normale lissee (round(s), 1 = gabarit)
+uniform float uDisques;    // passe des disques : 0 = lumieres derriere (avant les sprites), 1 = devant
+uniform float uFlip;       // 1 = sprite retourne : image en miroir ET normal.x inverse (correction du flipX)
+
+float palier(float v) {
+  if (uPaliers < 1.5) return v;
+  return min(floor(v * uPaliers), uPaliers - 1.0) / (uPaliers - 1.0);
+}
+
+// bord de silhouette : 1 si un pixel vide est a 1 px, 0,6 a 2 px, 0 a l'interieur
+// geometrie precalculee (viewer.py / sections.geometrie) : R = profondeur depuis le bord
+// EXTERIEUR reel (1 = pixel le plus exterieur), G = epaisseur locale, B = distance au sprite (fond)
+vec3 geoAt(vec2 ts) {
+  vec4 g = texture2D(uGeo, (ts + uPad + 0.5) / (uTaille + 2.0 * uPad));
+  return floor(g.rgb * 255.0 / 16.0 + 0.5);
+}
+
+vec3 recu(vec3 n, vec2 t, vec2 lp) {
+  // vecteur vers la lumiere, repere des normales : x droite, y HAUT, z vers le spectateur
+  vec3 d = vec3(lp.x - t.x, t.y - lp.y, uHauteur);
+  float dist = length(d);
+  // pas de valeur absolue : lumiere derriere (z < 0), les faces tournees vers l'avant donnent
+  // un produit negatif -> 0
+  float diff = max(dot(n, d / dist), 0.0);
+  float att = clamp(1.0 - (dist * dist) / (uPortee * uPortee), 0.0, 1.0);
+  return vec3(palier(diff * att));
+}
+
+// CONTRE-JOUR PAR LES SECTIONS (lampe derriere, z < 0). Pas de lisere ni de bande ajoutee : on
+// eclaire les sections du sprite comme pour une lampe devant (matiere x lumiere, memes paliers) ;
+// le contre-jour decide seulement QUELLES sections recoivent la lumiere et combien.
+//   bord   = |n.xy| : 0 pour la face, 0,64 incline, 0,93 rasant ; la portee regle l'exposant :
+//            petite portee -> seules les rasantes ; grande portee -> les inclinees aussi
+//   sens   = la section regarde vers la lampe (lampe hors silhouette) ou a l'oppose (lampe
+//            cachee derriere le sprite) ; melange continu selon la profondeur de la lampe dans
+//            la silhouette (texture de geometrie)
+//   portee = attenuation par la distance 2D lampe-pixel (rayon = portee x 0,3)
+float cache(vec2 lp) {
+  if (lp.x < 0.0 || lp.y < 0.0 || lp.x >= uTaille.x || lp.y >= uTaille.y) return 0.0;
+  vec2 q = floor(lp);
+  if (uFlip > 0.5) q.x = uTaille.x - 1.0 - q.x;
+  return clamp(geoAt(q).r / 3.0, 0.0, 1.0);
+}
+
+// ---- contre-jour v10 : UN modele continu, quantifie une seule fois a la fin
+// normale lissee (moyenne 5x5 des normales opaques) : l'orientation varie en douceur le long du
+// contour au lieu de sauter d'une section a l'autre ; les sections restent pour la lumiere de face
+vec3 normaleLisse(vec2 ts) {
+  vec3 acc = vec3(0.0);
+  for (int dy = -2; dy <= 2; dy++) {
+    for (int dx = -2; dx <= 2; dx++) {
+      vec2 q = ts + vec2(float(dx), float(dy)) * uPasLisse;
+      if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) continue;
+      vec4 nn = texture2D(uNormales, (q + 0.5) / uTaille);
+      if (nn.a < 0.5) continue;
+      acc += nn.rgb * 2.0 - 1.0;
+    }
+  }
+  if (uFlip > 0.5) acc.x = -acc.x;
+  return length(acc) > 0.001 ? normalize(acc) : vec3(0.0, 0.0, 1.0);
+}
+
+float lumiereBrute(vec3 n, vec2 t, vec2 lp) {   // comme recu(), sans paliers
+  vec3 d = vec3(lp.x - t.x, t.y - lp.y, uHauteur);
+  float dist = length(d);
+  float att = clamp(1.0 - (dist * dist) / (uPortee * uPortee), 0.0, 1.0);
+  return max(dot(n, d / dist), 0.0) * att;
+}
+
+//   rasance    = smoothstep(0,2 ; 0,6 ; 1 - n.z)                (face 0, inclinee ~0, rasante ~1)
+//   direction  = (0,5 + 0,5 mix(n2.u, -n2.u, cachee))^3          (doux, continu dehors / cachee)
+//   visibilite = 1 - smoothstep(1 ; 5 ; profondeur depuis le bord exterieur)
+//   attenuation= (1 - d2^2 / (0,3 portee)^2)^2                   (distance 2D seulement)
+float contreJourDoux(vec3 n, vec2 t, vec2 lp, vec2 ts) {
+  float m = length(n.xy);
+  if (m < 0.001) return 0.0;
+  float ras = smoothstep(0.2, 0.6, 1.0 - n.z);
+  vec2 dl = vec2(lp.x - t.x, t.y - lp.y);
+  float d2 = length(dl);
+  float dd = dot(n.xy / m, dl / max(d2, 0.001));
+  float h = cache(lp);
+  float dir = 0.5 + 0.5 * mix(dd, -dd, h);
+  dir = dir * dir * dir;
+  float vis = 1.0 - smoothstep(1.0, 5.0, geoAt(ts).r);
+  float R = max(uPortee * 0.3, 4.0);
+  float att = clamp(1.0 - (d2 * d2) / (R * R), 0.0, 1.0);
+  att *= att;
+  float prof = clamp(-uHauteur / 10.0, 0.0, 1.0);
+  return min(uContre * ras * dir * vis * att * prof, 1.0) * 0.67;
+}
+
+// ---- v11 : UN SEUL modele d'eclairage, sans branche sur la profondeur ni sur « lampe cachee »,
+// continu dans les 3 dimensions de la position de la lampe ; seuls les paliers font des marches.
+//   wb   = smoothstep(+15, -15, z) : poids « derriere », passe de 0 a 1 en douceur autour de z = 0
+//   ne   = normalize(mix(normale de la section, normale lissee 5x5, wb))
+//   diff = max((ne . L + w) / (1 + w), 0) x attenuation, L = vraie direction 3D (z negatif compris),
+//          w = 0,5 wb (« wrap » : les rasantes tournees vers une lampe derriere recoivent un peu)
+//   cj   = v16 : 0,6 contre x wb x exposition x max(cos(bord expose bascule, lampe en miroir), 0) x att,
+//          exposition et direction lues dans la carte contre-jour (voir eclairage()) ; occ inutilise.
+//   e    = min(diff + cj, 1)  ->  palier(e), un seul plafond, un seul palier
+float occultation(vec2 lp) {
+  vec2 q = floor(lp);
+  if (uFlip > 0.5) q.x = uTaille.x - 1.0 - q.x;
+  if (q.x < -uPad || q.y < -uPad || q.x >= uTaille.x + uPad || q.y >= uTaille.y + uPad) return 0.0;
+  vec3 g = geoAt(q);
+  float sd = g.r > 0.5 ? g.r : -g.b;     // profondeur dedans, distance dehors
+  // v13 : reste 1 tant que la lampe est dans la silhouette (avant : commencait a baisser 6 px avant
+  // le bord, alors que la lampe est encore cachee), puis baisse sur les 8 px dehors
+  return smoothstep(-8.0, 0.0, sd);
+}
+
+// v16 : contre-jour porte par une CARTE DEDIEE (<nom>.cj.png, sections.py carte_cj) et non plus
+// devine depuis les normales de face : cjm.rg = direction 2D du bord expose (x droite, y haut,
+// v x 2 - 1), cjm.b = exposition arriere (0 a l'interieur, 1 au bord, decroit dans la section,
+// arretee par les traits sombres). Lumiere de face = normales (inchangee) ; contre-jour =
+// exposition x cosinus x attenuation ; un seul melange continu wb selon la profondeur.
+float eclairage(vec3 n, vec2 ts, vec2 t, vec2 lp, float occ, float lumBase, vec4 cjm) {
+  float wb = smoothstep(15.0, -15.0, uHauteur);
+  vec3 ne = n;
+  if (wb > 0.0) ne = normalize(mix(n, normaleLisse(ts), wb));   // wb = 0 : rien a melanger
+  vec3 d = vec3(lp.x - t.x, t.y - lp.y, uHauteur);
+  float dist = max(length(d), 0.001);
+  float att = clamp(1.0 - (dist * dist) / (uPortee * uPortee), 0.0, 1.0);
+  float w = 0.5 * wb;
+  float ex = cjm.b;
+  // la part « derriere » de la diffuse n'atteint, elle aussi, que les plans exposes
+  float diff = max((dot(ne, d / dist) + w) / (1.0 + w), 0.0) * att * mix(1.0, ex, wb);
+  // contour sombre (couleur de base presque noire) : pas de contre-jour, il suit sa section et
+  // s'eclaircit au plus d'un palier (toute la lumiere reste multipliee par la couleur de base)
+  if (lumBase < 0.16) return min(diff, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
+  vec2 dir = cjm.rg * 2.0 - 1.0;
+  if (uFlip > 0.5) dir.x = -dir.x;
+  // meme cosinus que la lampe de face, sur le bord expose vu comme une rasante basculee
+  // (|n.xy| 0,93 -> « face », n.z 0,37 -> « rasante »), lampe en miroir devant le plan (|z|)
+  float cb = (0.37 * dot(dir, d.xy) + 0.93 * abs(uHauteur)) / dist;
+  // 0,6 x contre (1,5 par defaut) = 0,9
+  float cj = 0.6 * uContre * wb * ex * max(cb, 0.0) * att;
+  return min(diff + cj, 1.0);
+}
+
+void main() {
+  vec2 fc = vec2(gl_FragCoord.x, uCanvas.y - gl_FragCoord.y);
+  if (uMode > 8.5) {
+    // disques des lumieres ; derriere le plan : dessines AVANT les sprites (caches par la
+    // silhouette) avec un halo, devant : par-dessus
+    bool derriere = uHauteur < 0.0;
+    if ((uDisques > 0.5) == derriere) discard;
+    vec4 o = vec4(0.0);
+    for (int i = 0; i < 2; i++) {
+      if (float(i) >= uN) break;
+      vec2 lp = i == 0 ? uL1 : uL2;
+      vec3 lc = i == 0 ? uC1 : uC2;
+      float r = length(fc - lp);
+      if (r < uRayonDisque) { o = vec4(mix(lc, vec3(1.0), 0.35), 1.0); break; }
+      if (!derriere && r < uRayonDisque + 1.5) { o = vec4(vec3(0.05), 1.0); break; }
+      if (derriere && r < uRayonDisque * 4.0) {
+        float h = 1.0 - (r - uRayonDisque) / (uRayonDisque * 3.0);
+        o = max(o, vec4(lc, 0.45 * h * h));
+      }
+    }
+    if (o.a <= 0.0) discard;
+    gl_FragColor = o;
+    return;
+  }
+  vec2 t = floor((fc - uOrigineEcr) / uEchelle);
+  if (t.x < 0.0 || t.y < 0.0 || t.x >= uTaille.x || t.y >= uTaille.y) discard;
+  vec2 ts = t;
+  if (uFlip > 0.5) ts.x = uTaille.x - 1.0 - t.x;
+  vec2 uv = (ts + 0.5) / uTaille;
+  vec4 base = texture2D(uNeutre, uv);
+  vec4 o = texture2D(uOrigine, uv);
+  float a = uMode > 0.5 && uMode < 1.5 ? o.a : base.a;
+  if (a < 0.5) discard;
+  vec3 c;
+  if (uMode > 3.5) {
+    // carte contre-jour, comme <nom>.cj-apercu.png : teinte = direction du bord expose,
+    // luminosite = exposition arriere
+    vec4 k = texture2D(uCj, uv);
+    vec2 v = k.rg * 2.0 - 1.0;
+    if (uFlip > 0.5) v.x = -v.x;
+    float hh = fract(atan(v.y, v.x) / 6.2831853);
+    vec3 rgb = clamp(abs(fract(hh + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+    c = rgb * k.b;
+  }
+  else if (uMode > 2.5) { c = texture2D(uNormales, uv).rgb; if (uFlip > 0.5) c.r = 1.0 - c.r; }
+  else if (uMode > 1.5) c = texture2D(uSections, uv).rgb;
+  else if (uMode > 0.5) c = o.rgb;
+  else {
+    vec3 n = texture2D(uNormales, uv).rgb * 2.0 - 1.0;
+    if (uFlip > 0.5) n.x = -n.x;   // le sprite regarde de l'autre cote : sa face gauche devient la droite
+    n = normalize(n);
+    vec2 tc = t + 0.5;
+    vec2 l1 = (uL1 - uOrigineEcr) / uEchelle, l2 = (uL2 - uOrigineEcr) / uEchelle;
+    vec3 l;
+    if (uAncien < 0.5) {
+      // v11 : modele unique (contour noir = sa couleur sombre x l'eclairage de sa section)
+      float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
+      vec4 cjm = texture2D(uCj, uv);
+      l = vec3(uAmbiante) + uC1 * uIntensite * palier(eclairage(n, ts, tc, l1, occultation(l1), lb, cjm));
+      if (uN > 1.5) l += uC2 * uIntensite * palier(eclairage(n, ts, tc, l2, occultation(l2), lb, cjm));
+    } else if (uHauteur >= 0.0) {
+      // v10 (pour comparer) : formule de face...
+      l = vec3(uAmbiante) + uC1 * uIntensite * recu(n, tc, l1);
+      if (uN > 1.5) l += uC2 * uIntensite * recu(n, tc, l2);
+    } else {
+      // ...et formule de contre-jour separee
+      vec3 ns = normaleLisse(ts);
+      l = vec3(uAmbiante) + uC1 * uIntensite * palier(min(lumiereBrute(ns, tc, l1) + contreJourDoux(ns, tc, l1, ts), 1.0));
+      if (uN > 1.5) l += uC2 * uIntensite * palier(min(lumiereBrute(ns, tc, l2) + contreJourDoux(ns, tc, l2, ts), 1.0));
+    }
+    c = base.rgb * l;
+  }
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+  function shader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
+  const ap = gl.getAttribLocation(prog, "p");
+  gl.enableVertexAttribArray(ap);
+  gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
+  const U = {};
+  for (const n of ["uRect", "uNeutre", "uNormales", "uOrigine", "uSections", "uTaille", "uCanvas",
+    "uOrigineEcr", "uEchelle", "uMode", "uPaliers", "uAmbiante", "uHauteur", "uPortee", "uIntensite",
+    "uL1", "uL2", "uC1", "uC2", "uN", "uRayonDisque", "uFlip", "uContre", "uDisques", "uGeo", "uPad", "uAncien", "uCj", "uPasLisse"]) U[n] = gl.getUniformLocation(prog, n);
+  gl.uniform1i(U.uNeutre, 0); gl.uniform1i(U.uNormales, 1);
+  gl.uniform1i(U.uOrigine, 2); gl.uniform1i(U.uSections, 3); gl.uniform1i(U.uGeo, 4); gl.uniform1i(U.uCj, 5);
+  gl.uniform1f(U.uPad, D.geoPad || 6);
+
+  // ---- textures de chaque asset
+  const NOMS = ["neutre", "normales", "origine", "sections", "geo", "cj"];
+  // un asset = une image fixe ({ images }) ou une animation ({ frames: [{ images }], fps, vitesse, regarde })
+  const assets = D.assets.map((a) => ({
+    nom: a.nom, fps: a.fps || 0, vitesse: a.vitesse || 0, regarde: a.regarde || "droite", pasLisse: Math.max(1, Math.round(a.s || 1)),
+    frames: (a.frames || [{ images: a.images }]).map((f) => ({ images: f.images, tex: {}, taille: [1, 1] })),
+  }));
+  let aCharger = assets.reduce((s, a) => s + a.frames.length, 0) * NOMS.length;
+  function texture(img) {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  for (const a of assets) {
+    for (const f of a.frames) {
+      for (const nom of NOMS) {
+        const img = new Image();
+        img.onload = () => {
+          if (nom === "neutre") f.taille = [img.width, img.height];
+          f.tex[nom] = texture(img);
+          if (--aCharger === 0) {
+            for (const b of assets) b.taille = b.frames[0].taille;
+            majAnim(); majPlages(); dessiner(); demarrerBoucle();
+          }
+        };
+        img.src = f.images[nom] || f.images.origine;
+      }
+    }
+  }
+
+  // ---- etat et reglages
+  const PRESETS = [["Torche", "#ffb35c"], ["Lune", "#9fb8ff"], ["Blanc", "#ffffff"]];
+  // lumieres en fraction de la boite affichee (0,0 = coin haut-gauche, 1,1 = coin bas-droit)
+  const etat = { mode: 0, courant: 0, tous: false, lumieres: [[-0.25, 0.3], [1.2, 0.35]] };
+  let echelle = D.echelle || 6;
+  // animation : frame courante (flottante), lecture, marche aller-retour, sens
+  const anim = { joue: true, f: 0, vitesse: 1, marcher: false, sens: false, x: 0, dir: 1, dernier: 0 };
+  const animee = () => assets.some((a) => a.frames.length > 1);
+  const idx = (n) => ((Math.floor(anim.f) % n) + n) % n;
+  function majAnim() {
+    $("bloc-anim").hidden = !animee();
+    const a = assets[etat.courant];
+    const n = a.frames.length;
+    $("num-frame").textContent = n > 1 ? "frame " + (idx(n) + 1) + " / " + n
+      + (a.fps ? " - " + Math.round(a.fps * anim.vitesse) + " i/s" : "") : "";
+    $("lecture").textContent = anim.joue ? "Pause" : "Lecture";
+  }
+  function pas(d) {
+    anim.joue = false;
+    anim.f = Math.floor(anim.f) + d + 1000 * 12;  // reste positif
+    majAnim(); dessiner();
+  }
+  $("prec").onclick = () => pas(-1);
+  $("suiv").onclick = () => pas(1);
+  $("lecture").onclick = () => { anim.joue = !anim.joue; majAnim(); demarrerBoucle(); };
+  $("vitesse").addEventListener("input", () => {
+    anim.vitesse = +$("vitesse").value; $("o-vitesse").textContent = "x" + anim.vitesse; majAnim();
+  });
+  $("o-vitesse").textContent = "x1";
+  $("marcher").onchange = () => { anim.marcher = $("marcher").checked; if (!anim.marcher) anim.x = 0; demarrerBoucle(); dessiner(); };
+  $("sens").onchange = () => { anim.sens = $("sens").checked; dessiner(); };
+  let boucle = false;
+  function demarrerBoucle() {
+    if (boucle || !animee() || !(anim.joue || anim.marcher)) return;
+    boucle = true;
+    anim.dernier = performance.now();
+    const tick = (ts) => {
+      const dt = Math.max(0, Math.min(0.1, (ts - anim.dernier) / 1000));
+      anim.dernier = ts;
+      const a = assets[etat.courant];
+      if (anim.joue) anim.f += dt * (a.fps || 12) * anim.vitesse;
+      if (anim.marcher) anim.x += anim.dir * (a.vitesse || 120) * anim.vitesse * dt;  // px du jeu par seconde
+      majAnim();
+      rendu();
+      if (anim.joue || anim.marcher) requestAnimationFrame(tick); else boucle = false;
+    };
+    requestAnimationFrame(tick);
+  }
+
+  if (assets.length > 1) {
+    $("bloc-assets").hidden = false;
+    $("tous-txt").textContent = "Les " + assets.length + " cote a cote";
+    assets.forEach((a, i) => {
+      const o = document.createElement("option");
+      o.value = i; o.textContent = a.nom; $("asset").appendChild(o);
+    });
+    $("asset").onchange = () => { etat.courant = +$("asset").value; majAnim(); majPlages(); dessiner(); };
+    $("tous").onchange = () => { etat.tous = $("tous").checked; $("asset").disabled = etat.tous; majPlages(); dessiner(); };
+  }
+
+  // reglages de depart dans l'adresse : page.html#l=0.1,0.3&m=2&a=1&tous
+  const h = /l=(-?[\d.]+),(-?[\d.]+)/.exec(location.hash);
+  if (h) etat.lumieres[0] = [+h[1], +h[2]];
+  const hm = /m=(\d)/.exec(location.hash);
+  if (hm) {
+    etat.mode = +hm[1];
+    const cb = document.querySelector('input[data-mode="' + hm[1] + '"]');
+    if (cb) cb.checked = true;
+  }
+  const ha = /a=(\d+)/.exec(location.hash);
+  if (ha && assets[+ha[1]]) { etat.courant = +ha[1]; $("asset").value = ha[1]; }
+  if (/marche/.test(location.hash)) { anim.marcher = true; $("marcher").checked = true; }
+  if (/sens/.test(location.hash)) { anim.sens = true; $("sens").checked = true; }
+  if (/ancien/.test(location.hash)) $("ancien").checked = true;
+  const hc = /[&#]c=([0-9a-fA-F]{6})/.exec(location.hash);
+  if (hc) $("couleur1").value = "#" + hc[1].toLowerCase();
+  const hp = /[&#]p=(\d+)/.exec(location.hash);
+  if (hp) $("portee").value = hp[1];
+  const hz = /z=(-?\d+)/.exec(location.hash);
+  if (hz) $("hauteur").value = hz[1];
+  const hf = /f=(\d+)/.exec(location.hash);
+  if (hf) { anim.joue = false; anim.f = +hf[1]; }
+  const hx = /x=(-?[\d.]+)/.exec(location.hash);
+  if (hx) anim.x = +hx[1];
+  if (/tous/.test(location.hash) && assets.length > 1) {
+    etat.tous = true; $("tous").checked = true; $("asset").disabled = true;
+  }
+
+  const sel = $("echelle");
+  for (let k = 1; k <= 12; k++) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = "x" + k; if (k === echelle) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.onchange = () => { echelle = +sel.value; dessiner(); };
+
+  function presets(id, entree) {
+    const box = $(id);
+    const maj = () => box.querySelectorAll("button").forEach((b) =>
+      b.setAttribute("aria-pressed", b.dataset.c === entree.value ? "true" : "false"));
+    for (const [nom, c] of PRESETS) {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = nom; b.dataset.c = c;
+      b.onclick = () => { entree.value = c; maj(); dessiner(); };
+      box.appendChild(b);
+    }
+    entree.addEventListener("input", () => { maj(); dessiner(); });
+    maj();
+  }
+  presets("couleurs1", $("couleur1"));
+  presets("couleurs2", $("couleur2"));
+
+  const affichages = { hauteur: (v) => (v > 0 ? "+" : "") + v + " px" + (v < 0 ? " (derriere)" : v > 0 ? " (devant)" : " (dans le plan)"),
+    contre: (v) => (+v).toFixed(1), intensite: (v) => (+v).toFixed(2),
+    portee: (v) => v + " px", ambiante: (v) => Math.round(v * 100) + " %" };
+  for (const id in affichages) {
+    const e = $(id), o = $("o-" + id);
+    e.addEventListener("input", () => { o.textContent = affichages[id](e.value); dessiner(); });
+    o.textContent = affichages[id](e.value);
+  }
+  $("paliers").onchange = dessiner;
+  $("ancien").onchange = dessiner;
+
+  $("l2").onchange = dessiner;
+  document.querySelectorAll("input[data-mode]").forEach((cb) => {
+    cb.onchange = () => {
+      document.querySelectorAll("input[data-mode]").forEach((o) => { if (o !== cb) o.checked = false; });
+      etat.mode = cb.checked ? +cb.dataset.mode : 0;
+      dessiner();
+    };
+  });
+
+  function hex(c) { return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255); }
+
+  // plages des reglages selon la taille de l'asset affiche (grand sprite : portee et profondeur plus
+  // longues), en px du sprite ; les valeurs en cours sont gardees
+  function majPlages() {
+    const liste = etat.tous ? assets : [assets[etat.courant]];
+    const diag = Math.max(...liste.map((a) => Math.hypot(a.taille[0], a.taille[1])));
+    $("portee").max = Math.max(800, Math.round(3 * diag / 5) * 5);
+    const z = Math.max(60, Math.round(diag / 6));
+    $("hauteur").min = -z; $("hauteur").max = z;
+  }
+
+  // ---- mise en page : un asset centre, ou tous en ligne poses sur le meme sol
+  const ECART = 12; // px du sprite entre deux assets
+  function disposition() {
+    const liste = etat.tous ? assets : [assets[etat.courant]];
+    const lw = liste.reduce((s, a) => s + a.taille[0], 0) + ECART * (liste.length - 1);
+    const lh = Math.max(...liste.map((a) => a.taille[1]));
+    let x = 0;
+    const places = liste.map((a) => { const p = { a, x, y: lh - a.taille[1] }; x += a.taille[0] + ECART; return p; });
+    return { places, lw, lh };
+  }
+
+  let geo = { ox: 0, oy: 0, s: 1, dpr: 1, lw: 1, lh: 1 };
+  let attente = false;
+  function dessiner() {
+    if (aCharger > 0 || attente) return;
+    attente = true;
+    requestAnimationFrame(() => { attente = false; rendu(); });
+  }
+
+  function rendu() {
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    const H = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0.051, 0.043, 0.102, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    const { places, lw, lh } = disposition();
+    // echelle entiere ; reduite si l'ensemble ne tient pas dans la scene
+    let e = echelle;
+    while (e > 1 && (lw * e > canvas.clientWidth * 0.94 || lh * e > canvas.clientHeight * 0.88)) e--;
+    $("echelle-eff").textContent = e !== echelle ? "(x" + e + " pour tenir)" : "";
+    const s = Math.max(1, Math.round(e * dpr)); // entier en pixels ecran : pixels nets
+    const ox = Math.floor((W - lw * s) / 2), oy = Math.floor((H - lh * s) / 2);
+    geo = { ox, oy, s, dpr, lw, lh };
+    const L = etat.lumieres.map(([fx, fy]) => [ox + fx * lw * s, oy + fy * lh * s]);
+    const n2 = $("l2").checked ? 2 : 1;
+    gl.uniform2f(U.uCanvas, W, H);
+    gl.uniform1f(U.uEchelle, s);
+    gl.uniform1f(U.uPaliers, +$("paliers").value);
+    gl.uniform1f(U.uAmbiante, +$("ambiante").value);
+    gl.uniform1f(U.uHauteur, +$("hauteur").value);
+    gl.uniform1f(U.uPortee, +$("portee").value);
+    gl.uniform1f(U.uIntensite, +$("intensite").value);
+    gl.uniform2fv(U.uL1, L[0]); gl.uniform2fv(U.uL2, L[1]);
+    gl.uniform3fv(U.uC1, hex($("couleur1").value)); gl.uniform3fv(U.uC2, hex($("couleur2").value));
+    gl.uniform1f(U.uN, n2);
+    gl.uniform1f(U.uRayonDisque, 6 * dpr);
+    gl.uniform1f(U.uContre, +$("contre").value);
+    gl.uniform1f(U.uAncien, $("ancien").checked ? 1 : 0);
+    // lumieres derriere : disques et halos d'abord, les sprites les recouvrent
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.uniform1f(U.uFlip, 0);
+    gl.uniform1f(U.uMode, 9);
+    gl.uniform1f(U.uDisques, 0);
+    gl.uniform4f(U.uRect, 0, 0, W, H);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.uniform1f(U.uMode, etat.mode);
+    // marche : aller-retour dans la scene (la lumiere, elle, reste fixe)
+    let dx = 0;
+    if (anim.marcher && !etat.tous) {
+      const amp = Math.max(0, (W / s - lw) / 2 - 4);
+      if (anim.x > amp) { anim.x = amp; anim.dir = -1; }
+      if (anim.x < -amp) { anim.x = -amp; anim.dir = 1; }
+      dx = Math.round(anim.x);
+    }
+    gl.uniform1f(U.uMode, etat.mode);
+    for (const p of places) {
+      const fr = p.a.frames[idx(p.a.frames.length)];
+      NOMS.forEach((nom, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, fr.tex[nom]); });
+      // sens : sprite en miroir ET normal.x inverse dans le shader (ce que flipX seul ne fait pas)
+      const vers = anim.marcher && !etat.tous ? (anim.dir > 0 ? "droite" : "gauche") : null;
+      const flip = vers ? vers !== p.a.regarde : anim.sens;
+      gl.uniform1f(U.uFlip, flip ? 1 : 0);
+      const x = ox + (p.x + dx) * s, y = oy + p.y * s;
+      gl.uniform2f(U.uTaille, p.a.taille[0], p.a.taille[1]);
+      gl.uniform1f(U.uPasLisse, p.a.pasLisse);
+      gl.uniform2f(U.uOrigineEcr, x, y);
+      gl.uniform4f(U.uRect, x, y, p.a.taille[0] * s, p.a.taille[1] * s);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    gl.uniform1f(U.uFlip, 0);
+    gl.uniform1f(U.uMode, 9);
+    gl.uniform1f(U.uDisques, 1);
+    gl.uniform4f(U.uRect, 0, 0, W, H);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  // ---- deplacement de la lumiere (souris ou doigt)
+  let tenue = -1;
+  function versBoite(ev) {
+    const r = canvas.getBoundingClientRect();
+    const x = (ev.clientX - r.left) * geo.dpr, y = (ev.clientY - r.top) * geo.dpr;
+    return [(x - geo.ox) / geo.s / geo.lw, (y - geo.oy) / geo.s / geo.lh];
+  }
+  canvas.addEventListener("pointerdown", (ev) => {
+    const p = versBoite(ev);
+    tenue = 0;
+    if ($("l2").checked) {
+      const d = etat.lumieres.map(([x, y]) => Math.hypot((x - p[0]) * geo.lw, (y - p[1]) * geo.lh));
+      tenue = d[1] < d[0] ? 1 : 0;
+    }
+    etat.lumieres[tenue] = p;
+    canvas.setPointerCapture(ev.pointerId);
+    dessiner();
+  });
+  canvas.addEventListener("pointermove", (ev) => {
+    if (tenue < 0) return;
+    etat.lumieres[tenue] = versBoite(ev);
+    dessiner();
+  });
+  const lacher = () => { tenue = -1; };
+  canvas.addEventListener("pointerup", lacher);
+  canvas.addEventListener("pointercancel", lacher);
+  window.addEventListener("resize", dessiner);
+})();
+</script>
+</body>
+</html>

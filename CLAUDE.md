@@ -90,6 +90,10 @@ ligne de marche du jeu par défaut. Hauteur de marche : `448 + GROUND_STAND_SINK
   ligne ; `--scenes A,B`, `--rapide`, `--robot fs1 fs2`), `python tools/capture.py <zone> --x --y`
   (capture + gros plan). Robot du chemin principal : `tools/robot/`. Regles communes des agents :
   `docs/production/REGLES_AGENTS.md` (un brief y renvoie au lieu de les repeter).
+- **Éclairage par sections** (skill `eclairage-sections`) : après pixelfix, `npm run sections`
+  (cartes neutre / sections / normales dans `_lumiere/`, manifeste `src/data/sections.js`),
+  `npm run lumiere:tests`, `npm run lumiere:apercu` ; en jeu `src/utils/LightKit.js`, opt-in
+  (`LightKit.activer`), test : `?zone=<zone>&lumiere`. Node seul, rien à installer.
 - **Tests** : `python tools/playtest.py --port 88xx --scene ForetSombre1Scene --flags
   xaraMet=true --keys "ArrowRight:1500" --js "…" --shot x.png` (Edge headless, code de
   sortie 1 si erreur JS). Dans un test automatique, ne jamais cliquer « Enregistrer » de

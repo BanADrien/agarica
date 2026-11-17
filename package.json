@@ -1,0 +1,14 @@
+{
+  "name": "legend-of-agarica-outils",
+  "private": true,
+  "description": "Raccourcis des outils Node du jeu. Aucune dependance : rien a installer (le jeu reste sans build : index.html + Phaser par CDN).",
+  "scripts": {
+    "sections": "node tools/sections.js",
+    "lumiere:apercu": "node tools/lumiere/apercu.js",
+    "lumiere:tests": "node tools/lumiere/tests.js",
+    "lumiere:test-page": "node tools/lumiere/test-page.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
