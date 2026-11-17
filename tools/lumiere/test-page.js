@@ -7,7 +7,8 @@
  * au même calcul fait par Node (décodage par png.js) et aux cartes du jeu. Rien n'est écrit hors
  * de tools/lumiere/sortie/ (ignoré par git).
  * Cas : un asset du jeu tel quel (grizzly, réglages automatiques), un autre en natif recollé sur
- * fond blanc et agrandi x4, la marche d'Agarica (8 images = une animation).
+ * fond blanc et agrandi x4, la marche d'Agarica (8 images = une animation), Kainati (grand sprite,
+ * réglages à l'échelle) seul et en 4 images.
  * Navigateur : variable NAVIGATEUR, sinon Edge / Chrome / Chromium aux emplacements habituels.
  * Code 0 si tout est identique, 1 sinon, 2 sans navigateur.
  */
@@ -78,11 +79,15 @@ function main() {
   const griz = PNG.lirePng(asset('grizzly_frames/grizzly_row0_0.png'));
   // grizzly_row0_2 : pas de trou transparent enfermé (un trou enfermé redevient blanc sur fond blanc)
   const grizNat = PNG.lirePng(asset('grizzly_frames/_lumiere/grizzly_row0_2_natif.png'));
+  const kai = [0, 1, 2, 3].map((i) => PNG.lirePng(asset(`kainati_frames/kainati_row0_${i}.png`)));
   const marche = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => PNG.lirePng(asset(`agarica_walk_frames/agarica_walk_${i}.png`)));
   const cas = [
     { nom: 'grizzly du jeu (auto)', ims: [griz], reglages: {}, jeu: ['grizzly_frames/_lumiere/grizzly_row0_0'] },
     { nom: 'grizzly (pose 2) natif x4 sur fond blanc (auto)', ims: [surFondBlanc(grizNat, 4)], reglages: {}, jeu: ['grizzly_frames/_lumiere/grizzly_row0_2'] },
     { nom: 'marche d\'Agarica, 8 images (auto)', ims: marche, reglages: {}, jeu: marche.map((_, i) => `agarica_walk_frames/_lumiere/agarica_walk_${i}`) },
+    // grand sprite (s > 1) : réglages en pixels à l'échelle ; facteur 1,08 du registre imposé
+    { nom: 'Kainati, grand sprite seul (facteur 1,08)', ims: [kai[0]], reglages: { facteur: 1.08 }, jeu: null },
+    { nom: 'Kainati, 4 images (facteur 1,08)', ims: kai, reglages: { facteur: 1.08 }, jeu: kai.map((_, i) => `kainati_frames/_lumiere/kainati_row0_${i}`) },
   ];
   const page = construirePage({ titre: 'essai', echelle: 6, assets: [], geoPad: 10 },
     cas.map((c) => ({ nom: c.nom, reglages: c.reglages, images: c.ims.map(url) })));
@@ -117,6 +122,7 @@ function main() {
         const e = ecarts(depuisB64(bf[q]), fr[q]);
         dn += typeof e === 'number' ? e : 1e9;
       }
+      if (!c.jeu) return;
       const L = (s) => PNG.lirePng(asset(`${c.jeu[k]}_${s}.png`));
       for (const [q, s] of [['nat', 'natif'], ['neu', 'neutre'], ['sec', 'sections'], ['nor', 'n'], ['cj', 'cj']]) {
         const e = ecartsOpaques(depuisB64(bf[q]), L(s));
@@ -125,7 +131,7 @@ function main() {
       }
     });
     if (dn) echec++;
-    console.log(`| ${c.nom} | ${b.f} / ${n.f} | ${dn === 0 ? 'oui, 0 pixel différent' : `NON, ${dn} pixels`} | ${dj === 0 ? 'oui' : `écarts : ${detailJeu.join(', ')}`} | ${b.ms} ms |`);
+    console.log(`| ${c.nom} | ${b.f} / ${n.f} | ${dn === 0 ? 'oui, 0 pixel différent' : `NON, ${dn} pixels`} | ${!c.jeu ? '-' : dj === 0 ? 'oui' : `écarts : ${detailJeu.join(', ')}`} | ${b.ms} ms |`);
     if (b.messages.length) console.log(`|  | messages : ${b.messages.join(' ')} | | | |`);
   });
   return echec ? 1 : 0;

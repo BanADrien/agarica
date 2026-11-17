@@ -30,6 +30,7 @@ const SPRITES = [
   ['crapaud', 'assets/sprites/crapaud_frames/crapaud_row0_0.png'],
   ['loup', 'assets/sprites/loup_frames/loup_row0_0.png'],
   ['grizzly', 'assets/sprites/grizzly_frames/grizzly_row0_0.png'],
+  ['Kainati (grand)', 'assets/sprites/kainati_frames/kainati_row0_0.png'],
 ];
 
 function manifeste() {
@@ -42,15 +43,19 @@ function manifeste() {
 }
 
 const palier = (v) => CPU.palier(v, U);
+// max / min d'un grand tableau (Math.max(...t) déborde la pile au-delà de ~100 000 valeurs)
+const maxi = (t) => t.reduce((a, b) => (b > a ? b : a), -Infinity);
+const mini = (t) => t.reduce((a, b) => (b < a ? b : a), Infinity);
 
 class Sprite {
-  constructor(carte) {
-    const s = CPU.sprite(carte);
+  constructor(carte, pas, ech) {
+    const s = CPU.sprite(carte, pas || 1);
     Object.assign(this, s);
+    this.ech = ech > 1 ? ech : 1;   // grand sprite : contour et frange de la carte contre-jour x ech
     this.pts = [...s.N.keys()].map((p) => [p % s.w, Math.floor(p / s.w)]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
     this.S = new Set(s.N.keys());
     const xs = this.pts.map((p) => p[0]), ys = this.pts.map((p) => p[1]);
-    this.x0 = Math.min(...xs); this.x1 = Math.max(...xs); this.y0 = Math.min(...ys); this.y1 = Math.max(...ys);
+    this.x0 = mini(xs); this.x1 = maxi(xs); this.y0 = mini(ys); this.y1 = maxi(ys);
     this.preparerZones();
   }
   // profondeur depuis le bord EXTÉRIEUR (géométrie de sections.py), sections reliées à
@@ -68,7 +73,8 @@ class Sprite {
     this.reliee = new Set();
     this.frange = new Set();
     if (!this.brute) return;
-    const passe = (p) => this.lum.get(p) >= 0.16 || this.D.get(p) <= 2;
+    const ech = this.ech || 1;
+    const passe = (p) => this.lum.get(p) >= 0.16 || this.D.get(p) <= 2 * ech;
     const meme = (a, b) => { const u = this.brute.get(a), v = this.brute.get(b); return u.x === v.x && u.y === v.y && u.z === v.z; };
     const vu = new Set();
     for (const p0 of this.N.keys()) {
@@ -88,7 +94,7 @@ class Sprite {
       if (touche) comp.forEach((q) => this.reliee.add(q));
     }
     let front = new Set(this.reliee);
-    for (let k = 0; k < 2; k++) {
+    for (let k = 0; k < (ech > 1 ? Math.round(2 * ech) : 2); k++) {
       const nxt = new Set();
       for (const c of front) {
         const cx = c % w, cy = (c - cx) / w;
@@ -122,7 +128,8 @@ function chargerSprite(url, man) {
   if (!fs.existsSync(f('n')) || !fs.existsSync(f('neutre'))) return null;
   const n = lirePng(f('n')), neu = lirePng(f('neutre'));
   const cj = fs.existsSync(f('cj')) ? lirePng(f('cj')).data : null;   // sans carte : exposition 0
-  return new Sprite({ w: n.width, h: n.height, n: n.data, neutre: neu.data, cj });
+  // grand sprite : normale lissée échantillonnée tous les round(s) px, comme le shader
+  return new Sprite({ w: n.width, h: n.height, n: n.data, neutre: neu.data, cj }, e.s > 1 ? Math.round(e.s) : 1, e.s);
 }
 
 // demi-sphère analytique (normales continues), couleur moyenne
@@ -154,7 +161,7 @@ function demiSphere(r) {
   sp.pts = [...sp.N.keys()].map((p) => [p % w, Math.floor(p / w)]).sort((m, n) => m[0] - n[0] || m[1] - n[1]);
   sp.S = new Set(sp.N.keys());
   const xs = sp.pts.map((p) => p[0]), ys = sp.pts.map((p) => p[1]);
-  Object.assign(sp, { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+  Object.assign(sp, { x0: mini(xs), x1: maxi(xs), y0: mini(ys), y1: maxi(ys) });
   sp.preparerZones();
   return sp;
 }
@@ -205,7 +212,7 @@ function variations(sp, poses) {
   }
   let iso = 0;
   for (let i = 1; i < out.length - 1; i++) iso = Math.max(iso, Math.abs(out[i] - (out[i - 1] + out[i + 1]) / 2));
-  return [Math.max(...out), iso];
+  return [maxi(out), iso];
 }
 const pas = (a, b, s) => { const r = []; for (let v = a; s > 0 ? v <= b : v >= b; v += s) r.push(v); return r; };
 
@@ -256,7 +263,7 @@ function tDevant(sp) {
       }
     }
   }
-  return [moyenne(diffs), Math.max(...diffs)];
+  return [moyenne(diffs), maxi(diffs)];
 }
 
 function tUtilisateur(sp) {
@@ -318,12 +325,12 @@ function tFidelite(sp) {
           saut = Math.max(saut, s); npairs++; nbig += s >= 2;
         }
       }
-      const top = Math.max(...sp.pts.filter(clair).map((p) => lv.get(sp.id(p))));
+      const top = maxi(sp.pts.filter(clair).map((p) => lv.get(sp.id(p))));
       if (top > 0) {
         const zeros = sp.pts.filter((p) => lv.get(sp.id(p)) === 0 && clair(p));
         const tops = sp.pts.filter((p) => lv.get(sp.id(p)) === top && clair(p));
         for (let k = 0; k < tops.length; k += 7) {
-          if (zeros.length) larg.push(Math.min(...zeros.map((q) => Math.hypot(tops[k][0] - q[0], tops[k][1] - q[1]))));
+          if (zeros.length) larg.push(mini(zeros.map((q) => Math.hypot(tops[k][0] - q[0], tops[k][1] - q[1]))));
         }
       }
     }
@@ -455,7 +462,7 @@ function main() {
     const moy = (h) => h.reduce((s, v, i) => s + i * v, 0) / 100;
     const p49 = f[49], m49 = f[-49];
     const ex = tExpose(sp);
-    const ok11 = m49.big <= p49.big && m49.saut <= p49.saut && moy(m49.hist) <= moy(p49.hist) && Math.min(...ex.slice(1)) >= 3;
+    const ok11 = m49.big <= p49.big && m49.saut <= p49.saut && moy(m49.hist) <= moy(p49.hist) && mini(ex.slice(1)) >= 3;
     const fmt = (r) => `[${r.hist.join(', ')}] (${moy(r.hist).toFixed(2)}), ${r.saut}, ${r.big.toFixed(1)} %, ${r.larg.toFixed(1)} px`;
     const [mi, md, ni] = tMilieu(sp);
     ajout('12 milieu sombre', nom, mi === 0, `pixels intérieurs allumés : ${mi.toFixed(1)} % (pire ${md || '-'}) ; ${ni} px intérieurs`);

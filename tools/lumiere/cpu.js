@@ -65,7 +65,8 @@ function reference(n, t, lp, z, portee) {
 // Sprite pour la batterie : normales (normalisées comme dans le shader), normale lissée 5x5
 // (normaleLisse()), luminance de la couleur de base, carte contre-jour (CJ ; sans carte :
 // exposition 0) et normale brute (sections). carte = { w, h, n, neutre, cj? } (RGBA).
-function sprite(carte) {
+// pas : écart entre les 5 x 5 échantillons de la normale lissée (round(s) d'un grand sprite, 1 sinon)
+function sprite(carte, pas = 1) {
   const { w, h } = carte;
   const N = new Map(), lum = new Map(), NL = new Map(), brute = new Map(), CJ = new Map();
   for (let y = 0; y < h; y++) {
@@ -87,7 +88,7 @@ function sprite(carte) {
     let acc = vec3(0, 0, 0);
     for (let dy = -2; dy <= 2; dy++) {
       for (let dx = -2; dx <= 2; dx++) {
-        const X = x + dx, Y = y + dy;
+        const X = x + dx * pas, Y = y + dy * pas;
         if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
         const q = brute.get(Y * w + X);
         if (q) acc = vec3(acc.x + q.x, acc.y + q.y, acc.z + q.z);
