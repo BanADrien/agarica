@@ -67,6 +67,8 @@ des noms (`marche_1, marche_2... marche_10`).
   pas de grille détectée (image prise telle quelle), plus de 64 couleurs (image peinte, ramenée à
   32 couleurs, matières moins nettes). Refus au-delà de 400 pixels dessinés de côté (indiquer la
   taille d'un pixel). PNG conseillé : un JPG abîme les aplats et la grille.
+- Grand sprite : réglages à l'échelle automatiquement (message « Grand sprite : réglages en
+  pixels multipliés par s »), calcul plus long (Kainati : 1,5 s seul, 9 s pour 4 images).
 - Rien n'est envoyé sur Internet ; ne pas mettre les images d'essai de l'utilisateur dans le dépôt.
 - Contrôle du code de la page : `npm run lumiere:test-page` (Chrome / Edge sans fenêtre, variable
   `NAVIGATEUR` sinon) : calcul du navigateur = calcul de Node = cartes du jeu, sur le grizzly, un
@@ -96,6 +98,10 @@ profondeur 8), `lune` (0x9fb8ff, 0,8, portée 900, profondeur 30), `blanc`, `con
 
 Réglages conseillés : torche à **+8** (près du plan) ; lune loin et haut, grande portée ;
 contre-jour entre **-10 et -40**, contre 1,5 ; ambiance 0,3-0,4 la nuit ; 4 paliers.
+**Grand ennemi (boss, Kainati)** : la portée des préréglages (220 px du monde) n'éclaire qu'un
+bout de lui. Prendre `LightKit.porteeConseillee(boss)` (3 fois sa diagonale affichée) :
+`LightKit.regler(torche, { portee: LightKit.porteeConseillee(boss) })` ; profondeur à l'échelle
+aussi (devant : +8 à +20 ; derrière : -20 à -60 selon sa taille).
 
 Mode de test sans toucher au code : `index.html?zone=foret_sombre_1&lumiere` (Agarica et tout
 sprite préparé éclairés, nuit, torche au pointeur, molette = profondeur, lune) ;
@@ -148,7 +154,7 @@ pixel, jamais à travers un trait).
    profondeur et en largeur, pas de bande au contour, lumière devant = N.L, contour sombre
    ≤ 1 palier, adoucissement, fidélité à +49, milieu sombre (aucun pixel d'une section non
    reliée au bord allumé par une lampe derrière). Code 1 si un test échoue : lire la ligne.
-   État au 2026-11-17 (v16) : 68 / 68 sur les cartes du jeu.
+   État au 2026-11-17 (v16) : 81 / 81 sur les cartes du jeu (dont Kainati, grand sprite).
 2. `npm run lumiere:apercu [-- <anim|png>]` : page autonome dans `tools/lumiere/sortie/`
    (ignoré par git) ; donner le chemin à l'utilisateur. Lumière à glisser, profondeur, sens,
    animation, affichage des sections / normales / carte contre-jour. `--regarde gauche` pour un sprite dessiné
@@ -170,6 +176,25 @@ pixel, jamais à travers un trait).
   `apercu.html` (en gardant le commentaire d'en-tête), reporter le corps de `eclairage()` dans
   `FRAG_ECLAIRAGE` de LightKit.js et dans cpu.js, relancer `npm run lumiere:tests` (les lignes
   « 0 » disent ce qui diffère).
+
+## Grands sprites (échelle s)
+
+Les réglages en pixels du découpage ont été mis au point sur les sprites de la démo (Agarica,
+loup, grizzly, crapaud : racine de la surface opaque de 49 à 87 px). Un sprite plus grand
+(Kainati, ~250 px) les prend à l'échelle **s = max(1, racine(surface opaque) / 96)** (médiane
+des frames d'une animation ; arrondi au centième). s = 1 : rien ne change (cartes identiques à
+`sections.py`). s > 1 (calculé et noté `s` dans le manifeste, sans option à donner) :
+- sections : zones minimales × s², lissages, contour extérieur, bombé des parties × s, filtre
+  majoritaire × s passes : de grands plans qui suivent les masses (épaule, bras, cuisse) au lieu
+  d'éclats en escalier (Kainati : 951 zones -> 465, frontières -42 %, marches -49 %) ;
+- carte contre-jour : décroissance jusqu'à 12 s px, contour 2 s, frange 2 s px, direction lissée
+  2 s : de larges plans sur le bord, plus un liseré de 1-3 px (Kainati : bord exposé 11 % -> 36 %) ;
+- neutre détaillé : seul l'ombrage à grande échelle est retiré, mèches et nuances gardées dans la
+  palette (détail de la fourrure 0,4 % -> 2,1 %, l'original est à 2,0 %) ; matières claires
+  ramenées sous 188 / 255 pour que les paliers ne saturent pas au blanc (le blanc pur de la
+  fourrure devient un gris clair à l'ambiance seule) ;
+- shader : normale lissée échantillonnée tous les round(s) px ; page de test : portée jusqu'à
+  3 fois la diagonale, profondeur ± diagonale / 6.
 
 ## Le modèle en bref (v16)
 
@@ -220,3 +245,10 @@ toutes les positions de lampe, un seul palier à la fin.
 - **Objets éclairés** : chacun coûte un appel de dessin et quitte le pipeline de LookKit (pas
   d'étalonnage de zone sur lui ; LookKit ne touche jamais un pipeline posé par le jeu).
 - Sprite refait par pixelfix ou retouché : refaire les sections (`npm run sections -- verifier`).
+- **Réglages en pixels absolus sur un grand sprite** : un seuil pensé pour 60-100 px (zone
+  minimale, lissage, frange de 2 px) fait des éclats en escalier et un liseré de contre-jour en
+  pointillés sur un sprite de 300-400 px. Tout réglage en pixels passe par l'échelle s (coeur.js :
+  `aL` pour une longueur, `aS` pour une surface), et s = 1 doit redonner le calcul d'origine.
+- **Neutre en aplats sur un sprite détaillé** : la moyenne par matière efface le dessin (fourrure
+  devenue lisse). Retirer seulement l'ombrage à grande échelle ; et laisser de la marge sous le
+  blanc, sinon les matières claires saturent dès le 2e palier.
