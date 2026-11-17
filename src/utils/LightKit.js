@@ -21,7 +21,7 @@
 // lumière Phaser (scene.lights) avec en plus `profondeur`.
 //
 // Shader : PORT du gabarit validé tools/lumiere/apercu.html (copie de
-// viewer/lumiere-template.html du skill pixel-art-forge, v15). Fonctions palier(),
+// viewer/lumiere-template.html du skill pixel-art-forge, v16). Fonctions palier(),
 // normaleLisse() et eclairage() recopiées telles quelles ; seules différences, pour plusieurs
 // lumières de profondeurs différentes : uHauteur -> z, uPortee -> portee (paramètres) et
 // normaleLisse(ts) -> nLisse (calculée une fois par pixel). `npm run lumiere:tests` compare
@@ -35,7 +35,11 @@
 // portée sont divisées par la taille à l'écran d'un pixel natif. flipX : comme la case
 // « sens » de la page, l'image est lue en miroir ET normal.x inversé (uFlip), sinon la
 // lumière éclairerait le mauvais côté. flipY n'est pas pris en charge.
-// Objet éclairé sans carte (frame non préparée) : même lumière, normale de face (à plat).
+// Deux cartes par sprite : les NORMALES (sections) pour la lumière de face, la carte
+// CONTRE-JOUR (_cj.png : direction du bord exposé, exposition arrière) pour une lampe derrière.
+// Sans carte contre-jour, l'exposition vaut 0 : une lampe derrière n'allume rien.
+// Objet éclairé sans carte (frame non préparée) : même lumière de face, normale de face (à
+// plat), pas de contre-jour.
 
 const LightKit = (() => {
   const NOM_PIPELINE = 'LumiereSections';
@@ -55,10 +59,13 @@ const LightKit = (() => {
   const AMBIANCES = { neutre: 0x5c5c5c, nuit: 0x55506a, jour: 0xb4b4b4 };
 
   // ---------------------------------------------------------------- shader
-  // Corps d'eclairage() : MOT À MOT celui de tools/lumiere/apercu.html (v15) après
+  // Corps d'eclairage() : MOT À MOT celui de tools/lumiere/apercu.html (v16) après
   // substitutions uHauteur -> z, uPortee -> portee, normaleLisse(ts) -> nLisse.
+  // cjm = carte contre-jour : rg = direction du bord exposé (x droite, y haut), b = exposition.
+  // La lampe derrière (wb) ne passe QUE par elle : la part « derrière » de la diffuse et le
+  // contre-jour sont multipliés par l'exposition ; le milieu (exposition 0) ne s'allume jamais.
   const FRAG_ECLAIRAGE = `
-float eclairage(vec3 n, vec3 nLisse, vec2 t, vec2 lp, float z, float portee, float occ, float lumBase) {
+float eclairage(vec3 n, vec3 nLisse, vec2 t, vec2 lp, float z, float portee, float lumBase, vec4 cjm) {
   float wb = smoothstep(15.0, -15.0, z);
   vec3 ne = n;
   if (wb > 0.0) ne = normalize(mix(n, nLisse, wb));
@@ -66,15 +73,13 @@ float eclairage(vec3 n, vec3 nLisse, vec2 t, vec2 lp, float z, float portee, flo
   float dist = max(length(d), 0.001);
   float att = clamp(1.0 - (dist * dist) / (portee * portee), 0.0, 1.0);
   float w = 0.5 * wb;
-  float diff = max((dot(ne, d / dist) + w) / (1.0 + w), 0.0) * att;
+  float ex = cjm.b;
+  float diff = max((dot(ne, d / dist) + w) / (1.0 + w), 0.0) * att * mix(1.0, ex, wb);
   if (lumBase < 0.16) return min(diff, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
-  float cj = 0.0;
-  float m = length(ne.xy);
-  if (wb > 0.0 && m > 0.001) {
-    float ms = length(n.xy);
-    float cb = (n.z * dot(ne.xy / m, d.xy) + ms * abs(z)) / dist;
-    cj = 0.533 * uContre * wb * ms * max(cb, 0.0) * att;
-  }
+  vec2 dir = cjm.rg * 2.0 - 1.0;
+  if (uFlip > 0.5) dir.x = -dir.x;
+  float cb = (0.37 * dot(dir, d.xy) + 0.93 * abs(z)) / dist;
+  float cj = 0.6 * uContre * wb * ex * max(cb, 0.0) * att;
   return min(diff + cj, 1.0);
 }`;
 
@@ -94,6 +99,7 @@ const int kMaxLights = %LIGHT_COUNT%;
 uniform sampler2D uMainSampler;   // image du jeu (objet sans carte)
 uniform sampler2D uNeutre;        // _lumiere/<n>_neutre.png
 uniform sampler2D uNormales;      // _lumiere/<n>_n.png
+uniform sampler2D uCj;            // _lumiere/<n>_cj.png (carte contre-jour)
 uniform vec3 uAmbiance;
 uniform Lumiere uLumieres[kMaxLights];
 uniform int uNbLumieres;
@@ -137,6 +143,7 @@ void main() {
   vec4 base;
   vec3 n = vec3(0.0, 0.0, 1.0);
   vec3 nl = n;
+  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);                // sans carte : aucune exposition arrière
   vec2 ts;
   if (uCarte > 0.5) {
     ts = floor((px - uGrille) / uPas);
@@ -149,6 +156,7 @@ void main() {
     if (uFlip > 0.5) n.x = -n.x;
     n = normalize(n);
     if (uDerriere > 0.5) nl = normaleLisse(ts);
+    cjm = texture2D(uCj, uv);
   } else {
     base = texture2D(uMainSampler, outTexCoord);      // alpha prémultiplié (Phaser)
     if (base.a <= 0.0) discard;
@@ -162,8 +170,7 @@ void main() {
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      // occ (lampe cachée) : plus utilisé par eclairage() depuis la v15 -> 0
-      l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, 0.0, lb));
+      l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
     }
   }
   vec4 color = vec4(base.rgb * l, base.a) * texel;
@@ -178,13 +185,15 @@ void main() {
   const manifeste = () => (typeof SECTIONS_LUMIERE !== 'undefined' ? SECTIONS_LUMIERE : {});
   const cleCarte = (url, quoi) => `lumiere:${quoi}:${url}`;
 
-  // preload de BootScene : charge neutre + normales de chaque sprite du manifeste et note
+  // preload de BootScene : charge neutre, normales et carte contre-jour de chaque sprite du
+  // manifeste (la carte contre-jour seulement si le manifeste l'annonce : `cj`) et note
   // quelle clé de texture correspond à quelle image (le manifeste parle en fichiers).
   function chargerCartes(scene) {
     const man = manifeste();
     for (const [url, e] of Object.entries(man)) {
       scene.load.image(cleCarte(url, 'neutre'), `${e.d}/${e.n}_neutre.png`);
       scene.load.image(cleCarte(url, 'n'), `${e.d}/${e.n}_n.png`);
+      if (e.cj) scene.load.image(cleCarte(url, 'cj'), `${e.d}/${e.n}_cj.png`);
     }
     scene.load.on(Phaser.Loader.Events.FILE_LOAD, (file) => {
       if (!file || file.type !== 'image' || typeof file.url !== 'string') return;
@@ -196,7 +205,7 @@ void main() {
   // create de BootScene : pixels nets sur les cartes
   function filtrerCartes(scene) {
     for (const url of Object.keys(manifeste())) {
-      for (const q of ['neutre', 'n']) {
+      for (const q of ['neutre', 'n', 'cj']) {
         const k = cleCarte(url, q);
         if (scene.textures.exists(k)) scene.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
@@ -210,8 +219,12 @@ void main() {
     const e = url && manifeste()[url];
     let r = null;
     if (e && game.textures.exists(cleCarte(url, 'neutre')) && game.textures.exists(cleCarte(url, 'n'))) {
+      // carte contre-jour absente (ancien manifeste, fichier manquant) : texture vide de Phaser
+      // (__DEFAULT, transparente) -> exposition 0, la lampe derrière n'allume rien
+      const cj = game.textures.exists(cleCarte(url, 'cj')) ? cleCarte(url, 'cj') : '__DEFAULT';
       r = { e, neutre: game.textures.get(cleCarte(url, 'neutre')).source[0].glTexture,
-        n: game.textures.get(cleCarte(url, 'n')).source[0].glTexture };
+        n: game.textures.get(cleCarte(url, 'n')).source[0].glTexture,
+        cj: game.textures.get(cj).source[0].glTexture };
     }
     // pas de cache tant que les cartes ne sont pas prêtes (chargement en cours)
     if (r || !e) cacheCartes[cleTexture] = r;
@@ -244,6 +257,7 @@ void main() {
         this.set1i('uMainSampler', 0);
         this.set1i('uNeutre', 2);
         this.set1i('uNormales', 3);
+        this.set1i('uCj', 4);
         if (actif) this.set3f('uAmbiance', lm.ambientColor.r, lm.ambientColor.g, lm.ambientColor.b);
         else this.set3f('uAmbiance', 1, 1, 1);
         this.set1f('uPaliers', reg.paliers);
@@ -299,8 +313,8 @@ void main() {
         this._textures = c;
       }
 
-      // juste avant le dessin : cartes natives sur les unités 2 et 3 (Phaser n'utilise que 0 et
-      // 1 dans ce pipeline ; les autres pipelines revalident leurs unités en se liant)
+      // juste avant le dessin : cartes natives sur les unités 2, 3 et 4 (Phaser n'utilise que 0
+      // et 1 dans ce pipeline ; les autres pipelines revalident leurs unités en se liant)
       onBeforeFlush() {
         const c = this._textures;
         if (!c) return;
@@ -309,6 +323,8 @@ void main() {
         gl.bindTexture(gl.TEXTURE_2D, c.neutre.webGLTexture);
         gl.activeTexture(gl.TEXTURE3);
         gl.bindTexture(gl.TEXTURE_2D, c.n.webGLTexture);
+        gl.activeTexture(gl.TEXTURE4);
+        gl.bindTexture(gl.TEXTURE_2D, c.cj.webGLTexture);
         gl.activeTexture(gl.TEXTURE0);
       }
     };

@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- Page d'apercu de l'eclairage par sections. COPIE du gabarit valide du skill pixel-art-forge
-     (viewer/lumiere-template.html, v15, commit 38c4261) : ne pas la modifier ici, la recopier quand le
+     (viewer/lumiere-template.html, v16, commit 4e852ff) : ne pas la modifier ici, la recopier quand le
      modele change, puis reporter eclairage() dans src/utils/LightKit.js et tools/lumiere/cpu.js
      (npm run lumiere:tests verifie l'alignement). Remplie par tools/lumiere/apercu.js (DONNEES). -->
 <html lang="fr">
@@ -129,6 +129,7 @@
       <label class="c"><input type="checkbox" data-mode="1"> Sprite d'origine (sans eclairage)</label>
       <label class="c"><input type="checkbox" data-mode="2"> Carte des sections</label>
       <label class="c"><input type="checkbox" data-mode="3"> Carte de normales</label>
+      <label class="c"><input type="checkbox" data-mode="4"> Carte contre-jour (teinte = direction, clarte = exposition)</label>
     </fieldset>
     <p class="aide">Le sprite neutre est multiplie par la lumiere recue par chaque section
       (normales), puis arrondi en paliers. Cote a cote : meme echelle et meme lumiere pour tous,
@@ -161,7 +162,7 @@ void main() {
 }`;
   const FS = `
 precision highp float;
-uniform sampler2D uNeutre, uNormales, uOrigine, uSections, uGeo;
+uniform sampler2D uNeutre, uNormales, uOrigine, uSections, uGeo, uCj;  // uCj : carte contre-jour (v16)
 uniform float uPad;        // marge de la texture de geometrie (px du sprite)
 uniform float uAncien;     // 1 = ancienne version v10 (deux formules devant / derriere), pour comparer
 uniform vec2 uTaille;      // taille du sprite (px du sprite)
@@ -272,8 +273,8 @@ float contreJourDoux(vec3 n, vec2 t, vec2 lp, vec2 ts) {
 //   ne   = normalize(mix(normale de la section, normale lissee 5x5, wb))
 //   diff = max((ne . L + w) / (1 + w), 0) x attenuation, L = vraie direction 3D (z negatif compris),
 //          w = 0,5 wb (« wrap » : les rasantes tournees vers une lampe derriere recoivent un peu)
-//   cj   = v15 : 0,533 contre x wb x |n.xy| x max(cos(normale basculee, lampe en miroir), 0) x att
-//          (meme cosinus que la lampe de face ; voir eclairage()). occ n'est plus utilise par cj.
+//   cj   = v16 : 0,6 contre x wb x exposition x max(cos(bord expose bascule, lampe en miroir), 0) x att,
+//          exposition et direction lues dans la carte contre-jour (voir eclairage()) ; occ inutilise.
 //   e    = min(diff + cj, 1)  ->  palier(e), un seul plafond, un seul palier
 float occultation(vec2 lp) {
   vec2 q = floor(lp);
@@ -286,7 +287,12 @@ float occultation(vec2 lp) {
   return smoothstep(-8.0, 0.0, sd);
 }
 
-float eclairage(vec3 n, vec2 ts, vec2 t, vec2 lp, float occ, float lumBase) {
+// v16 : contre-jour porte par une CARTE DEDIEE (<nom>.cj.png, sections.py carte_cj) et non plus
+// devine depuis les normales de face : cjm.rg = direction 2D du bord expose (x droite, y haut,
+// v x 2 - 1), cjm.b = exposition arriere (0 a l'interieur, 1 au bord, decroit dans la section,
+// arretee par les traits sombres). Lumiere de face = normales (inchangee) ; contre-jour =
+// exposition x cosinus x attenuation ; un seul melange continu wb selon la profondeur.
+float eclairage(vec3 n, vec2 ts, vec2 t, vec2 lp, float occ, float lumBase, vec4 cjm) {
   float wb = smoothstep(15.0, -15.0, uHauteur);
   vec3 ne = n;
   if (wb > 0.0) ne = normalize(mix(n, normaleLisse(ts), wb));   // wb = 0 : rien a melanger
@@ -294,26 +300,19 @@ float eclairage(vec3 n, vec2 ts, vec2 t, vec2 lp, float occ, float lumBase) {
   float dist = max(length(d), 0.001);
   float att = clamp(1.0 - (dist * dist) / (uPortee * uPortee), 0.0, 1.0);
   float w = 0.5 * wb;
-  float diff = max((dot(ne, d / dist) + w) / (1.0 + w), 0.0) * att;
+  float ex = cjm.b;
+  // la part « derriere » de la diffuse n'atteint, elle aussi, que les plans exposes
+  float diff = max((dot(ne, d / dist) + w) / (1.0 + w), 0.0) * att * mix(1.0, ex, wb);
   // contour sombre (couleur de base presque noire) : pas de contre-jour, il suit sa section et
   // s'eclaircit au plus d'un palier (toute la lumiere reste multipliee par la couleur de base)
   if (lumBase < 0.16) return min(diff, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
-  float cj = 0.0;
-  float m = length(ne.xy);
-  if (wb > 0.0 && m > 0.001) {
-    // v15 : la MEME reponse en cosinus que la lampe de face, appliquee au bord. Normale de la
-    // section basculee (angle au spectateur theta -> 90 - theta : la rasante devient « face », la
-    // face devient « rasante »), direction 2D lissee (ne), lampe en miroir devant le plan (|z|) :
-    //   cb = (n.z (ne2 . d.xy) + |n.xy| |z|) / dist
-    // rasante tournee vers la lampe = palier haut, inclinee = intermediaire, puis ombre, comme la
-    // face / inclinee / rasante a +49. x |n.xy| de la section : la face (sans direction) reste a
-    // l'ombre. Attenuation = celle de la lampe de face. Plus de puissance, seuil ni occultation :
-    // continu en x, y et z (cb ne depend que de la position de la lampe, |z| continu en 0).
-    float ms = length(n.xy);
-    float cb = (n.z * dot(ne.xy / m, d.xy) + ms * abs(uHauteur)) / dist;
-    // 0,533 x contre (1,5 par defaut) = 0,8 : intensite moyenne a -49 sous celle de +49
-    cj = 0.533 * uContre * wb * ms * max(cb, 0.0) * att;
-  }
+  vec2 dir = cjm.rg * 2.0 - 1.0;
+  if (uFlip > 0.5) dir.x = -dir.x;
+  // meme cosinus que la lampe de face, sur le bord expose vu comme une rasante basculee
+  // (|n.xy| 0,93 -> « face », n.z 0,37 -> « rasante »), lampe en miroir devant le plan (|z|)
+  float cb = (0.37 * dot(dir, d.xy) + 0.93 * abs(uHauteur)) / dist;
+  // 0,6 x contre (1,5 par defaut) = 0,9
+  float cj = 0.6 * uContre * wb * ex * max(cb, 0.0) * att;
   return min(diff + cj, 1.0);
 }
 
@@ -351,7 +350,17 @@ void main() {
   float a = uMode > 0.5 && uMode < 1.5 ? o.a : base.a;
   if (a < 0.5) discard;
   vec3 c;
-  if (uMode > 2.5) { c = texture2D(uNormales, uv).rgb; if (uFlip > 0.5) c.r = 1.0 - c.r; }
+  if (uMode > 3.5) {
+    // carte contre-jour, comme <nom>.cj-apercu.png : teinte = direction du bord expose,
+    // luminosite = exposition arriere
+    vec4 k = texture2D(uCj, uv);
+    vec2 v = k.rg * 2.0 - 1.0;
+    if (uFlip > 0.5) v.x = -v.x;
+    float hh = fract(atan(v.y, v.x) / 6.2831853);
+    vec3 rgb = clamp(abs(fract(hh + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+    c = rgb * k.b;
+  }
+  else if (uMode > 2.5) { c = texture2D(uNormales, uv).rgb; if (uFlip > 0.5) c.r = 1.0 - c.r; }
   else if (uMode > 1.5) c = texture2D(uSections, uv).rgb;
   else if (uMode > 0.5) c = o.rgb;
   else {
@@ -364,8 +373,9 @@ void main() {
     if (uAncien < 0.5) {
       // v11 : modele unique (contour noir = sa couleur sombre x l'eclairage de sa section)
       float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
-      l = vec3(uAmbiante) + uC1 * uIntensite * palier(eclairage(n, ts, tc, l1, occultation(l1), lb));
-      if (uN > 1.5) l += uC2 * uIntensite * palier(eclairage(n, ts, tc, l2, occultation(l2), lb));
+      vec4 cjm = texture2D(uCj, uv);
+      l = vec3(uAmbiante) + uC1 * uIntensite * palier(eclairage(n, ts, tc, l1, occultation(l1), lb, cjm));
+      if (uN > 1.5) l += uC2 * uIntensite * palier(eclairage(n, ts, tc, l2, occultation(l2), lb, cjm));
     } else if (uHauteur >= 0.0) {
       // v10 (pour comparer) : formule de face...
       l = vec3(uAmbiante) + uC1 * uIntensite * recu(n, tc, l1);
@@ -401,13 +411,13 @@ void main() {
   const U = {};
   for (const n of ["uRect", "uNeutre", "uNormales", "uOrigine", "uSections", "uTaille", "uCanvas",
     "uOrigineEcr", "uEchelle", "uMode", "uPaliers", "uAmbiante", "uHauteur", "uPortee", "uIntensite",
-    "uL1", "uL2", "uC1", "uC2", "uN", "uRayonDisque", "uFlip", "uContre", "uDisques", "uGeo", "uPad", "uAncien"]) U[n] = gl.getUniformLocation(prog, n);
+    "uL1", "uL2", "uC1", "uC2", "uN", "uRayonDisque", "uFlip", "uContre", "uDisques", "uGeo", "uPad", "uAncien", "uCj"]) U[n] = gl.getUniformLocation(prog, n);
   gl.uniform1i(U.uNeutre, 0); gl.uniform1i(U.uNormales, 1);
-  gl.uniform1i(U.uOrigine, 2); gl.uniform1i(U.uSections, 3); gl.uniform1i(U.uGeo, 4);
+  gl.uniform1i(U.uOrigine, 2); gl.uniform1i(U.uSections, 3); gl.uniform1i(U.uGeo, 4); gl.uniform1i(U.uCj, 5);
   gl.uniform1f(U.uPad, D.geoPad || 6);
 
   // ---- textures de chaque asset
-  const NOMS = ["neutre", "normales", "origine", "sections", "geo"];
+  const NOMS = ["neutre", "normales", "origine", "sections", "geo", "cj"];
   // un asset = une image fixe ({ images }) ou une animation ({ frames: [{ images }], fps, vitesse, regarde })
   const assets = D.assets.map((a) => ({
     nom: a.nom, fps: a.fps || 0, vitesse: a.vitesse || 0, regarde: a.regarde || "droite",

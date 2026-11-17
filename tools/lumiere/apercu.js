@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const GEO = require('./geo.js');
+const PNG = require('./png.js');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SORTIE = path.join(__dirname, 'sortie');
@@ -37,10 +38,16 @@ const rel = (abs) => path.relative(ROOT, abs).split(path.sep).join('/');
 
 function images(e) {
   const f = (q) => path.join(ROOT, e.d, `${e.n}_${q}.png`);
-  for (const q of ['natif', 'neutre', 'n', 'sections', 'geo']) {
+  for (const q of ['natif', 'neutre', 'n', 'sections', 'cj']) {
     if (!fs.existsSync(f(q))) throw new Error(`${rel(f(q))} absent : relancer npm run sections`);
   }
-  return { origine: uri(f('natif')), neutre: uri(f('neutre')), normales: uri(f('n')), sections: uri(f('sections')), geo: uri(f('geo')) };
+  // géométrie (lampe cachée, ancienne version v10 de la page) : calculée ici, le jeu n'en a plus besoin
+  const nat = PNG.lirePng(f('natif'));
+  const masque = new Uint8Array(nat.width * nat.height);
+  for (let p = 0; p < masque.length; p++) masque[p] = nat.data[p * 4 + 3] >= 128 ? 1 : 0;
+  const g = GEO.geometrie(masque, nat.width, nat.height);
+  const geo = `data:image/png;base64,${PNG.encoder({ width: g.width, height: g.height, data: g.data }).toString('base64')}`;
+  return { origine: uri(f('natif')), neutre: uri(f('neutre')), normales: uri(f('n')), sections: uri(f('sections')), geo, cj: uri(f('cj')) };
 }
 
 function parseArgs(argv) {
