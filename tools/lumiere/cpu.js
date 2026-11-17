@@ -16,6 +16,9 @@ const vec3 = (x, y, z) => ({ x, y, z });
 const xy = (v) => vec2(v.x, v.y);
 const isV = (v) => typeof v === 'object';
 const div = (v, k) => vec3(v.x / k, v.y / k, v.z / k);
+const rg = (c) => vec2(c.r, c.g);
+const mul = (v, k) => vec2(v.x * k, v.y * k);
+const sub = (v, k) => vec2(v.x - k, v.y - k);
 const max = Math.max, min = Math.min, abs = Math.abs, sqrt = Math.sqrt, floor = Math.floor;
 const clamp = (x, a, b) => min(max(x, a), b);
 function smoothstep(a, b, x) { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
@@ -31,8 +34,9 @@ function palier(v, U) {
   return min(floor(v * U.uPaliers), U.uPaliers - 1.0) / (U.uPaliers - 1.0);
 }
 
-// eclairage() du shader (v15). t, lp : vec2 ; n, nLisse : vec3 normalisés.
-function eclairage(n, nLisse, t, lp, z, portee, occ, lumBase, U) {
+// eclairage() du shader (v16). t, lp : vec2 ; n, nLisse : vec3 normalisés ; cjm : carte
+// contre-jour du pixel { r, g, b } (0-1 : direction du bord exposé, exposition).
+function eclairage(n, nLisse, t, lp, z, portee, lumBase, cjm, U) {
   const wb = smoothstep(15.0, -15.0, z);
   let ne = n;
   if (wb > 0.0) ne = normalize(mix(n, nLisse, wb));
@@ -40,15 +44,13 @@ function eclairage(n, nLisse, t, lp, z, portee, occ, lumBase, U) {
   const dist = max(length(d), 0.001);
   const att = clamp(1.0 - (dist * dist) / (portee * portee), 0.0, 1.0);
   const w = 0.5 * wb;
-  const diff = max((dot(ne, div(d, dist)) + w) / (1.0 + w), 0.0) * att;
+  const ex = cjm.b;
+  const diff = max((dot(ne, div(d, dist)) + w) / (1.0 + w), 0.0) * att * mix(1.0, ex, wb);
   if (lumBase < 0.16) return min(diff, U.uPaliers < 1.5 ? 0.34 : 1.0 / (U.uPaliers - 1.0));
-  let cj = 0.0;
-  const m = length(xy(ne));
-  if (wb > 0.0 && m > 0.001) {
-    const ms = length(xy(n));
-    const cb = (n.z * dot(div(xy(ne), m), xy(d)) + ms * abs(z)) / dist;
-    cj = 0.533 * U.uContre * wb * ms * max(cb, 0.0) * att;
-  }
+  const dir = sub(mul(rg(cjm), 2.0), 1.0);
+  if (U.uFlip > 0.5) dir.x = -dir.x;
+  const cb = (0.37 * dot(dir, xy(d)) + 0.93 * abs(z)) / dist;
+  const cj = 0.6 * U.uContre * wb * ex * max(cb, 0.0) * att;
   return min(diff + cj, 1.0);
 }
 
@@ -61,10 +63,11 @@ function reference(n, t, lp, z, portee) {
 }
 
 // Sprite pour la batterie : normales (normalisées comme dans le shader), normale lissée 5x5
-// (normaleLisse()), luminance de la couleur de base. carte = { w, h, n: RGBA, neutre: RGBA }.
+// (normaleLisse()), luminance de la couleur de base, carte contre-jour (CJ ; sans carte :
+// exposition 0) et normale brute (sections). carte = { w, h, n, neutre, cj? } (RGBA).
 function sprite(carte) {
   const { w, h } = carte;
-  const N = new Map(), lum = new Map(), NL = new Map(), brute = new Map();
+  const N = new Map(), lum = new Map(), NL = new Map(), brute = new Map(), CJ = new Map();
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
@@ -75,6 +78,8 @@ function sprite(carte) {
       N.set(p, normalize(r));
       const b = carte.neutre;
       lum.set(p, (0.3 * b[i] + 0.59 * b[i + 1] + 0.11 * b[i + 2]) / 255);
+      const c = carte.cj;
+      CJ.set(p, c ? { r: c[i] / 255, g: c[i + 1] / 255, b: c[i + 2] / 255 } : { r: 0.5, g: 0.5, b: 0 });
     }
   }
   for (const p of N.keys()) {
@@ -90,7 +95,7 @@ function sprite(carte) {
     }
     NL.set(p, length(acc) > 0.001 ? normalize(acc) : vec3(0, 0, 1));
   }
-  return { w, h, N, NL, lum };
+  return { w, h, N, NL, lum, CJ, brute };
 }
 
 module.exports = { eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };

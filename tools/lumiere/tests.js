@@ -4,7 +4,8 @@
  * Batterie de cohérence de l'éclairage par sections, SANS navigateur : `npm run lumiere:tests`.
  * Calcule la lumière avec la version CPU du shader (tools/lumiere/cpu.js) sur les vraies cartes
  * du jeu (src/data/sections.js) et une demi-sphère synthétique. Mêmes tests et mêmes seuils que
- * la batterie de référence du skill pixel-art-forge (v15). Intensité AVANT paliers sauf mention.
+ * la batterie de référence du skill pixel-art-forge (v16 : normales pour la face, carte
+ * contre-jour _cj.png pour l'arrière). Intensité AVANT paliers sauf mention.
  * Plus deux contrôles de code : le shader du jeu (src/utils/LightKit.js) est bien celui de la
  * page validée (tools/lumiere/apercu.html), et la version CPU suit le même calcul que le GLSL.
  * Sortie : tableau Markdown ; code 0 si tout passe, 1 sinon.
@@ -14,11 +15,12 @@ const path = require('path');
 const vm = require('vm');
 const CPU = require('./cpu.js');
 const { lirePng } = require('./png.js');
+const GEO = require('./geo.js');
 const LightKit = require('../../src/utils/LightKit.js');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAL = 4, CONTRE = 1.5;
-const U = { uPaliers: PAL, uContre: CONTRE };
+const U = { uPaliers: PAL, uContre: CONTRE, uFlip: 0 };
 const { vec2 } = CPU;
 
 // sprites de la batterie : image du jeu (clé du manifeste)
@@ -49,14 +51,66 @@ class Sprite {
     this.S = new Set(s.N.keys());
     const xs = this.pts.map((p) => p[0]), ys = this.pts.map((p) => p[1]);
     this.x0 = Math.min(...xs); this.x1 = Math.max(...xs); this.y0 = Math.min(...ys); this.y1 = Math.max(...ys);
+    this.preparerZones();
+  }
+  // profondeur depuis le bord EXTÉRIEUR (géométrie de sections.py), sections reliées à
+  // l'extérieur (même normale, traits sombres intérieurs = murs) et frange de 2 px autour
+  preparerZones() {
+    const { w, h } = this;
+    const masque = new Uint8Array(w * h);
+    for (const p of this.N.keys()) masque[p] = 1;
+    const g = GEO.geometrie(masque, w, h);
+    this.D = new Map();
+    for (const p of this.N.keys()) {
+      const x = p % w, y = (p - x) / w;
+      this.D.set(p, (g.data[((y + g.pad) * g.width + x + g.pad) * 4] / 16) | 0);
+    }
+    this.reliee = new Set();
+    this.frange = new Set();
+    if (!this.brute) return;
+    const passe = (p) => this.lum.get(p) >= 0.16 || this.D.get(p) <= 2;
+    const meme = (a, b) => { const u = this.brute.get(a), v = this.brute.get(b); return u.x === v.x && u.y === v.y && u.z === v.z; };
+    const vu = new Set();
+    for (const p0 of this.N.keys()) {
+      if (vu.has(p0) || !passe(p0)) continue;
+      const comp = [p0], pile = [p0];
+      let touche = false;
+      vu.add(p0);
+      while (pile.length) {
+        const c = pile.pop(), cx = c % w, cy = (c - cx) / w;
+        touche = touche || this.D.get(c) === 1;
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+          const X = cx + a, Y = cy + b, q = Y * w + X;
+          if (X < 0 || Y < 0 || X >= w || Y >= h || !this.N.has(q) || vu.has(q) || !passe(q) || !meme(q, c)) continue;
+          vu.add(q); comp.push(q); pile.push(q);
+        }
+      }
+      if (touche) comp.forEach((q) => this.reliee.add(q));
+    }
+    let front = new Set(this.reliee);
+    for (let k = 0; k < 2; k++) {
+      const nxt = new Set();
+      for (const c of front) {
+        const cx = c % w, cy = (c - cx) / w;
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+          const X = cx + a, Y = cy + b, q = Y * w + X;
+          if (X < 0 || Y < 0 || X >= w || Y >= h || !this.N.has(q) || this.reliee.has(q) || this.frange.has(q)) continue;
+          nxt.add(q);
+        }
+      }
+      nxt.forEach((q) => this.frange.add(q));
+      front = nxt;
+    }
   }
   id(p) { return p[1] * this.w + p[0]; }
   has(x, y) { return x >= 0 && y >= 0 && x < this.w && y < this.h && this.S.has(y * this.w + x); }
-  // occ (lampe cachée) : plus utilisé par eclairage() depuis la v15 -> 0
   e(p, lp, z, portee) {
     const i = this.id(p);
-    return CPU.eclairage(this.N.get(i), this.NL.get(i), vec2(p[0] + 0.5, p[1] + 0.5), vec2(lp[0], lp[1]), z, portee, 0, this.lum.get(i), U);
+    return CPU.eclairage(this.N.get(i), this.NL.get(i), vec2(p[0] + 0.5, p[1] + 0.5), vec2(lp[0], lp[1]), z, portee, this.lum.get(i), this.CJ.get(i), U);
   }
+  // direction du bord exposé (carte contre-jour), x droite, y haut
+  V(p) { const c = this.CJ.get(this.id(p)); return [c.r * 2 - 1, c.g * 2 - 1]; }
+  X(p) { return this.CJ.get(this.id(p)).b; }
   lumP(p) { return this.lum.get(this.id(p)); }
   centre() { return [(this.x0 + this.x1) / 2 + 0.25, (this.y0 + this.y1) / 2 + 0.25]; }
 }
@@ -67,19 +121,23 @@ function chargerSprite(url, man) {
   const f = (q) => path.join(ROOT, e.d, `${e.n}_${q}.png`);
   if (!fs.existsSync(f('n')) || !fs.existsSync(f('neutre'))) return null;
   const n = lirePng(f('n')), neu = lirePng(f('neutre'));
-  return new Sprite({ w: n.width, h: n.height, n: n.data, neutre: neu.data });
+  const cj = fs.existsSync(f('cj')) ? lirePng(f('cj')).data : null;   // sans carte : exposition 0
+  return new Sprite({ w: n.width, h: n.height, n: n.data, neutre: neu.data, cj });
 }
 
 // demi-sphère analytique (normales continues), couleur moyenne
 function demiSphere(r) {
   const w = 2 * r + 3, c = r + 1;
-  const sp = Object.assign(Object.create(Sprite.prototype), { w, h: w, N: new Map(), NL: new Map(), lum: new Map() });
+  const sp = Object.assign(Object.create(Sprite.prototype), { w, h: w, N: new Map(), NL: new Map(), lum: new Map(), CJ: new Map() });
   for (let y = 0; y < w; y++) {
     for (let x = 0; x < w; x++) {
       const dx = (x + 0.5 - c - 0.5) / r, dy = (y + 0.5 - c - 0.5) / r;
       if (dx * dx + dy * dy > 1) continue;
       sp.N.set(y * w + x, CPU.vec3(dx, -dy, Math.sqrt(Math.max(0, 1 - dx * dx - dy * dy))));
       sp.lum.set(y * w + x, 0.5);
+      // tout exposé, direction = normale dans le plan (comme la batterie de référence)
+      const m = Math.hypot(dx, dy);
+      sp.CJ.set(y * w + x, { r: m ? (dx / m) * 0.5 + 0.5 : 0.5, g: m ? (-dy / m) * 0.5 + 0.5 : 0.5, b: 1 });
     }
   }
   for (const p of sp.N.keys()) {
@@ -97,10 +155,11 @@ function demiSphere(r) {
   sp.S = new Set(sp.N.keys());
   const xs = sp.pts.map((p) => p[0]), ys = sp.pts.map((p) => p[1]);
   Object.assign(sp, { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+  sp.preparerZones();
   return sp;
 }
 
-// ---------------------------------------------------------------- tests (batterie v15)
+// ---------------------------------------------------------------- tests (batterie v16)
 const COTES = { gauche: [-1, 0], droite: [1, 0], haut: [0, 1], bas: [0, -1] };   // (x, y haut)
 
 function trajet(sp, cote) {
@@ -170,12 +229,20 @@ function tAnneau(sp) {
     if (bord) ring.add(sp.id(p));
   }
   const lp = sp.centre();
-  let ra = 0, rn = 0, ia = 0, inn = 0;
+  // bande = bords tournés À L'OPPOSÉ de la lampe (direction de la carte contre-jour . (pixel -
+  // lampe) > 0,5), loin d'elle (> 2 |z| = 40 px en 2D), allumés quand même
+  const dos = (p) => {
+    const [vx, vy] = sp.V(p), dx = p[0] + 0.5 - lp[0], dy = lp[1] - (p[1] + 0.5), m = Math.hypot(dx, dy);
+    return m > 40 && (vx * dx + vy * dy) / m > 0.5;
+  };
+  let ra = 0, rn = 0, da = 0, dn = 0;
   for (const p of sp.pts) {
+    if (!ring.has(sp.id(p))) continue;
     const lit = palier(sp.e(p, lp, -20, 800)) > 0;
-    if (ring.has(sp.id(p))) { rn++; ra += lit; } else { inn++; ia += lit; }
+    rn++; ra += lit;
+    if (dos(p)) { dn++; da += lit; }
   }
-  return [100 * ra / rn, 100 * ia / Math.max(1, inn)];
+  return [100 * ra / rn, 100 * da / Math.max(1, dn)];
 }
 
 function tDevant(sp) {
@@ -207,27 +274,8 @@ function tSombre(sp) {
   return [pire, dark.length];
 }
 
-// profondeur depuis le bord extérieur (8-voisins) pour le test d'adoucissement
-function profondeurs(sp) {
-  const D = new Map(), q = [];
-  for (const p of sp.pts) {
-    let bord = false;
-    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (!sp.has(p[0] + a, p[1] + b)) bord = true;
-    if (bord) { D.set(sp.id(p), 1); q.push(p); }
-  }
-  for (let k = 0; k < q.length; k++) {
-    const p = q[k], v = D.get(sp.id(p)) + 1;
-    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
-      const x = p[0] + a, y = p[1] + b;
-      if (!sp.has(x, y) || D.has(y * sp.w + x)) continue;
-      D.set(y * sp.w + x, v); q.push([x, y]);
-    }
-  }
-  return D;
-}
-
 function tAdoucissement(sp) {
-  const D = profondeurs(sp);
+  const D = sp.D;
   const [cx, cy] = sp.centre();
   const cas = [[[cx, cy], -20, 800], [[sp.x1 + 3, sp.y0 + (sp.y1 - sp.y0) * 0.2], -20, 800],
     [[sp.x0 - 3, cy], -20, 220], [[cx, sp.y1 - 2], -20, 800]];
@@ -284,6 +332,34 @@ function tFidelite(sp) {
     out[z] = { hist: hist.map((h) => Math.round(100 * h / tot)), saut, larg: larg.length ? larg[Math.floor(larg.length / 2)] : 0, big: Math.round(1000 * nbig / Math.max(1, npairs)) / 10 };
   }
   return out;
+}
+
+// paliers (en %) des pixels de plans EXPOSÉS (reliés à l'extérieur, non sombres) à -49, 4 positions
+function tExpose(sp) {
+  const [cx, cy] = sp.centre();
+  const H = sp.y1 - sp.y0;
+  const pts = sp.pts.filter((p) => sp.reliee.has(sp.id(p)) && sp.lumP(p) >= 0.16 && sp.X(p) > 0);
+  const hist = new Array(PAL).fill(0);
+  for (const lp of [[sp.x0 - 6, cy], [sp.x1 + 6, sp.y0 + H * 0.25], [cx, sp.y0 - 6], [cx, cy]]) {
+    for (const p of pts) hist[Math.round(palier(sp.e(p, lp, -49, 220)) * (PAL - 1))]++;
+  }
+  const tot = Math.max(1, hist.reduce((a, b) => a + b, 0));
+  return hist.map((v) => Math.round(100 * v / tot));
+}
+
+// 12 : lampe derrière (centre, gauche, haut ; z = -20 et -49) : part des pixels de sections NON
+// reliées à l'extérieur (hors frange de 2 px, hors traits sombres) qui dépassent l'ambiance
+function tMilieu(sp) {
+  const [cx, cy] = sp.centre();
+  const inner = sp.pts.filter((p) => !sp.reliee.has(sp.id(p)) && !sp.frange.has(sp.id(p)) && sp.lumP(p) >= 0.16);
+  let pire = 0, det = '';
+  for (const [nom, lp] of [['centre', [cx, cy]], ['gauche', [sp.x0 - 6, cy]], ['haut', [cx, sp.y0 - 6]]]) {
+    for (const z of [-20, -49]) {
+      const v = 100 * inner.filter((p) => palier(sp.e(p, lp, z, 220)) > 0).length / Math.max(1, inner.length);
+      if (v >= pire) { pire = v; det = `${nom} z=${z}`; }
+    }
+  }
+  return [pire, det, inner.length];
 }
 
 function tSymetrie() {
@@ -365,8 +441,8 @@ function main() {
     ajout('4 continuité profondeur', nom, iso <= 0.02, `pic ${pk.toFixed(3)}, pic isolé ${iso.toFixed(3)}`);
     const [hk, hiso] = tHorizontal(sp);
     ajout('5 continuité horizontale z=-20', nom, hiso <= 0.03, `pic ${hk.toFixed(3)}, pic isolé ${hiso.toFixed(3)}`);
-    const [an, ai] = tAnneau(sp);
-    ajout('6 pas de bande (anneau 3 px allumé)', nom, an <= ai + 5 && an <= 30, `anneau ${an.toFixed(0)} % / intérieur ${ai.toFixed(0)} %`);
+    const [an, ad6] = tAnneau(sp);
+    ajout('6 pas de bande (anneau 3 px allumé)', nom, ad6 <= 5 && an <= 35, `anneau ${an.toFixed(0)} % ; bords dos à la lampe et loin (> 2|z|) ${ad6.toFixed(0)} %`);
     const [mo, mx] = tDevant(sp);
     ajout('7 lumière devant = référence N.L', nom, mx < 1e-9, `écart moyen ${mo.toFixed(4)}, max ${mx.toFixed(4)}`);
     const u = tUtilisateur(sp);
@@ -378,10 +454,12 @@ function main() {
     const f = tFidelite(sp);
     const moy = (h) => h.reduce((s, v, i) => s + i * v, 0) / 100;
     const p49 = f[49], m49 = f[-49];
-    const ok11 = m49.big <= p49.big && m49.saut <= p49.saut && moy(m49.hist) <= moy(p49.hist)
-      && Math.min(...m49.hist.slice(1)) >= 3 && m49.larg >= 0.6 * p49.larg;
+    const ex = tExpose(sp);
+    const ok11 = m49.big <= p49.big && m49.saut <= p49.saut && moy(m49.hist) <= moy(p49.hist) && Math.min(...ex.slice(1)) >= 3;
     const fmt = (r) => `[${r.hist.join(', ')}] (${moy(r.hist).toFixed(2)}), ${r.saut}, ${r.big.toFixed(1)} %, ${r.larg.toFixed(1)} px`;
-    ajout('11 fidélité à +49', nom, ok11, `paliers 0/1/2/3 en % (moyenne) ; saut max ; sauts >= 2 ; largeur -- +49 : ${fmt(p49)} | -49 : ${fmt(m49)}`);
+    const [mi, md, ni] = tMilieu(sp);
+    ajout('12 milieu sombre', nom, mi === 0, `pixels intérieurs allumés : ${mi.toFixed(1)} % (pire ${md || '-'}) ; ${ni} px intérieurs`);
+    ajout('11 fidélité à +49', nom, ok11, `plans exposés à -49 : [${ex.join(', ')}] ; paliers 0/1/2/3 en % (moyenne) ; saut max ; sauts >= 2 ; largeur -- +49 : ${fmt(p49)} | -49 : ${fmt(m49)}`);
   }
   const sy = tSymetrie();
   ajout('3 symétrie demi-sphère', 'demi-sphère', sy < 0.02, `écart max gauche/droite en miroir ${sy.toFixed(4)}`);
