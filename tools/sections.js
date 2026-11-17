@@ -30,7 +30,7 @@
  * et le manifeste src/data/sections.js (GÉNÉRÉ : BootScene charge neutre + normales des sprites
  * qui y figurent, LightKit sait où tombe chaque pixel natif dans l'image du jeu).
  * Options :
- *   --methode <m>    découpage : origine (défaut, sections.py), A (masses), B (matières), C (traits) ;
+ *   --methode <m>    découpage : A (masses, défaut, choisi le 2026-11-17), origine (sections.py), B (matières), C (traits) ;
  *                    A, B, C : neutre détaillé, matières séparées, parties sans miettes, table fine
  *                    (tools/lumiere/coeur.js) ; noté `m` dans le manifeste. Grand sprite : sans effet
  *   --vers <dossier> écrit les cartes sous <dossier>/<chemin du sprite>/_lumiere/ au lieu d'à côté
@@ -320,7 +320,9 @@ async function tout(o, reg, man) {
 
 // ------------------------------------------------------------ arguments
 function parseArgs(argv) {
-  const a = { inputs: [], o: { garder: [], rampes: [], fps: 12, vitesse: 0, couleurs: 32, echelleJeu: 0 } };
+  // Méthode A (masses) par défaut : choix de l'utilisateur du 2026-11-17 parmi les trois propositions
+  // (A masses, B matières, C traits). `--methode origine` redonne l'ancien découpage de sections.py.
+  const a = { inputs: [], o: { garder: [], rampes: [], fps: 12, vitesse: 0, couleurs: 32, echelleJeu: 0, methode: 'A' } };
   const num = (v, name) => {
     const n = Number(String(v).replace(',', '.'));
     if (!Number.isFinite(n) || n < 0) throw new Error(`nombre invalide pour ${name} : ${v}`);
