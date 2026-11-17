@@ -26,8 +26,26 @@ brun) et murs (grizzly) cassables, totems des formes qui n'en ont pas, zones cac
 Plan refait de zéro le 2026-11-16 (33 zones, ordre libre après le loup) : `PLAN_MONDE_V2.md`,
 carte `monde_v2/carte.png`, contrôle `python tools/monde_v2.py`. Carte validée le 2026-11-16 (« construis, mais garde l'ancienne version ») : ancienne version
 gardée (tag `demo-v1-avant-monde-v2`, branche `feature/demo-histoire`), travail sur la branche
-`monde-v2`. Étape en cours : 2, les pièces de jeu (`MONDE_V2_PIECES.md`), puis les zones en blocs. Les lots A, B et C
+`monde-v2`. Étape 2 (pièces de jeu) faite le 2026-11-17 : zone de test « Pièces du monde V2 »
+(`?zone=ZonePiecesScene`). Étape suivante : 3, les zones en blocs, bosquet d'abord.
+Restes de l'étape 2 :
+- toute zone avec de l'eau aura besoin d'une règle `fall` (sans pieuvre, l'eau retire un cœur par
+  seconde) ;
+- `showIf` ne marche pas encore sur les branches et les plateformes (BrancheKit) ;
+- « Tout débloquer » de l'éditeur ne donne ni les ours ni les compétences ;
+- images provisoires : totems (loup et aigle recolorés) et talismans. Les lots A, B et C
 de la vague 3 (P3) sont absorbés par cette mission.
+
+## Rangement du dossier assets/ (validé le 2026-11-17)
+
+À lancer APRÈS les deux agents en cours (pièces de jeu du monde V2, grotte lumineuse).
+- Dans `assets/`, seulement ce que le jeu charge : `personnages/`, `formes/`, `ennemis/`, `boss/`,
+  `decors/`, `objets/`, `interface/`, `effets/`, `audio/`.
+- Hors du jeu, dans `sources/` à la racine : les planches d'origine, `_pixelfix_originals`,
+  `_codex_src` et `_codex_ref` (environ 250 Mo).
+- Plus d'espaces ni d'accents dans les noms, un dossier par personnage ou objet.
+- Méthode : un script déplace les fichiers et réécrit les ~3 400 chemins cités dans 63 fichiers.
+  Ensuite on régénère les fichiers générés et on repasse toutes les vérifications, robot compris.
 
 ## P1 : gêne tous les joueurs
 
