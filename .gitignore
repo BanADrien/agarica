@@ -21,3 +21,6 @@ dist.zip
 .claude/skills/real-sfx/listening_log.json
 .claude/skills/real-sfx/vendor/venv*/
 .claude/skills/real-sfx/vendor/models/
+
+# Pages d'apercu de l'eclairage (npm run lumiere:apercu) : generees, jamais commitees
+tools/lumiere/sortie/
