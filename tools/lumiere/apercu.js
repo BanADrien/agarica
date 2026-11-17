@@ -164,8 +164,8 @@ function main() {
     es.sort((x, y) => (x.i || 0) - (y.i || 0));
     const frames = es.map((e) => ({ images: images(e) }));
     assets.push(frames.length > 1
-      ? { nom, frames, fps: es[0].fps || 12, vitesse: es[0].vitesse || 0, regarde: a.regarde }
-      : { nom, images: frames[0].images, regarde: a.regarde });
+      ? { nom, frames, fps: es[0].fps || 12, vitesse: es[0].vitesse || 0, regarde: a.regarde, s: es[0].s || 1 }
+      : { nom, images: frames[0].images, regarde: a.regarde, s: es[0].s || 1 });
   }
   const titre = a.titre || (assets.length === 1 ? assets[0].nom : 'Sprites en sections');
   const donnees = { titre, echelle: a.echelle, assets, geoPad: GEO.GEO_PAD };

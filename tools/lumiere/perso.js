@@ -62,8 +62,8 @@
       }));
       const images = (fr) => ({ origine: fr.natif, neutre: fr.neutre, normales: fr.n, sections: fr.sections, geo: fr.geo, cj: fr.cj });
       const asset = frames.length > 1
-        ? { nom: `${nom} (vos images)`, frames: frames.map((fr) => ({ images: images(fr) })), fps: 12, vitesse: 0, regarde: 'droite' }
-        : { nom: `${nom} (votre image)`, images: images(frames[0]), regarde: 'droite' };
+        ? { nom: `${nom} (vos images)`, frames: frames.map((fr) => ({ images: images(fr) })), fps: 12, vitesse: 0, regarde: 'droite', s: r.s }
+        : { nom: `${nom} (votre image)`, images: images(frames[0]), regarde: 'droite', s: r.s };
       D.assets.unshift(asset);
       perso.unshift({ nom, frames });
       const w = r.frames[0].nat.width, h = r.frames[0].nat.height;

@@ -2,7 +2,11 @@
 <!-- Page d'apercu de l'eclairage par sections. COPIE du gabarit valide du skill pixel-art-forge
      (viewer/lumiere-template.html, v16, commit 4e852ff) : ne pas la modifier ici, la recopier quand le
      modele change, puis reporter eclairage() dans src/utils/LightKit.js et tools/lumiere/cpu.js
-     (npm run lumiere:tests verifie l'alignement). Remplie par tools/lumiere/apercu.js (DONNEES). -->
+     (npm run lumiere:tests verifie l'alignement). Remplie par tools/lumiere/apercu.js (DONNEES).
+     ECARTS AU GABARIT (grands sprites, a reporter dans le skill) : 1) normaleLisse() echantillonne
+     ses 5 x 5 voisins tous les uPasLisse pixels (= round(s) de l'asset, 1 pour les sprites de la
+     demo : calcul identique) ; 2) plages des reglages adaptees a l'asset affiche : portee jusqu'a
+     3 x sa diagonale (800 au moins), profondeur +- diagonale / 6 (60 au moins). -->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -177,6 +181,7 @@ uniform vec3 uC1, uC2;     // couleurs
 uniform float uN;          // nombre de lumieres
 uniform float uRayonDisque;
 uniform float uContre;     // force du lisere de contre-jour (lumiere derriere, z < 0)
+uniform float uPasLisse;   // ecart entre les echantillons de la normale lissee (round(s), 1 = gabarit)
 uniform float uDisques;    // passe des disques : 0 = lumieres derriere (avant les sprites), 1 = devant
 uniform float uFlip;       // 1 = sprite retourne : image en miroir ET normal.x inverse (correction du flipX)
 
@@ -227,7 +232,7 @@ vec3 normaleLisse(vec2 ts) {
   vec3 acc = vec3(0.0);
   for (int dy = -2; dy <= 2; dy++) {
     for (int dx = -2; dx <= 2; dx++) {
-      vec2 q = ts + vec2(float(dx), float(dy));
+      vec2 q = ts + vec2(float(dx), float(dy)) * uPasLisse;
       if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) continue;
       vec4 nn = texture2D(uNormales, (q + 0.5) / uTaille);
       if (nn.a < 0.5) continue;
@@ -411,7 +416,7 @@ void main() {
   const U = {};
   for (const n of ["uRect", "uNeutre", "uNormales", "uOrigine", "uSections", "uTaille", "uCanvas",
     "uOrigineEcr", "uEchelle", "uMode", "uPaliers", "uAmbiante", "uHauteur", "uPortee", "uIntensite",
-    "uL1", "uL2", "uC1", "uC2", "uN", "uRayonDisque", "uFlip", "uContre", "uDisques", "uGeo", "uPad", "uAncien", "uCj"]) U[n] = gl.getUniformLocation(prog, n);
+    "uL1", "uL2", "uC1", "uC2", "uN", "uRayonDisque", "uFlip", "uContre", "uDisques", "uGeo", "uPad", "uAncien", "uCj", "uPasLisse"]) U[n] = gl.getUniformLocation(prog, n);
   gl.uniform1i(U.uNeutre, 0); gl.uniform1i(U.uNormales, 1);
   gl.uniform1i(U.uOrigine, 2); gl.uniform1i(U.uSections, 3); gl.uniform1i(U.uGeo, 4); gl.uniform1i(U.uCj, 5);
   gl.uniform1f(U.uPad, D.geoPad || 6);
@@ -420,7 +425,7 @@ void main() {
   const NOMS = ["neutre", "normales", "origine", "sections", "geo", "cj"];
   // un asset = une image fixe ({ images }) ou une animation ({ frames: [{ images }], fps, vitesse, regarde })
   const assets = D.assets.map((a) => ({
-    nom: a.nom, fps: a.fps || 0, vitesse: a.vitesse || 0, regarde: a.regarde || "droite",
+    nom: a.nom, fps: a.fps || 0, vitesse: a.vitesse || 0, regarde: a.regarde || "droite", pasLisse: Math.max(1, Math.round(a.s || 1)),
     frames: (a.frames || [{ images: a.images }]).map((f) => ({ images: f.images, tex: {}, taille: [1, 1] })),
   }));
   let aCharger = assets.reduce((s, a) => s + a.frames.length, 0) * NOMS.length;
@@ -445,7 +450,7 @@ void main() {
           f.tex[nom] = texture(img);
           if (--aCharger === 0) {
             for (const b of assets) b.taille = b.frames[0].taille;
-            majAnim(); dessiner(); demarrerBoucle();
+            majAnim(); majPlages(); dessiner(); demarrerBoucle();
           }
         };
         img.src = f.images[nom] || f.images.origine;
@@ -509,8 +514,8 @@ void main() {
       const o = document.createElement("option");
       o.value = i; o.textContent = a.nom; $("asset").appendChild(o);
     });
-    $("asset").onchange = () => { etat.courant = +$("asset").value; majAnim(); dessiner(); };
-    $("tous").onchange = () => { etat.tous = $("tous").checked; $("asset").disabled = etat.tous; dessiner(); };
+    $("asset").onchange = () => { etat.courant = +$("asset").value; majAnim(); majPlages(); dessiner(); };
+    $("tous").onchange = () => { etat.tous = $("tous").checked; $("asset").disabled = etat.tous; majPlages(); dessiner(); };
   }
 
   // reglages de depart dans l'adresse : page.html#l=0.1,0.3&m=2&a=1&tous
@@ -586,6 +591,16 @@ void main() {
   });
 
   function hex(c) { return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255); }
+
+  // plages des reglages selon la taille de l'asset affiche (grand sprite : portee et profondeur plus
+  // longues), en px du sprite ; les valeurs en cours sont gardees
+  function majPlages() {
+    const liste = etat.tous ? assets : [assets[etat.courant]];
+    const diag = Math.max(...liste.map((a) => Math.hypot(a.taille[0], a.taille[1])));
+    $("portee").max = Math.max(800, Math.round(3 * diag / 5) * 5);
+    const z = Math.max(60, Math.round(diag / 6));
+    $("hauteur").min = -z; $("hauteur").max = z;
+  }
 
   // ---- mise en page : un asset centre, ou tous en ligne poses sur le meme sol
   const ECART = 12; // px du sprite entre deux assets
@@ -664,6 +679,7 @@ void main() {
       gl.uniform1f(U.uFlip, flip ? 1 : 0);
       const x = ox + (p.x + dx) * s, y = oy + p.y * s;
       gl.uniform2f(U.uTaille, p.a.taille[0], p.a.taille[1]);
+      gl.uniform1f(U.uPasLisse, p.a.pasLisse);
       gl.uniform2f(U.uOrigineEcr, x, y);
       gl.uniform4f(U.uRect, x, y, p.a.taille[0] * s, p.a.taille[1] * s);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);

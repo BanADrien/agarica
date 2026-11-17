@@ -107,6 +107,7 @@ uniform float uPaliers, uContre;
 uniform float uCarte;             // 1 = sprite avec cartes, 0 = à plat
 uniform float uDerriere;          // 1 = au moins une lampe derrière (normale lissée utile)
 uniform float uFlip;              // 1 = flipX : miroir ET normal.x inversé
+uniform float uPasLisse;          // écart des échantillons de la normale lissée (round(s), 1 = démo)
 uniform vec2 uTaille;             // taille native (ou de la frame sans carte)
 uniform vec2 uTailleTex;          // taille de l'image source
 uniform vec2 uCoin;               // coin de la frame dans l'image source
@@ -125,7 +126,7 @@ vec3 normaleLisse(vec2 ts) {
   vec3 acc = vec3(0.0);
   for (int dy = -2; dy <= 2; dy++) {
     for (int dx = -2; dx <= 2; dx++) {
-      vec2 q = ts + vec2(float(dx), float(dy));
+      vec2 q = ts + vec2(float(dx), float(dy)) * uPasLisse;
       if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) continue;
       vec4 nn = texture2D(uNormales, (q + 0.5) / uTaille);
       if (nn.a < 0.5) continue;
@@ -305,6 +306,7 @@ void main() {
         this.set1f('uCarte', e ? 1 : 0);
         this.set1f('uDerriere', derriere);
         this.set1f('uFlip', flip ? 1 : 0);
+        this.set1f('uPasLisse', e && e.s > 1 ? Math.round(e.s) : 1);
         this.set2f('uTaille', w, h);
         this.set2f('uTailleTex', frame.source.width, frame.source.height);
         this.set2f('uCoin', frame.cutX, frame.cutY);
@@ -424,6 +426,13 @@ void main() {
     return lumiere;
   }
 
+  // Portée conseillée pour éclairer tout un objet (grand ennemi, boss) : k fois sa diagonale
+  // affichée, en px du monde (3 par défaut, comme la page de test). Ex. :
+  //   LightKit.regler(torche, { portee: LightKit.porteeConseillee(boss) });
+  function porteeConseillee(objet, k = 3) {
+    return Math.round(k * Math.hypot(objet.displayWidth || 0, objet.displayHeight || 0)) || PRESETS.torche.portee;
+  }
+
   // La lampe suit un objet (décalage dx, dy) après chaque mise à jour de la scène.
   function suivre(lumiere, cible, dx = 0, dy = 0) {
     const st = cible && cible.scene && cible.scene.__lumiere;
@@ -481,7 +490,7 @@ void main() {
   return {
     NOM_PIPELINE, DEFAUTS, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
     chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes,
-    ajouterLumiere, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest,
+    ajouterLumiere, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();
 
