@@ -13,14 +13,18 @@
  *                    (dans l'ordre de anims.create : même palette, mêmes matières, lissage dans
  *                    le temps : l'éclairage ne clignote pas d'une frame à l'autre)
  *   node tools/sections.js --depuis-sections <png>...  recalcule les normales depuis
- *                    _lumiere/<nom>_sections.png retouché à la main (rien d'autre ne change)
+ *                    _lumiere/<nom>_sections.png retouché à la main (puis refait la carte contre-jour)
+ *   node tools/sections.js --depuis-cj <png>...        réécrit _lumiere/<nom>_cj.png depuis
+ *                    _lumiere/<nom>_cj-apercu.png retouché à la main
  *   node tools/sections.js verifier                    cartes à refaire (sprite changé depuis)
  * Sorties, dans le dossier `_lumiere/` à côté du sprite (le `_` le cache à pixelfix.js) :
  *   <nom>_natif.png     le sprite à sa résolution native (1 pixel dessiné = 1 pixel)
  *   <nom>_neutre.png    couleurs de base en aplats (une couleur par matière), contour et œil gardés
  *   <nom>_sections.png  zones en couleurs franches (1 couleur = 1 direction), RETOUCHABLE
  *   <nom>_n.png         carte de normales (R = x droite, G = y HAUT, B = z vers le spectateur)
- *   <nom>_geo.png       géométrie de la silhouette (contre-jour, lampe cachée ; tools/lumiere/geo.js)
+ *   <nom>_cj.png        carte CONTRE-JOUR (lampe derrière) : R, G = direction du bord exposé
+ *                       (x droite, y HAUT), B = exposition arrière ; seuls ces plans s'allument
+ *   <nom>_cj-apercu.png la même en couleurs (teinte = direction, clarté = exposition), RETOUCHABLE
  * et le manifeste src/data/sections.js (GÉNÉRÉ : BootScene charge neutre + normales des sprites
  * qui y figurent, LightKit sait où tombe chaque pixel natif dans l'image du jeu).
  * Options :
@@ -886,10 +890,243 @@ function saveMaps(w, h, opq, neutral, codes) {
   return { neu, sec, nor };
 }
 
-// texture de géométrie (marge GEO.GEO_PAD autour du sprite), lue par le shader de LightKit
-function geoDe(opq, w, h) {
-  const g = GEO.geometrie(opq, w, h);
-  return { width: g.width, height: g.height, data: g.data };
+// ------------------------------------------------------------ carte contre-jour (v16, carte_cj de sections.py)
+// Les normales de face ne savent pas ce qui est exposé par l'ARRIÈRE : une carte dédiée le dit.
+// <nom>_cj.png (RGBA, taille native) : R, G = direction 2D du bord exposé (x droite, y HAUT,
+// v = c / 255 x 2 - 1 ; 128 = aucune) ; B = exposition arrière 0-255 ; A = 255 sur le sprite.
+// <nom>_cj-apercu.png : teinte = direction (0° rouge = droite, 90° = haut, sens trigo),
+// luminosité = exposition (noir = rien) ; retouchable, relu par --depuis-cj.
+const CJ_PORTEE = 12.0;   // px : longueur maximale de la décroissance, mesurée DANS la section
+const CJ_SOMBRE = 0.16;   // luminance du neutre sous laquelle un pixel est un trait sombre (= shader)
+const CJ_CONTOUR = 2;     // un trait sombre à <= 2 px du vide est le contour extérieur (laisse passer)
+const CJ_FRANGE = 2;      // adoucissement : 2 px dans la section voisine (x 0,5 par px), jamais à travers un trait
+const CJ_LISSE = 2;       // direction lissée sur (2 x 2 + 1)^2 pixels de la même zone
+
+// tas binaire ordonné comme les tuples de heapq : (d, p.x, p.y, s.x, s.y)
+function tasPlusPetit(a, b) {
+  for (let k = 0; k < 5; k++) if (a[k] !== b[k]) return a[k] < b[k];
+  return false;
+}
+function tasAjouter(t, e) {
+  t.push(e);
+  let i = t.length - 1;
+  while (i > 0) {
+    const j = (i - 1) >> 1;
+    if (!tasPlusPetit(t[i], t[j])) break;
+    [t[i], t[j]] = [t[j], t[i]];
+    i = j;
+  }
+}
+function tasRetirer(t) {
+  const top = t[0], fin = t.pop();
+  if (t.length) {
+    t[0] = fin;
+    let i = 0;
+    for (;;) {
+      const l = 2 * i + 1, r = l + 1;
+      let m = i;
+      if (l < t.length && tasPlusPetit(t[l], t[m])) m = l;
+      if (r < t.length && tasPlusPetit(t[r], t[m])) m = r;
+      if (m === i) break;
+      [t[i], t[m]] = [t[m], t[i]];
+      i = m;
+    }
+  }
+  return top;
+}
+
+// math.hypot de Python (arrondi correct) : Math.hypot de V8 peut s'écarter du dernier bit, ce qui
+// changeait le signe de directions presque nulles (127 / 128 dans la carte contre-jour)
+function decomposer(v) {   // v > 0 fini -> [mantisse BigInt, exposant] avec v = m x 2^e
+  const b = new DataView(new ArrayBuffer(8));
+  b.setFloat64(0, v);
+  const hi = b.getUint32(0), lo = b.getUint32(4);
+  let e = (hi >>> 20) & 0x7ff;
+  let m = (BigInt(hi & 0xfffff) << 32n) | BigInt(lo);
+  if (e === 0) e = 1; else m |= 1n << 52n;
+  return [m, e - 1075];
+}
+function voisinDouble(v, sens) {
+  const b = new DataView(new ArrayBuffer(8));
+  b.setFloat64(0, v);
+  b.setBigUint64(0, b.getBigUint64(0) + BigInt(sens));
+  return b.getFloat64(0);
+}
+function hypotPy(x, y) {
+  x = Math.abs(x); y = Math.abs(y);
+  if (!x || !y) return x + y;
+  const [mx, ex] = decomposer(x), [my, ey] = decomposer(y);
+  const h0 = Math.sqrt(x * x + y * y);
+  const cands = [voisinDouble(h0, -1), h0, voisinDouble(h0, 1)];
+  const parts = cands.map(decomposer);
+  const E = Math.min(2 * ex, 2 * ey, ...parts.map((p) => 2 * p[1]));
+  const S = ((mx * mx) << BigInt(2 * ex - E)) + ((my * my) << BigInt(2 * ey - E));
+  let best = -1, bd = null;
+  parts.forEach(([m, e], i) => {
+    let d = ((m * m) << BigInt(2 * e - E)) - S;
+    if (d < 0n) d = -d;
+    if (bd === null || d < bd || (d === bd && (m & 1n) === 0n)) { bd = d; best = i; }
+  });
+  return cands[best];
+}
+
+// nat : sprite natif (silhouette), nor : normales, neu : neutre (traits sombres)
+function carteCj(nat, nor, neu) {
+  const w = nat.width, h = nat.height, NP = w * h;
+  const opqM = new Uint8Array(NP);
+  for (let p = 0; p < NP; p++) opqM[p] = nat.data[p * 4 + 3] >= 128 ? 1 : 0;
+  const g = GEO.geometrie(opqM, w, h), pad = g.pad, GW = g.width;
+  const opq = [];
+  for (let p = 0; p < NP; p++) if (nor.data[p * 4 + 3] >= 128) opq.push(p);
+  const S = new Uint8Array(NP);
+  for (const p of opq) S[p] = 1;
+  const dans = (x, y) => x >= 0 && y >= 0 && x < w && y < h && S[y * w + x] === 1;
+  const D = new Int32Array(NP), sec = new Int32Array(NP).fill(-1), pente = new Float64Array(NP), passe = new Uint8Array(NP);
+  for (const p of opq) {
+    const x = p % w, y = (p - x) / w;
+    D[p] = (g.data[((y + pad) * GW + x + pad) * 4] / 16) | 0;
+    sec[p] = rgbInt(nor.data, p * 4);
+    const v = hypotPy(nor.data[p * 4] / 255 * 2 - 1, nor.data[p * 4 + 1] / 255 * 2 - 1) / 0.93;
+    pente[p] = v < 0.05 ? 0.0 : Math.min(1.0, v);
+    const lum = (0.3 * neu.data[p * 4] + 0.59 * neu.data[p * 4 + 1] + 0.11 * neu.data[p * 4 + 2]) / 255;
+    passe[p] = lum >= CJ_SOMBRE || D[p] <= CJ_CONTOUR ? 1 : 0;
+  }
+  // normale extérieure aux sources (somme des directions vers le vide ; y vers le HAUT)
+  const src = new Map();
+  for (const p of opq) {
+    if (D[p] !== 1 || !passe[p]) continue;
+    const x = p % w, y = (p - x) / w;
+    let vx = 0.0, vy = 0.0;
+    for (const [dx, dy] of N8) {
+      if (dans(x + dx, y + dy)) continue;
+      const k = dx && dy ? 0.7071 : 1.0;
+      vx += dx * k;
+      vy -= dy * k;
+    }
+    const m = hypotPy(vx, vy);
+    src.set(p, m > 1e-6 ? [vx / m, vy / m] : [0.0, 0.0]);
+  }
+  // distance géodésique dans la même section (Dijkstra, même ordre de sortie que heapq)
+  const dist = new Map(), vdir = new Map();
+  const tas = [];
+  for (const p of src.keys()) { const x = p % w, y = (p - x) / w; tasAjouter(tas, [0.0, x, y, x, y]); }
+  while (tas.length) {
+    const [d, x, y, sx, sy] = tasRetirer(tas);
+    const p = y * w + x;
+    if (dist.has(p)) continue;
+    dist.set(p, d);
+    vdir.set(p, src.get(sy * w + sx));
+    for (const [dx, dy] of N8) {
+      const X = x + dx, Y = y + dy, q = Y * w + X;
+      if (dans(X, Y) && !dist.has(q) && passe[q] && sec[q] === sec[p]) tasAjouter(tas, [d + (dx && dy ? 1.4142 : 1.0), X, Y, sx, sy]);
+    }
+  }
+  // zones : pixels atteints, reliés dans la même section ; profondeur max de chaque zone
+  const zone = new Map(), prof = [];
+  for (const p of dist.keys()) {
+    if (zone.has(p)) continue;
+    const k = prof.length, pile = [p];
+    let dm = 0.0;
+    zone.set(p, k);
+    while (pile.length) {
+      const c = pile.pop(), cx = c % w, cy = (c - cx) / w;
+      dm = Math.max(dm, dist.get(c));
+      for (const [dx, dy] of N8) {
+        const X = cx + dx, Y = cy + dy, q = Y * w + X;
+        if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+        if (dist.has(q) && !zone.has(q) && sec[q] === sec[c]) { zone.set(q, k); pile.push(q); }
+      }
+    }
+    prof.push(dm);
+  }
+  const ex = new Map(), dl = new Map();
+  for (const [p, d] of dist) {
+    const L = Math.min(prof[zone.get(p)] + 1.0, CJ_PORTEE);
+    const t = Math.min(1.0, d / L);
+    ex.set(p, (1.0 - t * t * (3 - 2 * t)) * pente[p]);
+    const x = p % w, y = (p - x) / w;
+    let ax = 0.0, ay = 0.0;
+    for (let a = -CJ_LISSE; a <= CJ_LISSE; a++) {
+      for (let b = -CJ_LISSE; b <= CJ_LISSE; b++) {
+        const X = x + a, Y = y + b;
+        if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+        const q = Y * w + X;
+        if (zone.get(q) === zone.get(p)) { ax += vdir.get(q)[0]; ay += vdir.get(q)[1]; }
+      }
+    }
+    const m = hypotPy(ax, ay);
+    dl.set(p, m > 1e-6 ? [ax / m, ay / m] : vdir.get(p));
+  }
+  // frange d'adoucissement : chaque pixel reçoit au moins la moitié de son voisin le plus exposé
+  // (2 passes : x 0,5 puis x 0,25), y compris dans une autre section, jamais à travers un trait
+  for (let it = 0; it < CJ_FRANGE; it++) {
+    const ajout = new Map();
+    for (const p of opq) {
+      if (!passe[p]) continue;
+      const x = p % w, y = (p - x) / w;
+      let best = 0.0, bd = [0.0, 0.0];
+      for (const [dx, dy] of N8) {
+        const X = x + dx, Y = y + dy, q = Y * w + X;
+        if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
+        if (ex.has(q) && passe[q] && ex.get(q) > best) { best = ex.get(q); bd = dl.get(q); }
+      }
+      if (0.5 * best > (ex.has(p) ? ex.get(p) : 0.0)) ajout.set(p, [0.5 * best, dl.has(p) ? dl.get(p) : bd]);
+    }
+    for (const [p, [v, d]] of ajout) { ex.set(p, v); dl.set(p, d); }
+  }
+  const out = nouvelle(w, h);
+  for (const p of opq) {
+    const e = ex.has(p) ? ex.get(p) : 0.0;
+    const [vx, vy] = e > 0 ? dl.get(p) : [0.0, 0.0];
+    out.data.set([pyRound((vx * 0.5 + 0.5) * 255), pyRound((vy * 0.5 + 0.5) * 255), pyRound(255 * e), 255], p * 4);
+  }
+  return out;
+}
+
+// colorsys de Python (hsv_to_rgb, rgb_to_hsv), pour un aperçu identique à sections.py
+function pyModF(a, b) { let m = a % b; if (m && (m < 0) !== (b < 0)) m += b; return m; }
+function hsvVersRgb(hh, s, v) {
+  if (s === 0.0) return [v, v, v];
+  let i = Math.trunc(hh * 6.0);
+  const f = (hh * 6.0) - i, p = v * (1.0 - s), q = v * (1.0 - s * f), t = v * (1.0 - s * (1.0 - f));
+  i %= 6;
+  return [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i];
+}
+function rgbVersHsv(r, g, b) {
+  const maxc = Math.max(r, g, b), minc = Math.min(r, g, b), rangec = maxc - minc, v = maxc;
+  if (minc === maxc) return [0.0, 0.0, v];
+  const s = rangec / maxc;
+  const rc = (maxc - r) / rangec, gc = (maxc - g) / rangec, bc = (maxc - b) / rangec;
+  let hh;
+  if (r === maxc) hh = bc - gc;
+  else if (g === maxc) hh = 2.0 + rc - bc;
+  else hh = 4.0 + gc - rc;
+  return [pyModF(hh / 6.0, 1.0), s, v];
+}
+
+// aperçu coloré retouchable : teinte = direction, luminosité = exposition, fond transparent
+function cjApercu(cj) {
+  const out = nouvelle(cj.width, cj.height);
+  for (let p = 0; p < cj.width * cj.height; p++) {
+    const r = cj.data[p * 4], g = cj.data[p * 4 + 1], b = cj.data[p * 4 + 2];
+    if (cj.data[p * 4 + 3] < 128) continue;
+    const ang = pyModF(Math.atan2(g / 255 * 2 - 1, r / 255 * 2 - 1) * (180 / Math.PI), 360);
+    const c = hsvVersRgb(ang / 360, 1.0, b / 255);
+    out.data.set([pyRound(c[0] * 255), pyRound(c[1] * 255), pyRound(c[2] * 255), 255], p * 4);
+  }
+  return out;
+}
+// inverse : aperçu retouché à la main -> carte (gris ou noir = pas d'exposition)
+function cjDepuisApercu(ap) {
+  const out = nouvelle(ap.width, ap.height);
+  for (let p = 0; p < ap.width * ap.height; p++) {
+    if (ap.data[p * 4 + 3] < 128) continue;
+    const [hh, s, v] = rgbVersHsv(ap.data[p * 4] / 255, ap.data[p * 4 + 1] / 255, ap.data[p * 4 + 2] / 255);
+    if (s < 0.2) { out.data.set([128, 128, 0, 255], p * 4); continue; }
+    const ang = hh * 360 * (Math.PI / 180);
+    out.data.set([pyRound((Math.cos(ang) * 0.5 + 0.5) * 255), pyRound((Math.sin(ang) * 0.5 + 0.5) * 255), pyRound(255 * v), 255], p * 4);
+  }
+  return out;
 }
 
 function normalesDepuisSections(sec) {
@@ -1228,7 +1465,7 @@ const empreinte = (file) => crypto.createHash('sha1').update(fs.readFileSync(fil
 function sortiesDe(file) {
   const dir = path.join(path.dirname(file), DOSSIER), nom = path.basename(file, path.extname(file));
   const s = (suffixe) => path.join(dir, `${nom}_${suffixe}.png`);
-  return { dir, nom, natif: s('natif'), neutre: s('neutre'), sections: s('sections'), n: s('n'), geo: s('geo'), apercu: s('apercu') };
+  return { dir, nom, natif: s('natif'), neutre: s('neutre'), sections: s('sections'), n: s('n'), cj: s('cj'), cjApercu: s('cj-apercu'), apercu: s('apercu') };
 }
 
 function facteurDe(file, o, reg) {
@@ -1243,7 +1480,7 @@ async function ecrireCartes(nat, res, sorties, o) {
   await ecrirePng(neu, sorties.neutre);
   await ecrirePng(sec, sorties.sections);
   await ecrirePng(nor, sorties.n);
-  await ecrirePng(geoDe(res.opq, nat.width, nat.height), sorties.geo);
+  await ecrireCj(nat, nor, neu, sorties);
   if (o.gauche) {
     await ecrirePng(miroir(neu, false), sorties.neutre.replace(/_neutre\.png$/, '_neutre-gauche.png'));
     await ecrirePng(miroir(nor, true), sorties.n.replace(/_n\.png$/, '_n-gauche.png'));
@@ -1294,7 +1531,7 @@ async function unSprite(file, o, reg, man) {
 function entree(file, hd, nat, g, s, extra) {
   const r2 = (v) => Math.round(v * 100) / 100;
   return Object.assign({ d: relOf(s.dir), n: s.nom, w: nat.width, h: nat.height, f: g.f, fx: Math.round(g.fx * 1000) / 1000, fy: Math.round(g.fy * 1000) / 1000, gx: r2(g.gx), gy: r2(g.gy),
-    W: hd.width, H: hd.height, v: empreinte(file) }, extra || {});
+    W: hd.width, H: hd.height, v: empreinte(file), cj: 1 }, extra || {});
 }
 
 // une animation : toutes les frames ENSEMBLE (même toile calée en bas au centre, même grille, mêmes
@@ -1388,12 +1625,32 @@ async function uneAnimation(files, o, reg, man) {
   console.log(`  orientation qui change sans que la matière change (frame suivante) : ${(100 * avant).toFixed(1)} % -> ${(100 * r.apres).toFixed(1)} % après lissage`);
 }
 
+// carte contre-jour + son aperçu (sections.py : ecrire_cj)
+async function ecrireCj(nat, nor, neu, sorties) {
+  const cj = carteCj(nat, nor, neu);
+  await ecrirePng(cj, sorties.cj);
+  await ecrirePng(cjApercu(cj), sorties.cjApercu);
+}
+
+// aperçu contre-jour retouché à la main -> _cj.png (rien d'autre ne change)
+async function depuisCj(file, man) {
+  const s = sortiesDe(file);
+  if (!fs.existsSync(s.cjApercu)) throw new Error(`${relOf(s.cjApercu)} absent : lancer d'abord node tools/sections.js ${relOf(file)}`);
+  await ecrirePng(cjDepuisApercu(await lirePng(s.cjApercu)), s.cj);
+  console.log(`${relOf(s.cj)} réécrite depuis ${path.basename(s.cjApercu)}`);
+  if (man[relOf(file)]) man[relOf(file)].v = empreinte(file);
+}
+
 async function depuisSections(file, man) {
   const s = sortiesDe(file);
   if (!fs.existsSync(s.sections)) throw new Error(`${relOf(s.sections)} absent : lancer d'abord node tools/sections.js ${relOf(file)}`);
   const { nor, lues } = normalesDepuisSections(await lirePng(s.sections));
   await ecrirePng(nor, s.n);
   console.log(`${relOf(s.n)} recalculée ; sections lues : ${[...lues].sort().join(', ')}`);
+  // comme sections.py : la carte contre-jour suit les nouvelles sections (retoucher
+  // _cj-apercu.png APRÈS les sections, sinon la retouche est écrasée)
+  await ecrireCj(await lirePng(s.natif), nor, await lirePng(s.neutre), s);
+  console.log(`${relOf(s.cj)} recalculée`);
   if (man[relOf(file)]) man[relOf(file)].v = empreinte(file);
 }
 
@@ -1401,7 +1658,7 @@ function verifier(man) {
   let n = 0;
   for (const [k, e] of Object.entries(man)) {
     const abs = path.join(ROOT, k);
-    const manque = ['neutre', 'n'].filter((x) => !fs.existsSync(path.join(ROOT, e.d, `${e.n}_${x}.png`)));
+    const manque = ['neutre', 'n', 'cj'].filter((x) => !fs.existsSync(path.join(ROOT, e.d, `${e.n}_${x}.png`)));
     if (!fs.existsSync(abs)) { console.log(`${k} : image du jeu absente`); n++; } else if (empreinte(abs) !== e.v) { console.log(`${k} : image changée depuis les cartes -> relancer tools/sections.js`); n++; } else if (manque.length) { console.log(`${k} : cartes manquantes (${manque.join(', ')})`); n++; }
   }
   console.log(n ? `${n} sprite(s) à refaire` : `${Object.keys(man).length} sprite(s) à jour`);
@@ -1421,6 +1678,7 @@ function parseArgs(argv) {
     const next = () => { if (i + 1 >= argv.length) throw new Error(`valeur manquante pour ${t}`); return argv[++i]; };
     if (t === '--animation') a.o.animation = true;
     else if (t === '--depuis-sections') a.o.depuisSections = true;
+    else if (t === '--depuis-cj') a.o.depuisCj = true;
     else if (t === '--facteur') a.o.facteur = num(next(), t);
     else if (t === '--echelle-jeu') a.o.echelleJeu = num(next(), t);
     else if (t === '--couleurs') a.o.couleurs = Math.round(num(next(), t));
@@ -1461,7 +1719,8 @@ async function main() {
   try {
     const files = a.inputs.flatMap(pngsDe);
     if (!files.length) throw new Error('aucune image PNG');
-    if (a.o.depuisSections) for (const f of files) await depuisSections(f, man);
+    if (a.o.depuisCj) for (const f of files) await depuisCj(f, man);
+    else if (a.o.depuisSections) for (const f of files) await depuisSections(f, man);
     else if (a.o.animation) await uneAnimation(files, a.o, reg, man);
     else {
       for (const f of files) {
