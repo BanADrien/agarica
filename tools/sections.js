@@ -66,7 +66,7 @@ function chargerSharp() {
 
 // ------------------------------------------------------------ calcul (tools/lumiere/coeur.js)
 const COEUR = require('./lumiere/coeur.js');
-const { N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs } = COEUR;
+const { N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, echelleSprite } = COEUR;
 
 // ------------------------------------------------------------ images (E/S) et mode image peinte (sharp)
 async function lirePng(file) { return PNGIO.lirePng(file); }
@@ -102,6 +102,7 @@ const ASSET_VERSION = '${Date.now()}';
   fs.writeFileSync(MANIFESTE, `// GÉNÉRÉ par tools/sections.js -- ne pas modifier à la main.
 // Sprites préparés pour l'éclairage par sections (src/utils/LightKit.js) : clé = image du jeu ;
 // \`d\` : dossier des cartes (<n>_neutre.png, <n>_n.png) ; \`w\`, \`h\` : taille native ;
+// \`s\` : échelle des réglages en pixels (grand sprite ; absente = 1) ;
 // \`f\` : px de l'image du jeu par pixel natif ; \`gx\`, \`gy\` : coin de la grille native dans
 // l'image du jeu ; \`W\`, \`H\` : taille de l'image du jeu ; \`v\` : empreinte de l'image du jeu.
 const SECTIONS_LUMIERE = {
@@ -124,8 +125,8 @@ function facteurDe(file, o, reg) {
   return e ? e.f : 0;
 }
 
-async function ecrireCartes(nat, res, sorties, o) {
-  const { neu, sec, nor, cj, cjAp } = cartes(nat, res);
+async function ecrireCartes(nat, res, sorties, o, ech) {
+  const { neu, sec, nor, cj, cjAp } = cartes(nat, res, ech);
   await ecrirePng(nat, sorties.natif);
   await ecrirePng(neu, sorties.neutre);
   await ecrirePng(sec, sorties.sections);
@@ -168,13 +169,15 @@ async function unSprite(file, o, reg, man) {
     nat = hd;
     grille = { f: 1, fx: 1, fy: 1, gx: 0, gy: 0, accord: 1 };
   }
-  const res = analyse(nat, o.garder, o.rampes, o.echelleJeu > 0, null);
-  const c = await ecrireCartes(nat, res, s, o);
+  const ech = echelleSprite([nat]);   // grand sprite : réglages en pixels x ech (coeur.js)
+  const res = analyse(nat, o.garder, o.rampes, o.echelleJeu > 0, null, ech);
+  const c = await ecrireCartes(nat, res, s, o, ech);
+  if (ech > 1) console.log(`  grand sprite : réglages en pixels x ${ech}`);
   if (o.apercu) await ecrirePng(planche([c]), s.apercu);
   console.log(`${relOf(file)} : natif ${nat.width}x${nat.height}, 1 pixel = ${grille.f} px (pas mesuré ${grille.fx.toFixed(3)} x ${grille.fy.toFixed(3)})` +
     (grille.accord !== null ? `, grille calée à ${(100 * grille.accord).toFixed(2)} %` : '') + ` -> ${relOf(s.dir)}/${s.nom}_*.png`);
   afficherInfo(res.info);
-  man[relOf(file)] = entree(file, hd, nat, grille, s);
+  man[relOf(file)] = entree(file, hd, nat, grille, s, ech > 1 ? { s: ech } : null);
 }
 
 function entree(file, hd, nat, g, s, extra) {
@@ -211,13 +214,15 @@ async function uneAnimation(files, o, reg, man) {
     cropPeint = box;
   }
   const w = canv[0].width, h = canv[0].height;
-  const r = sectionsAnimation(canv, o.garder, o.rampes, peint);
+  const ech = echelleSprite(canv);   // médiane des frames ; grand sprite : réglages en pixels x ech
+  if (ech > 1) console.log(`  grand sprite : réglages en pixels x ${ech}`);
+  const r = sectionsAnimation(canv, o.garder, o.rampes, peint, ech);
   const res = { info: r.info }, avant = r.avant;
   const cols = [];
   let grille = null;
   for (let i = 0; i < files.length; i++) {
     const s = sortiesDe(files[i]);
-    const c = await ecrireCartes(canv[i], r.frames[i], s, o);
+    const c = await ecrireCartes(canv[i], r.frames[i], s, o, ech);
     cols.push(c);
     if (!grille) {
       if (peint) grille = { fx: k, fy: k, gx: cropPeint[0] - decal[i][0], gy: cropPeint[1] - decal[i][1], accord: null };
@@ -227,7 +232,7 @@ async function uneAnimation(files, o, reg, man) {
     // même grille pour tout le lot (pixelfix.js : grille ancrée au bas-centre, commune au lot)
     const g = { f: grille.f, fx: grille.fx, fy: grille.fy, gx: grille.gx + decal[0][0] - decal[i][0], gy: grille.gy + decal[0][1] - decal[i][1] };
     g.accord = peint ? null : accord(hds[i], canv[i], g.fx, g.fy, g.gx, g.gy);
-    man[relOf(files[i])] = entree(files[i], hds[i], canv[i], g, s, { anim: o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, ''), i, fps: o.fps, vitesse: o.vitesse });
+    man[relOf(files[i])] = entree(files[i], hds[i], canv[i], g, s, { anim: o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, ''), i, fps: o.fps, vitesse: o.vitesse, ...(ech > 1 ? { s: ech } : {}) });
     console.log(`  ${relOf(files[i])} -> ${relOf(s.dir)}/${s.nom}_*.png` + (g.accord !== null ? ` (grille calée à ${(100 * g.accord).toFixed(2)} %)` : ''));
   }
   if (o.apercu) await ecrirePng(planche(cols), path.join(sortiesDe(files[0]).dir, `${o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, '')}_planche.png`));
@@ -237,8 +242,8 @@ async function uneAnimation(files, o, reg, man) {
 }
 
 // carte contre-jour + son aperçu (sections.py : ecrire_cj)
-async function ecrireCj(nat, nor, neu, sorties) {
-  const cj = carteCj(nat, nor, neu);
+async function ecrireCj(nat, nor, neu, sorties, ech) {
+  const cj = carteCj(nat, nor, neu, ech);
   await ecrirePng(cj, sorties.cj);
   await ecrirePng(cjApercu(cj), sorties.cjApercu);
 }
@@ -260,7 +265,8 @@ async function depuisSections(file, man) {
   console.log(`${relOf(s.n)} recalculée ; sections lues : ${[...lues].sort().join(', ')}`);
   // comme sections.py : la carte contre-jour suit les nouvelles sections (retoucher
   // _cj-apercu.png APRÈS les sections, sinon la retouche est écrasée)
-  await ecrireCj(await lirePng(s.natif), nor, await lirePng(s.neutre), s);
+  const e = man[relOf(file)];
+  await ecrireCj(await lirePng(s.natif), nor, await lirePng(s.neutre), s, e && e.s ? e.s : 1);
   console.log(`${relOf(s.cj)} recalculée`);
   if (man[relOf(file)]) man[relOf(file)].v = empreinte(file);
 }

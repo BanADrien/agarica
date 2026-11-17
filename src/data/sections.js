@@ -1,6 +1,7 @@
 // GÉNÉRÉ par tools/sections.js -- ne pas modifier à la main.
 // Sprites préparés pour l'éclairage par sections (src/utils/LightKit.js) : clé = image du jeu ;
 // `d` : dossier des cartes (<n>_neutre.png, <n>_n.png) ; `w`, `h` : taille native ;
+// `s` : échelle des réglages en pixels (grand sprite ; absente = 1) ;
 // `f` : px de l'image du jeu par pixel natif ; `gx`, `gy` : coin de la grille native dans
 // l'image du jeu ; `W`, `H` : taille de l'image du jeu ; `v` : empreinte de l'image du jeu.
 const SECTIONS_LUMIERE = {
@@ -21,6 +22,10 @@ const SECTIONS_LUMIERE = {
   "assets/sprites/grizzly_frames/grizzly_row0_1.png": {"d":"assets/sprites/grizzly_frames/_lumiere","n":"grizzly_row0_1","w":83,"h":54,"f":4.13,"fx":4.131,"fy":4.129,"gx":6.62,"gy":91.86,"W":352,"H":319,"v":"de54ed9051","cj":1},
   "assets/sprites/grizzly_frames/grizzly_row0_2.png": {"d":"assets/sprites/grizzly_frames/_lumiere","n":"grizzly_row0_2","w":94,"h":49,"f":3.65,"fx":3.65,"fy":3.65,"gx":4.47,"gy":136.52,"W":352,"H":319,"v":"5fbf511cdb","cj":1},
   "assets/sprites/grizzly_frames/grizzly_row0_3.png": {"d":"assets/sprites/grizzly_frames/_lumiere","n":"grizzly_row0_3","w":72,"h":55,"f":4.75,"fx":4.75,"fy":4.75,"gx":5.12,"gy":53.11,"W":352,"H":319,"v":"e8eaa50780","cj":1},
+  "assets/sprites/kainati_frames/kainati_row0_0.png": {"d":"assets/sprites/kainati_frames/_lumiere","n":"kainati_row0_0","w":306,"h":336,"f":1.08,"fx":1.08,"fy":1.08,"gx":28.76,"gy":28.8,"W":388,"H":396,"v":"365844d29c","cj":1,"anim":"kainati_idle","i":0,"fps":6,"vitesse":0,"s":2.61},
+  "assets/sprites/kainati_frames/kainati_row0_1.png": {"d":"assets/sprites/kainati_frames/_lumiere","n":"kainati_row0_1","w":306,"h":336,"f":1.08,"fx":1.08,"fy":1.08,"gx":28.76,"gy":28.8,"W":388,"H":396,"v":"e46da296a5","cj":1,"anim":"kainati_idle","i":1,"fps":6,"vitesse":0,"s":2.61},
+  "assets/sprites/kainati_frames/kainati_row0_2.png": {"d":"assets/sprites/kainati_frames/_lumiere","n":"kainati_row0_2","w":306,"h":336,"f":1.08,"fx":1.08,"fy":1.08,"gx":28.76,"gy":28.8,"W":388,"H":396,"v":"d267a9bd29","cj":1,"anim":"kainati_idle","i":2,"fps":6,"vitesse":0,"s":2.61},
+  "assets/sprites/kainati_frames/kainati_row0_3.png": {"d":"assets/sprites/kainati_frames/_lumiere","n":"kainati_row0_3","w":306,"h":336,"f":1.08,"fx":1.08,"fy":1.08,"gx":28.76,"gy":28.8,"W":388,"H":396,"v":"03f7de589f","cj":1,"anim":"kainati_idle","i":3,"fps":6,"vitesse":0,"s":2.61},
   "assets/sprites/loup_frames/loup_row0_0.png": {"d":"assets/sprites/loup_frames/_lumiere","n":"loup_row0_0","w":116,"h":69,"f":2.5,"fx":2.5,"fy":2.5,"gx":66.27,"gy":89.71,"W":422,"H":267,"v":"6fcbd1edb3","cj":1,"anim":"loup_run","i":0,"fps":12,"vitesse":0},
   "assets/sprites/loup_frames/loup_row0_1.png": {"d":"assets/sprites/loup_frames/_lumiere","n":"loup_row0_1","w":116,"h":69,"f":2.5,"fx":2.5,"fy":2.5,"gx":66.27,"gy":89.71,"W":422,"H":267,"v":"53f8f4be43","cj":1,"anim":"loup_run","i":1,"fps":12,"vitesse":0},
   "assets/sprites/loup_frames/loup_row0_2.png": {"d":"assets/sprites/loup_frames/_lumiere","n":"loup_row0_2","w":116,"h":69,"f":2.5,"fx":2.5,"fy":2.5,"gx":66.27,"gy":89.71,"W":422,"H":267,"v":"3a73688612","cj":1,"anim":"loup_run","i":2,"fps":12,"vitesse":0},

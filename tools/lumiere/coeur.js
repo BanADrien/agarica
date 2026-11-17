@@ -382,8 +382,28 @@
     return codes;
   }
 
+  // ------------------------------------------------------------ échelle du sprite
+  // Réglages en pixels (zones, lissages, contour, carte contre-jour) pensés pour les sprites de la
+  // démo (Agarica 67 x 94, loup, grizzly, crapaud : racine de la surface opaque 49 à 87 px). Un
+  // sprite plus grand (Kainati, ~250) les multiplie par s = max(1, racine(surface opaque) / 96),
+  // médiane sur les frames d'une animation ; s = 1 : calcul strictement identique à sections.py.
+  const ECHELLE_REF = 96;
+  function echelleSprite(ims) {
+    const r = ims.map((im) => {
+      let a = 0;
+      for (let p = 0; p < im.width * im.height; p++) if (im.data[p * 4 + 3] >= 128) a++;
+      return Math.sqrt(a);
+    }).sort((x, y) => x - y);
+    const m = r[Math.floor(r.length / 2)] || 0;
+    return Math.max(1, Math.round((m / ECHELLE_REF) * 100) / 100);
+  }
+  // longueur (px) et surface (px²) à l'échelle s ; s = 1 : valeur d'origine telle quelle
+  const aL = (v, s) => (s > 1 ? Math.round(v * s) : v);
+  const aS = (v, s) => (s > 1 ? Math.round(v * s * s) : v);
+
   // ------------------------------------------------------------ analyse (sections.py analyse())
-  function analyse(im, garder, rampes, peint, tailleRef) {
+  function analyse(im, garder, rampes, peint, tailleRef, echelle) {
+    const s = echelle > 1 ? echelle : 1;
     const w = im.width, h = im.height, d = im.data, NP = w * h;
     const opq = new Uint8Array(NP), ligneParLigne = [];
     const col = new Int32Array(NP).fill(-1);
@@ -507,15 +527,25 @@
       }
       rid++;
     }
+    // Petites parties fondues dans leur voisine majoritaire, la plus petite d'abord (à taille égale :
+    // la première apparue dans regOrdre), une à la fois, comme sections.py. Même résultat que de
+    // tout recompter après chaque fusion, mais en tenant tailles et membres à jour (sinon le temps
+    // explose sur un grand sprite : des milliers de fusions x tous les pixels).
     function absorb(minsize) {
+      const pos = new Map(), taille = new Map(), premier = new Map(), membres = new Map();
+      regOrdre.forEach((p, i) => {
+        if (!pos.has(p)) pos.set(p, i);
+        const r = region[p];
+        compter(taille, r);
+        if (!premier.has(r)) { premier.set(r, i); membres.set(r, []); }
+      });
+      for (const p of pos.keys()) membres.get(region[p]).push(p);
       for (;;) {
-        const sizes = new Map();
-        for (const p of regOrdre) compter(sizes, region[p]);
-        const tri = [...sizes].map((e, i) => [e[0], e[1], i]).sort((a, b) => (a[1] - b[1]) || (a[2] - b[2]));
+        const petites = [...taille].filter((e) => e[1] < minsize).map((e) => [e[0], e[1], premier.get(e[0])])
+          .sort((x, y) => (x[1] - y[1]) || (x[2] - y[2]));
         let changed = false;
-        for (const [r, sz] of tri) {
-          if (sz >= minsize) break;
-          const members = regOrdre.filter((p) => region[p] === r);
+        for (const [r] of petites) {
+          const members = membres.get(r).slice().sort((x, y) => pos.get(x) - pos.get(y));
           const cnt = new Map();
           for (const p of members) {
             const x = p % w, y = (p - x) / w;
@@ -529,6 +559,10 @@
           if (cnt.size) {
             const nr = plusFrequent(cnt)[0];
             for (const p of members) region[p] = nr;
+            taille.set(nr, taille.get(nr) + taille.get(r)); taille.delete(r);
+            premier.set(nr, Math.min(premier.get(nr), premier.get(r))); premier.delete(r);
+            for (const p of members) membres.get(nr).push(p);
+            membres.delete(r);
             changed = true;
             break;
           }
@@ -536,7 +570,7 @@
         if (!changed) return;
       }
     }
-    absorb(12);
+    absorb(aS(12, s));
     // pixels de la bordure épaissie : rendus à la partie voisine de même matière (sinon la plus proche)
     let todo = body.filter((p) => region[p] < 0);
     for (let it = 0; it < 4; it++) {
@@ -556,7 +590,7 @@
       todo = rest;
     }
     for (const p of todo) { region[p] = rid++; regOrdre.push(p); }
-    absorb(12);
+    absorb(aS(12, s));
 
     // vecteurs vers le bord de la partie (bombé) et vers le vide (contour extérieur)
     const nD = new Float64Array(NP), nVX = new Float64Array(NP), nVY = new Float64Array(NP);
@@ -565,9 +599,9 @@
       const q = Y * w + X;
       if (line[q]) return true;
       return region[q] >= 0 && region[q] !== region[p];
-    }, body, 7, nD, nVX, nVY);
+    }, body, aL(7, s), nD, nVX, nVY);
     const oD = new Float64Array(NP), oVX = new Float64Array(NP), oVY = new Float64Array(NP);
-    nearestVectors(w, (X, Y) => !dans(X, Y), opqList, 6, oD, oVX, oVY);
+    nearestVectors(w, (X, Y) => !dans(X, Y), opqList, aL(6, s), oD, oVX, oVY);
     const nReg = rid;
     const dmax = new Float64Array(nReg);
     for (const p of body) dmax[region[p]] = Math.max(dmax[region[p]], nD[p]);
@@ -586,12 +620,12 @@
       const r = rampOf.get(col[p]);
       off[p] = (L.get(col[p]) - rmean[r]) / rstd[r]; hasOff[p] = 1;
     }
-    const soff = new Float64Array(NP);
+    const soff = new Float64Array(NP), rso = aL(2, s);
     for (const p of body) {
       const x = p % w, y = (p - x) / w;
       let s = 0, k = 0;
-      for (let dx = -2; dx <= 2; dx++) {
-        for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -rso; dx <= rso; dx++) {
+        for (let dy = -rso; dy <= rso; dy++) {
           const X = x + dx, Y = y + dy;
           if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
           const q = Y * w + X;
@@ -606,7 +640,7 @@
 
     // volume d'ensemble : la silhouette floutée est une colline ; sa pente = bombé global
     const tr = tailleRef || [w, h];
-    const gblur = Math.max(GBLUR_MIN, GBLUR_REL * Math.min(tr[0], tr[1]));
+    const gblur = Math.max(GBLUR_MIN * s, GBLUR_REL * Math.min(tr[0], tr[1]));
     const gp = Math.trunc(2.5 * gblur) + 2;
     const MW = w + 2 * gp, MH = h + 2 * gp;
     const mask = new Uint8Array(MW * MH);
@@ -627,19 +661,27 @@
     const pgX = new Float64Array(NP), pgY = new Float64Array(NP);
     const membres = Array.from({ length: nReg }, () => []);
     for (const p of regOrdre) membres[region[p]].push(p);
-    const PW = w + 2 * GPAD, PH = h + 2 * GPAD;
+    const gpad = aL(GPAD, s);
+    const PW = w + 2 * gpad, PH = h + 2 * gpad;
+    // flou de la partie sur un rectangle autour d'elle seulement (le flou de Pillow est en entiers :
+    // même résultat que sur toute l'image tant que la marge couvre son étalement, 3 passes)
     for (let r = 0; r < nReg; r++) {
       const ms = membres[r];
       if (!ms.length) continue;
-      const pm = new Uint8Array(PW * PH);
-      for (const p of ms) { const x = p % w, y = (p - x) / w; pm[(y + GPAD) * PW + x + GPAD] = 255; }
-      const rad = Math.max(1.2, Math.min(3.0, dmax[r] * 0.6));
-      const ph = flouGaussien(pm, PW, PH, rad);
+      const rad = Math.max(1.2 * s, Math.min(3.0 * s, dmax[r] * 0.6));
+      let bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+      for (const p of ms) { const x = p % w, y = (p - x) / w; bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x); by0 = Math.min(by0, y); by1 = Math.max(by1, y); }
+      const M = gpad + 3 * (Math.ceil(rad) + 2);
+      const CX0 = Math.max(0, bx0 + gpad - M), CY0 = Math.max(0, by0 + gpad - M);
+      const CW = Math.min(PW - 1, bx1 + gpad + M) - CX0 + 1, CH = Math.min(PH - 1, by1 + gpad + M) - CY0 + 1;
+      const pm = new Uint8Array(CW * CH);
+      for (const p of ms) { const x = p % w, y = (p - x) / w; pm[(y + gpad - CY0) * CW + x + gpad - CX0] = 255; }
+      const ph = flouGaussien(pm, CW, CH, rad);
       let pmx = 0;
       for (const p of ms) {
-        const x = p % w, y = (p - x) / w, X = x + GPAD, Y = y + GPAD;
-        pgX[p] = -(ph[Y * PW + X + 1] - ph[Y * PW + X - 1]) / 2.0;
-        pgY[p] = (ph[(Y + 1) * PW + X] - ph[(Y - 1) * PW + X]) / 2.0;
+        const x = p % w, y = (p - x) / w, X = x + gpad - CX0, Y = y + gpad - CY0;
+        pgX[p] = -(ph[Y * CW + X + 1] - ph[Y * CW + X - 1]) / 2.0;
+        pgY[p] = (ph[(Y + 1) * CW + X] - ph[(Y - 1) * CW + X]) / 2.0;
         pmx = Math.max(pmx, Math.hypot(pgX[p], pgY[p]));
       }
       pmx = pmx || 1.0;
@@ -654,19 +696,19 @@
       const gm = Math.min(1.0, Math.hypot(gx, gy) / gmax);
       const gn = Math.hypot(gx, gy) || 1.0;
       const gk = W_GLOBAL * Math.pow(gm, 0.8);
-      let s = 0.6 * soff[p] + 0.5 * regOff[r] / regN[r];
-      s = Math.max(-1.2, Math.min(1.2, s));
-      const wp = W_PART * Math.min(1.0, dmax[r] / 3.0);   // petite partie : bombé propre atténué
+      let sh = 0.6 * soff[p] + 0.5 * regOff[r] / regN[r];
+      sh = Math.max(-1.2, Math.min(1.2, sh));
+      const wp = W_PART * Math.min(1.0, dmax[r] / (3.0 * s));   // petite partie : bombé propre atténué
       const ws = W_SHADE * (peint ? 0.6 : 1.0);           // image peinte : ombrage riche, moins suivi
-      const nx = gx / gn * gk + wp * pgX[p] + ws * s * lx;
-      const ny = gy / gn * gk + wp * pgY[p] + ws * s * ly;
+      const nx = gx / gn * gk + wp * pgX[p] + ws * sh * lx;
+      const ny = gy / gn * gk + wp * pgY[p] + ws * sh * ly;
       codes[p] = quantize(nx, ny);
       ordre.push(p);
     }
     // contour extérieur : rasant, tourné vers l'extérieur ; traits intérieurs : comme leurs voisins
     const outline = new Uint8Array(NP);
     for (const p of ordreSet(opqList.filter((q) => line[q]), w)) {
-      if (oD[p] <= 2.3) {
+      if (oD[p] <= 2.3 * s) {
         outline[p] = 1;
         const m = Math.hypot(oVX[p], oVY[p]) || 1;
         codes[p] = quantize(oVX[p] / m, -oVY[p] / m);
@@ -674,7 +716,7 @@
       }
     }
     let pending = opqList.filter((p) => codes[p] < 0);
-    for (let it = 0; it < 6 && pending.length; it++) {
+    for (let it = 0; it < aL(6, s) && pending.length; it++) {
       const rest = [];
       for (const p of pending) {
         const x = p % w, y = (p - x) / w;
@@ -692,8 +734,8 @@
     for (const p of pending) { codes[p] = 0; ordre.push(p); }
     const regall = new Int32Array(NP).fill(-9);
     for (const p of opqList) regall[p] = region[p] >= 0 ? region[p] : outline[p] ? -2 : -3;
-    codes = modeFilter(codes, ordre, w, h, regall, outline, peint ? 5 : 3);
-    codes = mergeSmall(codes, ordre, w, h, peint ? 10 : 6, outline);
+    codes = modeFilter(codes, ordre, w, h, regall, outline, aL(peint ? 5 : 3, s));
+    codes = mergeSmall(codes, ordre, w, h, aS(peint ? 10 : 6, s), outline);
     codes = heriterBord(codes, opq, w, h);
 
     // neutre : chaque pixel prend la couleur de base de sa rampe ; grains isolés (1-2 px) absorbés
@@ -714,7 +756,7 @@
           if (ridOf[t] >= 0 && !seen[t] && ridOf[t] === ridOf[p]) { seen[t] = 1; comp.push(t); }
         }
       }
-      if (comp.length <= 2) {
+      if (comp.length <= aS(2, s)) {
         const cnt = new Map();
         for (const q of comp) {
           const x = q % w, y = (q - x) / w;
@@ -748,7 +790,7 @@
       parRampe.get(a[1]).push(a);
     }
     for (const [r, parts] of parRampe) {
-      const big = parts.filter((a) => a[5] >= PART_MIN);
+      const big = parts.filter((a) => a[5] >= aS(PART_MIN, s));
       if (big.length < 2) continue;
       const ls = big.map((a) => a[2] / a[5]), ws = big.map((a) => a[5]);
       let c1 = Math.min(...ls), c2 = Math.max(...ls), g1 = [], g2 = [];
@@ -778,12 +820,71 @@
         neutral[p] = partBase.has(k) ? partBase.get(k) : base[ridOf[p]];
       }
     }
+    if (s > 1) neutreDetaille(neutral, { w, h, NP, s, opqList, line, prot, col, rampOf, ridOf, ramps, L });
     const info = {
       ramps: ramps.map((r, i) => [hexc(base[i]), r.slice().sort((a, b) => L.get(a) - L.get(b)).map(hexc)]),
       lines: [...dark].map(hexc).sort(), protected: [...new Set(opqList.filter((p) => prot[p]).map((p) => hexc(col[p])))].sort(),
       parts: new Set(body.map((p) => region[p])).size, outline, rampOf,
     };
     return { opq, opqList, neutral, codes, info };
+  }
+
+  // Grand sprite (s > 1) : le neutre en aplats effaçait le dessin (mèches, nuances). On ne retire
+  // que l'ombrage à GRANDE échelle : couleur de base de la matière + écart du pixel à la moyenne
+  // locale de sa matière (luminance L*, fenêtre de 2 s px de rayon), ramené à la couleur de la rampe
+  // la plus proche (palette du sprite : ça reste du pixel art). Puis chaque matière claire est
+  // assombrie (même rapport pour toutes ses couleurs, détail gardé) pour que sa couleur la plus
+  // claire reste sous 188 / 255 : x 1,36 (ambiance 0,36 + lampe 1) au palier max = blanc, les
+  // paliers en dessous restent distincts au lieu de saturer.
+  function neutreDetaille(neutral, c) {
+    const { w, h, NP, s, opqList, line, prot, col, rampOf, ridOf, ramps, L } = c;
+    const rho = aL(2, s);
+    const nR = ramps.length;
+    // tables de sommes (L et nombre) par matière, pixels de leur propre rampe seulement
+    const W1 = w + 1;
+    const sl = new Float64Array(nR * W1 * (h + 1)), sn = new Float64Array(nR * W1 * (h + 1));
+    const propre = (p) => !line[p] && !prot[p] && ridOf[p] >= 0 && rampOf.get(col[p]) === ridOf[p];
+    for (let r = 0; r < nR; r++) {
+      const o = r * W1 * (h + 1);
+      for (let y = 0; y < h; y++) {
+        let al = 0, an = 0;
+        for (let x = 0; x < w; x++) {
+          const p = y * w + x;
+          if (propre(p) && ridOf[p] === r) { al += L.get(col[p]); an++; }
+          sl[o + (y + 1) * W1 + x + 1] = sl[o + y * W1 + x + 1] + al;
+          sn[o + (y + 1) * W1 + x + 1] = sn[o + y * W1 + x + 1] + an;
+        }
+      }
+    }
+    const somme = (t, r, x0, y0, x1, y1) => {
+      const o = r * W1 * (h + 1);
+      return t[o + y1 * W1 + x1] - t[o + y0 * W1 + x1] - t[o + y1 * W1 + x0] + t[o + y0 * W1 + x0];
+    };
+    const out = Int32Array.from(neutral);
+    for (const p of opqList) {
+      if (!propre(p)) continue;
+      const r = ridOf[p], x = p % w, y = (p - x) / w;
+      const x0 = Math.max(0, x - rho), y0 = Math.max(0, y - rho), x1 = Math.min(w, x + rho + 1), y1 = Math.min(h, y + rho + 1);
+      const n = somme(sn, r, x0, y0, x1, y1);
+      if (!n) continue;
+      const cible = L.get(neutral[p]) + (L.get(col[p]) - somme(sl, r, x0, y0, x1, y1) / n);
+      let best = neutral[p], bv = Infinity;
+      for (const cc of ramps[r]) { const v = Math.abs(L.get(cc) - cible); if (v < bv) { bv = v; best = cc; } }
+      out[p] = best;
+    }
+    // marge sous le blanc, par matière
+    const PLAFOND = 188;
+    const maxi = new Map();
+    for (const p of opqList) {
+      if (line[p] || prot[p] || ridOf[p] < 0) continue;
+      const c = out[p], m = Math.max((c >> 16) & 255, (c >> 8) & 255, c & 255);
+      maxi.set(ridOf[p], Math.max(maxi.get(ridOf[p]) || 0, m));
+    }
+    for (const p of opqList) {
+      if (line[p] || prot[p] || ridOf[p] < 0) { neutral[p] = out[p]; continue; }
+      const k = Math.min(1, PLAFOND / (maxi.get(ridOf[p]) || 255)), c = out[p];
+      neutral[p] = k >= 1 ? c : (pyRound(((c >> 16) & 255) * k) << 16) | (pyRound(((c >> 8) & 255) * k) << 8) | pyRound((c & 255) * k);
+    }
   }
 
   // ------------------------------------------------------------ images
@@ -915,7 +1016,10 @@
   }
 
   // nat : sprite natif (silhouette), nor : normales, neu : neutre (traits sombres)
-  function carteCj(nat, nor, neu) {
+  function carteCj(nat, nor, neu, echelle) {
+    const s = echelle > 1 ? echelle : 1;
+    const contour = CJ_CONTOUR * s, frange = aL(CJ_FRANGE, s), lisse = aL(CJ_LISSE, s), portee = CJ_PORTEE * s;
+    const demi = s > 1 ? Math.pow(0.5, 1 / s) : 0.5;   // même atténuation totale sur 2 s px
     const w = nat.width, h = nat.height, NP = w * h;
     const opqM = new Uint8Array(NP);
     for (let p = 0; p < NP; p++) opqM[p] = nat.data[p * 4 + 3] >= 128 ? 1 : 0;
@@ -933,7 +1037,7 @@
       const v = hypotPy(nor.data[p * 4] / 255 * 2 - 1, nor.data[p * 4 + 1] / 255 * 2 - 1) / 0.93;
       pente[p] = v < 0.05 ? 0.0 : Math.min(1.0, v);
       const lum = (0.3 * neu.data[p * 4] + 0.59 * neu.data[p * 4 + 1] + 0.11 * neu.data[p * 4 + 2]) / 255;
-      passe[p] = lum >= CJ_SOMBRE || D[p] <= CJ_CONTOUR ? 1 : 0;
+      passe[p] = lum >= CJ_SOMBRE || D[p] <= contour ? 1 : 0;
     }
     // normale extérieure aux sources (somme des directions vers le vide ; y vers le HAUT)
     const src = new Map();
@@ -985,13 +1089,13 @@
     }
     const ex = new Map(), dl = new Map();
     for (const [p, d] of dist) {
-      const L = Math.min(prof[zone.get(p)] + 1.0, CJ_PORTEE);
+      const L = Math.min(prof[zone.get(p)] + 1.0, portee);
       const t = Math.min(1.0, d / L);
       ex.set(p, (1.0 - t * t * (3 - 2 * t)) * pente[p]);
       const x = p % w, y = (p - x) / w;
       let ax = 0.0, ay = 0.0;
-      for (let a = -CJ_LISSE; a <= CJ_LISSE; a++) {
-        for (let b = -CJ_LISSE; b <= CJ_LISSE; b++) {
+      for (let a = -lisse; a <= lisse; a++) {
+        for (let b = -lisse; b <= lisse; b++) {
           const X = x + a, Y = y + b;
           if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
           const q = Y * w + X;
@@ -1003,7 +1107,7 @@
     }
     // frange d'adoucissement : chaque pixel reçoit au moins la moitié de son voisin le plus exposé
     // (2 passes : x 0,5 puis x 0,25), y compris dans une autre section, jamais à travers un trait
-    for (let it = 0; it < CJ_FRANGE; it++) {
+    for (let it = 0; it < frange; it++) {
       const ajout = new Map();
       for (const p of opq) {
         if (!passe[p]) continue;
@@ -1014,7 +1118,7 @@
           if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
           if (ex.has(q) && passe[q] && ex.get(q) > best) { best = ex.get(q); bd = dl.get(q); }
         }
-        if (0.5 * best > (ex.has(p) ? ex.get(p) : 0.0)) ajout.set(p, [0.5 * best, dl.has(p) ? dl.get(p) : bd]);
+        if (demi * best > (ex.has(p) ? ex.get(p) : 0.0)) ajout.set(p, [demi * best, dl.has(p) ? dl.get(p) : bd]);
       }
       for (const [p, [v, d]] of ajout) { ex.set(p, v); dl.set(p, d); }
     }
@@ -1306,8 +1410,10 @@
   }
 
   // ------------------------------------------------------------ animation
-  function meilleurDecalage(ca, cb, w, h, liste, r = 3) {
+  // pas > 1 (grand sprite) : un pixel sur pas compté, sinon (2 r + 1)² décalages x tous les pixels
+  function meilleurDecalage(ca, cb, w, h, liste, r = 3, pas = 1) {
     let best = [0, 0], bv = -1;
+    if (pas > 1) liste = liste.filter((_, i) => i % pas === 0);
     for (let dx = -r; dx <= r; dx++) {
       for (let dy = -r; dy <= r; dy++) {
         let v = 0;
@@ -1323,11 +1429,12 @@
   // Anti-clignotement : un pixel qui garde la même matière d'une frame à l'autre (après recalage du
   // corps entier, qui monte et descend en marchant) prend la direction majoritaire sur sa frame et ses
   // deux voisines (boucle).
-  function lisserTemps(codes, cols, keep, listes, w, h) {
+  function lisserTemps(codes, cols, keep, listes, w, h, echelle) {
+    const s = echelle > 1 ? echelle : 1;
     const n = codes.length, shifts = new Map();
     for (let i = 0; i < n; i++) {
       for (const j of [pyMod(i - 1, n), pyMod(i + 1, n)]) {
-        if (!shifts.has(i * n + j)) shifts.set(i * n + j, meilleurDecalage(cols[i], cols[j], w, h, listes[i]));
+        if (!shifts.has(i * n + j)) shifts.set(i * n + j, meilleurDecalage(cols[i], cols[j], w, h, listes[i], aL(3, s), aS(1, s)));
       }
     }
     const aCote = (cds, j, x, y) => (x >= 0 && y >= 0 && x < w && y < h ? cds[y * w + x] : undefined);
@@ -1361,7 +1468,7 @@
         const [best, v] = plusFrequent(votes);
         if (v >= 2.0) nw[p] = best;
       }
-      out.push(mergeSmall(nw, listes[i], w, h, 4, keep[i]));
+      out.push(mergeSmall(nw, listes[i], w, h, aS(4, s), keep[i]));
     }
     return { codes: out, avant, apres: taux(out) };
   }
@@ -1401,11 +1508,12 @@
 
   // Sections d'une animation : UNE analyse sur la mosaïque des frames (mêmes matières), puis
   // lissage dans le temps (4 passes) et contour hérité. Renvoie, par frame, { opq, neutral, codes }.
-  function sectionsAnimation(canv, garder, rampes, peint) {
+  function sectionsAnimation(canv, garder, rampes, peint, echelle) {
+    const s = echelle > 1 ? echelle : 1;
     const w = canv[0].width, h = canv[0].height, gap = 24;
     const mosa = nouvelle(canv.length * (w + gap) - gap, h);
     canv.forEach((c, i) => coller(mosa, c, i * (w + gap), 0));
-    const res = analyse(mosa, garder || [], rampes || [], !!peint, [w, h]);
+    const res = analyse(mosa, garder || [], rampes || [], !!peint, [w, h], s);
     const MW = mosa.width;
     const fc = [], fn = [], fcol = [], fkeep = [], listes = [];
     const mat = new Map();
@@ -1426,18 +1534,18 @@
       }
       fc.push(cd); fn.push(nd); fcol.push(cl); fkeep.push(kp); listes.push(liste);
     });
-    let r = lisserTemps(fc, fcol, fkeep, listes, w, h);
+    let r = lisserTemps(fc, fcol, fkeep, listes, w, h, s);
     const avant = r.avant;
-    for (let it = 0; it < 3; it++) r = lisserTemps(r.codes, fcol, fkeep, listes, w, h);
+    for (let it = 0; it < 3; it++) r = lisserTemps(r.codes, fcol, fkeep, listes, w, h, s);
     const opqF = listes.map((l) => { const m = new Uint8Array(w * h); for (const p of l) m[p] = 1; return m; });
     const codesF = r.codes.map((c, i) => heriterBord(c, opqF[i], w, h));
     return { frames: canv.map((c, i) => ({ opq: opqF[i], neutral: fn[i], codes: codesF[i] })), info: res.info, avant, apres: r.apres };
   }
 
   // Toutes les cartes d'un sprite natif analysé : neutre, sections, normales, contre-jour (+ aperçu)
-  function cartes(nat, res) {
+  function cartes(nat, res, echelle) {
     const { neu, sec, nor } = saveMaps(nat.width, nat.height, res.opq, res.neutral, res.codes);
-    const cj = carteCj(nat, nor, neu);
+    const cj = carteCj(nat, nor, neu, echelle);
     return { nat, neu, sec, nor, cj, cjAp: cjApercu(cj) };
   }
 
@@ -1613,11 +1721,13 @@
       canv = reduireCouleurs(canv, 32);
       messages.push(`${n} couleurs : image peinte plutôt que pixel art, ramenée à 32 couleurs ; le découpage en matières peut être moins net.`);
     }
-    const res = canv.length > 1 ? sectionsAnimation(canv, [], [], peint).frames : [analyse(canv[0], [], [], peint, null)];
+    const ech = echelleSprite(canv);
+    if (ech > 1) messages.push(`Grand sprite : réglages en pixels multipliés par ${ech} (zones, lissages, carte contre-jour, neutre détaillé).`);
+    const res = canv.length > 1 ? sectionsAnimation(canv, [], [], peint, ech).frames : [analyse(canv[0], [], [], peint, null, ech)];
     return {
-      f, auto, peint, messages,
+      f, auto, peint, messages, s: ech,
       frames: canv.map((nat, i) => {
-        const c = cartes(nat, res[i]);
+        const c = cartes(nat, res[i], ech);
         const masque = new Uint8Array(nat.width * nat.height);
         for (let p = 0; p < masque.length; p++) masque[p] = nat.data[p * 4 + 3] >= 128 ? 1 : 0;
         const g = GEO.geometrie(masque, nat.width, nat.height);
@@ -1627,5 +1737,5 @@
     };
   }
 
-  return { traiterImages, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
+  return { echelleSprite, ECHELLE_REF, neutreDetaille, traiterImages, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
 });
