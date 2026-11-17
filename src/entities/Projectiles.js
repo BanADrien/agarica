@@ -47,6 +47,10 @@ class PierreProjectile extends Phaser.Physics.Arcade.Sprite {
     this.setVelocity(dir * PIERRE_SPEED_X + inheritVx * 0.3, PIERRE_SPEED_Y);
     this.setAngularVelocity(dir * 540);
     this.done = false;
+    // Pierres en vol, lues par les cibles suspendues (Monde V2, targetsUpdate
+    // dans SecretKit.js : la liste y est aussi vidée des pierres finies).
+    scene.__pierres = (Array.isArray(scene.__pierres) ? scene.__pierres : []).filter((s) => s.active && !s.done);
+    scene.__pierres.push(this);
 
     scene.time.delayedCall(PIERRE_LIFESPAN_MS, () => this.shatter());
     if (scene.ground) scene.physics.add.collider(this, scene.ground, () => this.shatter());

@@ -9,7 +9,7 @@
 //
 // Ce que l'éditeur retire de la donnée POUR L'AFFICHAGE seulement (la donnée
 // enregistrée, elle, garde tout) : script d'histoire, déclencheurs, carte-titre,
-// musique, et les conditions d'histoire (`requires` / `forbids`) pour que
+// musique, et les conditions d'histoire (`requires` / `forbids` / `showIf`) pour que
 // chaque élément posé soit visible.
 
 // --- Images du jeu pour les vignettes et les aperçus ------------------------
@@ -286,7 +286,8 @@ const EDITEUR_GEOS = {
   // Mousse : (x, y) = centre ; sans y, posée sur le sol.
   mousse: {
     rect(sc, el, g) {
-      const w = el.w || 96;
+      // (`largeur` du genre : largeur par défaut du jeu, 64 pour un bloc SECRET ou une barrière.)
+      const w = el.w || g.largeur || 96;
       const h = el.h || g.hauteur;
       const y = el.y != null ? el.y : (typeof storyGroundY === 'function' ? storyGroundY(sc, el.x) : 448) - h / 2;
       return { x: el.x - w / 2, y: y - h / 2, w, h };
@@ -399,7 +400,9 @@ const EDITEUR_GEOS = {
     creer(sc, modele, x, y) {
       const gx = Math.floor(x / ED_CASE);
       const gy = Math.floor(y / ED_CASE);
-      return { ...modele, cells: [[gx, gy], [gx, gy + 1]] };
+      // Sol et dalle (Monde V2) : deux cases côte à côte ; sinon l'une sur l'autre (un mur).
+      const plat = modele.by === 'sol' || modele.by === 'dalle';
+      return { ...modele, cells: plat ? [[gx, gy], [gx + 1, gy]] : [[gx, gy], [gx, gy + 1]] };
     },
     ancre(sc, el) { const b = EDITEUR_GEOS.cassable.boite(sc, el); return { x: b.x + b.w / 2, y: b.y + b.h / 2 }; },
     deplacer(sc, el, x, y) {

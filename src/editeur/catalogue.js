@@ -87,6 +87,21 @@ const EditeurListes = {
     const items = typeof ITEM_MANIFEST !== 'undefined' ? ITEM_MANIFEST : {};
     return Object.keys(items).filter((k) => k.startsWith('fond_'));
   },
+  // Monde V2 : « apparaît quand… » d'un coffre ou d'un trésor = le drapeau
+  // d'une cible suspendue de la zone (son `flag`, sinon celui que le jeu lui
+  // donne : `cible_<zone du jeu>_<id>`, cf. targetFlag dans SecretKit.js).
+  drapeauxCibles() {
+    const E = typeof Editeur !== 'undefined' ? Editeur : null;
+    const d = (E && E.etat.donnees) || {};
+    const info = E ? E.infosZone() : null;
+    const entree = info && typeof storyZoneEntry === 'function' ? storyZoneEntry(info.scene) : null;
+    const zoneJeu = entree ? entree.zone : (info ? info.scene : '');
+    const cibles = Array.isArray(d.targets) ? d.targets : [];
+    return [{ v: '', nom: '(toujours là)' }, ...cibles.filter(Boolean).map((t, i) => {
+      const id = t.id || `cible${i}`;
+      return { v: t.flag || `cible_${zoneJeu}_${id}`, nom: `Quand la cible « ${id} » tombe` };
+    })];
+  },
 };
 
 const EDITEUR_GENRES = {
@@ -193,6 +208,8 @@ const EDITEUR_GENRES = {
     champs: [
       { cle: 'id', nom: 'Nom du coffre', type: 'texte' },
       { cle: 'contents', nom: 'Contenu', type: 'contenu' },
+      { cle: 'showIf', nom: 'Apparaît', type: 'liste', large: true, options: () => EditeurListes.drapeauxCibles(),
+        aide: 'Caché jusqu\'à ce qu\'une cible suspendue de la zone tombe (Monde V2).' },
     ],
   },
   treasures: {
@@ -200,6 +217,8 @@ const EDITEUR_GENRES = {
     champs: [
       { cle: 'id', nom: 'Nom du trésor', type: 'texte' },
       { cle: 'contents', nom: 'Contenu', type: 'contenu' },
+      { cle: 'showIf', nom: 'Apparaît', type: 'liste', large: true, options: () => EditeurListes.drapeauxCibles(),
+        aide: 'Caché jusqu\'à ce qu\'une cible suspendue de la zone tombe (Monde V2).' },
     ],
   },
   butterflies: {
@@ -215,17 +234,49 @@ const EDITEUR_GENRES = {
     champs: [
       { cle: 'item', nom: 'Objet', type: 'liste', options: () => EditeurListes.objets() },
       { cle: 'cutscene', nom: 'Scène jouée en le ramassant', type: 'liste', options: () => EditeurListes.cinematiques() },
+      { cle: 'showIf', nom: 'Apparaît', type: 'liste', large: true, options: () => EditeurListes.drapeauxCibles(),
+        aide: 'Caché jusqu\'à ce qu\'une cible suspendue de la zone tombe (Monde V2).' },
     ],
   },
   breakables: {
     nom: 'Bloc cassable', geo: 'cassable', distingue: ['by'], repere: 0xd8ccf5,
     champs: [
       { cle: 'id', nom: 'Nom du bloc', type: 'texte' },
-      { cle: 'by', nom: 'Cassé par', type: 'liste', options: [{ v: 'sword', nom: 'La dague (et l\'ours)' }, { v: 'bear', nom: 'L\'ours seulement' }] },
+      { cle: 'by', nom: 'Cassé par', type: 'liste', options: [{ v: 'sword', nom: 'La dague (et l\'ours)' }, { v: 'bear', nom: 'L\'ours seulement' },
+        { v: 'sol', nom: 'Sol : l\'ours brun (et l\'ours-hibou)' }, { v: 'mur', nom: 'Mur : la charge du grizzly' },
+        { v: 'dalle', nom: 'Dalle : l\'ours-hibou, de 3 rangées au moins' }] },
       { cle: 'hint', nom: 'Indice visible', type: 'liste', defaut: 'fissure',
         options: [{ v: 'fissure', nom: 'Une fissure' }, { v: 'mousse', nom: 'De la mousse' }, { v: 'poussiere', nom: 'De la poussière' }, { v: false, nom: 'Aucun' }] },
       { cle: 'hits', nom: 'Coups de dague', type: 'nombre', min: 1, max: 12, pas: 1, defaut: 3 },
       { cle: 'reward', nom: 'Récompense', type: 'contenu', facultatif: true },
+    ],
+  },
+  // Monde V2 (2026-11-16, docs/production/MONDE_V2_PIECES.md).
+  secretBlocks: {
+    nom: 'Bloc SECRET', geo: 'mousse', hauteur: 128, largeur: 64, repere: 0xb9a6ff,
+    champs: [
+      { cle: 'id', nom: 'Nom du bloc', type: 'texte' },
+      { cle: 'forme', nom: 'Forme qu\'il attend', type: 'liste', defaut: 'felin',
+        options: [{ v: 'insecte', nom: 'Insectes' }, { v: 'canide', nom: 'Canidés' }, { v: 'poisson', nom: 'Poissons' }, { v: 'felin', nom: 'Félins' }] },
+      { cle: 'w', nom: 'Largeur', type: 'nombre', min: 16, max: 1200, pas: 8, defaut: 64 },
+      { cle: 'h', nom: 'Hauteur', type: 'nombre', min: 16, max: 1200, pas: 8, defaut: 128 },
+    ],
+  },
+  targets: {
+    nom: 'Cible suspendue', geo: 'centre', taille: [34, 40], repere: 0xc08a5a,
+    champs: [
+      { cle: 'id', nom: 'Nom de la cible', type: 'texte' },
+      { cle: 'fil', nom: 'Longueur du fil', type: 'nombre', min: 0, max: 600, pas: 4, defaut: 60 },
+      { cle: 'flag', nom: 'Drapeau posé quand elle tombe', type: 'texte',
+        aide: 'Vide : cible_<zone>_<nom>. Un coffre ou un trésor réglé sur « Apparaît : quand la cible tombe » le lit.' },
+    ],
+  },
+  corruptBarriers: {
+    nom: 'Barrière corrompue', geo: 'mousse', hauteur: 192, largeur: 64, repere: 0xd04fe0,
+    champs: [
+      { cle: 'id', nom: 'Nom de la barrière', type: 'texte' },
+      { cle: 'w', nom: 'Largeur', type: 'nombre', min: 16, max: 1200, pas: 8, defaut: 64 },
+      { cle: 'h', nom: 'Hauteur', type: 'nombre', min: 16, max: 1200, pas: 8, defaut: 192 },
     ],
   },
   mossBlocks: {
@@ -282,6 +333,10 @@ const EDITEUR_ELEMENTS_FIXES = [
     modele: { flag: 'hasEagleForm', message: 'Une nouvelle capacité s\'éveille en toi.' } },
   { id: 'totem-pieuvre', onglet: 'objets', groupe: 'Repos et pouvoirs', nom: 'Totem de la pieuvre', genre: 'totems', image: { totem: 'octopus' },
     modele: { flag: 'hasOctopusForm', message: 'Une nouvelle capacité s\'éveille en toi.' } },
+  { id: 'totem-grizzly', onglet: 'objets', groupe: 'Repos et pouvoirs', nom: 'Totem du grizzly', genre: 'totems', image: { totem: 'grizzly' },
+    modele: { flag: 'hasGrizzlyForm', message: 'Une nouvelle capacité s\'éveille en toi.' } },
+  { id: 'totem-ours-hibou', onglet: 'objets', groupe: 'Repos et pouvoirs', nom: 'Totem de l\'ours-hibou', genre: 'totems', image: { totem: 'owlbear' },
+    modele: { flag: 'hasOwlbearForm', message: 'Une nouvelle capacité s\'éveille en toi.' } },
 
   { id: 'coffre', onglet: 'objets', groupe: 'Trésors', nom: 'Coffre', genre: 'chests', image: { objet: 'coffre_ferme' },
     modele: { id: 'coffre', contents: { eclats: 20 } }, numerote: 'id' },
@@ -298,6 +353,22 @@ const EDITEUR_ELEMENTS_FIXES = [
     modele: { id: 'bloc', by: 'sword', hint: 'fissure' }, numerote: 'id', aide: 'Un morceau de sol qui se casse : peins d\'abord le sol, puis pose le bloc dessus.' },
   { id: 'cassable-ours', onglet: 'objets', groupe: 'Obstacles', nom: 'Bloc cassable (ours)', genre: 'breakables', icone: 'cassable-ours',
     modele: { id: 'bloc', by: 'bear', hint: 'fissure' }, numerote: 'id', aide: 'Un morceau de sol que seul l\'ours casse : peins d\'abord le sol, puis pose le bloc dessus.' },
+  // Monde V2 : un ours par matière (règle de l'utilisateur : l'ours brun casse les sols, le grizzly les murs).
+  { id: 'cassable-sol', onglet: 'objets', groupe: 'Monde V2', nom: 'Sol fissuré (ours brun)', genre: 'breakables', icone: 'cassable-sol',
+    modele: { id: 'sol', by: 'sol', hint: 'fissure' }, numerote: 'id',
+    aide: 'Le fracas de l\'ours brun ou l\'atterrissage de l\'ours-hibou le casse. Peins d\'abord le sol, puis pose le bloc dessus.' },
+  { id: 'cassable-mur', onglet: 'objets', groupe: 'Monde V2', nom: 'Mur fissuré (grizzly)', genre: 'breakables', icone: 'cassable-mur',
+    modele: { id: 'mur', by: 'mur', hint: 'fissure' }, numerote: 'id',
+    aide: 'Seule la charge du grizzly le casse (laisse-lui de l\'élan). Peins d\'abord le mur, puis pose le bloc dessus.' },
+  { id: 'cassable-dalle', onglet: 'objets', groupe: 'Monde V2', nom: 'Dalle épaisse (ours-hibou)', genre: 'breakables', icone: 'cassable-dalle',
+    modele: { id: 'dalle', by: 'dalle', hint: 'fissure' }, numerote: 'id',
+    aide: 'L\'ours-hibou la casse en retombant d\'au moins 3 rangées. Peins d\'abord le sol, puis pose la dalle dessus.' },
+  { id: 'bloc-secret', onglet: 'objets', groupe: 'Monde V2', nom: 'Bloc SECRET', genre: 'secretBlocks', icone: 'secret',
+    modele: { id: 'secret', forme: 'felin', w: 64, h: 128 }, numerote: 'id', aide: 'Solide : il attend une forme à venir. Xara le dit quand on le touche.' },
+  { id: 'cible', onglet: 'objets', groupe: 'Monde V2', nom: 'Cible suspendue', genre: 'targets', image: { objet: 'cible_noix', icone: 'cible' },
+    modele: { id: 'cible', fil: 60 }, numerote: 'id', aide: 'Une pierre la fait tomber. Un coffre réglé sur « Apparaît : quand la cible tombe » sort alors.' },
+  { id: 'barriere-corrompue', onglet: 'objets', groupe: 'Monde V2', nom: 'Barrière corrompue', genre: 'corruptBarriers', icone: 'ronces',
+    modele: { id: 'barriere', w: 64, h: 192 }, numerote: 'id', aide: 'Des ronces solides ; les papillons les dissolvent pour toujours.' },
   { id: 'amas-mousse', onglet: 'objets', groupe: 'Obstacles', nom: 'Amas de mousse', genre: 'mossBlocks', image: { objet: 'mousse_amas_intact' },
     modele: { w: 96, h: 96 }, aide: 'Bouche le passage ; le fracas de l\'ours le détruit.' },
   { id: 'mur-mousse', onglet: 'objets', groupe: 'Obstacles', nom: 'Mur de mousse', genre: 'mossWalls', image: { objet: 'mousse_mur' },
@@ -478,6 +549,12 @@ const EDITEUR_ICONES = {
   cocon: '<path d="M12 2v5"/><ellipse cx="12" cy="14" rx="4.500" ry="7"/><path d="M8.500 11c2 1 5 1 7 0M8 15c2.500 1 5.500 1 8 0"/>',
   cassable: '<path d="M4 4h16v16H4zM12 4l-2 5 3 3-2 4 1 4"/>',
   'cassable-ours': '<path d="M4 4h16v16H4z"/><circle cx="9" cy="10" r="1.200"/><circle cx="15" cy="10" r="1.200"/><path d="M9 15c2 1.500 4 1.500 6 0"/>',
+  'cassable-sol': '<path d="M3 10h18v10H3zM3 14l5-1 4 2 4-2 5 1"/><path d="M12 3v4M9 5l3 2 3-2"/>',
+  'cassable-mur': '<path d="M7 3h10v18H7zM12 3l-1.500 5 2 4-2 4 1 5"/><path d="M2 12h3M3 9l2 3-2 3"/>',
+  'cassable-dalle': '<path d="M3 13h18v7H3zM3 16.500l4-1 3 2 4-2 3 1.500 4-1"/><path d="M12 2v7M9 6l3 3 3-3"/>',
+  secret: '<path d="M4 3h16v18H4z"/><path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.700.300-1 .900-1 1.700M12 17h.01"/>',
+  cible: '<path d="M12 2v7"/><circle cx="12" cy="14" r="5"/><path d="M12 9.500c-1 2-1 5 0 9"/>',
+  ronces: '<path d="M6 21c-1-5 2-8 0-12s1-6 1-6M12 21c1-5-2-8 0-12s-1-6-1-6M18 21c-1-5 2-8 0-12s1-6 1-6"/><path d="M6 13l-2-1M12 9l2-1M18 15l2-1M6 7l2-1M12 16l-2-1"/>',
   toile: '<path d="M12 3v18M3 12h18M5.500 5.500l13 13M18.500 5.500l-13 13M12 7l3.500 1.500L17 12l-1.500 3.500L12 17l-3.500-1.500L7 12l1.500-3.500z"/>',
   vent: '<path d="M3 9h10a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 19h6"/>',
   empreintes: '<circle cx="7" cy="16" r="2"/><circle cx="4.500" cy="12" r="1"/><circle cx="7.500" cy="11" r="1"/><circle cx="10" cy="12.500" r="1"/><circle cx="16" cy="9" r="2"/><circle cx="13.500" cy="5" r="1"/><circle cx="16.500" cy="4" r="1"/><circle cx="19" cy="5.500" r="1"/>',

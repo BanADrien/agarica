@@ -11,6 +11,9 @@
 //   5. Murs et sols cassables (`breakables`).
 //   6. Boutique : openShop / shopBuy (ShopScene.js, table SHOPS dans
 //      src/data/shops_data.js).
+//   7. Papillons prisonniers (`butterflies`).
+//   8. Monde V2 : bloc SECRET (`secretBlocks`), cible suspendue (`targets`),
+//      barrière corrompue (`corruptBarriers`), talismans dessinés.
 // Tout s'affiche aussi sans art : images du manifeste si elles existent,
 // sinon dessinées par code (STORY_DRAWN_ITEMS).
 // ============================================================================
@@ -109,7 +112,12 @@ function secretState(scene) {
       visit: scene.__storyVisit,
       breakables: [], chests: [], treasures: [], shards: [], shardGroup: null, butterflies: [],
       hud: null, refuseToastShown: new Set(),
+      // Monde V2 (section 8) : blocs SECRET, cibles, barrières et leurs corps.
+      secretBlocks: [], targets: [], barriers: [], secretGroup: null, barrierGroup: null,
     };
+    // Barrières d'une visite précédente (même instance de scène, autre zone
+    // jouée depuis l'éditeur) : plus des cibles de la nuée de papillons.
+    if (scene.healTargets) scene.healTargets = scene.healTargets.filter((t) => !t.__corruptBarrier);
   }
   return scene.__secret;
 }
@@ -539,6 +547,11 @@ LEVEL_DATA_HANDLERS.chests = (scene, list) => {
     chestSetLook(scene, ch, ch.opened);
     if (secretRectInIntactCells(scene, img.getBounds())) sendBehindFrontGround(scene, [img]);
     st.chests.push(ch);
+    // Coffre conditionnel (`showIf`, `requires`, `forbids`) : il n'APPARAÎT
+    // qu'une fois sa condition remplie (Monde V2 : la cible qui tombe fait
+    // apparaître un coffre), cf. chestsUpdate. Déjà ouvert : toujours là.
+    ch.gated = !ch.opened && !!(c.showIf || c.requires || c.forbids);
+    if (ch.gated) img.setVisible(storyAllowed(c));
     if (ch.opened) return;
     scene.__story.interactables.push({
       kind: 'chest', chest: ch,
@@ -552,6 +565,26 @@ LEVEL_DATA_HANDLERS.chests = (scene, list) => {
     });
   });
 };
+
+// Coffres conditionnels : montrés dès que leur condition tient ; s'il
+// apparaît pendant la visite, il « pousse » avec une gerbe d'étoiles.
+function chestsUpdate(scene) {
+  const st = secretState(scene);
+  for (const ch of st.chests) {
+    if (!ch.gated || ch.opened || !ch.img.active) continue;
+    const ok = storyAllowed(ch.data);
+    if (ok === ch.img.visible) continue;
+    ch.img.setVisible(ok);
+    if (!ok) continue;
+    const s = ch.img.scale;
+    ch.img.setScale(s * 0.2);
+    scene.tweens.add({ targets: ch.img, scale: s, duration: 420, ease: 'Back.easeOut' });
+    spawnFx(scene, 'star', ch.x, ch.footY - CHEST_HEIGHT / 2, { count: 10, power: 1.2, tint: [0xfff6c2, 0x9fe8ff, 0xff9fc9] });
+    juiceBurstImage(scene, 'glow', ch.x, ch.footY - CHEST_HEIGHT / 2, { size: 110, from: 0.3, to: 1.1, ms: 480, color: 0xfff6c2, alpha: 0.7 });
+    playSfx('pickup');
+    scene.events.emit('chest-shown', ch);
+  }
+}
 
 function chestOpen(scene, ch) {
   if (ch.opened) return;
@@ -649,8 +682,34 @@ function treasureTake(scene, t) {
 // Une salle cachée se met dans `cells` avec son mur : tout tombe d'un coup.
 // `by: 'sword'` : `hits` coups de mêlée (dague ou croc du loup) ; l'ours casse
 // aussi. `by: 'bear'` : seulement le fracas de l'ours. Flag `break_<zone>_<id>`.
+// Monde V2 (2026-11-16, docs/production/MONDE_V2_PIECES.md) : `by: 'sol'`,
+// `'mur'`, `'dalle'`, chacun cassé par UN ours (cf. secretBreaksBy).
 // ---------------------------------------------------------------------------
 const SECRET_SWORD_HITS = 3;
+// Valeurs de `by` comprises ; toute autre valeur vaut 'sword', comme avant.
+const SECRET_BREAK_KINDS = ['sword', 'bear', 'sol', 'mur', 'dalle'];
+// Dalle épaisse : l'ours-hibou doit retomber d'au moins 3 rangées (192 px) de
+// TERRAIN : dénivelé entre le dernier sol quitté et la dalle (`owlbearSlamDrop`,
+// Player). Pas depuis le sommet du saut : un double saut sur sol plat y fait
+// déjà 210 à 335 px (mesuré le 2026-11-17), la dalle casserait sans hauteur.
+const SECRET_DALLE_MIN_FALL = 192;
+// Tolérance (px) des arrondis de la physique : une corniche de 3 rangées pile passe.
+const SECRET_DALLE_FALL_SLACK = 4;
+
+// Qui casse quoi. `cause` : 'brun' (fracas de l'ours brun, compétence `ours`),
+// 'hibou' (atterrissage de l'ours-hibou), 'charge' (percussion du grizzly en
+// charge). La mêlée (dague, croc) est traitée à part : seul `sword` la compte.
+// Règle de l'utilisateur : l'ours brun casse les sols, le grizzly les murs.
+// `bear` (anciennes zones) garde son sens d'avant : tout ours le casse.
+function secretBreaksBy(b, cause, fall = 0) {
+  switch (b.by) {
+    case 'sword': case 'bear': return cause === 'brun' || cause === 'hibou' || cause === 'charge';
+    case 'sol': return cause === 'brun' || cause === 'hibou';
+    case 'mur': return cause === 'charge';
+    case 'dalle': return cause === 'hibou' && fall >= SECRET_DALLE_MIN_FALL - SECRET_DALLE_FALL_SLACK;
+    default: return false;
+  }
+}
 // Le fracas de l'ours part des pieds (40 px de haut) : on le prolonge vers le
 // bas pour qu'il atteigne un sol cassable sous elle.
 const SECRET_BEAR_REACH_DOWN = 28;
@@ -693,7 +752,7 @@ function secretPrepareGroundCells(scene, data, cells) {
     const isBroken = !!storyGet(flag);
     const keys = new Set(bc.map(([gx, gy]) => gridCellKey(gx, gy)));
     st.breakables.push({
-      id, flag, data: b, cells: bc, keys, broken: isBroken, by: b.by === 'bear' ? 'bear' : 'sword',
+      id, flag, data: b, cells: bc, keys, broken: isBroken, by: SECRET_BREAK_KINDS.includes(b.by) ? b.by : 'sword',
       hits: 0, needed: Math.max(1, Math.round(b.hits || SECRET_SWORD_HITS)), lastToken: null, hint: [], crack: null, trembled: false,
     });
     for (const [gx, gy] of bc) {
@@ -715,9 +774,14 @@ function secretPrepareGroundCells(scene, data, cells) {
   return out;
 }
 
-// Le handler ne pose que les indices : les cases sont déjà dans le sol.
+// Le handler ne pose que les indices : les cases sont déjà dans le sol. Une
+// dalle (Monde V2) a en plus son propre dessin de pierre, quel que soit l'indice.
 LEVEL_DATA_HANDLERS.breakables = (scene) => {
-  for (const b of secretState(scene).breakables) if (!b.broken) secretDrawHint(scene, b);
+  for (const b of secretState(scene).breakables) {
+    if (b.broken) continue;
+    if (b.by === 'dalle') secretDrawSlab(scene, b);
+    secretDrawHint(scene, b);
+  }
 };
 
 // Faces exposées d'une case (voisin orthogonal hors du sol) : 'top', 'bottom', 'left', 'right'.
@@ -766,7 +830,11 @@ function secretDrawHint(scene, b) {
   if (kind === 'poussiere') return;
   // Blocs de l'ours : le sol de la zone, mais fracturé sur tout le bloc
   // (demande de l'utilisateur, 2026-11-12), au lieu de la petite fissure.
-  if (kind === 'fissure' && b.by === 'bear' && secretDrawFractures(scene, b)) return;
+  // Monde V2 : fissures en travers pour un sol (`sol`, comme `bear`), en long
+  // pour un mur (`mur`) ; la dalle a déjà sa grande fissure (secretDrawSlab).
+  if (kind === 'fissure' && b.by === 'dalle' && b.slabKey) return;
+  if (kind === 'fissure' && (b.by === 'bear' || b.by === 'sol' || b.by === 'mur')
+    && secretDrawFractures(scene, b, b.by === 'mur' ? 'mur' : 'sol')) return;
   if (kind === 'fissure' && scene.textures.exists('item-fissure_secret')) {
     const img = scene.add.image(at.x, at.y, 'item-fissure_secret').setAlpha(SECRET_HINT_ALPHA);
     img.setScale(26 / Math.max(img.width, img.height));
@@ -828,8 +896,12 @@ const SECRET_FRACTURE_DARK = 'rgba(14, 8, 20, 0.82)';
 // le trait foncé se perd.
 const SECRET_FRACTURE_LIGHT = 'rgba(232, 222, 255, 0.4)';
 
-function secretDrawFractures(scene, b) {
+// `style` (Monde V2) : 'sol' (le dessin d'origine, fissures en travers) ou
+// 'mur' (fissures EN LONG, du haut au bas du mur, plus épaisses : un mur que
+// seul le grizzly casse doit se lire autrement qu'un sol de l'ours brun).
+function secretDrawFractures(scene, b, style = 'sol') {
   if (!b.cells.length || !scene.textures || !scene.textures.createCanvas) return false;
+  const wall = style === 'mur';
   const T = GROUND_TILE_SIZE;
   const N = scene.__groundRender && scene.__groundRender.tileset ? 32 : 24;
   const gxs = b.cells.map((c) => c[0]);
@@ -884,12 +956,18 @@ function secretDrawFractures(scene, b) {
   const opposite = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
   // Grandes fissures : d'un bord vers le bord d'en face, en zigzag anguleux ;
   // une sur deux s'arrête en chemin. Plus le bloc est grand, plus il y en a.
-  const count = Phaser.Math.Clamp(Math.round(b.cells.length * 0.9), 4, 9);
+  // Mur : du haut vers le bas (ou l'inverse) seulement, une à deux par colonne,
+  // presque toutes de bout en bout.
+  const count = wall ? Phaser.Math.Clamp(cols * 2, 3, 8) : Phaser.Math.Clamp(Math.round(b.cells.length * 0.9), 4, 9);
   for (let c = 0; c < count; c++) {
-    const side = ['top', 'left', 'right', 'bottom'][(c + rnd.between(0, 1)) % 4];
+    const side = wall ? (c % 2 ? 'bottom' : 'top') : ['top', 'left', 'right', 'bottom'][(c + rnd.between(0, 1)) % 4];
     const from = edgePoint(side);
-    const to = edgePoint(rnd.frac() < 0.7 ? opposite[side] : rnd.pick(['top', 'bottom', 'left', 'right'].filter((s) => s !== side)));
-    const reach = c % 2 ? rnd.realInRange(0.45, 0.75) : 1;
+    const to = edgePoint(wall || rnd.frac() < 0.7 ? opposite[side] : rnd.pick(['top', 'bottom', 'left', 'right'].filter((s) => s !== side)));
+    if (wall) {
+      // Bout d'arrivée pas trop loin en travers : la fissure reste verticale.
+      to[0] = Phaser.Math.Clamp(from[0] + rnd.between(-N / 3, N / 3), 1, W - 2);
+    }
+    const reach = wall ? (c % 3 === 2 ? rnd.realInRange(0.55, 0.8) : 1) : (c % 2 ? rnd.realInRange(0.45, 0.75) : 1);
     const len = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1;
     const nx = -(to[1] - from[1]) / len;
     const ny = (to[0] - from[0]) / len;
@@ -901,7 +979,8 @@ function secretDrawFractures(scene, b) {
       const pt = [from[0] + (to[0] - from[0]) * t + nx * off, from[1] + (to[1] - from[1]) * t + ny * off];
       line(prev[0], prev[1], pt[0], pt[1]);
       // Épaisse de 2 pixels sur sa première moitié : la fissure s'affine vers son bout.
-      if (i <= steps / 2) line(prev[0] + 1, prev[1], pt[0] + 1, pt[1]);
+      // (Mur : épaisse de bout en bout.)
+      if (wall || i <= steps / 2) line(prev[0] + 1, prev[1], pt[0] + 1, pt[1]);
       // Petite branche qui part d'un coude.
       if (rnd.frac() < 0.55) {
         const a = Math.atan2(pt[1] - prev[1], pt[0] - prev[0]) + rnd.pick([-1, 1]) * rnd.realInRange(0.6, 1.2);
@@ -920,11 +999,13 @@ function secretDrawFractures(scene, b) {
   }
   if (!dark.size) { scene.textures.remove(key); return false; }
   // Liseré clair sous chaque pixel sombre (arête éclairée), puis les fissures.
+  // (Mur : à droite de la fissure, sinon il ne se lit pas sur un trait vertical.)
   ctx.fillStyle = SECRET_FRACTURE_LIGHT;
   for (const k of dark) {
     const x = k % W;
     const y = Math.floor(k / W);
-    if (!dark.has((y + 1) * W + x) && inside(x, y + 1)) ctx.fillRect(x, y + 1, 1, 1);
+    const [lx, ly] = wall ? [x + 1, y] : [x, y + 1];
+    if (!dark.has(ly * W + lx) && inside(lx, ly)) ctx.fillRect(lx, ly, 1, 1);
   }
   ctx.fillStyle = SECRET_FRACTURE_DARK;
   for (const k of dark) ctx.fillRect(k % W, Math.floor(k / W), 1, 1);
@@ -938,6 +1019,88 @@ function secretDrawFractures(scene, b) {
   if (end) scene.children.moveBelow(img, end);
   b.hint.push(img);
   b.fractureKey = key;
+  return true;
+}
+
+// Dalle épaisse (Monde V2, `by: 'dalle'`) : rendu provisoire dessiné par code.
+// Une pierre grise posée PAR-DESSUS les tuiles du bloc (biseau clair en haut,
+// ombre en bas, grain), et UNE seule grande fissure d'un bord à l'autre : elle
+// doit se lire comme une matière à part, que l'ours brun ne casse pas. Même
+// grain que les fissures (24 ou 32 pixels par case), sans lissage. L'herbe des
+// cases est cachée (une dalle n'a pas d'herbe). Faux si rien n'a été dessiné.
+const SECRET_SLAB_COLORS = { base: '#5d5a6b', light: '#8f8ca0', top: '#b4b0c4', dark: '#34313f', grain: '#4b4858', crack: '#16111e' };
+
+function secretDrawSlab(scene, b) {
+  if (!b.cells.length || !scene.textures || !scene.textures.createCanvas) return false;
+  const T = GROUND_TILE_SIZE;
+  const N = scene.__groundRender && scene.__groundRender.tileset ? 32 : 24;
+  const gxs = b.cells.map((c) => c[0]);
+  const gys = b.cells.map((c) => c[1]);
+  const gx0 = Math.min(...gxs);
+  const gy0 = Math.min(...gys);
+  const W = (Math.max(...gxs) - gx0 + 1) * N;
+  const H = (Math.max(...gys) - gy0 + 1) * N;
+  const key = `dalle-${storyZoneId(scene)}-${b.id}`;
+  if (scene.textures.exists(key)) scene.textures.remove(key);
+  const tex = scene.textures.createCanvas(key, W, H);
+  if (!tex) return false;
+  const ctx = tex.getContext();
+  const C = SECRET_SLAB_COLORS;
+  const rnd = new Phaser.Math.RandomDataGenerator([`dalle-${b.id}`]);
+  const inside = (x, y) => x >= 0 && y >= 0 && x < W && y < H && b.keys.has(gridCellKey(gx0 + Math.floor(x / N), gy0 + Math.floor(y / N)));
+  const px = (x, y, color) => { if (inside(x, y)) { ctx.fillStyle = color; ctx.fillRect(x, y, 1, 1); } };
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!inside(x, y)) continue;
+      // Bords exposés du bloc : biseau clair en haut et à gauche, ombre en bas et à droite.
+      const up = !inside(x, y - 1) || !inside(x, y - 2);
+      const down = !inside(x, y + 1) || !inside(x, y + 2);
+      const left = !inside(x - 1, y);
+      const right = !inside(x + 1, y);
+      let c = C.base;
+      if (up) c = !inside(x, y - 1) ? C.top : C.light;
+      else if (down || right) c = C.dark;
+      else if (left) c = C.light;
+      else if (rnd.frac() < 0.07) c = rnd.frac() < 0.5 ? C.grain : C.light;
+      ctx.fillStyle = c;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  // La grande fissure : de gauche à droite, à mi-hauteur de la rangée du haut,
+  // en zigzag anguleux, épaisse de 2 pixels, liseré clair dessous.
+  const midY = Math.round(N * 0.45);
+  let x = 0;
+  let y = midY;
+  const pts = [[0, y]];
+  while (x < W - 1) {
+    x = Math.min(W - 1, x + rnd.between(3, 6));
+    y = Phaser.Math.Clamp(midY + rnd.between(-Math.round(N * 0.22), Math.round(N * 0.22)), 3, N - 4);
+    pts.push([x, y]);
+  }
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1];
+    const [bx, by] = pts[i];
+    const n = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) || 1;
+    for (let k = 0; k <= n; k++) {
+      const cx = Math.round(ax + ((bx - ax) * k) / n);
+      const cy = Math.round(ay + ((by - ay) * k) / n);
+      px(cx, cy + 2, C.light);
+      px(cx, cy, C.crack);
+      px(cx, cy + 1, C.crack);
+    }
+  }
+  tex.refresh();
+  tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  const img = scene.add.image(gx0 * T, gy0 * T, key).setOrigin(0, 0).setScale(T / N);
+  img.lookRole = 'world';
+  const gr = scene.__groundRender;
+  if (gr && gr.end) scene.children.moveBelow(img, gr.end);
+  for (const k of b.keys) {
+    const rec = gr && gr.cellObjects.get(k);
+    if (rec && rec.grass) rec.grass.setVisible(false);
+  }
+  b.hint.push(img);
+  b.slabKey = key;
   return true;
 }
 
@@ -1016,14 +1179,28 @@ function secretBreakableHit(scene, b, x, y) {
 
 // Mauvaise méthode (dague contre un mur de l'ours) : rien ne cède. Première
 // fois de la visite : un mot qui oriente sans tout dire.
-function secretBreakableRefuse(scene, b, x, y) {
+// Monde V2 : aussi le mauvais ours (fracas contre un mur du grizzly, charge
+// contre un sol…) ; `token` : un seul refus par coup ; `cause` : pour le mot
+// de la dalle (l'ours-hibou est bien le bon, mais il tombait de trop bas).
+function secretBreakableRefuse(scene, b, x, y, { token = null, cause = 'melee' } = {}) {
+  if (token) {
+    if (b.refuseToken === token) return;
+    b.refuseToken = token;
+  }
   juiceParticles(scene, 'dust', x, y, { count: 2, power: 0.4, tint: [0x8a7a68, 0xb4a690] });
   playSfx('breakable_denied');
   const st = secretState(scene);
-  if (st.refuseToastShown.has(b.id)) return;
-  st.refuseToastShown.add(b.id);
   const floor = b.hintSpot && b.hintSpot.side === 'top';
-  showToast(scene, floor ? 'Le sol sonne creux. Il faudrait frapper bien plus fort.' : 'Ça sonne creux. Il faudrait frapper bien plus fort.', 2400);
+  let text = floor ? 'Le sol sonne creux. Il faudrait frapper bien plus fort.' : 'Ça sonne creux. Il faudrait frapper bien plus fort.';
+  if (b.by === 'mur') text = 'Ce mur sonne creux. Il faudrait foncer dedans.';
+  else if (b.by === 'dalle') {
+    text = cause === 'hibou' ? 'La dalle a tenu. Il faudrait tomber de plus haut.' : 'Une dalle épaisse. Il faudrait lui tomber dessus de très haut.';
+  }
+  // Une fois par visite et par message (la dalle en a deux).
+  const seen = `${b.id}:${text}`;
+  if (st.refuseToastShown.has(seen)) return;
+  st.refuseToastShown.add(seen);
+  showToast(scene, text, 2400);
 }
 
 // Éclats d'une case : ses images découpées en quatre, qui volent et tombent.
@@ -1178,16 +1355,39 @@ function breakablesUpdate(scene) {
   const extend = (r) => (r ? new Phaser.Geom.Rectangle(r.x, r.y, r.width, r.height + SECRET_BEAR_REACH_DOWN) : null);
   const bear = extend(bearRect);
   const bearSoon = extend(bearPending);
+  // Quel ours frappe (Monde V2) : le fracas de l'ours-hibou passe par la même
+  // zone que celui de l'ours brun (`hitboxKind: 'ours'`) ; son dénivelé est
+  // noté par Player à l'atterrissage (`owlbearSlamDrop`).
+  const owl = p.activeSkillId === 'owlbear_slam';
+  const bearCause = owl ? 'hibou' : 'brun';
+  const fall = owl ? (p.owlbearSlamDrop || 0) : 0;
+  const bearToken = `fracas-${p.skillActiveUntil}`;
   // Percussion du grizzly en charge (Ursides.js) : casse aussi les blocs de l'ours.
   const crash = typeof p.getGrizzlyImpactRect === 'function' ? p.getGrizzlyImpactRect() : null;
+  // Ce qui est DEVANT lui seulement (Monde V2) : sa zone d'impact descend
+  // jusqu'à ses pieds et touchait le sol où il se tient. Les anciens blocs
+  // (`bear`, `sword`) gardent la zone entière, comme avant.
+  const crashFront = crash ? new Phaser.Geom.Rectangle(crash.x, crash.y, crash.width, Math.max(1, crash.height - 6)) : null;
+  const crashToken = crash && p.grizzlyImpact ? p.grizzlyImpact.token : null;
   const view = scene.cameras.main.worldView;
   for (const b of st.breakables) {
     if (b.broken) continue;
-    if (bear || crash) {
-      const hit = (bear && secretHitPoint(b, bear)) || (crash && secretHitPoint(b, crash));
-      if (hit) { secretBreak(scene, b, { cause: 'bear', x: hit.x, y: hit.y }); continue; }
+    const legacy = b.by === 'bear' || b.by === 'sword';
+    if (bear) {
+      const hit = secretHitPoint(b, bear);
+      if (hit) {
+        if (secretBreaksBy(b, bearCause, fall)) { secretBreak(scene, b, { cause: 'bear', x: hit.x, y: hit.y }); continue; }
+        secretBreakableRefuse(scene, b, hit.x, hit.y, { token: bearToken, cause: bearCause });
+      }
     }
-    if (bearSoon && !b.trembled && secretHitPoint(b, bearSoon)) {
+    if (crash) {
+      const hit = secretHitPoint(b, legacy ? crash : crashFront);
+      if (hit) {
+        if (secretBreaksBy(b, 'charge')) { secretBreak(scene, b, { cause: 'bear', x: hit.x, y: hit.y }); continue; }
+        secretBreakableRefuse(scene, b, hit.x, hit.y, { token: crashToken, cause: 'charge' });
+      }
+    }
+    if (bearSoon && !b.trembled && secretBreaksBy(b, bearCause, fall) && secretHitPoint(b, bearSoon)) {
       b.trembled = true;
       secretTremble(scene, b, 3, 5);
     }
@@ -1196,7 +1396,7 @@ function breakablesUpdate(scene) {
       const hit = secretHitPoint(b, melee);
       if (hit) {
         b.lastToken = token;
-        if (b.by === 'bear') secretBreakableRefuse(scene, b, hit.x, hit.y);
+        if (b.by !== 'sword') secretBreakableRefuse(scene, b, hit.x, hit.y);
         else secretBreakableHit(scene, b, hit.x, hit.y);
         if (b.broken) continue;
       }
@@ -1501,6 +1701,352 @@ function butterflyFree(scene, b) {
 }
 
 // ---------------------------------------------------------------------------
+// 8. Monde V2 : bloc SECRET, cible suspendue, barrière corrompue (2026-11-16,
+//    docs/production/MONDE_V2_PIECES.md). Rendus provisoires dessinés par code.
+// ---------------------------------------------------------------------------
+// Cible : une noix au bout d'un fil (image `cible_noix` du manifeste si elle
+// existe un jour, sinon celle-ci). Talismans du panda et de l'ours polaire :
+// le médaillon de bois du talisman de l'ours, recoloré par code (bambou, glace).
+function secretDrawTalisman(ctx, w, h, { rim, face, mark, glow }) {
+  const cx = w / 2;
+  const cy = h / 2;
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#140c1c';
+  ctx.fillStyle = rim;
+  ctx.beginPath(); ctx.arc(cx, cy, w / 2 - 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = face;
+  ctx.beginPath(); ctx.arc(cx, cy, w / 2 - 12, 0, Math.PI * 2); ctx.fill();
+  // Empreinte de patte (comme le talisman de l'ours) : quatre doigts, une paume.
+  ctx.fillStyle = mark;
+  ctx.beginPath(); ctx.ellipse(cx, cy + 8, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
+  for (const [dx, dy] of [[-13, -6], [-5, -13], [5, -13], [13, -6]]) {
+    ctx.beginPath(); ctx.arc(cx + dx, cy + dy, 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(cx - 14, cy - 18, 3, 0, Math.PI * 2); ctx.fill();
+}
+
+Object.assign(STORY_DRAWN_ITEMS, {
+  cible_noix: {
+    w: 28, h: 34, scale: 1,
+    draw(ctx, w, h) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#1a0f14';
+      // Coque brune, sillon du milieu, reflet ; petite queue verte en haut.
+      ctx.fillStyle = '#8a5a36';
+      ctx.beginPath(); ctx.ellipse(w / 2, h / 2 + 3, w / 2 - 2, h / 2 - 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#5a3620';
+      ctx.beginPath(); ctx.moveTo(w / 2, 8); ctx.lineTo(w / 2 - 2, h / 2 + 2); ctx.lineTo(w / 2 + 1, h - 4); ctx.stroke();
+      ctx.fillStyle = '#c08a5a';
+      ctx.beginPath(); ctx.ellipse(w / 2 - 6, h / 2 - 2, 3, 5, -0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#5fae3a';
+      ctx.fillRect(w / 2 - 1, 0, 3, 7);
+      ctx.fillStyle = '#8fe3b8';
+      ctx.beginPath(); ctx.ellipse(w / 2 + 5, 4, 5, 2.5, -0.4, 0, Math.PI * 2); ctx.fill();
+    },
+  },
+  talisman_panda: {
+    w: 72, h: 72, scale: 0.5,
+    draw: (ctx, w, h) => secretDrawTalisman(ctx, w, h, { rim: '#4f7a43', face: '#f2f0e6', mark: '#1c1a20', glow: '#c9f0a0' }),
+  },
+  talisman_ours_polaire: {
+    w: 72, h: 72, scale: 0.5,
+    draw: (ctx, w, h) => secretDrawTalisman(ctx, w, h, { rim: '#3f7fc4', face: '#dff4ff', mark: '#6fa8d8', glow: '#ffffff' }),
+  },
+});
+
+// --- 8a. Bloc SECRET ----------------------------------------------------------
+//   secretBlocks: [{ id, x, y?, w?, h?, forme: 'insecte' | 'canide' | 'poisson' | 'felin' }]
+// x, y = CENTRE (y absent : posé au sol), 64 x 128 par défaut. Solide et
+// incassable pour l'instant : il attend une forme à venir. Quand on le touche
+// ou qu'on appuie sur E devant lui, Xara le dit en une bulle.
+const SECRET_BLOCK_FAMILIES = { insecte: 'Insectes', canide: 'Canidés', poisson: 'Poissons', felin: 'Félins' };
+const SECRET_BLOCK_TEXT = 'Il faudrait une autre forme pour passer.';
+const SECRET_BLOCK_BUBBLE_GAP_MS = 4000;
+
+function secretPieceRect(scene, d, w0, h0) {
+  const w = d.w || w0;
+  const h = d.h || h0;
+  const y = d.y != null ? d.y : storyGroundY(scene, d.x) - h / 2;
+  return { x: d.x, y, w, h };
+}
+
+// Groupe statique de la visite (corps des blocs et des barrières), heurté par
+// Agarica et les ennemis.
+function secretSolidGroup(scene, name, onTouch = null) {
+  const st = secretState(scene);
+  if (!st[name]) {
+    st[name] = scene.physics.add.staticGroup();
+    if (scene.player) scene.physics.add.collider(scene.player, st[name], onTouch || undefined);
+    if (scene.enemies) scene.physics.add.collider(scene.enemies, st[name]);
+  }
+  return st[name];
+}
+
+function secretBlockSpeak(scene, blk) {
+  const now = scene.time.now;
+  if (now < blk.bubbleAt) return;
+  blk.bubbleAt = now + SECRET_BLOCK_BUBBLE_GAP_MS;
+  showSpeechBubble(scene, 'xara', SECRET_BLOCK_TEXT, { who: 'xara', replace: true });
+  scene.events.emit('secret-block', blk);
+}
+
+LEVEL_DATA_HANDLERS.secretBlocks = (scene, list) => {
+  const st = secretState(scene);
+  (list || []).forEach((s, i) => {
+    if (!s || s.x == null) return;
+    const r = secretPieceRect(scene, s, 64, 128);
+    const g = scene.add.graphics({ x: r.x, y: r.y });
+    g.lookRole = 'prop';
+    g.fillStyle(0x120c1c, 1).fillRect(-r.w / 2, -r.h / 2, r.w, r.h);
+    g.lineStyle(3, 0x6b5a9a, 1).strokeRect(-r.w / 2 + 1.5, -r.h / 2 + 1.5, r.w - 3, r.h - 3);
+    g.lineStyle(1, 0x2a1f45, 1).strokeRect(-r.w / 2 + 6, -r.h / 2 + 6, r.w - 12, r.h - 12);
+    const size = Math.round(Phaser.Math.Clamp(Math.min(r.w * 0.21, r.h * 0.3), 11, 40));
+    const title = scene.add.text(r.x, r.y - size * 0.35, 'SECRET', {
+      fontFamily: 'sans-serif', fontSize: `${size}px`, fontStyle: 'bold', color: '#ffd6f2',
+    }).setOrigin(0.5);
+    const fam = SECRET_BLOCK_FAMILIES[s.forme] || '';
+    const sub = scene.add.text(r.x, r.y + size * 0.6, fam, {
+      fontFamily: 'sans-serif', fontSize: `${Math.max(10, Math.round(size * 0.55))}px`, color: '#a99bd6',
+    }).setOrigin(0.5);
+    title.lookRole = 'prop';
+    sub.lookRole = 'prop';
+    for (const o of [g, title, sub]) storyPutBehindPlayer(scene, o);
+    const blk = { id: s.id || `secret${i}`, data: s, ...r, parts: [g, title, sub], bubbleAt: 0 };
+    const group = secretSolidGroup(scene, 'secretGroup', (pl, zone) => {
+      // Contact de côté ou par en dessous (pas debout dessus) : la bulle de Xara.
+      const tb = pl.body && pl.body.touching;
+      if (zone.__secretBlock && tb && (tb.left || tb.right || tb.up)) secretBlockSpeak(scene, zone.__secretBlock);
+    });
+    const zone = scene.add.zone(r.x, r.y, r.w, r.h);
+    scene.physics.add.existing(zone, true);
+    zone.__secretBlock = blk;
+    group.add(zone);
+    blk.body = zone;
+    st.secretBlocks.push(blk);
+    scene.__story.interactables.push({
+      kind: 'secretBlock', block: blk,
+      probe: (sc, p) => {
+        if (p.y < r.y - r.h / 2 - 20 || p.y > r.y + r.h / 2 + 70) return null;
+        return { x: p.x < r.x ? r.x - r.w / 2 : r.x + r.w / 2, topY: r.y - r.h / 2 - 6, label: 'E : examiner' };
+      },
+      activate: (sc) => { blk.bubbleAt = 0; secretBlockSpeak(sc, blk); },
+    });
+  });
+};
+
+// --- 8b. Cible suspendue -------------------------------------------------------
+//   targets: [{ id, x, y, flag?, fil? }]
+// (x, y) = centre du fruit ; `fil` : longueur du fil au-dessus (défaut 60).
+// Une pierre (compétence `pierre`) qui la touche la fait tomber : `flag`
+// (défaut `cible_<zone>_<id>`) passe à vrai, sauvegardé. Un élément qui porte
+// `showIf: '<flag>'` (un coffre, un trésor…) apparaît alors.
+const TARGET_FIL = 60;
+const TARGET_RADIUS = 14;
+const TARGET_SWAY_DEG = 5;
+
+function targetFlag(scene, t, i) {
+  return t.flag || `cible_${storyZoneId(scene)}_${t.id || `cible${i}`}`;
+}
+
+// Fruit et fil à l'angle de balancement `a` (radians).
+function targetPlace(t, a) {
+  const len = t.fil + TARGET_RADIUS;
+  t.img.setPosition(t.ax + Math.sin(a) * len, t.ay + Math.cos(a) * len).setRotation(-a);
+  t.thread.clear();
+  t.thread.lineStyle(1.5, 0xd8d2c0, 0.85).lineBetween(t.ax, t.ay, t.ax + Math.sin(a) * t.fil, t.ay + Math.cos(a) * t.fil);
+}
+
+LEVEL_DATA_HANDLERS.targets = (scene, list) => {
+  const st = secretState(scene);
+  (list || []).forEach((d, i) => {
+    if (!d || d.x == null || d.y == null) return;
+    const fil = d.fil != null ? Math.max(0, d.fil) : TARGET_FIL;
+    const thread = scene.add.graphics();
+    thread.lookRole = 'prop';
+    const img = addItemImage(scene, d.x, d.y, 'cible_noix');
+    img.lookRole = 'prop';
+    const t = {
+      id: d.id || `cible${i}`, data: d, flag: targetFlag(scene, d, i), img, thread, fil,
+      ax: d.x, ay: d.y - TARGET_RADIUS - fil, phase: (d.x % 7) / 7 * Math.PI * 2, fallen: false,
+    };
+    for (const o of [thread, img]) storyPutBehindPlayer(scene, o);
+    if (storyGet(t.flag)) {
+      // Déjà tombée : le fil coupé, le fruit couché au sol.
+      t.fallen = true;
+      const floor = secretFloorBelow(scene, d.x, d.y) ?? storyStandY(scene, d.x, 448);
+      img.setPosition(d.x + 10, floor - TARGET_RADIUS * 0.75).setAngle(80);
+      thread.lineStyle(1.5, 0xd8d2c0, 0.85).lineBetween(t.ax, t.ay, t.ax, t.ay + fil * 0.4);
+    } else {
+      targetPlace(t, 0);
+    }
+    st.targets.push(t);
+  });
+};
+
+function targetDrop(scene, t, stone) {
+  t.fallen = true;
+  storySet(t.flag, true);
+  playSfx('decor_bois_coup');
+  spawnFx(scene, 'star', t.img.x, t.img.y, { count: 6, power: 1 });
+  // Le fil casse : il en reste un bout au plafond.
+  t.thread.clear();
+  t.thread.lineStyle(1.5, 0xd8d2c0, 0.85).lineBetween(t.ax, t.ay, t.ax, t.ay + t.fil * 0.4);
+  const floor = secretFloorBelow(scene, t.img.x, t.img.y) ?? storyStandY(scene, t.img.x, 448);
+  const endY = floor - TARGET_RADIUS * 0.75;
+  const dist = Math.max(0, endY - t.img.y);
+  const ms = Math.max(160, Math.sqrt((2 * dist) / 1300) * 1000);
+  const dir = stone && stone.body ? Math.sign(stone.body.velocity.x) || 1 : 1;
+  scene.tweens.add({ targets: t.img, y: endY, x: t.img.x + dir * 10, angle: 80 * dir, duration: ms, ease: 'Quad.easeIn',
+    onComplete: () => {
+      if (!t.img.active) return;
+      playSfx('land');
+      juiceParticles(scene, 'dust', t.img.x, floor, { count: 4, power: 0.6, tint: [0x8a7a68, 0xb4a690] });
+      scene.tweens.add({ targets: t.img, y: endY - 10, duration: 110, yoyo: true, ease: 'Quad.easeOut' });
+    } });
+  scene.events.emit('target-dropped', t);
+}
+
+function targetsUpdate(scene) {
+  const st = secretState(scene);
+  if (!st.targets.length) return;
+  const now = scene.time.now;
+  // Pierres en vol (Projectiles.js les note dans `scene.__pierres`).
+  const stones = (scene.__pierres || []).filter((s) => s && s.active && !s.done);
+  scene.__pierres = stones;
+  for (const t of st.targets) {
+    if (t.fallen) continue;
+    targetPlace(t, Math.sin(now / 700 + t.phase) * Phaser.Math.DegToRad(TARGET_SWAY_DEG));
+    for (const s of stones) {
+      if (Phaser.Math.Distance.Between(s.x, s.y, t.img.x, t.img.y) > TARGET_RADIUS + 12) continue;
+      const stone = s;
+      targetDrop(scene, t, stone);
+      stone.shatter();
+      break;
+    }
+  }
+}
+
+// --- 8c. Barrière corrompue ----------------------------------------------------
+//   corruptBarriers: [{ id, x, y?, w?, h? }]
+// x, y = CENTRE (y absent : posée au sol), 64 x 192 par défaut. Ronces
+// violettes qui pulsent, solides. Les papillons (compétence `papillon`) la
+// soignent : elle se dissout, pour toujours (flag `barrier_<zone>_<id>`).
+// Elle se présente à la nuée comme un ennemi corrompu (`scene.healTargets`,
+// lu par PapillonSwarm.checkTargets dans Projectiles.js).
+function barrierTexture(scene, key, w, h, seed, glow) {
+  if (scene.textures.exists(key)) scene.textures.remove(key);
+  // Dessinée à mi-résolution puis agrandie x2 sans lissage (grain de 2 px).
+  const W = Math.max(4, Math.round(w / 2));
+  const H = Math.max(4, Math.round(h / 2));
+  const tex = scene.textures.createCanvas(key, W, H);
+  const ctx = tex.getContext();
+  const rnd = new Phaser.Math.RandomDataGenerator([seed]);
+  const vines = Math.max(3, Math.round(W / 7));
+  // Lacis en travers d'abord (derrière les tiges) : la barrière se lit comme un
+  // mur de ronces, pas comme des tiges isolées.
+  if (!glow) {
+    for (let y = 6; y < H - 2; y += rnd.between(7, 11)) {
+      const y2 = y + rnd.between(-6, 6);
+      ctx.strokeStyle = '#1a0c24';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(1, y); ctx.lineTo(W - 1, y2); ctx.stroke();
+      ctx.strokeStyle = '#4a2266';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(1, y); ctx.lineTo(W - 1, y2); ctx.stroke();
+    }
+  }
+  for (let v = 0; v < vines; v++) {
+    let x = ((v + 0.5) / vines) * W + rnd.realInRange(-2, 2);
+    const pts = [];
+    for (let y = H; y >= -2; y -= rnd.between(4, 7)) {
+      x = Phaser.Math.Clamp(x + rnd.realInRange(-3, 3), 2, W - 3);
+      pts.push([x, y]);
+    }
+    const stroke = (color, width) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      pts.forEach(([px, py], k) => (k ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+      ctx.stroke();
+    };
+    if (!glow) {
+      stroke('#1a0c24', 5);
+      stroke(v % 2 ? '#5a2a7a' : '#7a3aa0', 3);
+      // Épines.
+      ctx.fillStyle = '#2a1238';
+      for (const [px, py] of pts) {
+        const s = rnd.pick([-1, 1]);
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + s * 3, py - 2); ctx.lineTo(px, py - 2); ctx.closePath(); ctx.fill();
+      }
+    } else {
+      // Veines lumineuses : quelques points roses le long des ronces.
+      ctx.fillStyle = '#ff6fe0';
+      for (const [px, py] of pts) if (rnd.frac() < 0.45) ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+    }
+  }
+  tex.refresh();
+  tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  return key;
+}
+
+LEVEL_DATA_HANDLERS.corruptBarriers = (scene, list) => {
+  const st = secretState(scene);
+  const zoneId = storyZoneId(scene);
+  // Cibles de soin d'une visite précédente (instance de scène réutilisée) : retirées.
+  scene.healTargets = (scene.healTargets || []).filter((t) => !t.__corruptBarrier);
+  (list || []).forEach((d, i) => {
+    if (!d || d.x == null) return;
+    const id = d.id || `barriere${i}`;
+    const flag = `barrier_${zoneId}_${id}`;
+    if (storyGet(flag)) return;
+    const r = secretPieceRect(scene, d, 64, 192);
+    const base = scene.add.image(r.x, r.y + r.h / 2, barrierTexture(scene, `ronces-${zoneId}-${id}`, r.w, r.h, `ronces-${id}`, false))
+      .setOrigin(0.5, 1).setScale(2);
+    const glow = scene.add.image(r.x, r.y + r.h / 2, barrierTexture(scene, `ronces-${zoneId}-${id}-lueur`, r.w, r.h, `ronces-${id}`, true))
+      .setOrigin(0.5, 1).setScale(2).setBlendMode(Phaser.BlendModes.ADD);
+    base.lookRole = 'prop';
+    glow.lookRole = 'prop';
+    for (const o of [base, glow]) storyPutBehindPlayer(scene, o);
+    // La corruption pulse : la lueur respire, les ronces se gonflent à peine.
+    scene.tweens.add({ targets: glow, alpha: { from: 0.25, to: 1 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    scene.tweens.add({ targets: base, scaleX: 2.06, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const zone = scene.add.zone(r.x, r.y, r.w, r.h);
+    scene.physics.add.existing(zone, true);
+    secretSolidGroup(scene, 'barrierGroup').add(zone);
+    const bar = {
+      id, flag, data: d, ...r, base, glow, body: zone, dissolved: false,
+      // Interface de « créature corrompue » attendue par la nuée de papillons.
+      __corruptBarrier: true, active: true, corrupted: true,
+      getBounds: () => new Phaser.Geom.Rectangle(r.x - r.w / 2, r.y - r.h / 2, r.w, r.h),
+      heal: () => barrierDissolve(scene, bar),
+    };
+    st.barriers.push(bar);
+    scene.healTargets.push(bar);
+  });
+};
+
+function barrierDissolve(scene, bar) {
+  if (bar.dissolved) return;
+  bar.dissolved = true;
+  bar.active = false;
+  bar.corrupted = false;
+  storySet(bar.flag, true);
+  scene.healTargets = (scene.healTargets || []).filter((t) => t !== bar);
+  const st = secretState(scene);
+  if (st.barrierGroup) st.barrierGroup.remove(bar.body, true, true);
+  scene.tweens.killTweensOf([bar.base, bar.glow]);
+  playSfx('decor_feuilles');
+  // Les ronces se fanent vers le sol, la lueur s'éteint ; poussière d'ailes.
+  for (let k = 0; k < 6; k++) {
+    spawnFx(scene, 'wingDust', bar.x + Phaser.Math.Between(-bar.w / 2, bar.w / 2), bar.y + Phaser.Math.Between(-bar.h / 2, bar.h / 2), { count: 3, power: 1 });
+  }
+  scene.tweens.add({ targets: bar.glow, alpha: 0, duration: 300, onComplete: () => bar.glow.destroy() });
+  scene.tweens.add({ targets: bar.base, scaleY: 0.1, alpha: 0, duration: 800, ease: 'Quad.easeIn', onComplete: () => bar.base.destroy() });
+  scene.events.emit('barrier-healed', bar);
+}
+
+// ---------------------------------------------------------------------------
 // Boucle (monde non gelé) : butin, éclats, trésors, cassables.
 // ---------------------------------------------------------------------------
 function secretUpdateHook(scene, time, delta) {
@@ -1511,5 +2057,7 @@ function secretUpdateHook(scene, time, delta) {
   treasuresUpdate(scene);
   breakablesUpdate(scene);
   butterfliesUpdate(scene);
+  chestsUpdate(scene);
+  targetsUpdate(scene);
 }
 LEVEL_UPDATE_HOOKS.push(secretUpdateHook);

@@ -422,6 +422,8 @@ const LEGACY_TEST_ZONES = [
   { scene: 'ZonetestScene', name: 'Zone test' },
   // Familles d'animaux : les quatre ours (cf. src/data/zone_ours_data.js).
   { scene: 'ZoneOursScene', name: 'Zone des ours' },
+  // Monde V2 : les nouvelles pièces de jeu (cf. src/data/zone_pieces_data.js).
+  { scene: 'ZonePiecesScene', name: 'Pièces du monde V2' },
 ];
 
 // `sceneOrKey` : scène Phaser, clé de scène ('BosquetScene') ou id de zone ('bosquet').
@@ -622,6 +624,10 @@ const ITEM_INFO = {
   repulsif: { name: 'Répulsif à mousse', desc: 'De Morgat. Quelques gouttes font fondre un mur de mousse ([E] devant le mur).' },
   bocal_antidote: { name: "Bocal d'antidote", desc: 'Apporté par les papillons de Morgat. Il brille un peu.' },
   note_geralt: { name: 'Note de Geralt', desc: "« Si tu lis ceci, c'est que je suis passé par là. Ou que je l'ai perdue. Clak, rends-moi ce crayon. »" },
+  // Monde V2 (2026-11-16) : talismans à ramasser. `skill` : la compétence que
+  // l'objet donne au ramassage (cf. updateStoryInteractables), sans cinématique.
+  talisman_panda: { name: 'Talisman du panda', desc: 'Un médaillon de bambou. Donne la compétence du panda.', skill: 'panda' },
+  talisman_ours_polaire: { name: "Talisman de l'ours polaire", desc: "Froid au toucher. Donne les pics de glace de l'ours polaire.", skill: 'ours_polaire' },
 };
 
 function itemInfo(id) {
@@ -1176,8 +1182,11 @@ function storyCondition(cond) {
 }
 
 // `requires` : toutes les clés vraies. `forbids` : interdit dès qu'UNE de ses clés est vraie.
+// `showIf: 'drapeau'` (Monde V2, 2026-11-16) : raccourci de `requires: { drapeau: true }`,
+// réglable dans l'éditeur (un simple nom) : l'élément n'apparaît que si le drapeau est vrai.
 function storyAllowed(entry) {
   if (!entry) return true;
+  if (entry.showIf && !storyConditionPart(String(entry.showIf), true)) return false;
   if (entry.requires && !storyCondition(entry.requires)) return false;
   if (entry.forbids) {
     if (typeof entry.forbids === 'function') return !entry.forbids();
@@ -3837,7 +3846,8 @@ LEVEL_DATA_HANDLERS.pickups = (scene, list) => {
     scene.tweens.add({ targets: img, angle: { from: -5, to: 5 }, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     storyPutBehindPlayer(scene, glow);
     storyPutBehindPlayer(scene, img);
-    const it = { kind: 'pickup', data: p, flag, img, glow, x: p.x, y, glintAt: 0, gated: !!(p.requires || p.forbids) };
+    // (`showIf`, Monde V2 : l'objet sort quand une cible suspendue tombe, par exemple.)
+    const it = { kind: 'pickup', data: p, flag, img, glow, x: p.x, y, glintAt: 0, gated: !!(p.showIf || p.requires || p.forbids) };
     scene.__story.interactables.push(it);
     if (it.gated) storyPickupGate(it);
   });
@@ -4071,7 +4081,7 @@ LEVEL_DATA_HANDLERS.lights = (scene, list) => {
     if (L.tint != null) img.setTint(L.tint);
     if (L.layer === 'aboveAmbient') img.setDepth(STORY_LIGHT_ABOVE_AMBIENT_DEPTH);
     else storyPutBehindPlayer(scene, img);
-    const light = { data: L, img, on: storyAllowed(L), tween: null, conditional: !!(L.requires || L.forbids) };
+    const light = { data: L, img, on: storyAllowed(L), tween: null, conditional: !!(L.showIf || L.requires || L.forbids) };
     storyLightApply(scene, light, true);
     scene.__story.lights.push(light);
   }
@@ -4246,7 +4256,10 @@ function updateStoryInteractables(scene) {
   } else if (it.kind === 'pickup') {
     it.done = true;
     storySet(it.flag, true);
-    inventoryAdd(scene, it.data.item);
+    // Talisman (ITEM_INFO[item].skill) : un seul bandeau, celui de la compétence.
+    const skill = (ITEM_INFO[it.data.item] || {}).skill;
+    inventoryAdd(scene, it.data.item, { silent: !!skill });
+    if (skill) unlockSkillFromStory(scene, skill);
     storyPickupJuice(scene, it);
     if (it.data.cutscene) runCutscene(scene, it.data.cutscene);
   } else if (it.kind === 'mossWall') {
@@ -4566,8 +4579,10 @@ function storyStandOk(scene, x, feetY) {
 function storySupportedAt(scene, x, feetY) {
   if (typeof scene.physics.overlapRect !== 'function') return true;
   const water = scene.water || [];
+  // Plaque de glace de l'ours polaire (Monde V2, Ursides.js) : appui qui fond
+  // en 4 s, jamais un point de reprise (on y reviendrait au-dessus de l'eau).
   return scene.physics.overlapRect(x - 1, feetY - 2, 2, 8, false, true)
-    .some((b) => !water.includes(b.gameObject));
+    .some((b) => !water.includes(b.gameObject) && !(b.gameObject && b.gameObject.__icePlate));
 }
 
 // Haut du premier appui statique sous (x, y), à `maxDrop` px au plus (null

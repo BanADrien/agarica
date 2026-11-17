@@ -2297,6 +2297,13 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         }
       } else if (!swimming && !this.skillTransformActive && typeof OWLBEAR_TUNING !== 'undefined'
         && this.y - this.owlbearTopY >= OWLBEAR_TUNING.minFall) {
+        // Chute depuis le sommet du saut (info) et DÉNIVELÉ depuis le dernier sol
+        // quitté : c'est lui que lisent les dalles épaisses (Monde V2, SecretKit).
+        // Mesuré du sommet, un double saut sur sol plat fait déjà 210 à 335 px :
+        // la dalle ne demanderait jamais de « retomber de haut ».
+        this.owlbearSlamFall = this.y - this.owlbearTopY;
+        // (Bas du corps physique : `y` du sprite dépend de la forme affichée.)
+        this.owlbearSlamDrop = this.body.bottom - (this.lastGroundFeetY != null ? this.lastGroundFeetY : this.body.bottom);
         this.beginSkill('owlbear_slam', now);
       }
     }
@@ -2307,6 +2314,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.vineMomentumSpeed = 0;
       this.vineFlight = false;
       this.lastGroundedAt = now;
+      // Hauteur des pieds sur le dernier appui (dénivelé du fracas de l'ours-hibou).
+      this.lastGroundFeetY = this.body.bottom;
     }
 
     // Lianes (forme singe, cf. Liane.js) : accroche automatique, mais seulement

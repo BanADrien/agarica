@@ -1327,7 +1327,7 @@ function drawCombatDebugOverlays(scene) {
 // (`?editor`, playtest compris) ou les anciennes zones de test (menu « Zones
 // de test » du titre). En partie normale, aucune de ces touches n'agit.
 const DEV_KEYS_TEST_SCENES = ['Zone1Scene', 'Zone2Scene', 'Zone3Scene', 'Zone4Scene', 'Zone5Scene',
-  'SousGrotteScene', 'ZoneAquatiqueScene', 'ZonetestScene', 'ZoneOursScene', 'PlaytestScene'];
+  'SousGrotteScene', 'ZoneAquatiqueScene', 'ZonetestScene', 'ZoneOursScene', 'ZonePiecesScene', 'PlaytestScene'];
 
 // `?debug` est RETENU par le navigateur (localStorage) : une fois l'adresse
 // ouverte avec `?debug`, les raccourcis restent actifs aux lancements suivants,
@@ -1538,6 +1538,17 @@ const TOTEM_TYPE_BY_FLAG = {
   hasWolfForm: 'wolf',
   hasEagleForm: 'eagle',
   hasOctopusForm: 'octopus',
+  // Monde V2 (2026-11-16) : les deux ours-formes. Sans art : totem recoloré
+  // (cf. TOTEM_RECOLOR et totemTextureKey).
+  hasGrizzlyForm: 'grizzly',
+  hasOwlbearForm: 'owlbear',
+};
+// Totems sans art (Monde V2) : celui d'une autre forme, recoloré par code
+// (le loup pour le grizzly, l'aigle pour l'ours-hibou). `tint` : la couleur de
+// la forme (FORM_FX_COLORS, Player.js).
+const TOTEM_RECOLOR = {
+  grizzly: { from: 'wolf', tint: [217, 164, 65] },
+  owlbear: { from: 'eagle', tint: [232, 200, 144] },
 };
 // Retour utilisateur "les totems sont trop haut" mal lu la première fois
 // comme "trop grands" (taille rétrécie à 0.2) -- retour user suivant :
@@ -1656,7 +1667,12 @@ const FORM_UNLOCK_LABEL = {
   wolf: 'Forme Loup\nMaj tenue · croc (K)',
   eagle: 'Forme Aigle\n2e saut : planer',
   octopus: 'Forme Pieuvre\nNager',
+  grizzly: 'Forme Grizzly\nMaj tenue : élan, puis charge',
+  owlbear: 'Forme Ours-hibou\n2e saut : fracas en retombant',
 };
+// Icônes des formes sans icône historique (`form-icon-<forme>`, BootScene) :
+// celles du manifeste.
+const FORM_UNLOCK_ICON_ITEM = { monkey: 'form_icone_singe', grizzly: 'form_icone_grizzly', owlbear: 'form_icone_ours_hibou' };
 
 function ensureUnlockPopupAnimation(scene) {
   if (scene.anims.exists(ANIM_UNLOCK_POPUP_KEY)) return;
@@ -1682,8 +1698,9 @@ function showFormUnlockPopup(scene, totemType) {
   // la pancarte, jamais recalculées) mais invisibles (alpha 0) jusqu'à ce
   // que la pousse soit terminée -- cf. onComplete de l'anim plus bas.
   // Forme sans icône historique (singe) : icône du manifest ou placeholder.
+  const iconItem = FORM_UNLOCK_ICON_ITEM[totemType] || 'form_icone_singe';
   const iconKey = scene.textures.exists(`form-icon-${totemType}`) ? `form-icon-${totemType}`
-    : (scene.textures.exists('item-form_icone_singe') && totemType === 'monkey' ? 'item-form_icone_singe' : manifestPlaceholderKey(scene, 'form_icone_singe'));
+    : (FORM_UNLOCK_ICON_ITEM[totemType] && scene.textures.exists(`item-${iconItem}`) ? `item-${iconItem}` : manifestPlaceholderKey(scene, iconItem));
   const icon = scene.add.image(
     banner.x,
     banner.y + UNLOCK_POPUP_MEDALLION_OFFSET_Y * targetScale,
@@ -2548,7 +2565,41 @@ function totemTextureKey(scene, totemType, state) {
   if (scene.textures.exists(key)) return key;
   const itemId = `totem_${totemType}_${state}`;
   if (scene.textures.exists(`item-${itemId}`)) return `item-${itemId}`;
+  const recolored = totemRecolorTexture(scene, totemType, state);
+  if (recolored) return recolored;
   return manifestPlaceholderKey(scene, itemId);
+}
+
+// Totem provisoire (Monde V2) : l'image du totem d'une autre forme, chaque
+// pixel ramené à la couleur de la forme en gardant sa clarté (60 % de la
+// teinte, 40 % de l'original : le bois et la lueur restent lisibles). Fabriqué
+// une fois par jeu (clé `totem-<forme>-<état>`, la même que l'art historique).
+function totemRecolorTexture(scene, totemType, state) {
+  const rc = TOTEM_RECOLOR[totemType];
+  if (!rc || !scene.textures || !scene.textures.createCanvas) return null;
+  const srcKey = `totem-${rc.from}-${state}`;
+  if (!scene.textures.exists(srcKey)) return null;
+  const src = scene.textures.get(srcKey).getSourceImage();
+  if (!src || !src.width) return null;
+  const key = `totem-${totemType}-${state}`;
+  const tex = scene.textures.createCanvas(key, src.width, src.height);
+  if (!tex) return null;
+  const ctx = tex.getContext();
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, src.width, src.height);
+  const d = img.data;
+  const [tr, tg, tb] = rc.tint;
+  for (let i = 0; i < d.length; i += 4) {
+    if (!d[i + 3]) continue;
+    const l = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+    const k = Math.min(1.35, l * 1.35);
+    d[i] = Math.min(255, 0.4 * d[i] + 0.6 * tr * k);
+    d[i + 1] = Math.min(255, 0.4 * d[i + 1] + 0.6 * tg * k);
+    d[i + 2] = Math.min(255, 0.4 * d[i + 2] + 0.6 * tb * k);
+  }
+  ctx.putImageData(img, 0, 0);
+  tex.refresh();
+  return key;
 }
 
 // Écouteur de scène posé par un objet de la zone (totem, feu de camp) et
@@ -2691,7 +2742,13 @@ function addAbilityShrine(scene, x, y, flagName, message, scale = TOTEM_SCALE) {
     // retombe sur 'wolf' par défaut) exclut les futurs sanctuaires de
     // compétence (flagName hors de cette table) -- ceux-là doivent
     // continuer à passer par le choix explicite du feu de camp.
-    if (TOTEM_TYPE_BY_FLAG[flagName] && !scene.player.equippedForms.includes(totemType)) {
+    // Grizzly (Monde V2) : il prend l'emplacement au sol, à la place du loup
+    // (une forme au sol obtenue sans feu de camp doit marcher aussitôt, comme
+    // une forme aérienne, cf. Player.syncFormSlots) ; on rechange au feu.
+    if (totemType === 'grizzly' && typeof scene.player.equipForm === 'function') {
+      scene.player.equipForm('grizzly');
+      scene.registry.set('equippedForms', scene.player.equippedForms);
+    } else if (TOTEM_TYPE_BY_FLAG[flagName] && !scene.player.equippedForms.includes(totemType)) {
       const emptySlot = scene.player.equippedForms.indexOf(null);
       if (emptySlot !== -1) scene.player.equippedForms[emptySlot] = totemType;
       scene.registry.set('equippedForms', scene.player.equippedForms);

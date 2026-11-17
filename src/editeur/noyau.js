@@ -602,7 +602,7 @@ const Editeur = (() => {
     d.ambience = false;
     for (const k of Object.keys(d)) {
       if (!Array.isArray(d[k])) continue;
-      for (const el of d[k]) if (el && typeof el === 'object' && !Array.isArray(el)) { delete el.requires; delete el.forbids; }
+      for (const el of d[k]) if (el && typeof el === 'object' && !Array.isArray(el)) { delete el.requires; delete el.forbids; delete el.showIf; }
     }
     return d;
   }

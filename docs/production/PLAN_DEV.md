@@ -1610,6 +1610,42 @@ Conception : `EDITEUR_V2_DESIGN.md` ; mode d'emploi : `EDITEUR_MODE_EMPLOI.md`. 
 - Lots 2 et 3 (onglets Monde, Passages, Histoire) : place réservée dans `EDITEUR_ONGLETS` (`bientot: true`) ; les clés
   `exits`, `entries`, `triggers`, `checkpoints`, `playerSpawn` sont gardées telles quelles en attendant.
 
+### Monde V2 : pièces (2026-11-17, rétro-compatible)
+Conception : `MONDE_V2_PIECES.md`. Zone d'essai : `ZonePiecesScene` (`src/data/zone_pieces_data.js`, script
+`zone_pieces` : loup, singe, ours brun, pierre, papillon donnés ; la sauvegarde est remise telle quelle en sortant),
+`index.html?zone=ZonePiecesScene`. Code : `SecretKit.js` § 5 et § 8, `Ursides.js` (glace), `LevelKit.js` (totems).
+- **`breakables[].by`** : `'sword'` et `'bear'` inchangés (tout ours casse `bear`). Nouveaux : `'sol'` = fracas de
+  l'ours brun ou atterrissage de l'ours-hibou ; `'mur'` = percussion du grizzly en charge ; `'dalle'` = atterrissage
+  de l'ours-hibou avec un DÉNIVELÉ d'au moins 192 px (3 rangées, à 4 px près) entre le dernier sol quitté et la dalle
+  (`player.lastGroundFeetY`, `player.owlbearSlamDrop` ; `owlbearSlamFall` = chute depuis le sommet, info seulement).
+  Table : `secretBreaksBy(b, cause, fall)`. Mauvais ours ou dague : refus (poussière, son, un mot par visite). La
+  percussion ne compte, pour les nouveaux blocs, que devant le grizzly (zone d'impact moins ses 6 px du bas).
+- **`secretBlocks: [{ id, x, y?, w = 64, h = 128, forme: 'insecte'|'canide'|'poisson'|'felin' }]`** : (x, y) = centre,
+  sans `y` posé au sol. Solide, incassable ; contact de côté, par-dessous ou [E] : bulle de Xara (événement
+  `secret-block`).
+- **`targets: [{ id, x, y, fil = 60, flag? }]`** : (x, y) = centre du fruit. Une pierre (`scene.__pierres`, tenue par
+  `PierreProjectile`) la fait tomber : `flag` (défaut `cible_<zone>_<id>`) passe à vrai, sauvegardé (événement
+  `target-dropped`).
+- **`showIf: '<drapeau>'`** : raccourci de `requires: { drapeau: true }`, lu par `storyAllowed` (coffres, trésors,
+  objets à ramasser, PNJ, déclencheurs, lumières, cassables de vague 3). Coffre, trésor, objet et lumière le relisent
+  en continu : le coffre « pousse » quand la cible tombe. Pas encore sur les branches ni les plateformes.
+- **`corruptBarriers: [{ id, x, y?, w = 64, h = 192 }]`** : ronces solides ; la nuée de papillons les soigne
+  (`scene.healTargets` : `{ active, corrupted, getBounds(), heal() }`), drapeau `barrier_<zone>_<id>` (événement
+  `barrier-healed`).
+- **Glace sur l'eau** (pas de clé) : les pics de l'ours polaire qui arrivent sur une `water` dont la surface est à
+  48 px au plus sous la berge posent des plaques sur toute la longueur de la rangée (~215 px, 4 s de vie)
+  (`POLAR_TUNING.waterDown`, `iceLifeMs`, `plateH`, `plateLift`), corps statiques `__icePlate` : jamais un appui pour
+  d'autres pics, jamais un point de reprise (`storySupportedAt`). `player.lastIceCast.plates`. Sans pieuvre, l'eau
+  retire un cœur par seconde : une zone avec de l'eau a besoin d'une règle `fall` au-dessus du fond (zone d'essai :
+  `fall: { y: 470 }`).
+- **Totems** : `TOTEM_TYPE_BY_FLAG` + `hasGrizzlyForm` -> `grizzly` (remplace le loup au sol, aussitôt), `hasOwlbearForm`
+  -> `owlbear`. Sans art : `TOTEM_RECOLOR` (loup et aigle recolorés, texture `totem-<forme>-<état>`).
+- **Talismans** : `ITEM_INFO.talisman_panda` / `talisman_ours_polaire` avec `skill` : le ramasser donne la compétence
+  (un seul bandeau). Images provisoires dessinées (`STORY_DRAWN_ITEMS`).
+- **Éditeur** : groupe « Monde V2 » (sol, mur, dalle, bloc SECRET, cible, barrière), totems dans « Repos et pouvoirs »,
+  talismans dans « À ramasser ». Champ « Apparaît » (`showIf`) des coffres, trésors et objets : les cibles de la zone
+  (`EditeurListes.drapeauxCibles`).
+
 ## Progression & flags d'histoire (noms figés)
 
 | Ordre | Zone (nom snake → Scene / DATA) | Événements | Flags posés |

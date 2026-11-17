@@ -175,6 +175,17 @@ const POLAR_TUNING = {
   // Écart de hauteur toléré entre deux pics (le sol « suivi ») ; au-delà : vide ou mur.
   stepUp: 8,
   stepDown: 16,
+  // Glace sur l'eau (Monde V2, 2026-11-16) : un pic qui tombe sur une surface
+  // d'eau (`water`) jusqu'à `waterDown` px sous le sol suivi pose une PLAQUE de
+  // glace au lieu d'un pic ; on marche dessus, puis elle fond (`iceLifeMs`,
+  // clignotement les `iceBlinkMs` dernières). Plaque : `plateH` px d'épaisseur,
+  // son dessus `plateLift` px au-dessus de l'eau (Agarica debout ne touche pas
+  // l'eau, qui la blesserait sans la pieuvre).
+  waterDown: 48,
+  iceLifeMs: 4000,
+  iceBlinkMs: 800,
+  plateH: 16,
+  plateLift: 4,
 };
 
 // ---------------------------------------------------------------------------
@@ -623,7 +634,7 @@ function ursideFxState(scene) {
   if (!st || !st.g || !st.g.active || st.g.scene !== scene) {
     const g = scene.add.graphics().setDepth(CHARACTER_DEPTH + 2);
     g.lookRole = 'fx';
-    st = scene.__ursideFx = { g, parts: [], spikes: [], castId: 0 };
+    st = scene.__ursideFx = { g, parts: [], spikes: [], castId: 0, plates: [], plateGroup: null };
   }
   return st;
 }
@@ -860,6 +871,9 @@ function ursideGroundTopAt(scene, x, y, up, down) {
   let best = null;
   for (const b of scene.physics.overlapRect(x - 2, y - up, 4, up + down, false, true)) {
     if (water.includes(b.gameObject)) continue;
+    // Plaque de glace (Monde V2) : jamais un appui pour les pics ; sur l'eau,
+    // un nouveau lancer repose ses propres plaques.
+    if (b.gameObject && b.gameObject.__icePlate) continue;
     if (b.top < y - up - 0.5) continue;
     if (best === null || b.top < best) best = b.top;
   }
@@ -889,12 +903,22 @@ function ursideCastIceSpikes(scene, player, now) {
   const hits = { small: new Set(), big: new Set() };
   let groundY = player.body.bottom;
   const made = [];
+  // Points de la rangée tombés sur l'eau (Monde V2) : plaques de glace.
+  const onWater = [];
   for (let i = 0; i < total; i++) {
     const big = i === total - 1;
     // Le gros pic : une demi-enjambée après le 5e, au bout de la rangée.
     const x = player.x + dir * (T.startGap * size + (i < T.spikes ? step * (i + 1) : step * T.spikes + step * 0.55));
     const top = ursideGroundTopAt(scene, x, groundY, T.stepUp, T.stepDown);
-    if (top === null || ursideWallAt(scene, x, top)) break;
+    if (top === null) {
+      // Pas de sol : une surface d'eau juste dessous ? La rangée y continue en glace.
+      const w = ursideWaterAt(scene, x, groundY, T.stepUp, T.waterDown);
+      if (!w) break;
+      onWater.push({ x, i, water: w });
+      groundY = w.body.top - T.plateLift;
+      continue;
+    }
+    if (ursideWallAt(scene, x, top)) break;
     groundY = top;
     const art = ursideSpikeArt(scene, big, i);
     // Zone de dégâts = la glace dessinée : toute la largeur du segment (la
@@ -920,9 +944,114 @@ function ursideCastIceSpikes(scene, player, now) {
     st.spikes.push(spike);
     made.push(spike);
   }
-  player.lastIceCast = { id: castId, count: made.length, spikes: made };
+  const plates = onWater.length ? ursideIcePlates(scene, player, onWater, dir, step, now) : [];
+  player.lastIceCast = { id: castId, count: made.length, spikes: made, plates };
   scene.events.emit('ice-spikes', player.lastIceCast);
   return made;
+}
+
+// --- Glace sur l'eau (Monde V2, docs/production/MONDE_V2_PIECES.md) --------
+// Volume d'eau dont la surface est entre y - up et y + down sous x, ou null.
+function ursideWaterAt(scene, x, y, up, down) {
+  for (const z of scene.water || []) {
+    const b = z && z.body;
+    if (!b || x < b.left || x > b.right) continue;
+    if (b.top >= y - up && b.top <= y + down) return z;
+  }
+  return null;
+}
+
+// Plaques de glace de la rangée : sur chaque eau touchée, de sous Agarica
+// jusqu'au bout de la rangée (« sur toute la longueur des pics ») -- debout au
+// bord de la mare, la glace part donc du bord. Une plaque par enjambée (`step`),
+// qui naît avec le pic qu'elle remplace : la glace « avance » sur l'eau.
+function ursideIcePlates(scene, player, onWater, dir, step, now) {
+  const T = POLAR_TUNING;
+  const st = ursideFxState(scene);
+  if (!st.plateGroup) {
+    st.plateGroup = scene.physics.add.staticGroup();
+    scene.physics.add.collider(player, st.plateGroup);
+  }
+  const last = onWater[onWater.length - 1];
+  const far = last.x + dir * step / 2;
+  const made = [];
+  for (const z of new Set(onWater.map((o) => o.water))) {
+    const b = z.body;
+    const x0 = Math.max(b.left, Math.min(player.x, far));
+    const x1 = Math.min(b.right, Math.max(player.x, far));
+    if (x1 - x0 < 4) continue;
+    const n = Math.max(1, Math.round((x1 - x0) / step));
+    const w = (x1 - x0) / n;
+    const top = b.top - T.plateLift;
+    for (let k = 0; k < n; k++) {
+      const left = dir > 0 ? x0 + k * w : x1 - (k + 1) * w;
+      // Né en même temps que le pic le plus proche de la rangée.
+      const cx = left + w / 2;
+      const rank = Math.max(0, Math.floor((Math.abs(cx - player.x) - T.startGap) / step));
+      const plate = ursideIcePlate(scene, left, top, w, now + rank * T.spikeEveryMs);
+      st.plateGroup.add(plate.body);
+      st.plates.push(plate);
+      made.push(plate);
+    }
+  }
+  if (made.length) playSfx('ice_spike');
+  return made;
+}
+
+// Une plaque : corps statique (zone) + dessin en gros pixels (2 px d'écran),
+// cachée et sans collision jusqu'à sa naissance.
+function ursideIcePlate(scene, x, top, w, bornAt) {
+  const T = POLAR_TUNING;
+  const h = T.plateH;
+  const body = scene.add.zone(x + w / 2, top + h / 2, w, h);
+  scene.physics.add.existing(body, true);
+  body.__icePlate = true;
+  body.body.enable = false;
+  const g = scene.add.graphics().setDepth(CHARACTER_DEPTH - 1).setVisible(false);
+  g.lookRole = 'fx';
+  const P = URSIDE_PX;
+  // Corps bleu pâle, arête blanche en haut, ombre en bas, quelques reflets.
+  g.fillStyle(0x16305c, 1).fillRect(x, top, w, h);
+  g.fillStyle(0xbfe6ff, 1).fillRect(x + P, top + P, w - 2 * P, h - 2 * P);
+  g.fillStyle(0xf2fdff, 1).fillRect(x + P, top + P, w - 2 * P, P);
+  g.fillStyle(0x7fb8e0, 1).fillRect(x + P, top + h - 2 * P, w - 2 * P, P);
+  for (let px = x + 6; px < x + w - 8; px += 14) g.fillStyle(0xffffff, 0.8).fillRect(Math.round(px / P) * P, top + 2 * P, 2 * P, P);
+  return { body, g, x, top, w, h, bornAt, born: false, dieAt: bornAt + T.iceLifeMs };
+}
+
+// Naissance, clignotement puis fonte (corps retiré : qui est dessus tombe à l'eau).
+function ursideIcePlatesUpdate(scene, now) {
+  const st = scene.__ursideFx;
+  if (!st || !st.plates || !st.plates.length) return;
+  const T = POLAR_TUNING;
+  st.plates = st.plates.filter((pl) => {
+    if (now < pl.bornAt) return true;
+    if (now >= pl.dieAt) {
+      if (st.plateGroup && pl.body.active) st.plateGroup.remove(pl.body, true, true);
+      if (pl.g.active) {
+        // Elle fond : quelques gouttes bleues tombent dans l'eau.
+        for (let i = 0; i < 4; i++) {
+          ursideFxAdd(scene, { x: pl.x + Math.random() * pl.w, y: pl.top + 4, w: 4, h: 4, color: i % 2 ? 0xbfe6ff : 0x7fb8e0,
+            vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 60, gy: 600, ms: 260 });
+        }
+        pl.g.destroy();
+      }
+      return false;
+    }
+    if (!pl.born) {
+      pl.born = true;
+      pl.body.body.enable = true;
+      pl.g.setVisible(true);
+      for (let i = 0; i < 3; i++) {
+        ursideFxAdd(scene, { x: pl.x + Math.random() * pl.w, y: pl.top, w: 4, h: 4, color: [0xf2fdff, 0x8fd4ff, 0x4f9be0][i],
+          vx: (Math.random() - 0.5) * 120, vy: -80 - Math.random() * 80, gy: 700, ms: 260 });
+      }
+    }
+    // Clignote par crans avant de fondre (comme les pics).
+    const left = pl.dieAt - now;
+    pl.g.setVisible(!(left < T.iceBlinkMs && Math.floor(left / 90) % 2 === 0));
+    return true;
+  });
 }
 
 function ursideSpikesUpdate(scene, now) {
@@ -1455,6 +1584,7 @@ function ursideUpdateHook(scene, time) {
   }
   ursideGrizzlyFireTick(scene, now);
   ursideSpikesUpdate(scene, now);
+  ursideIcePlatesUpdate(scene, now);
   ursideFxDraw(scene, now);
 }
 
