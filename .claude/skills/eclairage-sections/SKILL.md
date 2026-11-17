@@ -6,12 +6,17 @@ description: Rendre un sprite de Legend of Agarica sensible à la lumière (écl
 # Éclairage par sections
 
 Un sprite préparé a, dans `_lumiere/` à côté de son image, une version **neutre** (couleurs de
-base en aplats, contour et œil gardés), une **carte de sections** (zones en couleurs franches,
-1 couleur = 1 direction, retouchable à la main) et une **carte de normales**. En jeu,
-`src/utils/LightKit.js` multiplie le neutre par la lumière reçue par chaque section, arrondie en
-**paliers** (4) : ça reste du pixel art. Le modèle de lumière vient du skill `pixel-art-forge`
-(réglé avec l'utilisateur sur sa page de test, version v15) ; tout ce qu'il faut est dans le
-dépôt, rien ne dépend de ce skill ni d'un autre PC.
+base en aplats, contour et œil gardés) et DEUX cartes :
+- la **carte de sections** (zones en couleurs franches, 1 couleur = 1 direction) et les
+  **normales** qui s'en déduisent : elles servent à la lumière de **FACE** (lampe devant) ;
+- la **carte contre-jour** (`_cj.png`, aperçu coloré `_cj-apercu.png`) : quels bords sont
+  exposés à une lampe **DERRIÈRE** le sprite, dans quelle direction et combien. Le milieu du
+  sprite n'y est pas : une lampe derrière ne l'allume jamais.
+Les deux sont générées automatiquement et retouchables à la main. En jeu, `src/utils/LightKit.js`
+multiplie le neutre par la lumière reçue, arrondie en **paliers** (4) : ça reste du pixel art.
+Le modèle de lumière vient du skill `pixel-art-forge` (réglé avec l'utilisateur sur sa page de
+test, version v16) ; tout ce qu'il faut est dans le dépôt, rien ne dépend de ce skill ni d'un
+autre PC.
 
 ## Chaîne complète (depuis la racine du jeu)
 
@@ -33,8 +38,8 @@ dépôt, rien ne dépend de ce skill ni d'un autre PC.
    - options : `--apercu` (planche origine / neutre / sections / éclairé g. / d.),
      `--garder hex,hex` (couleurs gardées telles quelles), `--rampes "hex,hex;hex,hex"` (matières
      forcées), `--facteur f` (forcer f).
-   Sorties : `_lumiere/<nom>_natif.png`, `_neutre.png`, `_sections.png`, `_n.png`, `_geo.png`,
-   et le manifeste `src/data/sections.js` (GÉNÉRÉ, `ASSET_VERSION` changée). Lire la ligne
+   Sorties : `_lumiere/<nom>_natif.png`, `_neutre.png`, `_sections.png`, `_n.png`, `_cj.png`,
+   `_cj-apercu.png`, et le manifeste `src/data/sections.js` (GÉNÉRÉ, `ASSET_VERSION` changée). Lire la ligne
    « rampes » : une matière par couleur de base ; si le visage et la tunique se mélangent, forcer
    `--rampes`.
 3. **Vérifier** (section plus bas) puis **commiter** les `_lumiere/`, `sections.js` et
@@ -70,12 +75,15 @@ Mode de test sans toucher au code : `index.html?zone=foret_sombre_1&lumiere` (Ag
 sprite préparé éclairés, nuit, torche au pointeur, molette = profondeur, lune) ;
 `&lumiere=-20` = profondeur de départ.
 
-## Retoucher une carte à la main
+## Retoucher les cartes à la main
 
-Peindre `_lumiere/<nom>_sections.png` avec les couleurs EXACTES ci-dessous (sans
-antialiasing ; la couleur la plus proche est prise de toute façon), puis :
-`npm run sections -- --depuis-sections assets/.../<nom>.png` (recalcule `_n.png` seule).
-Même famille de teinte = même direction (clair = incliné 40°, foncé = rasant 68°).
+Toujours dans cet ordre : d'abord les sections (lumière de face), puis la carte contre-jour,
+car `--depuis-sections` recalcule aussi la carte contre-jour (et écrase sa retouche).
+
+**Sections (face)** : peindre `_lumiere/<nom>_sections.png` avec les couleurs EXACTES
+ci-dessous (sans antialiasing ; la couleur la plus proche est prise de toute façon), puis
+`npm run sections -- --depuis-sections assets/.../<nom>.png` (recalcule `_n.png` et la carte
+contre-jour). Même famille de teinte = même direction (clair = incliné 40°, foncé = rasant 68°).
 
 | Section | Couleur | | Section | Couleur |
 |---|---|---|---|---|
@@ -91,20 +99,33 @@ Même famille de teinte = même direction (clair = incliné 40°, foncé = rasan
 
 Normales : R = x (droite), G = y (HAUT), B = z (vers le spectateur), n = rgb / 255 × 2 − 1.
 
+**Carte contre-jour (arrière)** : peindre `_lumiere/<nom>_cj-apercu.png`. Teinte = direction
+d'où la lumière de derrière arrive sur ce bord (rouge 0° = droite, jaune-vert 90° = haut, cyan
+180° = gauche, bleu-violet 270° = bas, sens trigonométrique, comme la roue des sections) ;
+clarté = exposition (noir = rien ; plus c'est clair, plus le bord s'allume) ; gris ou noir =
+pas d'exposition. Pour éteindre une zone qui s'allume à tort : la peindre en noir ; pour en
+allumer une : la teinte de sa direction, plus ou moins claire. Puis
+`npm run sections -- --depuis-cj assets/.../<nom>.png` (réécrit `_cj.png`). Format de
+`_cj.png` : R, G = direction (x droite, y haut, v = c / 255 × 2 − 1, 128 = aucune), B =
+exposition 0-255, A = 255 sur le sprite.
+Calcul automatique : sources = pixels qui touchent le vide ; l'exposition se propage SEULEMENT
+dans la même section, les traits sombres intérieurs (luminance < 0,16 à plus de 2 px du vide)
+font mur ; elle décroît sur la largeur de la zone (au plus 12 px) et vaut |n.xy| / 0,93 de la
+section au bord (rasante 1, inclinée 0,69, face 0) ; frange d'adoucissement de 2 px (× 0,5 par
+pixel, jamais à travers un trait).
+
 ## Vérifier (dans cet ordre)
 
 1. `npm run lumiere:tests` : batterie sans navigateur (version CPU du shader sur les vraies
    cartes). Deux lignes « 0 » contrôlent le code (shader du jeu = page validée, GLSL = CPU) ;
    les autres : monotonie quand la lampe approche d'un côté, symétrie demi-sphère, continuité en
    profondeur et en largeur, pas de bande au contour, lumière devant = N.L, contour sombre
-   ≤ 1 palier, adoucissement, fidélité à +49. Code 1 si un test échoue : lire la ligne.
-   État au 2026-11-17 (v15) : 59 / 63 ; échecs connus, propres aux cartes « pixel-fixer » du
-   jeu : grizzly (anneau 18 % contre 12 % à l'intérieur ; fidélité : dégradé à −49 de 5,4 px
-   contre 10,8 à +49), crapaud (fidélité : dégradé 3,6 px contre 14,3), Agarica f0
-   (adoucissement 5,02 % pour un seuil de 5).
+   ≤ 1 palier, adoucissement, fidélité à +49, milieu sombre (aucun pixel d'une section non
+   reliée au bord allumé par une lampe derrière). Code 1 si un test échoue : lire la ligne.
+   État au 2026-11-17 (v16) : 68 / 68 sur les cartes du jeu.
 2. `npm run lumiere:apercu [-- <anim|png>]` : page autonome dans `tools/lumiere/sortie/`
    (ignoré par git) ; donner le chemin à l'utilisateur. Lumière à glisser, profondeur, sens,
-   animation, affichage des sections / normales. `--regarde gauche` pour un sprite dessiné
+   animation, affichage des sections / normales / carte contre-jour. `--regarde gauche` pour un sprite dessiné
    tourné vers la gauche.
 3. En jeu : `?zone=<zone>&lumiere`. L'utilisateur teste lui-même (ne pas lancer le jeu sans
    qu'il le demande).
@@ -124,17 +145,19 @@ Normales : R = x (droite), G = y (HAUT), B = z (vers le spectateur), n = rgb / 2
   `FRAG_ECLAIRAGE` de LightKit.js et dans cpu.js, relancer `npm run lumiere:tests` (les lignes
   « 0 » disent ce qui diffère).
 
-## Le modèle en bref (v15)
+## Le modèle en bref (v16)
 
 Lumière = ambiance + Σ couleur × intensité × palier(min(diff + cj, 1)), MULTIPLIÉE par la couleur
-du neutre (aucune part additive de la lampe). `diff` = N·L × atténuation, avec un poids
-« derrière » wb = smoothstep(15, −15, z) qui mélange la normale de la section et la normale
-lissée 5×5 et ajoute un léger « wrap ». Le **contre-jour** `cj` est la même réponse en cosinus
-que la lumière de face, appliquée à la normale basculée vers la lampe (angle au spectateur
-θ → 90° − θ : la rasante tournée vers la lampe devient « face », la face devient « rasante » ;
-lampe en miroir devant le plan, |z|), × |n.xy| de la section (la face reste à l'ombre) ×
-l'atténuation de la lumière de face. Contour sombre (luminance < 0,16) : pas de contre-jour, au
-plus 1 palier. UNE formule pour toutes les positions de lampe, un seul palier à la fin.
+du neutre (aucune part additive de la lampe). Poids « derrière » wb = smoothstep(15, −15, z).
+`diff` = N·L × atténuation (normale de la section, mélangée à la normale lissée 5×5 et avec un
+léger « wrap » quand wb > 0), × mix(1, exposition, wb) : la part « derrière » n'atteint que les
+bords exposés de la carte contre-jour. Le **contre-jour** `cj` est la même réponse en cosinus
+que la lumière de face, appliquée à la normale basculée vers la lampe : le bord exposé (direction
+de la carte) vu comme une rasante basculée (angle au spectateur θ → 90° − θ), lampe en miroir
+devant le plan (|z|) : cj = 0,6 × contre × wb × exposition × max((0,37 v·d.xy + 0,93 |z|) / dist,
+0) × atténuation. Lampe devant (z ≥ 15) : wb = 0, exactement N·L, la carte contre-jour ne joue
+pas. Contour sombre (luminance < 0,16) : pas de contre-jour, au plus 1 palier. UNE formule pour
+toutes les positions de lampe, un seul palier à la fin.
 
 ## Pièges (leçons du réglage avec l'utilisateur)
 
@@ -152,6 +175,12 @@ plus 1 palier. UNE formule pour toutes les positions de lampe, un seul palier à
   quand la lampe s'en approche, y compris quand elle sort de la silhouette (test « monotonie »).
 - **Bords à fond sans palier intermédiaire** (v14) : une rasante au palier max ne doit pas
   toucher directement une voisine à l'ambiance (test « adoucissement »).
+- **La lumière de derrière ne doit jamais allumer le milieu ; elle passe uniquement par la carte
+  contre-jour** (v16). Les normales de face ne disent pas ce qui est exposé par l'arrière : toute
+  règle qui le devine depuis elles (bande, taches, bascule, milieu éclairé) échoue quelque part.
+  Une information qui manque se met dans une carte dédiée, générée et retouchable, pas dans une
+  règle de plus dans le shader. Un milieu qui s'allume à contre-jour se corrige dans
+  `_cj-apercu.png` (en noir), pas dans le code.
 - **Contre-jour réinventé** (v15) : ne pas empiler puissances, seuils et rayons ad hoc pour
   imiter l'effet de face ; reprendre la MÊME fonction (cosinus N·L) sur une orientation
   transformée. Mesurer la référence (+49) avant de fixer un objectif : +49 a déjà des sauts de
