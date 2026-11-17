@@ -71,6 +71,8 @@ const config = {
     // Vague 3 : zones facultatives.
     GrotteLisiereScene, GaleriesRacinesScene, CercleLuneScene, CimeCacheeScene, IleDesVentsScene,
     IleDuGardienScene, MaraisBrumesScene, RacinesSuspenduesScene, NidCoconsScene, CanopeeMaladeScene,
+    // Zone de test de l'éclairage par sections (src/data/grotte_lumiere_data.js).
+    GrotteLumiereScene,
   ],
 };
 
