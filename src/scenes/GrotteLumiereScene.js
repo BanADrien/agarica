@@ -5,7 +5,7 @@
 // Toute la scène passe par LightKit (LightKit.eclairerTout) : sol, paroi, décors et personnages
 // sont éclairés, en volume s'ils ont des cartes (npm run sections), à plat sinon. Seules les
 // sources (champignons, mousses, lanterne, feu, lucioles, ciel) gardent leurs couleurs : ce sont
-// elles qui éclairent. L'ambiance suit le x du monde (LightKit.ambianceZone) : noire dans la
+// elles qui éclairent. L'ambiance suit le x du monde (LightKit.ambianceZone) : sombre dans la
 // grotte, de jour dehors, avec un passage doux à l'entrée ; le soleil n'éclaire que dehors
 // (lampe masquée en x).
 class GrotteLumiereScene extends Phaser.Scene {
@@ -32,9 +32,14 @@ ZONE_SCRIPTS.grotte_lumiere = {
     const p = scene.player;
     grotteLumierePreterFormes(scene, p);
     // WebGL absent (rendu Canvas) : LightKit ne fait rien, la zone reste jouable en plein jour.
-    if (typeof LightKit === 'undefined' || !LightKit.activer(scene, { ambiance: R.ambiance.grotte, paliers: R.paliers, paliersPlat: R.paliersPlat, contre: R.contre })) return;
+    // Réglages de rendu repris tels quels du fichier de données (cf. LightKit.DEFAUTS).
+    const rendu = {};
+    for (const k of ['paliers', 'contre', 'paliersPlat', 'attenuationDouce', 'tramePlat', 'enroulement', 'ambiancePersos', 'desaturePersos']) {
+      if (R[k] !== undefined) rendu[k] = R[k];
+    }
+    if (typeof LightKit === 'undefined' || !LightKit.activer(scene, { ambiance: R.ambiance.grotte, ...rendu })) return;
     LightKit.ambianceZone(scene, { x0: R.ambiance.x0, x1: R.ambiance.x1, couleur: R.ambiance.dehors });
-    const st = { sources: [], lucioles: [], soleil: null, xara: null, feu: null, t0: scene.time.now };
+    const st = { sources: [], lucioles: [], soleil: null, feu: null, t0: scene.time.now };
     scene.__grotteLumiere = st;
 
     // Ciel du dehors : derrière tout, en parallaxe, gardé tel quel (source : on le voit clair
@@ -65,13 +70,25 @@ ZONE_SCRIPTS.grotte_lumiere = {
       feu.fire.__lumiereEmissif = true;
       const F = R.feu;
       st.feu = { info: feu, lampe: LightKit.ajouterLumiere(scene, { x: feu.x, y: feu.flameY + F.dy, couleur: F.couleur, intensite: F.intensite, portee: F.portee, profondeur: F.profondeur }), bruit: 0 };
+      // Flaque additive peinte au pied du feu (LevelKit, `item-fx_lueur_sol`) : ici la lampe
+      // éclaire déjà l'herbe ; la flaque doublait cette lumière juste sous Agarica (herbe plus
+      // claire qu'elle). Cachée sauf `lueurSol: true`.
+      if (!F.lueurSol) {
+        for (const o of scene.children.list) {
+          if (o.texture && o.texture.key === 'item-fx_lueur_sol' && Math.abs(o.x - feu.x) < 8) o.setVisible(false);
+        }
+      }
+      // Halo additif autour des flammes (LevelKit) : dessiné SOUS Agarica mais par-dessus l'herbe
+      // et la paroi, il les éclaircissait plus qu'elle. Sa force passe par la teinte (son alpha
+      // est animé par LevelKit) : `halo` 1 = tel quel.
+      if (feu.halo && F.halo !== undefined && F.halo !== 1) {
+        const c = Phaser.Display.Color.IntegerToColor(feu.halo.tintTopLeft);
+        const k = Phaser.Math.Clamp(F.halo, 0, 1);
+        feu.halo.setTint(Phaser.Display.Color.GetColor(c.red * k, c.green * k, c.blue * k));
+      }
     }
 
-    // Les yeux de Xara.
-    if (scene.xara) {
-      const X = R.xara;
-      st.xara = LightKit.ajouterLumiere(scene, { x: scene.xara.x, y: scene.xara.y + X.dy, couleur: X.couleur, intensite: X.intensite, portee: X.portee, profondeur: X.profondeur });
-    }
+    // Xara ne porte plus de lampe (retour du 2026-11-17) : elle est éclairée comme Agarica.
 
     // Lucioles : points qui dérivent ; les premières portent une vraie lampe.
     const L = R.lucioles;
@@ -125,12 +142,6 @@ ZONE_SCRIPTS.grotte_lumiere = {
       st.feu.bruit += (Math.random() - 0.5) * 0.35;
       st.feu.bruit *= 0.85;
       st.feu.lampe.setIntensity(F.intensite * (1 + F.vacille * st.feu.bruit + 0.05 * Math.sin(t * 0.011)));
-    }
-    if (st.xara && scene.xara && scene.xara.active) {
-      const X = R.xara;
-      const sens = scene.xara.flipX ? -1 : 1;
-      LightKit.deplacer(st.xara, scene.xara.x + sens * X.dx, scene.xara.y + X.dy);
-      st.xara.setIntensity(scene.xara.visible ? X.intensite : 0);
     }
     for (const f of st.lucioles) {
       const x = f.bx + f.ax * Math.sin(t * f.w1 + f.p1) + 0.4 * f.ax * Math.sin(t * f.w2 * 1.7 + f.p2);

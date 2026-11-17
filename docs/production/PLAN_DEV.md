@@ -1658,7 +1658,18 @@ Mode d'emploi des sprites et du modèle : skill `eclairage-sections`. Rien ne ch
 - `LightKit.ambianceZone(scene, { x0, x1, couleur })` : ambiance en dégradé selon le x du MONDE, par pixel (grotte ->
   jour) ; `LightKit.ambianceEn(scene, x)` et `LightKit.lumiereEstimee(scene, x, y)` pour mesurer.
 - Lampe `masque: [x0, x1]` (`ajouterLumiere` / `regler`) : elle n'éclaire que d'un côté, passage doux (soleil dehors).
-- `activer(scene, { paliersPlat })` : paliers des objets sans carte (6 adoucit les flaques au sol ; défaut = `paliers`).
+- `activer(scene, { paliersPlat })` : paliers des objets sans carte (0 = lumière continue ; défaut = `paliers`).
+- Réglages de zone (2026-11-17, `activer` / `reglerRendu`) ; leur valeur par défaut redonne exactement le rendu
+  d'avant (mode `?lumiere` vérifié au pixel près) :
+  - `attenuationDouce: true` : objets à plat éclairés par `eclairagePlat()` (shader), atténuation (1 - d²/r²)² qui
+    arrive à 0 sans pente au bord de la portée (plus de cercle) ; `lumiereEstimee` suit la même courbe ;
+  - `tramePlat: n` : tramage ordonné Bayer 4x4 (cases de n px du MONDE) entre les `paliersPlat` niveaux, au lieu
+    de paliers en anneaux (0 = pas de trame) ;
+  - `enroulement: 0-1` : sprites à cartes, part de demi-Lambert ((N.L / 2 + 1/2)², toujours >= N.L) pour les
+    lampes devant (`enrouler()`) ; derrière, le modèle v16 seul (`eclairage()` reste identique à la page validée) ;
+  - `ambiancePersos` (facteur, 1 = rien) et `desaturePersos` (0-1, couleur des lampes vers le gris de même
+    luminance) : seulement sur les objets `__lumierePerso`.
+- `eclairerTout(scene, { perso(o) })` -> `o.__lumierePerso` (défaut : un Sprite sur le plan des personnages, plan 0).
 - `LightKit.bilan(scene)` : ce qui est visible sans passer par la lumière (tests : doit être vide).
 - Pipeline : objets hors de la caméra non dessinés ; lampes hors de portée d'un objet ignorées ; parallaxe
   (`scrollFactor`) prise en compte ; cadre découpé dans une image (`corps` / `langue` du crapaud) lu dans les cartes
@@ -1668,7 +1679,11 @@ Mode d'emploi des sprites et du modèle : skill `eclairage-sections`. Rien ne ch
 `src/data/grotte_lumiere_data.js` + `src/scenes/GrotteLumiereScene.js` (script `ZONE_SCRIPTS.grotte_lumiere`).
 Accès : « Zones de test » du titre (ajoutée à `LEGACY_TEST_ZONES` depuis la scène) ou `?zone=GrotteLumiereScene`.
 Réglages de lumière en tête du fichier de données (`GROTTE_LUMIERE_REGLAGES`). Loup, singe, aigle prêtés le temps de la
-visite (registre rendu à l'arrêt de la scène). Pas de sortie.
+visite (registre rendu à l'arrêt de la scène). Pas de sortie. Retours du 2026-11-17 : ambiance grotte 0x55506a
+(luminance 0,33), dehors 0xd8d6dc (0,84), soleil 0,4 ; Xara sans lampe ; sol à 30 px du plan ; `feu.lueurSol`
+(flaque additive de LevelKit, cachée par défaut) et `feu.halo` (force du halo des flammes, 0,5) ; réglages de rendu
+de zone ci-dessus (`enroulement` 1, `ambiancePersos` 1,15, `desaturePersos` 0,3, `paliersPlat` 0,
+`attenuationDouce`, `tramePlat` 0).
 
 ## Progression & flags d'histoire (noms figés)
 

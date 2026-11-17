@@ -6,8 +6,9 @@
 //
 // Une seule zone en deux parties, pour juger le PASSAGE de l'obscurité au plein jour sans
 // changement de scène (demande du 2026-11-17) :
-//   x 0-1856     la grotte, toute noire : seules les lampes éclairent ;
-//                x 64-448    couloir bas, on n'avance qu'à la lueur de Xara ;
+//   x 0-1856     la grotte, sombre (ambiance basse : on y lit tout sans lampe) ; les lampes
+//                font les flaques de lumière ;
+//                x 64-448    couloir bas, sans lampe (Xara n'éclaire plus, 2026-11-17) ;
 //                x 576-1280  salle des champignons (bleu, vert, rose), contre-jour en x 905,
 //                            une araignée sous la voûte, un crapaud corrompu ;
 //                x 1280-1730 passage des lucioles, lanterne, feu de camp (x 1600) ;
@@ -21,30 +22,50 @@
 // monde ; `profondeur` : px devant le plan des sprites (négatif = DERRIÈRE : contre-jour) ;
 // `intensite` : 1 = la couleur pleine. Au plus 10 lampes visibles à la fois (limite de Phaser).
 const GROTTE_LUMIERE_REGLAGES = {
-  // Rendu : paliers de lumière (pixel art) et force du contre-jour (cf. skill eclairage-sections).
+  // Rendu des SPRITES à cartes (Agarica, Xara, crapaud...) : paliers de lumière (pixel art) et
+  // force du contre-jour (cf. skill eclairage-sections).
   paliers: 4,
   contre: 2.0,
-  // Paliers des surfaces à plat (sol, paroi, décors sans carte) : un peu plus que les sprites,
-  // sinon chaque lampe dessine un disque à bord dur sur le sol.
-  paliersPlat: 6,
-  // Ambiance (lumière reçue partout, sans lampe) : la grotte presque noire, le jour dehors, et
-  // un passage doux entre x0 et x1 (calculé par pixel : chaque chose prend l'ambiance de
-  // l'endroit où elle est, Agarica comprise quand elle avance).
-  ambiance: { grotte: 0x0d0b15, dehors: 0x74727f, x0: 1720, x1: 2000 },
+  // Ombres moins dures sur les sprites : part d'enroulement demi-Lambert mêlée à N.L (0 = N.L
+  // seul, comme la page de test ; 1 = tout en demi-Lambert). Le côté opposé à la lampe ne tombe
+  // plus au noir, le volume reste lisible. Lampes devant seulement (le contre-jour ne change pas).
+  enroulement: 1,
+  // Personnages (Agarica, Xara, ennemis) : un peu plus d'ambiance que le décor pour se détacher
+  // du fond (1.15 = +15 %), et couleur des lampes ramenée vers un gris de même luminance
+  // (0.3 = 30 % : le feu ne teinte plus tout d'orange ni ne brûle les cheveux).
+  ambiancePersos: 1.15,
+  desaturePersos: 0.3,
+  // Surfaces à plat (sol, herbe, paroi, décors) : lumière CONTINUE (paliersPlat 0) qui s'éteint
+  // en douceur avant la portée (attenuationDouce) : plus de cercles autour des lampes.
+  paliersPlat: 0,
+  attenuationDouce: true,
+  // Variante tramée (Bayer 4x4) au lieu du continu : taille d'une case de trame en px du monde
+  // (2.667 = un pixel des tuiles), avec paliersPlat >= 2 (ex. 6). 0 = pas de trame.
+  tramePlat: 0,
+  // Ambiance (lumière reçue partout, sans lampe ; luminance entre parenthèses) : la grotte
+  // sombre mais lisible sans lampe (0,33), presque les vraies couleurs dehors (0,84), et un
+  // passage doux entre x0 et x1 (calculé par pixel : chaque chose prend l'ambiance de l'endroit
+  // où elle est, Agarica comprise quand elle avance).
+  ambiance: { grotte: 0x55506a, dehors: 0xd8d6dc, x0: 1720, x1: 2000 },
   // Distance (px) derrière le plan des personnages : une lampe tout près d'Agarica (8-14 px
   // devant, le bon réglage pour les sprites) est plus loin devant la paroi du fond, et y fait
-  // une flaque de lumière assez large. 0 : la paroi ne recevrait qu'une petite tache.
-  plans: { paroi: 90, sol: 45, decors: 30 },
+  // une flaque de lumière assez large. 0 : la paroi ne recevrait qu'une petite tache. Le sol
+  // (herbe comprise) reste plus près du plan d'Agarica : à 45, l'herbe à ses pieds recevait
+  // bien plus de lumière qu'elle (20 : flaques au sol trop petites).
+  plans: { paroi: 90, sol: 30, decors: 30 },
   // Teinte de la paroi du fond (sol de second plan ; le jeu l'assombrit à 0x404040 par défaut).
   teinteParoi: 0x8a8494,
   // Soleil : lampe très loin en haut à droite de la vue (comme le soleil peint du ciel) (il suit la caméra : même angle partout),
   // grande profondeur (devant) pour éclairer les volumes de biais. Il n'entre pas dans la
   // grotte : `masque` = de rien en x0 à plein en x1.
-  soleil: { couleur: 0xfff0d2, intensite: 0.78, portee: 7000, dx: 700, y: -1100, profondeur: 1100, masque: [1800, 2000] },
-  // Les yeux de Xara : une petite lampe faible qui la suit (décalage depuis ses pattes).
-  xara: { couleur: 0xc8ffd8, intensite: 1.0, portee: 190, profondeur: 14, dx: 8, dy: -18 },
+  // Plus faible que l'ambiance du dehors : il donne le volume sans brûler les couleurs.
+  soleil: { couleur: 0xfff0d2, intensite: 0.4, portee: 7000, dx: 700, y: -1100, profondeur: 1100, masque: [1800, 2000] },
+  // Xara ne fait plus de lumière (retour du 2026-11-17) : le couloir se lit à l'ambiance seule.
   // Feu de camp : lampe chaude qui vacille (contraste avec le froid des champignons).
-  feu: { couleur: 0xffa04a, intensite: 1.15, portee: 330, profondeur: 14, dy: -26, vacille: 0.16 },
+  // `lueurSol` : garder la flaque additive peinte au pied du feu (false : la lampe seule éclaire
+  // l'herbe, comme partout ailleurs). `halo` : force du halo additif autour des flammes (1 = tel
+  // que LevelKit le pose ; il éclaircit l'herbe et la paroi derrière Agarica, pas elle).
+  feu: { couleur: 0xffa04a, intensite: 1.15, portee: 330, profondeur: 14, dy: -26, vacille: 0.16, lueurSol: false, halo: 0.5 },
   // Champignons et mousses : une lampe par source, qui pulse doucement (`pulse` : amplitude,
   // `periode` en ms). `prop` : le décor posé (clé `props` plus bas, même x) qui la porte.
   sources: [

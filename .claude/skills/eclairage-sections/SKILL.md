@@ -107,6 +107,29 @@ Mode de test sans toucher au code : `index.html?zone=foret_sombre_1&lumiere` (Ag
 sprite préparé éclairés, nuit, torche au pointeur, molette = profondeur, lune) ;
 `&lumiere=-20` = profondeur de départ.
 
+## Toute une zone éclairée (LightKit.eclairerTout, grotte lumineuse)
+
+`eclairerTout(scene, { emissif, plan, perso })` met tout le monde sous la lumière ; `ambianceZone`
+fait passer l'ambiance de la grotte au jour selon x. Réglages de zone (`activer` / `reglerRendu`,
+valeurs NEUTRES par défaut : le mode `?lumiere` ne change pas) réglés le 2026-11-17 avec
+l'utilisateur sur `?zone=GrotteLumiereScene` (`GROTTE_LUMIERE_REGLAGES`) :
+- **ambiance** : grotte 0,30-0,35 de luminance (0x55506a), dehors 0,80-0,90 (0xd8d6dc) avec un
+  soleil faible (0,4). À 0,05 tout est noir hors des lampes : trop sombre ;
+- **objets à plat** (sol, herbe, paroi, décors sans carte) : `paliersPlat: 0` (continu) +
+  `attenuationDouce: true` ((1 - d²/r²)², fonction `eclairagePlat()`) : plus de cercles. Les
+  paliers sur une grande surface ET l'atténuation 1 - d²/r² (pente franche au bord de la portée)
+  dessinent chacun des anneaux. `tramePlat: 64 / 24` (Bayer 4x4 alignée sur le monde) existe
+  mais fait du bruit sur les pierres : le continu est retenu ;
+- **sprites** : `enroulement: 1` (demi-Lambert pour les lampes DEVANT, `enrouler()` ; le
+  contre-jour reste le modèle v16), 4 paliers gardés ; `ambiancePersos: 1.15` et
+  `desaturePersos: 0.3` sur les personnages (`__lumierePerso`) : ils se détachent du décor et le
+  feu ne les teinte plus tout d'orange ;
+- **cohérence** : `plan` du sol à 30 (à 45, l'herbe recevait bien plus que le visage d'Agarica,
+  tourné vers le spectateur) ; pas de lueur additive peinte sur le sol en plus d'une lampe (la
+  flaque `item-fx_lueur_sol` du feu de camp est cachée : `feu.lueurSol`) ; halo des flammes à 0,5.
+- `eclairage()` du shader n'est JAMAIS modifiée pour un réglage de zone (le test « 0 shader du
+  jeu = page validée » la compare mot à mot) : une fonction à part, appelée selon un uniform.
+
 ## Retoucher les cartes à la main
 
 Toujours dans cet ordre : d'abord les sections (lumière de face), puis la carte contre-jour,

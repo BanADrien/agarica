@@ -44,8 +44,23 @@
 const LightKit = (() => {
   const NOM_PIPELINE = 'LumiereSections';
 
-  // Réglages par défaut = ceux de la page de test validée.
-  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8 };
+  // Réglages par défaut = ceux de la page de test validée. Les réglages « de zone » (2026-11-17,
+  // retours sur la grotte lumineuse) valent ici leur valeur NEUTRE : le mode `?lumiere` et toute
+  // scène qui ne les donne pas restent exactement comme avant.
+  //  attenuationDouce : objets à plat (sol, paroi, décors) éclairés par une lumière qui s'éteint
+  //                     en douceur avant la portée ((1 - d²/r²)², dérivée nulle au bord) : plus de
+  //                     cercle à la limite de la portée ;
+  //  tramePlat        : 0 = pas de trame ; sinon taille (px du MONDE) d'une case de tramage
+  //                     ordonné (Bayer 4x4) entre les `paliersPlat` niveaux des objets à plat ;
+  //  enroulement      : 0-1, part de demi-Lambert ((N.L / 2 + 1/2)²) mêlée à N.L sur les sprites à
+  //                     cartes, pour les lampes DEVANT : le côté opposé ne tombe plus au noir ;
+  //  ambiancePersos   : facteur d'ambiance des personnages (`__lumierePerso`) : ils se détachent ;
+  //  desaturePersos   : 0-1, couleur des lampes ramenée vers un gris de même luminance sur les
+  //                     personnages (le feu ne teinte plus tout d'orange).
+  const DEFAUTS = {
+    paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8,
+    attenuationDouce: false, tramePlat: 0, enroulement: 0, ambiancePersos: 1, desaturePersos: 0,
+  };
 
   // Préréglages de lampes (couleurs de la page de test : Torche, Lune, Blanc).
   // Torche : près du plan (8 px devant, comme la page ; plus loin devant, le sommet des formes
@@ -116,6 +131,12 @@ uniform vec2 uGrille, uPas;       // grille native dans la frame : coin et taill
 uniform vec3 uMondeX;             // x du monde d'un pixel natif = dot(vec3(t + 0.5, 1), uMondeX)
 uniform vec3 uAmbiance2;          // ambiance au bout du dégradé (uAmbZone)
 uniform vec3 uAmbZone;            // x0, x1 (monde), actif : ambiance uAmbiance -> uAmbiance2 en x
+uniform vec3 uMondeY;             // y du monde d'un pixel natif (comme uMondeX) : case de la trame
+uniform float uAttDouce;          // 1 = objet à plat éclairé par eclairagePlat() (bord doux)
+uniform float uTrame;             // > 0 : taille (monde) d'une case de trame Bayer (objet à plat)
+uniform float uEnroule;           // part de demi-Lambert (sprite à cartes, lampes devant)
+uniform float uGainAmb;           // facteur d'ambiance (personnages : un peu plus que le décor)
+uniform float uDesat;             // couleur des lampes vers le gris de même luminance (personnages)
 varying vec2 outTexCoord;
 varying float outTexId;
 varying float outTintEffect;
@@ -148,6 +169,56 @@ float masqueX(vec3 m, float wx) {
   if (m.z < 0.5) return 1.0;
   if (m.x < m.y) return smoothstep(m.x, m.y, wx);
   return 1.0 - smoothstep(m.y, m.x, wx);
+}
+
+// Objet à plat (normale de face) avec une atténuation qui s'éteint EN DOUCEUR : même calcul
+// qu'eclairage() pour une normale (0, 0, 1) sans carte contre-jour (poids derrière wb, léger
+// wrap, contour sombre plafonné), sauf l'atténuation : (1 - d²/r²)² au lieu de 1 - d²/r². La
+// seconde arrive au bord de la portée avec une pente franche (un cercle se voit sur le sol et la
+// paroi, que les paliers soulignent) ; la première y arrive à plat. eclairage() reste celle de
+// la page validée (npm run lumiere:tests la compare mot à mot) : d'où une fonction à part.
+float eclairagePlat(vec2 t, vec2 lp, float z, float portee, float lumBase) {
+  float wb = smoothstep(15.0, -15.0, z);
+  vec3 d = vec3(lp.x - t.x, t.y - lp.y, z);
+  float dist = max(length(d), 0.001);
+  float a = clamp(1.0 - (dist * dist) / (portee * portee), 0.0, 1.0);
+  float w = 0.5 * wb;
+  float diff = max((z / dist + w) / (1.0 + w), 0.0) * a * a * (1.0 - wb);
+  if (lumBase < 0.16) return min(diff, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
+  return min(diff, 1.0);
+}
+
+// Ombres moins dures sur un sprite à cartes : on mêle à e (= eclairage(), N.L) une part
+// d'enroulement demi-Lambert, (N.L / 2 + 1/2)², toujours >= N.L : le côté opposé à la lampe
+// garde un peu de sa lumière, le côté tourné vers elle ne change presque pas (volume lisible).
+// Seulement pour une lampe DEVANT (1 - wb) : derrière, le modèle v16 (carte contre-jour) reste
+// seul juge, le milieu du sprite ne s'allume jamais.
+float enrouler(float e, vec3 n, vec2 t, vec2 lp, float z, float portee, float lumBase) {
+  float wb = smoothstep(15.0, -15.0, z);
+  vec3 d = vec3(lp.x - t.x, t.y - lp.y, z);
+  float dist = max(length(d), 0.001);
+  float att = clamp(1.0 - (dist * dist) / (portee * portee), 0.0, 1.0);
+  float h = 0.5 * dot(n, d / dist) + 0.5;
+  float r = mix(e, max(e, h * h * att), uEnroule * (1.0 - wb));
+  if (lumBase < 0.16) return min(r, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
+  return min(r, 1.0);
+}
+
+// Seuil de Bayer 4x4 (0..1) d'une case de trame (entiers).
+float bayer4(vec2 c) {
+  vec2 p = mod(c, 4.0);
+  float a = mod(p.x, 2.0), b = mod(p.y, 2.0);
+  float m2 = 2.0 * a + 3.0 * b - 4.0 * a * b;               // 2x2 : 0 2 / 3 1
+  vec2 q = floor(p / 2.0);
+  float n2 = 2.0 * q.x + 3.0 * q.y - 4.0 * q.x * q.y;
+  return (4.0 * m2 + n2 + 0.5) / 16.0;
+}
+
+// Palier tramé : entre deux des uPaliers niveaux, le seuil de la case de trame décide (la
+// moyenne sur une case 4x4 vaut v : un dégradé en pixels au lieu d'un anneau).
+float palierTrame(float v, vec2 caseTrame) {
+  float n = max(uPaliers - 1.0, 1.0);
+  return clamp(floor(v * n + bayer4(caseTrame)) / n, 0.0, 1.0);
 }
 
 void main() {
@@ -183,10 +254,21 @@ void main() {
   float wx = dot(vec3(tc, 1.0), uMondeX);
   vec3 l = uAmbiance;
   if (uAmbZone.z > 0.5) l = mix(uAmbiance, uAmbiance2, smoothstep(uAmbZone.x, uAmbZone.y, wx));
+  l *= uGainAmb;
+  // case de trame : grille du MONDE (même motif d'un objet à l'autre), lue au centre du pixel
+  vec2 caseTrame = uTrame > 0.0 ? floor(vec2(wx, dot(vec3(tc, 1.0), uMondeY)) / uTrame) : vec2(0.0);
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      l += L.couleur * masqueX(L.masque, wx) * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
+      vec3 c = L.couleur * masqueX(L.masque, wx);
+      if (uDesat > 0.0) c = mix(c, vec3(dot(c, vec3(0.3, 0.59, 0.11))), uDesat);
+      float e;
+      if (uAttDouce > 0.5) e = eclairagePlat(tc, L.position.xy, L.position.z, L.portee, lb);
+      else {
+        e = eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm);
+        if (uEnroule > 0.0) e = enrouler(e, n, tc, L.position.xy, L.position.z, L.portee, lb);
+      }
+      l += c * (uTrame > 0.0 ? palierTrame(e, caseTrame) : palier(e));
     }
   }
   vec4 color = vec4(base.rgb * l, base.a) * texel;
@@ -284,6 +366,12 @@ void main() {
         } else this.set3f('uAmbZone', 0, 1, 0);
         this.set1f('uPaliers', reg.paliers);
         this.set1f('uContre', reg.contre);
+        // valeurs neutres (un objet dessiné sans passer par preparer() rend comme avant)
+        this.set1f('uGainAmb', 1);
+        this.set1f('uDesat', 0);
+        this.set1f('uEnroule', 0);
+        this.set1f('uAttDouce', 0);
+        this.set1f('uTrame', 0);
         this._reg = reg;
       }
 
@@ -336,6 +424,9 @@ void main() {
         const dx0 = flip ? cx + W - gx - w * fx : gx - cx;
         this.set3f('uMondeX', m.a * fx, m.c * fy,
           m.a * (dx0 - go.displayOriginX) + m.c * (gy - cy - go.displayOriginY) + m.tx + dx);
+        // y du monde, même construction (seulement pour la case de trame des objets à plat)
+        this.set3f('uMondeY', m.b * fx, m.d * fy,
+          m.b * (dx0 - go.displayOriginX) + m.d * (gy - cy - go.displayOriginY) + m.ty + dy);
         const lampes = this._lampes, max = Math.min(lampes.length, this.renderer.config.maxLights);
         let derriere = 0, nb = 0;
         for (let j = 0; j < max; j++) {
@@ -367,6 +458,15 @@ void main() {
         // quelques paliers de plus adoucissent la flaque sans quitter le pixel art.
         const reg = this._reg || DEFAUTS;
         this.set1f('uPaliers', e ? reg.paliers : (reg.paliersPlat ?? reg.paliers));
+        // Réglages de zone (cf. DEFAUTS) ; leurs valeurs neutres redonnent le calcul d'avant.
+        // Objet à plat : bord doux et trame ; sprite à cartes : enroulement ; personnage
+        // (`__lumierePerso`, cf. eclairerTout) : plus d'ambiance, lampes moins saturées.
+        const perso = !!go.__lumierePerso;
+        this.set1f('uAttDouce', !e && reg.attenuationDouce ? 1 : 0);
+        this.set1f('uTrame', !e && reg.tramePlat > 0 && (reg.paliersPlat ?? reg.paliers) > 1.5 ? reg.tramePlat : 0);
+        this.set1f('uEnroule', e ? (reg.enroulement || 0) : 0);
+        this.set1f('uGainAmb', perso ? (reg.ambiancePersos ?? 1) : 1);
+        this.set1f('uDesat', perso ? (reg.desaturePersos || 0) : 0);
         this.set1f('uCarte', e ? 1 : 0);
         this.set1f('uDerriere', derriere);
         this.set1f('uFlip', flip ? 1 : 0);
@@ -523,7 +623,9 @@ void main() {
     scene.lights.setAmbientColor(couleurDe(couleur));
   }
 
-  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour }.
+  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour } et ceux de
+  // zone (paliersPlat, attenuationDouce, tramePlat, enroulement, ambiancePersos, desaturePersos :
+  // cf. DEFAUTS).
   function reglerRendu(scene, reglages) {
     if (scene.__lumiere) Object.assign(scene.__lumiere.reglages, reglages);
   }
@@ -589,7 +691,9 @@ void main() {
   //   LightKit.eclairerTout(scene, { emissif: (o) => o.texture.key.startsWith('item-fx_') });
   // `plan(o)` (facultatif) : distance en px du monde entre l'objet et le plan des sprites (paroi
   // du fond : grande ; sol : moyenne ; personnages : 0), cf. `__lumierePlan` dans le pipeline.
-  function eclairerTout(scene, { emissif = null, plan = null, intervalle = 30 } = {}) {
+  // `perso(o)` (facultatif) : personnage (`o.__lumierePerso`), qui reçoit `ambiancePersos` et
+  // `desaturePersos` (cf. DEFAUTS). Par défaut : un Sprite sur le plan des personnages (plan 0).
+  function eclairerTout(scene, { emissif = null, plan = null, perso = null, intervalle = 30 } = {}) {
     const st = scene.__lumiere;
     if (!st) return;
     st.emissif = emissif;
@@ -605,6 +709,7 @@ void main() {
       const cl = classer(o, emissif);
       if (cl === 'eclaire' && (!o.pipeline || o.pipeline.name !== NOM_PIPELINE)) {
         if (plan) o.__lumierePlan = plan(o) || 0;
+        o.__lumierePerso = perso ? !!perso(o) : (o.type === 'Sprite' && !o.__lumierePlan);
         eclairer(o);
       } else if (cl === 'autre' && (o.type === 'ParticleEmitter' || o.type === 'TileSprite')) {
         o.__lumiereAttenue = true;
@@ -654,6 +759,8 @@ void main() {
   function lumiereEstimee(scene, x, y, plan = 40) {
     const a = ambianceEn(scene, x);
     let l = 0.3 * a[0] + 0.59 * a[1] + 0.11 * a[2];
+    // même atténuation que les objets à plat du pipeline (bord doux si `attenuationDouce`)
+    const douce = !!(scene.__lumiere && scene.__lumiere.reglages.attenuationDouce);
     for (const L of scene.lights.lights) {
       const d = Math.hypot(L.x - x, L.y - y);
       const z = (L.profondeur ?? DEFAUTS.profondeur) + plan;
@@ -663,8 +770,8 @@ void main() {
         const [x0, x1] = L.masque, t = Phaser.Math.Clamp((x - Math.min(x0, x1)) / Math.abs(x1 - x0), 0, 1);
         w = x0 < x1 ? t : 1 - t;
       }
-      const c = L.color;
-      l += w * L.intensity * (1 - (d * d) / (L.radius * L.radius)) * (z / Math.hypot(d, z)) * (0.3 * c.r + 0.59 * c.g + 0.11 * c.b);
+      const c = L.color, att = 1 - (d * d) / (L.radius * L.radius);
+      l += w * L.intensity * (douce ? att * att : att) * (z / Math.hypot(d, z)) * (0.3 * c.r + 0.59 * c.g + 0.11 * c.b);
     }
     return l;
   }
