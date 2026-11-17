@@ -40,6 +40,9 @@ compte et son quota : on avance par petits essais, on ne régénère pas pour ri
    silhouettes. Une image ratée se relance seule (`--images <numéro>`).
 6. **Pixel-fixer, toujours**, juste après l'import : aperçu d'abord (`--preview`), puis le
    script de la catégorie (`tools/pixelfix_ours.sh` pour les ours ; voir CLAUDE.md, « Pixel art »).
+   **Après génération : pixelfix puis sections** : si le sprite doit réagir à la lumière
+   (personnage, animal, ennemi éclairé par LightKit), enchaîner `npm run sections` sur toutes
+   les frames de chaque animation (skill `eclairage-sections`).
 7. **Vérifier en jeu** (skills `capture` et `verif`), changer `src/data/asset_version.js`,
    puis skill `livrer`.
 
