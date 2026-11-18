@@ -90,7 +90,7 @@ LightKit.suivre(torche, this.player, 30, -40);           // ou LightKit.deplacer
 LightKit.ajouterLumiere(this, 'lune', { x: 200, y: -300 });
 LightKit.regler(torche, { profondeur: -20, portee: 300 }); // couleur, intensite, portee, profondeur
 LightKit.reglerRendu(this, { paliers: 4, contre: 1.5, hemi: 0.05, detail: 0.7, epaule: 0.8 }); // ou ciel / sol : [r, g, b]
-const soleil = LightKit.ajouterSoleil(this, { direction: { x: -0.25, y: 0.95, z: 0.2 }, intensite: 0.09 });
+const soleil = LightKit.ajouterSoleil(this, { direction: { x: -0.25, y: 0.75, z: 0.6 }, intensite: 0.4 });
 ```
 
 Lampe = `{ x, y, profondeur, couleur, intensite, portee }` en px du MONDE ; `profondeur` < 0 =
@@ -100,10 +100,11 @@ profondeur 8), `lune` (0x9fb8ff, 0,8, portée 900, profondeur 30), `blanc`, `con
 
 **Soleil** (`ajouterSoleil`) : lumière DIRECTIONNELLE fixe, même direction pour tous les pixels, sans position,
 portée ni atténuation : le rendu ne change ni avec la caméra, ni avec le joueur, ni avec la place du sprite.
-`direction` pointe VERS le soleil (x droite, y haut, z vers le spectateur). Plein jour : `ciel` = `sol` = 1,
-`detail` 1 et `epaule` 0,95 redonnent le sprite d'origine, le soleil (0,09) n'ajoute qu'un léger éclaircissement
-aux plans tournés vers le haut. Sous un abri : `soleil.attenuation = (o) => dessous(o) ? 0 : 1` et
-`reglerRendu(this, { ombre: (o) => dessous(o) ? 0.82 : 1 })` (assombrit tout le sprite uniformément).
+`direction` pointe VERS le soleil (x droite, y haut, z vers le spectateur). Il éclaire le DESSIN d'origine (même gain
+relatif pour toutes les matières). Plein jour : `ciel` 0,78, `sol` 0,74, `detail` 1, `epaule` 0,9, soleil 0,4 : par
+rapport au sprite d'origine, dessus +15 %, flancs +1 %, palier intermédiaire 89 %, dessous 75 %. Sous un abri :
+`soleil.attenuation = (o) => dessous(o) ? 0 : 1` et `reglerRendu(this, { ombre: (o) => dessous(o) ? 1.08 : 1 })`
+(facteur sur l'ambiance, uniforme sur tout le sprite : 82 % de l'origine avec ces réglages).
 
 Réglages conseillés : torche à **+8** (près du plan) ; lune loin et haut, grande portée ;
 contre-jour entre **-10 et -40**, contre 1,5 ; ambiance 0,3-0,4 la nuit ; 4 paliers.
@@ -147,7 +148,7 @@ et Kainati immobiles à leur échelle du jeu dans chaque partie. Trois parties d
 lampes en fondu au passage (sur 360 px) :
 - **Nuit** : champignons lumineux (décor du jeu, pulsation lente), lucioles (`fx_luciole`, s'allument et
   s'éteignent), feu de camp (animation du jeu, sans son menu, vacille), lampe qui passe derrière Kainati ;
-- **Soleil** : sprite d'origine (ciel = sol = 1, détail 1) et soleil directionnel très faible sur le dessus ;
+- **Soleil** : ambiance uniforme sur le dessin d'origine et soleil directionnel qui dessine le volume par paliers ;
   auvent (marqueur dessiné) : plus de soleil dessous, sprite uniformément à 82 % ;
 - **Banc d'essai** : torche au pointeur, lune, lampe derrière Kainati, lampe qui passe de devant à derrière
   (loup), lampe tournante (grizzly), trois couleurs (crapaud), Agarica retournée sous une lampe fixe.
@@ -169,6 +170,12 @@ ne sont même pas chargées (`TOUJOURS` dans LightKit.js le jour où une vraie z
 | T | écran net (canvas agrandi sans lissage du navigateur) |
 | C | copie les réglages de la partie (presse-papiers et console) : à transmettre tels quels |
 | W | masquer le panneau |
+| Maj + direction | forme grizzly (commandes normales du jeu) |
+| Espace deux fois | forme aigle (tenir : plane, S : pique) |
+| A | ours polaire (compétence : il se dresse et retombe) |
+
+Ces formes sont prêtées au joueur du labo seulement : la sauvegarde et le registre trouvés à l'entrée sont remis à la
+sortie de la zone et à la fermeture de la page.
 
 Le panneau est un élément HTML posé sur le canvas : même place et même taille à tous les zooms, police selon la
 fenêtre. La caméra se recale aussitôt après Y et Z et ne montre jamais sous le bas du monde. Il affiche la partie, les lampes actives, la taille à l'écran de chaque mannequin, ses pixels
@@ -283,7 +290,8 @@ des frames d'une animation ; arrondi au centième). s = 1 : rien ne change (cart
 ## Le modèle en bref (v16)
 
 Couleur = dessin × ambiance(n) + neutre × Σ couleur × intensité × palier(min(diff + cj, 1)), puis épaule.
-Pour un soleil, min(diff + cj, 1) est remplacé par `directionnel()` = max(N·d, 0) (contour sombre : au plus 1 palier).
+Pour un soleil, min(diff + cj, 1) est remplacé par `directionnel()` = max(N·d, 0) (contour sombre : au plus 1 palier)
+et sa lumière s'ajoute à l'ambiance, sur le dessin : couleur = dessin × (ambiance(n) + soleils) + neutre × lampes.
 - **Ambiance ciel / sol** : ambiance(n) = mix(sol, ciel, 0,5 + 0,5 n.y), avec ciel et sol presque égaux (hemi 0,05) :
   l'utilisateur ne veut pas d'ombre marquée vers le bas, le volume vient d'une faible lumière sur le dessus.
 - **Détail dans l'ombre** : dessin = mix(neutre, `_natif.png`, détail) (0,7 par défaut) : l'ambiance garde
