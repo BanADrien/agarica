@@ -59,6 +59,8 @@ const config = {
     ZoneAquatiqueScene, Zone5Scene, ZonetestScene, ZoneOursScene,
     // Labo d'éclairage : seulement par ?zone=labo_lumiere&lumiere.
     LaboLumiereScene,
+    // Forêt de lumière : seulement par ?zone=foret_lumiere&lumiere.
+    ForetLumiereScene,
     EndScreenScene,
     EditorScene, PlaytestScene,
     CampfireMenuScene,
