@@ -7,7 +7,8 @@
      ses 5 x 5 voisins tous les uPasLisse pixels (= round(s) de l'asset, 1 pour les sprites de la
      demo : calcul identique) ; 2) plages des reglages adaptees a l'asset affiche : portee jusqu'a
      3 x sa diagonale (800 au moins), profondeur +- diagonale / 6 (60 au moins) ; 3) case « Taille reelle
-     en jeu » : 1 pixel du jeu = 1 pixel d'ecran, une case de carte = np pixels (asset.np). -->
+     en jeu » : 1 pixel du jeu = 1 pixel d'ecran, une case de carte = np pixels (asset.np) ; 4) ambiance
+     hemispherique (ciel / sol selon n.y) sur le dessin d'origine : voir ambianceHemi() et main(). -->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -110,6 +111,12 @@
         <input type="range" id="portee" min="20" max="800" step="5" value="220"></label>
       <label class="r">Lumiere ambiante <output id="o-ambiante"></output>
         <input type="range" id="ambiante" min="0" max="1" step="0.02" value="0.36"></label>
+      <label class="r" title="Ecart entre le ciel (plans tournes vers le haut) et le sol (plans tournes vers le bas).">Ciel / sol <output id="o-hemi"></output>
+        <input type="range" id="hemi" min="0" max="1" step="0.05" value="0.45"></label>
+      <label class="r" title="Part du dessin d'origine dans l'ambiance : le detail reste lisible dans l'ombre.">Detail dans l'ombre <output id="o-detail"></output>
+        <input type="range" id="detail" min="0" max="1" step="0.05" value="0.7"></label>
+      <label class="r" title="Valeur a partir de laquelle les hautes lumieres sont tassees vers le blanc sans l'atteindre (100 % = aucune).">Epaule des blancs <output id="o-epaule"></output>
+        <input type="range" id="epaule" min="0.5" max="1" step="0.05" value="0.8"></label>
     </fieldset>
     <fieldset>
       <legend>Rendu</legend>
@@ -177,6 +184,9 @@ uniform vec2 uOrigineEcr;  // coin haut-gauche du sprite (px ecran, y vers le ba
 uniform float uEchelle;    // px ecran par px du sprite (entier)
 uniform float uMode;       // 0 eclaire, 1 origine, 2 sections, 3 normales, 9 disques des lumieres
 uniform float uPaliers;    // 0 = lisse
+uniform vec3 uCiel, uSol;  // ambiance : plans tournes vers le haut / vers le bas
+uniform float uDetail;     // part du dessin d'origine dans l'ambiance (0 = neutre, 1 = origine)
+uniform float uEpaule;     // debut de l'epaule des hautes lumieres (1 = aucune)
 uniform float uAmbiante, uHauteur, uPortee, uIntensite;  // uHauteur = profondeur de la lumiere devant le plan (px du sprite)
 uniform vec2 uL1, uL2;     // lumieres en px ecran
 uniform vec3 uC1, uC2;     // couleurs
@@ -186,6 +196,16 @@ uniform float uContre;     // force du lisere de contre-jour (lumiere derriere, 
 uniform float uPasLisse;   // ecart entre les echantillons de la normale lissee (round(s), 1 = gabarit)
 uniform float uDisques;    // passe des disques : 0 = lumieres derriere (avant les sprites), 1 = devant
 uniform float uFlip;       // 1 = sprite retourne : image en miroir ET normal.x inverse (correction du flipX)
+
+vec3 ambianceHemi(vec3 n) {
+  return mix(uSol, uCiel, 0.5 + 0.5 * n.y);
+}
+
+float epaule(float v) {
+  if (v <= uEpaule || uEpaule >= 1.0) return v;
+  float e = 1.0 - uEpaule;
+  return uEpaule + e * (1.0 - exp((uEpaule - v) / e));
+}
 
 float palier(float v) {
   if (uPaliers < 1.5) return v;
@@ -377,11 +397,13 @@ void main() {
     vec2 tc = t + 0.5;
     vec2 l1 = (uL1 - uOrigineEcr) / uEchelle, l2 = (uL2 - uOrigineEcr) / uEchelle;
     vec3 l;
+    vec3 amb = vec3(0.0);
     if (uAncien < 0.5) {
       // v11 : modele unique (contour noir = sa couleur sombre x l'eclairage de sa section)
       float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
       vec4 cjm = texture2D(uCj, uv);
-      l = vec3(uAmbiante) + uC1 * uIntensite * palier(eclairage(n, ts, tc, l1, occultation(l1), lb, cjm));
+      amb = ambianceHemi(n);
+      l = uC1 * uIntensite * palier(eclairage(n, ts, tc, l1, occultation(l1), lb, cjm));
       if (uN > 1.5) l += uC2 * uIntensite * palier(eclairage(n, ts, tc, l2, occultation(l2), lb, cjm));
     } else if (uHauteur >= 0.0) {
       // v10 (pour comparer) : formule de face...
@@ -393,7 +415,12 @@ void main() {
       l = vec3(uAmbiante) + uC1 * uIntensite * palier(min(lumiereBrute(ns, tc, l1) + contreJourDoux(ns, tc, l1, ts), 1.0));
       if (uN > 1.5) l += uC2 * uIntensite * palier(min(lumiereBrute(ns, tc, l2) + contreJourDoux(ns, tc, l2, ts), 1.0));
     }
-    c = base.rgb * l;
+    // ambiance sur le dessin d'origine (detail dans l'ombre), lampes sur le neutre (pas d'ombrage double)
+    c = mix(base.rgb, o.rgb, uDetail) * amb + base.rgb * l;
+    if (uAncien < 0.5) {
+      float m = max(c.r, max(c.g, c.b));
+      if (m > 0.0) c *= epaule(m) / m;
+    }
   }
   gl_FragColor = vec4(c, 1.0);
 }`;
@@ -418,7 +445,7 @@ void main() {
   const U = {};
   for (const n of ["uRect", "uNeutre", "uNormales", "uOrigine", "uSections", "uTaille", "uCanvas",
     "uOrigineEcr", "uEchelle", "uMode", "uPaliers", "uAmbiante", "uHauteur", "uPortee", "uIntensite",
-    "uL1", "uL2", "uC1", "uC2", "uN", "uRayonDisque", "uFlip", "uContre", "uDisques", "uGeo", "uPad", "uAncien", "uCj", "uPasLisse"]) U[n] = gl.getUniformLocation(prog, n);
+    "uL1", "uL2", "uC1", "uC2", "uN", "uRayonDisque", "uFlip", "uContre", "uDisques", "uGeo", "uPad", "uAncien", "uCj", "uPasLisse", "uCiel", "uSol", "uDetail", "uEpaule"]) U[n] = gl.getUniformLocation(prog, n);
   gl.uniform1i(U.uNeutre, 0); gl.uniform1i(U.uNormales, 1);
   gl.uniform1i(U.uOrigine, 2); gl.uniform1i(U.uSections, 3); gl.uniform1i(U.uGeo, 4); gl.uniform1i(U.uCj, 5);
   gl.uniform1f(U.uPad, D.geoPad || 6);
@@ -574,7 +601,8 @@ void main() {
 
   const affichages = { hauteur: (v) => (v > 0 ? "+" : "") + v + " px" + (v < 0 ? " (derriere)" : v > 0 ? " (devant)" : " (dans le plan)"),
     contre: (v) => (+v).toFixed(1), intensite: (v) => (+v).toFixed(2),
-    portee: (v) => v + " px", ambiante: (v) => Math.round(v * 100) + " %" };
+    portee: (v) => v + " px", ambiante: (v) => Math.round(v * 100) + " %",
+    hemi: (v) => Math.round(v * 100) + " %", detail: (v) => Math.round(v * 100) + " %", epaule: (v) => Math.round(v * 100) + " %" };
   for (const id in affichages) {
     const e = $(id), o = $("o-" + id);
     e.addEventListener("input", () => { o.textContent = affichages[id](e.value); dessiner(); });
@@ -648,6 +676,11 @@ void main() {
     gl.uniform1f(U.uEchelle, s);
     gl.uniform1f(U.uPaliers, +$("paliers").value);
     gl.uniform1f(U.uAmbiante, +$("ambiante").value);
+    const amb = +$("ambiante").value, hemi = +$("hemi").value;
+    gl.uniform3f(U.uCiel, amb * (1 + hemi), amb * (1 + hemi), amb * (1 + hemi));
+    gl.uniform3f(U.uSol, amb * (1 - hemi), amb * (1 - hemi), amb * (1 - hemi));
+    gl.uniform1f(U.uDetail, +$("detail").value);
+    gl.uniform1f(U.uEpaule, +$("epaule").value);
     gl.uniform1f(U.uHauteur, +$("hauteur").value);
     gl.uniform1f(U.uPortee, +$("portee").value);
     gl.uniform1f(U.uIntensite, +$("intensite").value);

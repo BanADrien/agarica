@@ -57,7 +57,10 @@ const LightKit = (() => {
   const NOM_PIPELINE = 'LumiereSections';
 
   // Réglages par défaut = ceux de la page de test validée.
-  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8 };
+  // Ambiance hémisphérique : ciel = ambiance x (1 + hemi), sol = ambiance x (1 - hemi), sauf couleurs
+  // imposées (reglerRendu : ciel, sol en [r, g, b] de 0 à 1). detail : part du dessin d'origine dans l'ambiance.
+  // epaule : valeur à partir de laquelle les hautes lumières sont tassées vers le blanc sans l'atteindre (1 = aucune).
+  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.45, detail: 0.7, ciel: null, sol: null, epaule: 0.8 };
 
   // Préréglages de lampes (couleurs de la page de test : Torche, Lune, Blanc).
   // Torche : près du plan (8 px devant, comme la page ; plus loin devant, le sommet des formes
@@ -112,7 +115,10 @@ uniform sampler2D uMainSampler;   // image du jeu (objet sans carte)
 uniform sampler2D uNeutre;        // _lumiere/<n>_neutre.png
 uniform sampler2D uNormales;      // _lumiere/<n>_n.png
 uniform sampler2D uCj;            // _lumiere/<n>_cj.png (carte contre-jour)
-uniform vec3 uAmbiance;
+uniform sampler2D uNatif;         // _lumiere/<n>_natif.png (dessin d'origine, meme grille)
+uniform vec3 uCiel, uSol;         // ambiance : plans tournes vers le haut / vers le bas
+uniform float uDetail;            // part du dessin d'origine dans l'ambiance
+uniform float uEpaule;            // debut de l'epaule des hautes lumieres (1 = aucune)
 uniform Lumiere uLumieres[kMaxLights];
 uniform int uNbLumieres;
 uniform float uPaliers, uContre;
@@ -128,6 +134,16 @@ varying vec2 outTexCoord;
 varying float outTexId;
 varying float outTintEffect;
 varying vec4 outTint;
+
+vec3 ambianceHemi(vec3 n) {
+  return mix(uSol, uCiel, 0.5 + 0.5 * n.y);
+}
+
+float epaule(float v) {
+  if (v <= uEpaule || uEpaule >= 1.0) return v;
+  float e = 1.0 - uEpaule;
+  return uEpaule + e * (1.0 - exp((uEpaule - v) / e));
+}
 
 float palier(float v) {
   if (uPaliers < 1.5) return v;
@@ -154,6 +170,7 @@ void main() {
   vec4 texel = vec4(outTint.bgr * outTint.a, outTint.a);
   vec2 px = outTexCoord * uTailleTex - uCoin;          // pixel de la frame (image du jeu)
   vec4 base;
+  vec3 dessin;
   vec3 n = vec3(0.0, 0.0, 1.0);
   vec3 nl = n;
   vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);                // sans carte : aucune exposition arriere
@@ -165,6 +182,7 @@ void main() {
     base = texture2D(uNeutre, uv);
     if (base.a < 0.5) discard;
     base = vec4(base.rgb, 1.0);
+    dessin = mix(base.rgb, texture2D(uNatif, uv).rgb, uDetail);
     n = texture2D(uNormales, uv).rgb * 2.0 - 1.0;
     if (uFlip > 0.5) n.x = -n.x;
     n = normalize(n);
@@ -173,20 +191,26 @@ void main() {
   } else {
     base = texture2D(uMainSampler, outTexCoord);      // alpha premultiplie (Phaser)
     if (base.a <= 0.0) discard;
+    dessin = base.rgb;
     ts = floor((px - uGrille) / uPas);
   }
   vec2 t = ts;
   if (uFlip > 0.5) t.x = uTaille.x - 1.0 - ts.x;
   vec2 tc = t + 0.5;
   float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
-  vec3 l = uAmbiance;
+  vec3 l = vec3(0.0);
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
       l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
     }
   }
-  vec4 color = vec4(base.rgb * l, base.a) * texel;
+  // ambiance sur le dessin d'origine (detail dans l'ombre), lampes sur le neutre (pas d'ombrage double)
+  vec3 c = dessin * ambianceHemi(n) + base.rgb * l;
+  // epaule sur la composante la plus forte : teinte gardee, chaque palier reste distinct jusque dans les blancs
+  float m = max(c.r, max(c.g, c.b));
+  if (m > 0.0) c *= epaule(m) / m;
+  vec4 color = vec4(c, base.a) * texel;
   if (outTintEffect == 1.0) color.rgb = outTint.bgr * outTint.a * base.a;   // setTintFill
   else if (outTintEffect == 2.0) color = texel;
   gl_FragColor = color;
@@ -217,6 +241,7 @@ void main() {
     for (const [url, e] of Object.entries(man)) {
       scene.load.image(cleCarte(url, 'neutre'), `${e.d}/${e.n}_neutre.png`);
       scene.load.image(cleCarte(url, 'n'), `${e.d}/${e.n}_n.png`);
+      scene.load.image(cleCarte(url, 'natif'), `${e.d}/${e.n}_natif.png`);
       if (e.cj) scene.load.image(cleCarte(url, 'cj'), `${e.d}/${e.n}_cj.png`);
     }
     scene.load.on(Phaser.Loader.Events.FILE_LOAD, (file) => {
@@ -229,7 +254,7 @@ void main() {
   // create de BootScene : pixels nets sur les cartes
   function filtrerCartes(scene) {
     for (const url of Object.keys(manifeste())) {
-      for (const q of ['neutre', 'n', 'cj']) {
+      for (const q of ['neutre', 'n', 'cj', 'natif']) {
         const k = cleCarte(url, q);
         if (scene.textures.exists(k)) scene.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
@@ -248,7 +273,8 @@ void main() {
       const cj = game.textures.exists(cleCarte(url, 'cj')) ? cleCarte(url, 'cj') : '__DEFAULT';
       r = { e, neutre: game.textures.get(cleCarte(url, 'neutre')).source[0].glTexture,
         n: game.textures.get(cleCarte(url, 'n')).source[0].glTexture,
-        cj: game.textures.get(cj).source[0].glTexture };
+        cj: game.textures.get(cj).source[0].glTexture,
+        natif: game.textures.get(game.textures.exists(cleCarte(url, 'natif')) ? cleCarte(url, 'natif') : cleCarte(url, 'neutre')).source[0].glTexture };
     }
     // pas de cache tant que les cartes ne sont pas prêtes (chargement en cours)
     if (r || !e) cacheCartes[cleTexture] = r;
@@ -270,7 +296,10 @@ void main() {
         this._lampes = [];
         this._textures = null;
         this._reglages = DEFAUTS;
-        this._ambiance = { r: 1, g: 1, b: 1 };
+        this._ciel = [1, 1, 1];
+        this._sol = [1, 1, 1];
+        this._detail = 1;
+        this._epaule = 1;
       }
 
       onRender(scene, camera) {
@@ -280,7 +309,11 @@ void main() {
         this.lightsActive = true;
         this._lampes = actif ? lm.getLights(camera).map((o) => o.light) : [];
         this._reglages = (scene.__lumiere && scene.__lumiere.reglages) || DEFAUTS;
-        this._ambiance = actif ? lm.ambientColor : { r: 1, g: 1, b: 1 };
+        const r = this._reglages, a = actif ? lm.ambientColor : { r: 1, g: 1, b: 1 }, h = actif ? r.hemi ?? DEFAUTS.hemi : 0;
+        this._ciel = (actif && r.ciel) || [a.r * (1 + h), a.g * (1 + h), a.b * (1 + h)];
+        this._sol = (actif && r.sol) || [a.r * (1 - h), a.g * (1 - h), a.b * (1 - h)];
+        this._detail = actif ? r.detail ?? DEFAUTS.detail : 1;
+        this._epaule = actif ? r.epaule ?? DEFAUTS.epaule : 1;
       }
 
       // un appel de dessin par objet éclairé : ses lampes sont exprimées dans SON repère natif
@@ -299,7 +332,11 @@ void main() {
         this.set1i('uNeutre', 2);
         this.set1i('uNormales', 3);
         this.set1i('uCj', 4);
-        this.set3f('uAmbiance', this._ambiance.r, this._ambiance.g, this._ambiance.b);
+        this.set1i('uNatif', 5);
+        this.set3f('uCiel', this._ciel[0], this._ciel[1], this._ciel[2]);
+        this.set3f('uSol', this._sol[0], this._sol[1], this._sol[2]);
+        this.set1f('uDetail', this._detail);
+        this.set1f('uEpaule', this._epaule);
         this.set1f('uPaliers', this._reglages.paliers);
         this.set1f('uContre', this._reglages.contre);
         const frame = go.frame;
@@ -373,6 +410,8 @@ void main() {
         gl.bindTexture(gl.TEXTURE_2D, c.n.webGLTexture);
         gl.activeTexture(gl.TEXTURE4);
         gl.bindTexture(gl.TEXTURE_2D, c.cj.webGLTexture);
+        gl.activeTexture(gl.TEXTURE5);
+        gl.bindTexture(gl.TEXTURE_2D, c.natif.webGLTexture);
         gl.activeTexture(gl.TEXTURE0);
       }
     };
@@ -508,7 +547,7 @@ void main() {
     scene.lights.setAmbientColor(couleurDe(couleur));
   }
 
-  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour }.
+  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour, hemi, detail, ciel, sol, epaule }.
   function reglerRendu(scene, reglages) {
     if (scene.__lumiere) Object.assign(scene.__lumiere.reglages, reglages);
   }

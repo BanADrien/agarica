@@ -19,7 +19,7 @@ const div = (v, k) => vec3(v.x / k, v.y / k, v.z / k);
 const rg = (c) => vec2(c.r, c.g);
 const mul = (v, k) => vec2(v.x * k, v.y * k);
 const sub = (v, k) => vec2(v.x - k, v.y - k);
-const max = Math.max, min = Math.min, abs = Math.abs, sqrt = Math.sqrt, floor = Math.floor;
+const max = Math.max, min = Math.min, abs = Math.abs, sqrt = Math.sqrt, floor = Math.floor, exp = Math.exp;
 const clamp = (x, a, b) => min(max(x, a), b);
 function smoothstep(a, b, x) { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 function mix(a, b, t) {
@@ -52,6 +52,18 @@ function eclairage(n, nLisse, t, lp, z, portee, lumBase, cjm, U) {
   const cb = (0.37 * dot(dir, xy(d)) + 0.93 * abs(z)) / dist;
   const cj = 0.6 * U.uContre * wb * ex * max(cb, 0.0) * att;
   return min(diff + cj, 1.0);
+}
+
+// ambianceHemi() du shader : ciel pour les plans tournés vers le haut, sol pour ceux tournés vers le bas
+function ambianceHemi(n, U) {
+  return mix(U.uSol, U.uCiel, 0.5 + 0.5 * n.y);
+}
+
+// epaule() du shader : hautes lumières tassées vers le blanc sans l'atteindre
+function epaule(v, U) {
+  if (v <= U.uEpaule || U.uEpaule >= 1.0) return v;
+  const e = 1.0 - U.uEpaule;
+  return U.uEpaule + e * (1.0 - exp((U.uEpaule - v) / e));
 }
 
 // Référence « lumière de face » : Light2D de Phaser avec la lampe à la profondeur z, N.L x att.
@@ -99,4 +111,4 @@ function sprite(carte, pas = 1) {
   return { w, h, N, NL, lum, CJ, brute };
 }
 
-module.exports = { eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };
+module.exports = { ambianceHemi, epaule, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };
