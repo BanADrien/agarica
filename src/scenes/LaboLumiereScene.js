@@ -7,6 +7,7 @@
 // G éclairage, O sprites d'origine, V décor éclairé, T écran net, C copier, W panneau.
 // Zoom : le labo rend en 1920 x 1080 avec une caméra à zoom ENTIER (2, 3, 4), donc x1,5 garde des pixels
 // réguliers ; l'interface passe par une 2e caméra. Taille d'origine rendue en quittant la zone.
+// Panneau : élément HTML posé sur le canvas, donc indépendant des caméras et du zoom.
 
 // Mannequins : images du manifeste SECTIONS_LUMIERE, échelle = celle du code de chaque personnage.
 const LABO_MANNEQUINS = [
@@ -18,6 +19,7 @@ const LABO_MANNEQUINS = [
 const LABO_ZOOMS = [{ nom: 'x1', camera: 2 }, { nom: 'x1,5', camera: 3 }, { nom: 'x2', camera: 4 }];
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
+const LABO_BAS_MONDE = 540;  // bas du monde : la caméra ne montre jamais en dessous
 const LABO_PARTIES = [
   // Ambiance : ciel (plans tournés vers le haut) et sol (vers le bas), niveau x teinte ; detail = dessin d'origine dans l'ambiance
   { id: 'nuit', nom: 'NUIT', ciel: 0.4, cielT: [0.72, 0.82, 1.25], sol: 0.12, solT: [0.6, 0.66, 1], detail: 0.7, fond: [8, 10, 24], contre: 1.5, paliers: 4 },
@@ -77,12 +79,14 @@ class LaboLumiereScene extends Phaser.Scene {
     st.decors = this.children.list.filter((o) => o.type === 'Image' && o.scrollFactorX === 1 && o.depth < CHARACTER_DEPTH
       && !o.__laboBrille && !(o.texture && /champignons_lumineux/.test(o.texture.key)));
     this.laboAppliquer(st);
-    st.texte = this.add.text(10, 64, '', {
-      fontFamily: 'monospace', fontSize: '11px', color: '#e8e2f2', backgroundColor: '#0d0b1acc', padding: { x: 8, y: 6 },
-    }).setScrollFactor(0).setDepth(100000).setResolution(2);
-    st.texte.lookRole = 'ui';
+    st.texte = document.createElement('pre');
+    st.texte.id = 'labo-panneau';
+    st.texte.style.cssText = 'position:fixed;z-index:10;box-sizing:border-box;width:70ch;margin:0;padding:.5em .8em;color:#e8e2f2;background:#0d0b1acc;'
+      + 'font-family:monospace;line-height:1.15;white-space:pre;overflow:hidden;pointer-events:none';
+    document.body.appendChild(st.texte);
     this.laboTouches(st);
     this.events.once('shutdown', () => {
+      st.texte.remove();
       if (this.game.canvas) this.game.canvas.style.imageRendering = '';
       this.game.scale.setGameSize(st.tailleJeu[0], st.tailleJeu[1]);
     });
@@ -259,13 +263,13 @@ class LaboLumiereScene extends Phaser.Scene {
     sur('H', () => this.laboChanger(st, -1));
     sur('L', () => this.laboChanger(st, 1));
     sur('N', () => { st.choix[st.partie] = Phaser.Math.Wrap(st.choix[st.partie] + 1, 0, Math.max(1, this.laboGroupes(st).length)); });
-    sur('Y', () => this.laboTeleporter(st));
-    sur('Z', () => { st.zoom = (st.zoom + 1) % LABO_ZOOMS.length; });
+    sur('Y', () => { this.laboTeleporter(st); this.laboCadrer(st, true); });
+    sur('Z', () => { st.zoom = (st.zoom + 1) % LABO_ZOOMS.length; this.laboCadrer(st, true); });
     sur('G', bascule('eclairage'));
     sur('O', bascule('origine'));
     sur('V', bascule('decor'));
     sur('T', bascule('net'));
-    sur('W', () => { st.visible = !st.visible; st.texte.setVisible(st.visible); });
+    sur('W', () => { st.visible = !st.visible; st.texte.style.display = st.visible ? '' : 'none'; });
     sur('C', () => this.laboCopier(st));
   }
 
@@ -341,7 +345,34 @@ class LaboLumiereScene extends Phaser.Scene {
     }
     for (const m of st.messages) lignes.push(`! ${m}`);
     if (st.note) lignes.push(st.note);
-    st.texte.setText(lignes.join('\n'));
+    st.texte.textContent = lignes.join('\n');
+    this.laboPlacerPanneau(st);
+  }
+
+  // Panneau calé sur le canvas : même place et même taille quel que soit le zoom, police selon la fenêtre
+  laboPlacerPanneau(st) {
+    const c = this.game.canvas;
+    if (!c) return;
+    let r = c.getBoundingClientRect();
+    if (r.width > window.innerWidth + 1 || r.height > window.innerHeight + 1) { this.scale.refresh(); r = c.getBoundingClientRect(); }
+    const s = st.texte.style;
+    s.left = `${Math.round(r.left + r.width * 0.01)}px`;
+    s.top = `${Math.round(r.top + r.height * 0.12)}px`;
+    s.fontSize = `${Phaser.Math.Clamp(r.height / 48, 7, 13)}px`;
+    s.maxWidth = `${Math.floor(r.width * 0.98)}px`;
+    s.maxHeight = `${Math.floor(r.height * 0.87)}px`;
+  }
+
+  // Zoom et hauteur de la caméra : jamais sous le bas du monde. immediat : aussi sur Agarica en largeur, sans attendre
+  laboCadrer(st, immediat) {
+    const cam = this.cameras.main, zc = LABO_ZOOMS[st.zoom].camera, hVue = cam.height / zc, lVue = cam.width / zc;
+    if (cam.zoom !== zc) cam.setZoom(zc);
+    const bas = st.zoom === 0 ? LABO_BAS_MONDE : Math.min(LABO_BAS_MONDE, this.laboSol() + 60);
+    cam.scrollY = Math.max(0, bas - hVue) - (cam.height - hVue) / 2;
+    if (!immediat || !this.player) return;
+    const marge = (cam.width - lVue) / 2;
+    cam.scrollX = Phaser.Math.Clamp(this.player.x - cam.width / 2, -marge, this.levelWidth - lVue - marge);
+    this.scale.refresh();
   }
 
   // Poids de chaque partie selon la position d'Agarica : fondu sur LABO_FONDU autour de chaque limite
@@ -360,9 +391,8 @@ class LaboLumiereScene extends Phaser.Scene {
     this.laboRepartir(st);
     // Zoom imposé à chaque image (le fondu d'entrée de zone remet la caméra à 1). Bas de la vue : bas de
     // la zone à x1, 60 px sous le sol en zoomant (les personnages restent au milieu de l'écran)
-    const zc = LABO_ZOOMS[st.zoom].camera, hVue = cam.height / zc;
-    if (cam.zoom !== zc) cam.setZoom(zc);
-    cam.scrollY = Math.min(540, this.laboSol() + 60 + (st.zoom === 0 ? 540 : 0)) - hVue - (cam.height - hVue) / 2;
+    this.laboCadrer(st);
+    const zc = LABO_ZOOMS[st.zoom].camera;
     // Hors de la vue : rien à dessiner (les corps physiques du sol ne dépendent pas de l'affichage)
     const vueX = cam.scrollX + cam.width / 2, demi = cam.width / zc / 2;
     for (const o of st.decors) o.setVisible(Math.abs(o.x - vueX) < demi + 160);
