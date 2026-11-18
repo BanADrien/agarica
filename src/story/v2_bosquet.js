@@ -59,12 +59,16 @@ LEVEL_DATA_HANDLERS.v2Mousses = (scene, list) => {
   for (const m of list || []) {
     const g = scene.add.graphics();
     g.lookRole = 'prop';
-    g.fillStyle(0x1d3a1a, 1).fillRect(m.x, m.y, m.w, m.h - 22);
+    g.fillStyle(0x2f5a2a, 1).fillRect(m.x, m.y, m.w, m.h - 22);
     const rnd = new Phaser.Math.RandomDataGenerator([`mousse${m.x},${m.y}`]);
+    // Taches et coulures vert acide : on doit lire « danger » de loin, pas un simple plafond.
+    for (let i = 0; i < m.w / 14; i++) {
+      g.fillStyle(0x9bff5a, 0.8).fillCircle(m.x + rnd.realInRange(6, m.w - 6), m.y + rnd.realInRange(8, m.h - 30), rnd.realInRange(2, 5));
+    }
     for (let x = m.x + 8; x < m.x + m.w; x += 22) {
-      const len = rnd.realInRange(10, 22);
-      g.fillStyle(0x3e7a2c, 1).fillTriangle(x - 11, m.y + m.h - 24, x + 11, m.y + m.h - 24, x, m.y + m.h - 24 + len);
-      g.fillStyle(0x9bff5a, 0.9).fillCircle(x, m.y + m.h - 26 + len * 0.6, 2);
+      const len = rnd.realInRange(12, 22);
+      g.fillStyle(0x6fdc3a, 1).fillTriangle(x - 11, m.y + m.h - 24, x + 11, m.y + m.h - 24, x, m.y + m.h - 24 + len);
+      g.fillStyle(0xd8ffb0, 1).fillCircle(x, m.y + m.h - 26 + len * 0.6, 2.5);
     }
     storyPutBehindPlayer(scene, g);
     v.mousses.push(new Phaser.Geom.Rectangle(m.x, m.y, m.w, m.h));

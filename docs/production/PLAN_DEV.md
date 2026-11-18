@@ -1663,6 +1663,8 @@ Robot : `python tools/robot/v2_bosquet.py prologue|caves|sauvegarde`. L'ancienne
 - **`v2Portes: [{ id, x, y, w, h, cote: 'dedans'|'dehors', flag }]`** : porte barrée (x = milieu, y = sol). Solide tant que
   `flag` est faux ; [E] la débarre du côté `dedans`, simple remarque du côté `dehors`.
 - **`breakables[].ronces: true`** : voile d'épines dessiné sur une haie cassable à la dague (`v2PoserRonces`).
+- **Essai des caves** : `index.html?zone=v2_caves&flags=v2Essai` prête grizzly, singe, pieuvre et l'état d'après le
+  bannissement (`v2PreparerEssai`), tant que les zones voisines n'existent pas.
 - **Drapeaux** : `v2SourceLibree`, `v2Nuit`, `v2PorteCavesOuverte`, plus ceux de l'ancien bosquet (`talismanOurs`,
   `idoleVolee`, `amaniteCouverte`, `banished`). Cinématiques `v2_*` ; le jugement et ses répliques viennent de `acte1.js`.
 
