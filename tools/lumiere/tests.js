@@ -377,17 +377,17 @@ function tMilieu(sp) {
   return [pire, det, inner.length];
 }
 
-// 13 : sans aucune lampe, pas d'ombre marquée vers le bas (ciel et sol presque égaux, réglage par défaut) et
+// 13 : sans aucune lampe, pas d'ombre marquée vers le bas (ciel et sol presque égaux, ambiance du soleil du labo) et
 // le dessin d'origine reste lisible : écart de luminance à la moyenne 5 x 5, ambiance contre neutre seul
 function tOmbre(sp, carte) {
   const V = (o) => CPU.vec3(o, o, o);
-  const h = LightKit.DEFAUTS.hemi, UA = { uCiel: V(1 + h), uSol: V(1 - h) }, DETAIL = LightKit.DEFAUTS.detail;
+  const UA = { uCiel: V(0.78), uSol: V(0.74) }, DETAIL = LightKit.DEFAUTS.detail;
   const lum = (d, i) => 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
   let haut = 0, nh = 0, bas = 0, nb = 0;
   const compo = new Float64Array(sp.w * sp.h), neutre = new Float64Array(sp.w * sp.h);
   for (const p of sp.pts) {
     const i = sp.id(p), n = sp.N.get(i), a = CPU.ambianceHemi(n, UA).x;
-    const v = (lum(carte.neutre, i * 4) * (1 - DETAIL) + lum(carte.natif, i * 4) * DETAIL) * a;
+    const v = (lum(carte.neutre, i * 4) * (1 - DETAIL) + lum(carte.natif, i * 4) * DETAIL) * a / 0.76;
     compo[i] = v; neutre[i] = lum(carte.neutre, i * 4);
     if (sp.lumP(p) < 0.16) continue;
     if (n.y > 0.3) { haut += a; nh++; } else if (n.y < -0.3) { bas += a; nb++; }
@@ -411,27 +411,33 @@ function tOmbre(sp, carte) {
 const LUMIERES = {
   'lampe forte': { ciel: CPU.vec3(0.44, 0.44, 0.44), sol: CPU.vec3(0.4, 0.4, 0.4), detail: 0.7, c: [1.3, 1.3, 1.3], lp: [-120, -160], z: 120, portee: 2000 },
 };
-// 15 : soleil du labo. Base = sprite d'origine (ciel = sol = 1, détail 1), très faible lumière sur le dessus
+// 15 : soleil du labo. Ambiance uniforme sur le dessin d'origine ; par rapport à l'origine : dessus +5 à +15 %,
+// flancs proches, dessous 72 à 82 %, au moins un palier entre le dessus et le dessous, jamais de noir bouché
 const SOLEIL_LABO = { d: CPU.normalize(CPU.vec3(LightKit.SOLEIL.direction.x, LightKit.SOLEIL.direction.y, LightKit.SOLEIL.direction.z)),
-  c: [LightKit.SOLEIL.intensite, LightKit.SOLEIL.intensite * 0.945, LightKit.SOLEIL.intensite * 0.839], epaule: 0.95 };
+  c: [LightKit.SOLEIL.intensite, LightKit.SOLEIL.intensite * 0.945, LightKit.SOLEIL.intensite * 0.839], epaule: 0.9, ciel: CPU.vec3(0.78, 0.78, 0.78), sol: CPU.vec3(0.74, 0.74, 0.74) };
 function pixelSoleil(sp, p) {
-  const i = sp.id(p) * 4, neu = sp.carte.neutre, nat = sp.carte.natif, S = SOLEIL_LABO;
+  const i = sp.id(p) * 4, nat = sp.carte.natif, S = SOLEIL_LABO;
   const v = palier(CPU.directionnel(sp.N.get(sp.id(p)), S.d, sp.lumP(p), U));
-  const c = [0, 1, 2].map((k) => nat[i + k] / 255 + neu[i + k] / 255 * S.c[k] * v), m = Math.max(...c);
+  const a = CPU.ambianceHemi(sp.N.get(sp.id(p)), { uCiel: S.ciel, uSol: S.sol }).x;
+  const c = [0, 1, 2].map((k) => nat[i + k] / 255 * (a + S.c[k] * v)), m = Math.max(...c);
   return m > 0 ? c.map((x) => x * CPU.epaule(m, { uEpaule: S.epaule }) / m) : c;
 }
 function tSoleil(sp) {
   const Y = (c) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
-  let sombre = 0, n = 0, gain = 0, nh = 0, blancs = 0;
+  const g = { dessus: [0, 0], flancs: [0, 0], dessous: [0, 0] }, paliers = new Set();
+  let mini = Infinity, n = 0, blancs = 0;
   for (const p of sp.pts) {
     const i = sp.id(p) * 4, nat = sp.carte.natif, o = [nat[i] / 255, nat[i + 1] / 255, nat[i + 2] / 255], yo = Y(o);
     if (yo < 0.05) continue;
     const c = pixelSoleil(sp, p), e = Y(c) / yo - 1;
-    sombre += Math.min(e, 0); n++;
-    if (sp.N.get(sp.id(p)).y > 0.5) { gain += e; nh++; }
+    n++; mini = Math.min(mini, 1 + e);
+    const ny = sp.N.get(sp.id(p)).y, t = ny > 0.5 ? g.dessus : ny < -0.5 ? g.dessous : Math.abs(ny) < 0.2 ? g.flancs : null;
+    if (t) { t[0] += e; t[1]++; }
+    paliers.add(palier(CPU.directionnel(sp.N.get(sp.id(p)), SOLEIL_LABO.d, sp.lumP(p), U)));
     if (Math.min(...c) >= 254 / 255 && Math.min(...o) < 254 / 255) blancs++;
   }
-  return { sombre: 100 * sombre / Math.max(1, n), dessus: 100 * gain / Math.max(1, nh), nh, blancs: 100 * blancs / Math.max(1, n) };
+  const moy = (t) => 100 * t[0] / Math.max(1, t[1]);
+  return { dessus: moy(g.dessus), flancs: moy(g.flancs), dessous: 100 + moy(g.dessous), mini: 100 * mini, paliers: paliers.size, blancs: 100 * blancs / Math.max(1, n) };
 }
 // 16 : le code du soleil ne lit aucune position : ni dans le shader, ni dans ce que LightKit lui envoie
 // (la mesure à l'écran, deux positions de caméra et zéro pixel d'écart, se fait dans le labo)
@@ -576,8 +582,8 @@ function main() {
         `plans exposes clairs : ${assez ? `${b.ecart >= 0 ? '+' : ''}${b.ecart.toFixed(1)} % par rapport a l'origine` : 'trop peu de pixels'} ; blanc pur ${b.blancs.toFixed(2)} % ; paliers clairs ${b.niveaux.map((v) => v.toFixed(2)).join(' / ') || '-'}`);
     }
     const so = tSoleil(sp);
-    ajout('15 soleil : origine + tres faible lumiere dessus', nom, so.sombre > -3 && so.blancs <= 2 && so.dessus >= 3 && so.dessus <= 14,
-      `plus sombre que l'origine ${so.sombre.toFixed(2)} % ; plans du dessus ${so.dessus >= 0 ? '+' : ''}${so.dessus.toFixed(1)} % (${so.nh} px) ; blanc pur ajoute ${so.blancs.toFixed(2)} %`);
+    ajout('15 soleil : volume par paliers, ombre douce', nom, so.dessus >= 5 && so.dessus <= 15 && so.flancs >= -10 && so.flancs <= 5 && so.dessous >= 72 && so.dessous <= 82 && so.mini >= 60 && so.paliers >= 3 && so.blancs <= 2,
+      `dessus ${so.dessus >= 0 ? '+' : ''}${so.dessus.toFixed(1)} % ; flancs ${so.flancs >= 0 ? '+' : ''}${so.flancs.toFixed(1)} % ; dessous ${so.dessous.toFixed(1)} % de l'origine ; pixel le plus sombre ${so.mini.toFixed(0)} % ; ${so.paliers} paliers ; blanc pur ajoute ${so.blancs.toFixed(2)} %`);
     const [mi, md, ni] = tMilieu(sp);
     ajout('12 milieu sombre', nom, mi === 0, `pixels intérieurs allumés : ${mi.toFixed(1)} % (pire ${md || '-'}) ; ${ni} px intérieurs`);
     ajout('11 fidélité à +49', nom, ok11, `plans exposés à -49 : [${ex.join(', ')}] ; paliers 0/1/2/3 en % (moyenne) ; saut max ; sauts >= 2 ; largeur -- +49 : ${fmt(p49)} | -49 : ${fmt(m49)}`);

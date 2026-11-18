@@ -62,8 +62,9 @@ const LightKit = (() => {
   // epaule : valeur à partir de laquelle les hautes lumières sont tassées vers le blanc sans l'atteindre (1 = aucune).
   // ombre(objet) : facteur d'ambiance propre à un objet, 0 à 1 (sous un auvent), uniforme sur tout le sprite.
   const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.05, detail: 0.7, ciel: null, sol: null, epaule: 0.8, ombre: null };
-  // Soleil : direction VERS le soleil (x droite, y haut, z vers le spectateur), lumière discrète sur le dessus
-  const SOLEIL = { direction: { x: -0.25, y: 0.95, z: 0.2 }, couleur: 0xfff1d6, intensite: 0.09 };
+  // Soleil : direction VERS le soleil (x droite, y haut, z vers le spectateur). Avec une ambiance uniforme vers 0,76 :
+  // dessus éclairé, flancs intermédiaires, dessous dans une ombre douce
+  const SOLEIL = { direction: { x: -0.25, y: 0.75, z: 0.6 }, couleur: 0xfff1d6, intensite: 0.4 };
 
   // Préréglages de lampes (couleurs de la page de test : Torche, Lune, Blanc).
   // Torche : près du plan (8 px devant, comme la page ; plus loin devant, le sommet des formes
@@ -210,15 +211,16 @@ void main() {
   vec2 tc = t + 0.5;
   float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
   vec3 l = vec3(0.0);
+  vec3 ls = vec3(0.0);   // soleils : eclairent le dessin, meme gain relatif pour toutes les matieres
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      float e = L.soleil > 0.5 ? directionnel(n, L.position, lb) : eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm);
-      l += L.couleur * palier(e);
+      if (L.soleil > 0.5) ls += L.couleur * palier(directionnel(n, L.position, lb));
+      else l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
     }
   }
   // ambiance sur le dessin d'origine (detail dans l'ombre), lampes sur le neutre (pas d'ombrage double)
-  vec3 c = dessin * ambianceHemi(n) + base.rgb * l;
+  vec3 c = dessin * (ambianceHemi(n) + ls) + base.rgb * l;
   // epaule sur la composante la plus forte : teinte gardee, chaque palier reste distinct jusque dans les blancs
   float m = max(c.r, max(c.g, c.b));
   if (m > 0.0) c *= epaule(m) / m;
@@ -534,7 +536,7 @@ void main() {
 
   // Soleil : lumière DIRECTIONNELLE fixe. Même direction pour tous les pixels, indépendante de la caméra, du
   // joueur et de la position du sprite, sans portée ni atténuation. direction = vers le soleil (x droite,
-  // y haut, z vers le spectateur). Ex. : LightKit.ajouterSoleil(this, { direction: { x: -0.25, y: 0.95, z: 0.2 } });
+  // y haut, z vers le spectateur). Ex. : LightKit.ajouterSoleil(this, { direction: { x: -0.25, y: 0.75, z: 0.6 } });
   // L.attenuation(objet), facultatif, le masque pour un objet (auvent). Ne pas le déplacer : il n'a pas de position.
   function ajouterSoleil(scene, options = {}) {
     const o = Object.assign({}, SOLEIL, options);
