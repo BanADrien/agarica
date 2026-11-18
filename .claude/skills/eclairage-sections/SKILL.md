@@ -181,6 +181,20 @@ Le panneau est un élément HTML posé sur le canvas : même place et même tail
 fenêtre. La caméra se recale aussitôt après Y et Z et ne montre jamais sous le bas du monde. Il affiche la partie, les lampes actives, la taille à l'écran de chaque mannequin, ses pixels
 d'écran par case, et la frame d'Agarica si elle n'a pas de cartes.
 
+## Zoom du jeu (ZoomKit)
+
+`ZOOM_JEU` (src/utils/ZoomKit.js) règle le zoom de tout le jeu : 1,3 aujourd'hui, 1 pour revenir au rendu d'origine.
+Le code continue de raisonner en 960 x 540 (caméras, scrollX, worldView, pointeur) ; seule l'image finale change :
+canvas 2220 x 1248, monde à l'échelle entière x3, interface sur une 2e caméra. `ZOOM_PAR_ZONE` garde les arènes à x1
+(Ghilt, Kainati) ; le duel de Geralt repasse à x1 le temps du combat. Le labo utilise les mêmes niveaux.
+
+## Rayons de soleil sous la canopée (zone foret_lumiere)
+
+`index.html?zone=foret_lumiere&lumiere` : copie de la première partie de la forêt sombre. Un seul masque de canopée
+(`reglerRendu(scene, { masque })`, une ligne de cellules : R trouée, G hauteur d'arrivée du rayon, B bords irréguliers),
+projeté selon la direction du soleil, sert au shader par pixel, aux faisceaux visibles et aux poussières.
+Touches : U / J réglage, H / L valeur, C copier, W panneau, G éclairage coupé.
+
 ## Retoucher les cartes à la main
 
 Toujours dans cet ordre : d'abord les sections (lumière de face), puis la carte contre-jour,
