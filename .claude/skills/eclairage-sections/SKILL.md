@@ -154,8 +154,8 @@ lampes en fondu au passage (sur 360 px) :
   (loup), lampe tournante (grizzly), trois couleurs (crapaud), Agarica retournée sous une lampe fixe.
 
 Au plus 10 lampes à la fois (`maxLights` de Phaser) : le labo n'allume que celles qui atteignent la vue,
-les prioritaires puis les plus proches. Aucun lien depuis le jeu ; sans `?lumiere` ni cette zone, les cartes
-ne sont même pas chargées (`TOUJOURS` dans LightKit.js le jour où une vraie zone éclaire).
+les prioritaires puis les plus proches. Aucun lien depuis le jeu. Avec `?lumiere` ou dans le labo, toutes les cartes
+sont chargées au démarrage ; dans le jeu normal, rien ne s'ajoute au démarrage (voir « Ambiance d'une zone »).
 
 | Touche | Effet |
 |---|---|
@@ -194,6 +194,36 @@ canvas 2220 x 1248, monde à l'échelle entière x3, interface sur une 2e camér
 (`reglerRendu(scene, { masque })`, une ligne de cellules : R trouée, G hauteur d'arrivée du rayon, B bords irréguliers),
 projeté selon la direction du soleil, sert au shader par pixel, aux faisceaux visibles et aux poussières.
 Touches : U / J réglage, H / L valeur, C copier, W panneau, G éclairage coupé.
+
+Un rayon vient d'en haut et s'arrête sur le dessus du corps. Sur un sprite à cartes : `corpsAuDessus()` remonte vers le soleil
+dans la silhouette (8 pas sur 6 à 12 px du monde selon la taille du sprite, flipX compris), `rayonCorps()` ne garde que les plans
+tournés vers le haut et exposés en haut de la silhouette (carte contre-jour), bords fondus par `masqueDoux` (rayon 5), un seul palier
+à la fin. Le reste du corps reçoit `lueurCorps` (part de la force du rayon, réglable dans le panneau). Un personnage sans cartes
+(`Sprite`) reçoit le rayon sur le haut de sa silhouette seulement ; le décor (`Image`) garde ses taches de lumière. Soleil de la
+forêt : `z` 0,2, il vient d'en haut. Sans masque (partie Soleil du labo) : rien ne change.
+
+Feu ou champignon affiché derrière un personnage (`depth` inférieure à la sienne) : `zLampe()` le passe en lumière arrière (feu
+-18, champignon -14, au moins -15 en pixels natifs), seuls les bords exposés côté source s'allument, jamais les plans de face
+(`expositionDecor()`). Le décor sur le même plan et une source au premier plan gardent leur profondeur positive (feu 60, champignon 30).
+
+## Ambiance d'une zone (AmbianceKit)
+
+`src/utils/AmbianceKit.js` applique l'ambiance validée dans `foret_lumiere` aux vraies zones. Tout se règle dans
+`src/data/ambiances_lumiere.js`, source unique :
+- **Déclarer une zone** : ajouter sa clé de scène à `AMBIANCE_PAR_ZONE` (`ForetSombre1Scene: 'foret'`). Rien d'autre à écrire.
+- **Régler le rendu** : les valeurs de `AMBIANCES_LUMIERE.foret`, essayées dans `foret_lumiere` (panneau, touche C pour les copier).
+- **Tout couper** : `AMBIANCE_ACTIVE = false`. **Comparer sans toucher au code** : `?sanslumiere` dans l'adresse. L'option
+  « Effets visuels » désactivée coupe aussi l'ambiance. `?lumiere` garde son mode de test et remplace l'ambiance.
+
+Dans une zone déclarée, `preparerDonnees()` retire `look`, `ambient` et `lights` (pas de double effet : ni étalonnage LookKit, ni
+voile, ni faux rayons) ; `attacher()` pose ensuite masque, faisceaux, poussières, soleil et sources de lumière. Chaque objet créé
+est rangé à sa première image : interface et effets additifs gardés tels quels, sources jamais assombries, le reste éclairé. Tout
+est démonté à l'arrêt de la scène. Ce qui est propre au test (panneau, touches, énergie pleine, formes prêtées) reste dans
+`ForetLumiereScene`.
+
+Cartes : rien au démarrage. En entrant dans une zone à ambiance, celles d'Agarica se chargent en fond, puis chaque sprite demande
+les cartes de son animation à son premier affichage (éclairé à plat en attendant). Nouvel ennemi courant : l'ajouter à
+`tools/lumiere/cartes-jeu.js`, puis `npm run lumiere:cartes -- <nom>`.
 
 Sources de lumière : `LightKit.emissif(objet, seuil)` garde un objet à pleine luminosité (avec `seuil`, seuls ses pixels vifs : flammes du feu, bûches éclairées) ; `LightKit.sourcesLumineuses(scene, { max })` reconnaît feux de camp et champignons lumineux, leur donne une lumière vacillante, allume les plus proches de la caméra et les fait apparaître en fondu (`scanner()` et `maj(dt)` à chaque image).
 
@@ -244,7 +274,7 @@ pixel, jamais à travers un trait).
    profondeur et en largeur, pas de bande au contour, lumière devant = N.L, contour sombre
    ≤ 1 palier, adoucissement, fidélité à +49, milieu sombre (aucun pixel d'une section non
    reliée au bord allumé par une lampe derrière). Code 1 si un test échoue : lire la ligne.
-   État au 2026-11-17 (v16) : 80 / 81 sur les cartes du jeu ; échec connu : Kainati, test 11
+   État au 2026-11-18 (v16) : 106 / 107 sur les cartes du jeu ; échec connu : Kainati, test 11
    (palier maximal 2 % des plans exposés à -49 pour un critère de 3 %).
 2. `npm run lumiere:apercu [-- <anim|png>]` : page autonome dans `tools/lumiere/sortie/`
    (ignoré par git) ; donner le chemin à l'utilisateur. Lumière à glisser, profondeur, sens,
