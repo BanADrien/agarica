@@ -19,7 +19,9 @@ const div = (v, k) => vec3(v.x / k, v.y / k, v.z / k);
 const rg = (c) => vec2(c.r, c.g);
 const mul = (v, k) => vec2(v.x * k, v.y * k);
 const sub = (v, k) => vec2(v.x - k, v.y - k);
-const max = Math.max, min = Math.min, abs = Math.abs, sqrt = Math.sqrt, floor = Math.floor, exp = Math.exp;
+const plus = (a, k, b) => vec2(a.x + k + b.x, a.y + k + b.y);
+const max = Math.max, min = Math.min, abs = Math.abs, sqrt = Math.sqrt, exp = Math.exp;
+const floor = (v) => (typeof v === 'object' ? vec2(Math.floor(v.x), Math.floor(v.y)) : Math.floor(v));
 const clamp = (x, a, b) => min(max(x, a), b);
 function smoothstep(a, b, x) { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 function mix(a, b, t) {
@@ -73,6 +75,23 @@ function directionnel(n, d, lumBase, U) {
   return diff;
 }
 
+// corpsAuDessus() du shader : part du corps traversée en remontant vers le soleil. opaqueEn(q) : le pixel q est-il plein ?
+function corpsAuDessus(ts, d, opaqueEn, U) {
+  const dir = normalize(vec2(U.uFlip > 0.5 ? -d.x : d.x, -d.y));
+  let plein = 0.0;
+  for (let i = 1; i <= 8; i++) {
+    plein += opaqueEn(floor(plus(ts, 0.5, mul(dir, U.uOmbreSoleil * i / 8.0))));
+  }
+  return plein / 8.0;
+}
+
+// rayonCorps() du shader : le rayon se pose sur les plans du dessus, le reste du corps garde une lueur uniforme
+function rayonCorps(n, d, lb, e, ms, U) {
+  const libre = 1.0 - smoothstep(0.3, 0.95, e);
+  const v = directionnel(n, d, lb, U) * smoothstep(0.1, 0.65, n.y) * libre * ms;
+  return max(palier(v, U), U.uLueurCorps * ms);
+}
+
 // Référence « lumière de face » : Light2D de Phaser avec la lampe à la profondeur z, N.L x att.
 function reference(n, t, lp, z, portee) {
   const d = vec3(lp.x - t.x, t.y - lp.y, z);
@@ -118,4 +137,4 @@ function sprite(carte, pas = 1) {
   return { w, h, N, NL, lum, CJ, brute };
 }
 
-module.exports = { ambianceHemi, epaule, directionnel, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };
+module.exports = { ambianceHemi, epaule, directionnel, corpsAuDessus, rayonCorps, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };

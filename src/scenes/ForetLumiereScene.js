@@ -13,6 +13,7 @@ const FORET_REGLAGES = [
   { id: 'ambiance', pas: 0.02, min: 0.1, max: 1, val: FORET_AMBIANCE.ambiance },
   { id: 'teinte', pas: 0.02, min: 0, max: 0.5, val: FORET_AMBIANCE.teinte },
   { id: 'rayons', pas: 0.05, min: 0, max: 2, val: FORET_AMBIANCE.rayons },
+  { id: 'lueurCorps', pas: 0.01, min: 0, max: 0.4, val: FORET_AMBIANCE.lueurCorps },
   { id: 'densite', pas: 0.02, min: 0.04, max: 0.7, val: FORET_AMBIANCE.densite, masque: true },
   { id: 'largeur', pas: 2, min: 6, max: 90, val: FORET_AMBIANCE.largeur, masque: true },
   { id: 'faisceaux', pas: 0.02, min: 0, max: 0.6, val: FORET_AMBIANCE.faisceaux },
@@ -182,7 +183,7 @@ class ForetLumiereScene extends Phaser.Scene {
   foretRendu(st) {
     const a = st.v.ambiance, t = st.v.teinte;
     const ciel = [a * (1 - t), a * (1 + t * 0.25), a * (1 - t * 0.7)];
-    LightKit.reglerRendu(this, { ciel, sol: ciel.map((c) => c * 0.94), detail: 1, epaule: 0.85, paliers: 4 });
+    LightKit.reglerRendu(this, { ciel, sol: ciel.map((c) => c * 0.94), detail: 1, epaule: 0.85, paliers: 4, lueurCorps: st.v.lueurCorps });
     LightKit.regler(st.soleil, { intensite: st.v.rayons });
     st.teinteFond = Phaser.Display.Color.GetColor(...ciel.map((c) => Math.round(Math.min(1, c) * 255)));
     for (const o of st.teintes) if (o.active) o.setTint(st.teinteFond);

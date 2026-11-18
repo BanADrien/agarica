@@ -61,7 +61,7 @@ const LightKit = (() => {
   // imposées (reglerRendu : ciel, sol en [r, g, b] de 0 à 1). detail : part du dessin d'origine dans l'ambiance.
   // epaule : valeur à partir de laquelle les hautes lumières sont tassées vers le blanc sans l'atteindre (1 = aucune).
   // ombre(objet) : facteur d'ambiance propre à un objet, 0 à 1 (sous un auvent), uniforme sur tout le sprite.
-  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.05, detail: 0.7, ciel: null, sol: null, epaule: 0.8, ombre: null };
+  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.05, detail: 0.7, ciel: null, sol: null, epaule: 0.8, ombre: null, lueurCorps: 0 };
   // Soleil : direction VERS le soleil (x droite, y haut, z vers le spectateur). Avec une ambiance uniforme vers 0,71 :
   // dessus éclairé, flancs intermédiaires, dessous dans une ombre douce
   const SOLEIL = { direction: { x: -0.25, y: 0.75, z: 0.6 }, couleur: 0xfff1d6, intensite: 0.57 };
@@ -169,6 +169,9 @@ uniform vec3 uCiel, uSol;         // ambiance : plans tournes vers le haut / ver
 uniform float uDetail;            // part du dessin d'origine dans l'ambiance
 uniform float uEpaule;            // debut de l'epaule des hautes lumieres (1 = aucune)
 uniform float uEmissif;           // > 0 : les pixels au moins aussi vifs gardent leur couleur (flammes du feu)
+uniform float uLueurCorps;        // rayon de canopee : lueur uniforme du corps, part de la force du rayon
+uniform float uOmbreSoleil;       // rayon de canopee : distance remontee vers le soleil dans la silhouette (cases)
+uniform float uPerso;             // 1 = personnage sans cartes : le rayon se pose sur le haut de sa silhouette
 ${FRAG_MASQUE}
 uniform Lumiere uLumieres[kMaxLights];
 uniform int uNbLumieres;
@@ -223,6 +226,36 @@ vec3 normaleLisse(vec2 ts) {
 }
 ${FRAG_ECLAIRAGE}
 
+// Rayon de canopee sur un personnage : il vient d'en haut, touche le dessus du corps et s'arrete la.
+float opaqueEn(vec2 q) {
+  if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) return 0.0;
+  if (uCarte > 0.5) return step(0.5, texture2D(uNormales, (q + 0.5) / uTaille).a);
+  return step(0.5, texture2D(uMainSampler, (uCoin + uGrille + (q + 0.5) * uPas) / uTailleTex).a);
+}
+
+// Part du corps traversee en remontant vers le soleil (0 = rien au-dessus, 1 = corps sur tout le trajet)
+float corpsAuDessus(vec2 ts, vec3 d) {
+  vec2 dir = normalize(vec2(uFlip > 0.5 ? -d.x : d.x, -d.y));
+  float plein = 0.0;
+  for (int i = 1; i <= 8; i++) {
+    plein += opaqueEn(floor(ts + 0.5 + dir * uOmbreSoleil * float(i) / 8.0));
+  }
+  return plein / 8.0;
+}
+
+// Sprite a cartes : plans du dessus seulement, un seul palier a la fin ; le reste du corps garde une lueur uniforme
+float rayonCorps(vec3 n, vec3 d, float lb, float e, float ms) {
+  float libre = 1.0 - smoothstep(0.3, 0.95, e);
+  float v = directionnel(n, d, lb) * smoothstep(0.1, 0.65, n.y) * libre * ms;
+  return max(palier(v), uLueurCorps * ms);
+}
+
+// Personnage sans cartes (aucune orientation connue) : haut de la silhouette seulement
+float rayonSilhouette(float e, float ms) {
+  float libre = 1.0 - smoothstep(0.3, 0.95, e);
+  return max(0.55 * libre * ms, uLueurCorps * ms);
+}
+
 void main() {
   vec4 texel = vec4(outTint.bgr * outTint.a, outTint.a);
   vec2 px = outTexCoord * uTailleTex - uCoin;          // pixel de la frame (image du jeu)
@@ -257,13 +290,20 @@ void main() {
   float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
   vec3 l = vec3(0.0);
   vec3 ls = vec3(0.0);   // soleils : eclairent le dessin, meme gain relatif pour toutes les matieres
-  // canopee : hors des rayons, pas de soleil ; bords nets sur les personnages, fondus sur le decor
-  float ms = uMasqueAnim.w > 0.5 ? (uCarte > 0.5 ? masqueSoleil(pointMonde()) : masqueDoux(pointMonde(), 14.0)) : 1.0;
+  // canopee : hors des rayons, pas de soleil ; bords fondus, plus serres sur les personnages que sur le decor
+  bool perso = uCarte > 0.5 || uPerso > 0.5;
+  float ms = uMasqueAnim.w > 0.5 ? masqueDoux(pointMonde(), perso ? 5.0 : 14.0) : 1.0;
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      if (L.soleil > 0.5) ls += L.couleur * ms * (uCarte > 0.5 || uMasqueAnim.w < 0.5 ? palier(directionnel(n, L.position, lb)) : 0.55);
-      else {
+      if (L.soleil > 0.5) {
+        if (uMasqueAnim.w < 0.5) ls += L.couleur * palier(directionnel(n, L.position, lb));   // plein soleil, sans canopee
+        else if (!perso) ls += L.couleur * ms * 0.55;                                          // taches de lumiere du decor
+        else if (ms > 0.0) {
+          float e = corpsAuDessus(ts, L.position);
+          ls += L.couleur * (uCarte > 0.5 ? rayonCorps(n, L.position, lb, e, ms) : rayonSilhouette(e, ms));
+        }
+      } else {
         // personnages (cartes) : paliers ; decor sans carte : fondu continu, sinon les paliers y dessinent des cercles
         float e = eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm);
         l += L.couleur * (uCarte > 0.5 ? palier(e) : smoothstep(0.0, 1.0, e));
@@ -443,6 +483,10 @@ void main() {
         const flip = !!go.flipX;
         const kx = sx * fx, ky = sy * fy;                  // px du monde par pixel natif
         const k = (kx + ky) / 2;
+        // Rayon de canopée : il se pose sur 6 à 12 px du monde sous le haut du corps, selon la taille du sprite
+        this.set1f('uOmbreSoleil', Math.max(6, Math.min(12, 0.14 * Math.min(w * kx, h * ky))) / k);
+        this.set1f('uLueurCorps', this._reglages.lueurCorps ?? 0);
+        this.set1f('uPerso', !e && go.type === 'Sprite' ? 1 : 0);
         const lampes = this._lampes, maxi = this.renderer.config.maxLights;
         // Seules les lampes qui peuvent atteindre l'objet (au-delà de la portée, leur lumière vaut 0) :
         // même image, beaucoup moins de calcul quand de nombreux objets sont éclairés
