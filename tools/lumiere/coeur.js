@@ -989,14 +989,13 @@
   // Grand sprite (s > 1) : le neutre en aplats effaçait le dessin (mèches, nuances). On ne retire
   // que l'ombrage à GRANDE échelle : couleur de base de la matière + écart du pixel à la moyenne
   // locale de sa matière (luminance L*, fenêtre de 2 s px de rayon), ramené à la couleur de la rampe
-  // la plus proche (palette du sprite : ça reste du pixel art). Puis chaque matière claire est
-  // assombrie (même rapport pour toutes ses couleurs, détail gardé) pour que sa couleur la plus
-  // claire reste sous 188 / 255 : x 1,36 (ambiance 0,36 + lampe 1) au palier max = blanc, les
-  // paliers en dessous restent distincts au lieu de saturer.
+  // la plus proche (palette du sprite : ça reste du pixel art). Les matières claires gardent leur
+  // valeur : les hautes lumières sont tenues au rendu par l'épaule du shader (epaule()).
   function neutreDetaille(neutral, c) {
     const { w, h, NP, s, opqList, line, prot, col, rampOf, ridOf, ramps, L } = c;
     const rho = aL(2, s);
     const nR = ramps.length;
+    const out = Int32Array.from(neutral);
     // tables de sommes (L et nombre) par matière, pixels de leur propre rampe seulement
     const W1 = w + 1;
     const sl = new Float64Array(nR * W1 * (h + 1)), sn = new Float64Array(nR * W1 * (h + 1));
@@ -1017,7 +1016,6 @@
       const o = r * W1 * (h + 1);
       return t[o + y1 * W1 + x1] - t[o + y0 * W1 + x1] - t[o + y1 * W1 + x0] + t[o + y0 * W1 + x0];
     };
-    const out = Int32Array.from(neutral);
     for (const p of opqList) {
       if (!propre(p)) continue;
       const r = ridOf[p], x = p % w, y = (p - x) / w;
@@ -1029,19 +1027,7 @@
       for (const cc of ramps[r]) { const v = Math.abs(L.get(cc) - cible); if (v < bv) { bv = v; best = cc; } }
       out[p] = best;
     }
-    // marge sous le blanc, par matière
-    const PLAFOND = 188;
-    const maxi = new Map();
-    for (const p of opqList) {
-      if (line[p] || prot[p] || ridOf[p] < 0) continue;
-      const c = out[p], m = Math.max((c >> 16) & 255, (c >> 8) & 255, c & 255);
-      maxi.set(ridOf[p], Math.max(maxi.get(ridOf[p]) || 0, m));
-    }
-    for (const p of opqList) {
-      if (line[p] || prot[p] || ridOf[p] < 0) { neutral[p] = out[p]; continue; }
-      const k = Math.min(1, PLAFOND / (maxi.get(ridOf[p]) || 255)), c = out[p];
-      neutral[p] = k >= 1 ? c : (pyRound(((c >> 16) & 255) * k) << 16) | (pyRound(((c >> 8) & 255) * k) << 8) | pyRound((c & 255) * k);
-    }
+    neutral.set(out);
   }
 
   // ------------------------------------------------------------ images
