@@ -89,7 +89,7 @@ const torche = LightKit.ajouterLumiere(this, 'torche', { x: 640, y: 380 });
 LightKit.suivre(torche, this.player, 30, -40);           // ou LightKit.deplacer(torche, x, y, profondeur)
 LightKit.ajouterLumiere(this, 'lune', { x: 200, y: -300 });
 LightKit.regler(torche, { profondeur: -20, portee: 300 }); // couleur, intensite, portee, profondeur
-LightKit.reglerRendu(this, { paliers: 4, contre: 1.5 });
+LightKit.reglerRendu(this, { paliers: 4, contre: 1.5, hemi: 0.45, detail: 0.7, epaule: 0.8 }); // ou ciel / sol : [r, g, b]
 ```
 
 Lampe = `{ x, y, profondeur, couleur, intensite, portee }` en px du MONDE ; `profondeur` < 0 =
@@ -126,7 +126,7 @@ leurs échelles (`tools/lumiere/cartes-jeu.js`, à compléter pour un nouveau sp
 - Réduction : chaque case prend la couleur la plus présente (traits sombres comptés double, couleurs de
   l'image gardées) ; si la grille dessinée tombe déjà juste (loup), elle est gardée telle quelle.
 - L'échelle s des grands sprites se calcule donc sur la taille à l'écran (Kainati : 1,69).
-- En jeu, LightKit cale les cases sur les pixels d'écran (caméra à zoom 1, sans rotation).
+- En jeu, LightKit cale les cases sur les pixels d'écran (caméra à zoom entier, sans rotation).
 - Page de test : case « Taille reelle en jeu » ; pour vos images, champ « Échelle en jeu ».
 - À reporter dans `sections.py` : `grilleEcran` et `echantillonnerEcran` de `coeur.js`, champs `ech` et
   `np` du manifeste, `--echelle-jeu` sur un sprite pixel-fixer.
@@ -139,8 +139,8 @@ et Kainati immobiles à leur échelle du jeu dans chaque partie. Trois parties d
 lampes en fondu au passage (sur 360 px) :
 - **Nuit** : champignons lumineux (décor du jeu, pulsation lente), lucioles (`fx_luciole`, s'allument et
   s'éteignent), feu de camp (animation du jeu, sans son menu, vacille), lampe qui passe derrière Kainati ;
-- **Soleil** : lumière haute et lointaine qui garde la même direction, ambiance de jour, auvent (marqueur
-  dessiné) : le soleil baisse sur ce qui passe dessous (`L.attenuation`) ;
+- **Soleil** : lumière haute, inclinée et lointaine qui garde la même direction, ciel clair et sol plus
+  sombre, auvent (marqueur dessiné) : le soleil baisse sur ce qui passe dessous (`L.attenuation`) ;
 - **Banc d'essai** : torche au pointeur, lune, lampe derrière Kainati, lampe qui passe de devant à derrière
   (loup), lampe tournante (grizzly), trois couleurs (crapaud), Agarica retournée sous une lampe fixe.
 
@@ -150,10 +150,11 @@ ne sont même pas chargées (`TOUJOURS` dans LightKit.js le jour où une vraie z
 
 | Touche | Effet |
 |---|---|
-| U / J | réglage précédent / suivant (profondeur, portée, intensité, couleur, ambiance, contre-jour, paliers) |
+| U / J | réglage précédent / suivant (profondeur, portée, intensité, couleur, ciel, sol, détail, contre-jour, paliers) |
 | H / L | baisser / monter la valeur |
 | N | groupe de lampes suivant dans la partie |
 | Y | aller à la partie suivante |
+| Z | zoom x1, x1,5, x2 (rendu interne 1920 x 1080, caméra à zoom entier : pixels réguliers) |
 | G | éclairage activé / désactivé (comparaison immédiate) |
 | O | sprites d'origine (personnages sans éclairage, décor toujours éclairé) |
 | V | décor éclairé à plat ou non |
@@ -248,9 +249,8 @@ des frames d'une animation ; arrondi au centième). s = 1 : rien ne change (cart
 - carte contre-jour : décroissance jusqu'à 12 s px, contour 2 s, frange 2 s px, direction lissée
   2 s : de larges plans sur le bord, plus un liseré de 1-3 px (Kainati : bord exposé 11 % -> 36 %) ;
 - neutre détaillé : seul l'ombrage à grande échelle est retiré, mèches et nuances gardées dans la
-  palette (détail de la fourrure 0,4 % -> 2,1 %, l'original est à 2,0 %) ; matières claires
-  ramenées sous 188 / 255 pour que les paliers ne saturent pas au blanc (le blanc pur de la
-  fourrure devient un gris clair à l'ambiance seule) ;
+  palette (détail de la fourrure 0,4 % -> 2,1 %, l'original est à 2,0 %) ; les matières claires
+  gardent leur valeur, les hautes lumières sont tenues par l'épaule du shader ;
 - shader : normale lissée échantillonnée tous les round(s) px ; page de test : portée jusqu'à
   3 fois la diagonale, profondeur ± diagonale / 6 ;
 - **plus de sections** (« il faut le sectionner davantage ») :
@@ -273,8 +273,17 @@ des frames d'une animation ; arrondi au centième). s = 1 : rien ne change (cart
 
 ## Le modèle en bref (v16)
 
-Lumière = ambiance + Σ couleur × intensité × palier(min(diff + cj, 1)), MULTIPLIÉE par la couleur
-du neutre (aucune part additive de la lampe). Poids « derrière » wb = smoothstep(15, −15, z).
+Couleur = dessin × ambiance(n) + neutre × Σ couleur × intensité × palier(min(diff + cj, 1)), puis épaule.
+- **Ambiance hémisphérique** : ambiance(n) = mix(sol, ciel, 0,5 + 0,5 n.y) : sans aucune lampe, le dos reste
+  plus clair que le ventre, le dessous des pattes et la mâchoire.
+- **Détail dans l'ombre** : dessin = mix(neutre, `_natif.png`, détail) (0,7 par défaut) : l'ambiance garde
+  le dessin d'origine sur la grille des cartes, la lampe reste neutre × N·L (pas d'ombrage compté deux fois).
+- **Épaule** : au-dessus de 0,8, la composante la plus forte est tassée vers le blanc sans l'atteindre, les
+  trois canaux au même rapport (teinte gardée). Elle agit sur la somme, après les paliers : la courbe étant
+  strictement croissante, chaque palier reste distinct jusque dans les blancs. Sans lampe active, ciel = sol = 1,
+  détail = 1, épaule coupée : l'image est celle du jeu.
+
+Poids « derrière » wb = smoothstep(15, −15, z).
 `diff` = N·L × atténuation (normale de la section, mélangée à la normale lissée 5×5 et avec un
 léger « wrap » quand wb > 0), × mix(1, exposition, wb) : la part « derrière » n'atteint que les
 bords exposés de la carte contre-jour. Le **contre-jour** `cj` est la même réponse en cosinus
