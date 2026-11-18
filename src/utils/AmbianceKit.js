@@ -216,19 +216,24 @@ void main() {
   const estInterface = (o) => (o.scrollFactorX === 0 && o.depth >= ZOOM_PROFONDEUR_UI)
     || (typeof lookRoleOf === 'function' && lookRoleOf(o) === 'ui');
 
+  // Fond répété ou lueur de sortie : suit la teinte de l'ambiance, y compris quand on la règle ou la coupe
+  function suivreTeinte(st, o) {
+    if (o.isTinted) o.__ambianceTeinte0 = o.tintTopLeft;
+    teinter(st, o);
+    st.teintes.push(o);
+  }
+
   function rangerObjet(st, o) {
     if (o.__ambianceVu || !o.scene) return;
     o.__ambianceVu = true;
+    // Lueur d'une sortie : le repère reste visible, sans brûler un décor devenu plus sombre
+    if (o.texture && o.texture.key.startsWith('edge-glow-')) { suivreTeinte(st, o); return; }
     if (o.__lumiereEmissif !== undefined) return;   // sources de lumière : jamais assombries
     if (estInterface(o)) return;
     if (o.type === 'Container') { for (const c of o.list) rangerObjet(st, c); return; }
     if (o.blendMode === Phaser.BlendModes.ADD) return;
     if (o.type === 'Sprite' || o.type === 'Image') LightKit.eclairer(o);
-    else if (o.type === 'TileSprite') {
-      if (o.isTinted) o.__ambianceTeinte0 = o.tintTopLeft;
-      teinter(st, o);
-      st.teintes.push(o);
-    }
+    else if (o.type === 'TileSprite') suivreTeinte(st, o);
   }
 
   // Tout ce qui apparaît dans le monde passe par le même éclairage dès sa première image (ennemis, projectiles...)
