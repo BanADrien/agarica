@@ -337,7 +337,9 @@ void main() {
           if (z < 15) derriere = 1;
           const nom = `uLumieres[${i}].`;
           this.set3f(nom + 'position', tx, ty, z);
-          this.set3f(nom + 'couleur', L.color.r * L.intensity, L.color.g * L.intensity, L.color.b * L.intensity);
+          // L.attenuation(objet), facultatif : lampe masquée pour cet objet (ombre d'un auvent), 0 à 1
+          const force = L.intensity * (L.attenuation ? L.attenuation(go) : 1);
+          this.set3f(nom + 'couleur', L.color.r * force, L.color.g * force, L.color.b * force);
           this.set1f(nom + 'portee', L.radius / k);
         }
         this.set1i('uNbLumieres', nb);
