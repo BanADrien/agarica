@@ -2247,11 +2247,9 @@ const WORLD_UI_HEAD_GAP = 8;
 function worldUiView(scene, margin = WORLD_UI_MARGIN) {
   const cam = scene && scene.cameras && scene.cameras.main;
   if (!cam) return null;
-  const w = cam.width / cam.zoom;
-  const h = cam.height / cam.zoom;
-  const left = cam.scrollX + (cam.width - w) / 2;
-  const top = cam.scrollY + (cam.height - h) / 2;
-  return { left: left + margin, top: top + margin, right: left + w - margin, bottom: top + h - margin };
+  // Cadre réellement à l'image : les bulles restent lisibles quel que soit le zoom du jeu (ZoomKit)
+  const v = ZoomKit.vueVisible(cam);
+  return { left: v.left + margin, top: v.top + margin, right: v.right - margin, bottom: v.bottom - margin };
 }
 
 // Décalage qui ramène le segment [a, b] dans [min, max] (centré s'il est
@@ -5104,6 +5102,7 @@ function startZoneAmbience(scene, data) {
 }
 
 function buildLevelFromData(scene, data, sceneData) {
+  ZoomKit.entrerNiveau(scene);
   // État « juice » de la visite précédente (émetteurs, HUD) : objets déjà
   // détruits avec la scène, repartir de zéro.
   scene.__juiceFx = null;

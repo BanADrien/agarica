@@ -368,12 +368,14 @@ void main() {
         const w = e ? e.w : W * sx, h = e ? e.h : H * sy;
         let cx = gx, cy = gy, px = fx, py = fy;
         const cam = this._camera, flipC = !!go.flipX;
-        // carte à la taille écran, affichée à son échelle, sans rotation, zoom entier : cases sur les pixels
-        if (e && e.np && cam && cam.roundPixels && Number.isInteger(cam.zoom) && !go.rotation && !go.parentContainer
+        // carte à la taille écran, affichée à son échelle, sans rotation, échelle entière : cases sur les pixels
+        // (matrice réellement dessinée : elle contient le zoom du jeu, cf. ZoomKit)
+        const M = cam && cam.matrix;
+        if (e && e.np && cam && cam.roundPixels && Number.isInteger(M.a) && M.a === M.d && !go.rotation && !go.parentContainer
           && Math.abs(sx - e.ech) < 0.002 && Math.abs(sy - e.ech) < 0.002) {
-          const z = cam.zoom, ox = cam.width * cam.originX, oy = cam.height * cam.originY;
-          const gauche = cam.x + ox + z * (go.x - (flipC ? W - go.displayOriginX : go.displayOriginX) * sx - cam.scrollX * go.scrollFactorX - ox);
-          const haut = cam.y + oy + z * (go.y - go.displayOriginY * sy - cam.scrollY * go.scrollFactorY - oy);
+          const z = M.a;
+          const gauche = M.e + z * (go.x - (flipC ? W - go.displayOriginX : go.displayOriginX) * sx - cam.scrollX * go.scrollFactorX);
+          const haut = M.f + z * (go.y - go.displayOriginY * sy - cam.scrollY * go.scrollFactorY);
           const ax = grilleSurEcran(gauche, W, sx * z, gx, e.np * z, false), ay = grilleSurEcran(haut, H, sy * z, gy, e.np * z, true);
           if (ax && ay) { px = ax.pas; cx = ax.coin; py = ay.pas; cy = ay.coin; }
         }
@@ -517,7 +519,7 @@ void main() {
   // Pixels d'écran couverts par un pixel dessiné, à l'échelle actuelle (null sans carte)
   function pixelEcran(o) {
     const c = o && o.frame ? cartesDe(o.scene.game, o.frame.texture.key) : null;
-    return c ? Math.abs(o.scaleX) * c.e.fx * (o.scene.cameras.main.zoom || 1) : null;
+    return c ? Math.abs(o.scaleX) * c.e.fx * (o.scene.cameras.main.matrix.a || 1) : null;
   }
 
   // A une carte (sprite préparé par tools/sections.js) ? Utile pour n'éclairer que ceux-là.

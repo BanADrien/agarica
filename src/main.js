@@ -10,8 +10,9 @@ if (EDITOR_MODE) {
 
 const config = {
   type: Phaser.AUTO,
-  width: 960,
-  height: 540,
+  // Taille du canvas selon le zoom du jeu (ZOOM_JEU, src/utils/ZoomKit.js) ; le code raisonne toujours en 960 x 540
+  width: ZoomKit.rendu()[0],
+  height: ZoomKit.rendu()[1],
   parent: 'game-container',
   backgroundColor: '#0d0b1a',
   // Résolution de design fixe (960x540) mise à l'échelle pour remplir la
@@ -71,7 +72,8 @@ const config = {
   ],
 };
 
-window.__game = new Phaser.Game(config);
+ZoomKit.installer();
+window.__game = ZoomKit.brancher(new Phaser.Game(config));
 // `?muet` dans l'adresse : aucun son (onglets de test ouverts par l'assistant : demande de l'utilisateur du
 // 2026-11-15, « arrête de mettre du son sur ce que tu ouvres »).
 if (new URLSearchParams(window.location.search).has('muet')) {

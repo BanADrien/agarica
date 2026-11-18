@@ -1624,13 +1624,12 @@ function lookComputeFrame(scene, st) {
     st.lightScanAt = loopFrame + LOOK_LIGHT_RESCAN_FRAMES;
     lookScanStaticLights(scene, st);
   }
-  const W = cam.width;
-  const H = cam.height;
-  const z = cam.zoom;
-  const sh = cam.shakeEffect;
-  const ox = sh && sh.isRunning ? sh._offsetX : 0;
-  const oy = sh && sh.isRunning ? sh._offsetY : 0;
-  const toScreen = (wx, wy) => [(wx - cam.scrollX - W / 2) * z + W / 2 + ox, (wy - cam.scrollY - H / 2) * z + H / 2 + oy];
+  // Pixels réels du canvas, à travers la matrice dessinée (zoom du jeu et secousse compris, cf. ZoomKit)
+  const W = scene.game.renderer.width;
+  const H = scene.game.renderer.height;
+  const M = cam.matrix;
+  const z = M.a;
+  const toScreen = (wx, wy) => [(wx - cam.scrollX) * M.a + M.e, (wy - cam.scrollY) * M.d + M.f];
   const cand = [];
   const push = (wx, wy, color, radius, intensity, glow, prio) => {
     const [sx, sy] = toScreen(wx, wy);

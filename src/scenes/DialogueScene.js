@@ -123,7 +123,7 @@ class DialogueScene extends Phaser.Scene {
     const p = parent && parent.player;
     const cam = parent && parent.cameras && parent.cameras.main;
     if (!p || !cam || !p.active) return { ...DIALOGUE_BOX };
-    const feetScreenY = (p.y - cam.worldView.y) * cam.zoom;
+    const feetScreenY = ZoomKit.versEcran(cam, p.x, p.y).y;
     const hidden = feetScreenY > DIALOGUE_BOX.y - 4 && feetScreenY - 90 < DIALOGUE_BOX.y + DIALOGUE_BOX.h;
     return hidden ? { ...DIALOGUE_BOX, y: DIALOGUE_BOX_TOP_Y, top: true } : { ...DIALOGUE_BOX };
   }

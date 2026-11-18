@@ -5,12 +5,7 @@
 // partie. Seule cette scène active ce code : le jeu normal n'y passe jamais.
 // Touches : U / J réglage, H / L valeur, N groupe de lampes, Y partie suivante, Z zoom (x1, x1,3, x1,5, x2),
 // G éclairage, O sprites d'origine, V décor éclairé, T écran net, C copier, W panneau.
-// Zoom : chaque niveau montre une vue du monde avec une caméra à zoom ENTIER, le rendu interne valant vue x caméra :
-// les pixels restent réguliers à tous les niveaux. L'interface passe par une 2e caméra. Taille d'origine rendue
-// en quittant la zone.
-// Panneau : élément HTML posé sur le canvas, donc indépendant des caméras et du zoom.
-// Formes à l'essai : grizzly (Maj), aigle (double saut), ours polaire (A). Rien n'est gardé : la sauvegarde
-// et le registre trouvés à l'entrée sont remis en sortant (cf. laboProtegerPartie).
+// Zoom : niveaux de ZoomKit (src/utils/ZoomKit.js), le même code que le reste du jeu.
 
 // Mannequins : images du manifeste SECTIONS_LUMIERE, échelle = celle du code de chaque personnage.
 const LABO_MANNEQUINS = [
@@ -19,13 +14,7 @@ const LABO_MANNEQUINS = [
   { id: 'crapaud', dx: 880, nuit: 1130, choix: (e) => e.anim === 'crapaud', echelle: () => CRAPAUD_SCALE, origineX: () => CRAPAUD_ORIGIN_X },
   { id: 'kainati', dx: 1560, choix: (e) => e.anim === 'kainati_idle', echelle: () => (getAssetManifest().kainati || {}).scale || 0.6 },
 ];
-// vue : px du monde montrés ; rendu interne = vue x camera (x1,3 : 740 x 416 x 3 = 2220 x 1248, dimensions paires : centre de caméra sur un pixel entier)
-const LABO_ZOOMS = [
-  { nom: 'x1', camera: 2, vue: [960, 540] },
-  { nom: 'x1,3', camera: 3, vue: [740, 416] },
-  { nom: 'x1,5', camera: 3, vue: [640, 360] },
-  { nom: 'x2', camera: 4, vue: [480, 270] },
-];
+const LABO_ZOOMS = [{ nom: 'x1', zoom: 1 }, { nom: 'x1,3', zoom: 1.3 }, { nom: 'x1,5', zoom: 1.5 }, { nom: 'x2', zoom: 2 }];
 const LABO_ZOOM_DEPART = 1;   // x1,3 à l'entrée du labo
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
@@ -140,38 +129,14 @@ class LaboLumiereScene extends Phaser.Scene {
     this.events.once('shutdown', () => {
       st.texte.remove();
       if (this.game.canvas) this.game.canvas.style.imageRendering = '';
-      this.game.scale.setGameSize(st.tailleJeu[0], st.tailleJeu[1]);
     });
     this.laboImage(this.time.now);
     this.laboPanneau(st);
   }
 
-  // Rendu interne selon le zoom : caméra du monde à zoom entier, 2e caméra pour l'interface (repère 960 x 540)
   laboEcran(st) {
-    const sc = this.game.scale;
-    st.tailleJeu = [sc.gameSize.width, sc.gameSize.height];
     this.cameras.main.setLerp(1, 0);
-    st.camUi = this.cameras.add(0, 0, st.tailleJeu[0], st.tailleJeu[1]).setOrigin(0, 0);
-    this.laboRendu(st);
-    this.laboRepartir(st);
-  }
-
-  // Rendu interne du niveau de zoom (vue x caméra) ; vrai s'il vient de changer
-  laboRendu(st) {
-    const n = LABO_ZOOMS[st.zoom], W = n.vue[0] * n.camera, H = n.vue[1] * n.camera, sc = this.game.scale;
-    const change = sc.gameSize.width !== W || sc.gameSize.height !== H;
-    if (change) sc.setGameSize(W, H);
-    st.camUi.setZoom(W / st.tailleJeu[0], H / st.tailleJeu[1]);
-    return change;
-  }
-
-  // Chaque objet est vu par une seule caméra : fixé à l'écran = interface, sinon monde
-  laboRepartir(st) {
-    for (const o of this.children.list) {
-      if (st.vus.has(o)) continue;
-      st.vus.add(o);
-      (o.scrollFactorX === 0 ? this.cameras.main : st.camUi).ignore(o);
-    }
+    ZoomKit.appliquer(this, LABO_ZOOMS[st.zoom].zoom);
   }
 
   // Sol du labo : haut des tuiles, comme la marche d'Agarica
@@ -391,9 +356,9 @@ class LaboLumiereScene extends Phaser.Scene {
       return r.groupe ? (g ? g[r.id] ?? '-' : '-') : p[r.id];
     };
     const oui = (b) => (b ? 'oui' : 'non');
-    const z = LABO_ZOOMS[st.zoom], rendu = z.vue[0] * z.camera / st.tailleJeu[0];
-    const lignes = [`LABO LUMIERE : ${p.nom}   [Y] partie suivante   [Z] zoom ${z.nom}`,
-      `zoom reel x${(st.tailleJeu[0] / z.vue[0]).toFixed(2)} : vue ${z.vue[0]} x ${z.vue[1]}, rendu ${z.vue[0] * z.camera} x ${z.vue[1] * z.camera}, camera x${z.camera}`, `groupe [N] : ${g ? `${g.nom} (${g.lampes.length})` : 'aucun'}`];
+    const z = ZoomKit.etat.n, rendu = ZoomKit.etat.px;
+    const lignes = [`LABO LUMIERE : ${p.nom}   [Y] partie suivante   [Z] zoom ${LABO_ZOOMS[st.zoom].nom}`,
+      `zoom reel x${(960 / z.vue[0]).toFixed(2)} : vue ${z.vue[0]} x ${z.vue[1]}, rendu ${z.rendu[0]} x ${z.rendu[1]}, camera x${z.camera}`, `groupe [N] : ${g ? `${g.nom} (${g.lampes.length})` : 'aucun'}`];
     LABO_REGLAGES.forEach((r, i) => lignes.push(`${i === st.ligne ? '>' : ' '} ${r.id.padEnd(11)} ${aff(r)}`));
     lignes.push('U/J reglage  H/L valeur  C copier  W panneau');
     lignes.push(`G eclairage ${oui(st.eclairage)}  O origine ${oui(st.origine)}  V decor ${oui(st.decor)}  T net ${oui(st.net)}`);
@@ -432,14 +397,11 @@ class LaboLumiereScene extends Phaser.Scene {
 
   // Zoom et hauteur de la caméra : jamais sous le bas du monde. immediat : aussi sur Agarica en largeur, sans attendre
   laboCadrer(st, immediat) {
-    if (this.laboRendu(st)) immediat = true;
-    const cam = this.cameras.main, zc = LABO_ZOOMS[st.zoom].camera, hVue = cam.height / zc, lVue = cam.width / zc;
-    if (cam.zoom !== zc) cam.setZoom(zc);
+    const n = ZoomKit.appliquer(this, LABO_ZOOMS[st.zoom].zoom), cam = this.cameras.main;
     const bas = st.zoom === 0 ? LABO_BAS_MONDE : Math.min(LABO_BAS_MONDE, this.laboSol() + 60);
-    cam.scrollY = Math.max(0, bas - hVue) - (cam.height - hVue) / 2;
+    cam.scrollY = Math.max(0, bas - n.vue[1]) - n.ay;
     if (!immediat || !this.player) return;
-    const marge = (cam.width - lVue) / 2;
-    cam.scrollX = Phaser.Math.Clamp(this.player.x - cam.width / 2, -marge, this.levelWidth - lVue - marge);
+    cam.scrollX = cam.clampX(this.player.x - cam.width / 2);
     this.scale.refresh();
   }
 
@@ -456,13 +418,11 @@ class LaboLumiereScene extends Phaser.Scene {
   // À chaque image : fondu d'ambiance, lampes animées, et seulement les plus utiles allumées
   laboImage(t) {
     const st = this.__labo, cam = this.cameras.main;
-    this.laboRepartir(st);
     // Zoom imposé à chaque image (le fondu d'entrée de zone remet la caméra à 1). Bas de la vue : bas de
     // la zone à x1, 60 px sous le sol en zoomant (les personnages restent au milieu de l'écran)
     this.laboCadrer(st);
-    const zc = LABO_ZOOMS[st.zoom].camera;
     // Hors de la vue : rien à dessiner (les corps physiques du sol ne dépendent pas de l'affichage)
-    const vueX = cam.scrollX + cam.width / 2, demi = cam.width / zc / 2;
+    const vueX = cam.scrollX + cam.width / 2, demi = ZoomKit.etat.n.vue[0] / 2;
     for (const o of st.decors) o.setVisible(Math.abs(o.x - vueX) < demi + 160);
     for (const m of st.sprites) m.sp.setVisible(Math.abs(m.sp.x - vueX) < demi + 420);
     const x = this.player ? this.player.x : 0;

@@ -485,9 +485,11 @@ function a2ArenaCamera(scene, on) {
     const b = cam.getBounds();
     st.camBounds = [b.x, b.y, b.width, b.height];
     cam.setBounds(GERALT_ARENA.minX, b.y, GERALT_ARENA.maxX - GERALT_ARENA.minX, b.height);
+    ZoomKit.zoomCombat(scene, true);   // l'arène de 960 px doit tenir à l'écran
   } else if (st.camBounds) {
     cam.setBounds(...st.camBounds);
     st.camBounds = null;
+    ZoomKit.zoomCombat(scene, false);
   }
 }
 
