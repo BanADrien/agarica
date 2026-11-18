@@ -2,7 +2,7 @@
 // sol, caméra, Agarica jouable) avec des mannequins immobiles à leur échelle du jeu, trois lampes et
 // un panneau de réglage au clavier. Seule cette scène active ce code : le jeu normal n'y passe jamais.
 // Touches libres dans le jeu : U / J choisir un réglage, H / L le changer, N lampe suivante,
-// G éclairage, O sprites d'origine, V décor éclairé, B pixels entiers, T écran net, C copier, W panneau.
+// G éclairage, O sprites d'origine, V décor éclairé, T écran net, C copier, W panneau.
 
 // Mannequins : images du manifeste SECTIONS_LUMIERE, échelle = celle du code de chaque personnage.
 const LABO_MANNEQUINS = [
@@ -50,7 +50,7 @@ class LaboLumiereScene extends Phaser.Scene {
   laboConstruire() {
     const ok = LightKit.activer(this, { ambiance: 0x5c5c5c });
     const st = {
-      ok, lampes: [], ligne: 0, lampe: 0, eclairage: true, origine: false, decor: true, entiers: false, net: false,
+      ok, lampes: [], ligne: 0, lampe: 0, eclairage: true, origine: false, decor: true, net: false,
       visible: true, ambiance: 0.36, sprites: [], decors: [], messages: [], note: '', image: 0,
     };
     this.__labo = st;
@@ -106,14 +106,6 @@ class LaboLumiereScene extends Phaser.Scene {
   // Applique les bascules : qui passe par le pipeline d'éclairage, à quelle échelle, quel rendu d'écran
   laboAppliquer(st) {
     const persos = st.sprites.map((m) => m.sp).concat(this.player ? [this.player] : []);
-    for (const m of st.sprites) {
-      // Pixels entiers : un pixel dessiné = un nombre entier de pixels d'écran (mannequins seulement :
-      // changer l'échelle d'Agarica changerait sa hitbox)
-      const k = m.echelle * m.e.fx;
-      const ech = st.entiers ? Math.max(1, Math.round(k)) / m.e.fx : m.echelle;
-      m.sp.setScale(ech);
-      m.sp.y = this.laboSol() + m.marge * ech;
-    }
     if (this.game.canvas) this.game.canvas.style.imageRendering = st.net ? 'pixelated' : '';
     if (!st.ok) return;
     const persosLumiere = st.eclairage && !st.origine;
@@ -134,7 +126,6 @@ class LaboLumiereScene extends Phaser.Scene {
     sur('G', bascule('eclairage'));
     sur('O', bascule('origine'));
     sur('V', bascule('decor'));
-    sur('B', bascule('entiers'));
     sur('T', bascule('net'));
     sur('W', () => { st.visible = !st.visible; st.texte.setVisible(st.visible); });
     sur('C', () => this.laboCopier(st));
@@ -186,7 +177,7 @@ class LaboLumiereScene extends Phaser.Scene {
         intensite: l.L.intensity, couleur: `#${LABO_COULEURS[Math.max(0, l.couleur)][1].toString(16).padStart(6, '0')}`,
       })),
       ambiance: st.ambiance, contre: reg.contre, paliers: reg.paliers,
-      eclairage: st.eclairage, origine: st.origine, decor: st.decor, pixelsEntiers: st.entiers, ecranNet: st.net,
+      eclairage: st.eclairage, origine: st.origine, decor: st.decor, ecranNet: st.net,
     };
   }
 
@@ -214,8 +205,9 @@ class LaboLumiereScene extends Phaser.Scene {
     LABO_REGLAGES.forEach((r, i) => lignes.push(`${i === st.ligne ? '>' : ' '} ${r.id.padEnd(11)} ${aff(r)}`));
     lignes.push('U/J reglage   H/L valeur   C copier   W panneau');
     lignes.push(`G eclairage ${oui(st.eclairage)}  O origine ${oui(st.origine)}  V decor ${oui(st.decor)}`);
-    lignes.push(`B pixels entiers ${oui(st.entiers)}  T ecran net ${oui(st.net)}`);
-    lignes.push(`px ecran par pixel dessine : ${st.sprites.map((m) => `${m.id} ${(LightKit.pixelEcran(m.sp) || 0).toFixed(2)}`).join('  ')}`);
+    lignes.push(`T ecran net ${oui(st.net)}`);
+    lignes.push('taille ecran, px ecran par case de carte :');
+    for (const m of st.sprites) lignes.push(`  ${m.id.padEnd(8)} ${Math.round(m.e.w * (m.e.np || 1))} x ${Math.round(m.e.h * (m.e.np || 1))}  ${(LightKit.pixelEcran(m.sp) || 0).toFixed(2)}`);
     const p = this.player;
     if (p && p.frame) {
       const k = LightKit.pixelEcran(p);

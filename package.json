@@ -6,7 +6,8 @@
     "sections": "node tools/sections.js",
     "lumiere:apercu": "node tools/lumiere/apercu.js",
     "lumiere:tests": "node tools/lumiere/tests.js",
-    "lumiere:test-page": "node tools/lumiere/test-page.js"
+    "lumiere:test-page": "node tools/lumiere/test-page.js",
+    "lumiere:cartes": "node tools/lumiere/cartes-jeu.js"
   },
   "engines": {
     "node": ">=18"

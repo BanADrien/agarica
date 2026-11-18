@@ -30,7 +30,9 @@
  * Options :
  *   --facteur <f>    px de l'image par pixel dessiné ; défaut : `f` de src/data/pixel_fixed.js
  *                    (sprite refait par pixelfix.js), sinon 1 (sprite déjà natif)
- *   --echelle-jeu <s> image encore peinte (absente de pixel_fixed.js) : ramenée à sa taille vue en
+ *   --echelle-jeu <s> setScale du sprite dans le code. Sprite pixel-fixer : cartes À LA TAILLE VUE EN JEU
+ *                    (une case = un nombre entier de pixels d'écran, cf. grilleEcran de coeur.js).
+ *                    Image encore peinte (absente de pixel_fixed.js) : ramenée à sa taille vue en
  *                    jeu (setScale s), 32 couleurs, alpha net (approché : réduction Lanczos de sharp,
  *                    seul cas qui demande sharp : `npm install` dans tools/pixel-fixer)
  *   --couleurs <n>   avec --echelle-jeu : nombre de couleurs (32)
@@ -66,7 +68,7 @@ function chargerSharp() {
 
 // ------------------------------------------------------------ calcul (tools/lumiere/coeur.js)
 const COEUR = require('./lumiere/coeur.js');
-const { N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, echelleSprite } = COEUR;
+const { N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, echelleSprite, grilleEcran } = COEUR;
 
 // ------------------------------------------------------------ images (E/S) et mode image peinte (sharp)
 async function lirePng(file) { return PNGIO.lirePng(file); }
@@ -151,7 +153,8 @@ async function unSprite(file, o, reg, man) {
   const f = facteurDe(file, o, reg);
   const s = sortiesDe(file);
   let nat, grille;
-  if (o.echelleJeu > 0) {
+  const ge = o.echelleJeu > 0 && f > 0 ? grilleEcran(o.echelleJeu, f) : null;
+  if (o.echelleJeu > 0 && !ge) {
     const small = await reduirePeint(hd, o.echelleJeu);
     const opq = [];
     for (let p = 0; p < small.width * small.height; p++) if (small.data[p * 4 + 3] >= 128) opq.push(rgbInt(small.data, p * 4));
@@ -160,6 +163,10 @@ async function unSprite(file, o, reg, man) {
     nat = rogner(nat, b);
     const k = 1 / o.echelleJeu;
     grille = { f: k, fx: k, fy: k, gx: small.crop[0] + b[0] * k, gy: small.crop[1] + b[1] * k, accord: null };
+  } else if (ge && !ge.natif) {
+    const r = natifSprite(hd, f, ge), b = r.b;
+    nat = r.nat;
+    grille = { f: ge.pas, fx: ge.pas, fy: ge.pas, gx: b[0] * ge.pas, gy: b[1] * ge.pas, accord: null };
   } else if (f > 0) {
     const r = natifSprite(hd, f), ph = r.ph, b = r.b;
     nat = r.nat;
@@ -177,7 +184,7 @@ async function unSprite(file, o, reg, man) {
   console.log(`${relOf(file)} : natif ${nat.width}x${nat.height}, 1 pixel = ${grille.f} px (pas mesuré ${grille.fx.toFixed(3)} x ${grille.fy.toFixed(3)})` +
     (grille.accord !== null ? `, grille calée à ${(100 * grille.accord).toFixed(2)} %` : '') + ` -> ${relOf(s.dir)}/${s.nom}_*.png`);
   afficherInfo(res.info);
-  man[relOf(file)] = entree(file, hd, nat, grille, s, ech > 1 ? { s: ech } : null);
+  man[relOf(file)] = entree(file, hd, nat, grille, s, { ...(ech > 1 ? { s: ech } : {}), ...(ge ? { ech: ge.echelle, np: ge.np } : {}) });
 }
 
 function entree(file, hd, nat, g, s, extra) {
@@ -192,12 +199,17 @@ async function uneAnimation(files, o, reg, man) {
   const hds = [];
   for (const f of files) hds.push(await lirePng(f));
   const fs_ = [...new Set(files.map((f) => facteurDe(f, o, reg)))];
-  if (fs_.length > 1) throw new Error(`frames à facteurs différents (${fs_.join(', ')}) : ce ne sont pas les frames d'un même lot pixelfix`);
+  if (fs_.length > 1 && !(o.echelleJeu > 0)) throw new Error(`frames à facteurs différents (${fs_.join(', ')}) : ce ne sont pas les frames d'un même lot pixelfix`);
   const f = fs_[0];
-  const peint = o.echelleJeu > 0;
-  const nf = natifsAnimation(hds, peint ? 0 : f);
+  // sprite pixel-fixer + échelle du jeu : grille d'écran commune (facteur de la 1re frame pour np)
+  const ge = o.echelleJeu > 0 && f > 0 ? grilleEcran(o.echelleJeu, f) : null;
+  // frames de facteurs différents (grizzly) : toutes réduites à la même grille d'écran
+  if (ge && fs_.length > 1) ge.natif = false;
+  const reduit = ge && !ge.natif;
+  const peint = o.echelleJeu > 0 && !ge;
+  const nf = natifsAnimation(hds, peint ? 0 : f, ge);
   const { ph, box, decal } = nf;
-  let canv = nf.canv, k = !peint && f > 0 ? f : 1, cropPeint = null;
+  let canv = nf.canv, k = reduit ? ge.pas : !peint && f > 0 ? f : 1, cropPeint = null;
   if (peint) {
     const w = Math.max(1, pyRound(canv[0].width * o.echelleJeu)), h = Math.max(1, pyRound(canv[0].height * o.echelleJeu));
     const small = [];
@@ -226,13 +238,14 @@ async function uneAnimation(files, o, reg, man) {
     cols.push(c);
     if (!grille) {
       if (peint) grille = { fx: k, fy: k, gx: cropPeint[0] - decal[i][0], gy: cropPeint[1] - decal[i][1], accord: null };
+      else if (reduit) grille = { fx: k, fy: k, gx: box[0] * k - decal[i][0], gy: box[1] * k - decal[i][1], accord: null };
       else grille = calerGrille(hds[i], canv[i], k, ph[0] + box[0] * k - decal[i][0], ph[1] + box[1] * k - decal[i][1]);
       grille.f = Math.round(k * 1000) / 1000;
     }
     // même grille pour tout le lot (pixelfix.js : grille ancrée au bas-centre, commune au lot)
     const g = { f: grille.f, fx: grille.fx, fy: grille.fy, gx: grille.gx + decal[0][0] - decal[i][0], gy: grille.gy + decal[0][1] - decal[i][1] };
-    g.accord = peint ? null : accord(hds[i], canv[i], g.fx, g.fy, g.gx, g.gy);
-    man[relOf(files[i])] = entree(files[i], hds[i], canv[i], g, s, { anim: o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, ''), i, fps: o.fps, vitesse: o.vitesse, ...(ech > 1 ? { s: ech } : {}) });
+    g.accord = peint || reduit ? null : accord(hds[i], canv[i], g.fx, g.fy, g.gx, g.gy);
+    man[relOf(files[i])] = entree(files[i], hds[i], canv[i], g, s, { anim: o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, ''), i, fps: o.fps, vitesse: o.vitesse, ...(ech > 1 ? { s: ech } : {}), ...(ge ? { ech: ge.echelle, np: ge.np } : {}) });
     console.log(`  ${relOf(files[i])} -> ${relOf(s.dir)}/${s.nom}_*.png` + (g.accord !== null ? ` (grille calée à ${(100 * g.accord).toFixed(2)} %)` : ''));
   }
   if (o.apercu) await ecrirePng(planche(cols), path.join(sortiesDe(files[0]).dir, `${o.nomAnim || sortiesDe(files[0]).nom.replace(/_?\d+$/, '')}_planche.png`));

@@ -1637,13 +1637,57 @@
   }
 
 
+  // ------------------------------------------------------------ résolution d'affichage
+  // Le jeu réduit ses sprites (setScale) : un pixel dessiné y couvre souvent moins d'un pixel d'écran
+  // (Kainati 0,65) et des pixels sautent. Les cartes sont donc faites À LA TAILLE VUE EN JEU : une case
+  // = np pixels d'écran, np entier = max(1, round(échelle x f)). natif : la grille dessinée tombe déjà
+  // juste (loup : 0,4 x 2,5 = 1), on la garde telle quelle.
+  function grilleEcran(echelle, f) {
+    const k = echelle * (f > 0 ? f : 1 / echelle), np = Math.max(1, Math.round(k));
+    return { echelle, np, pas: np / echelle, natif: f > 0 && Math.abs(k - np) < 0.01 };
+  }
+  // Réduction à la grille d'écran : chaque case prend la couleur la plus présente parmi ses pixels
+  // (couleurs de l'image gardées, aucune nouvelle palette) ; les traits sombres comptent double pour ne
+  // pas disparaître ; à égalité, la plus sombre. Case opaque si la moitié de ses pixels l'est.
+  function echantillonnerEcran(im, pas) {
+    const w = im.width, h = im.height, d = im.data;
+    const nw = Math.floor(w / pas), nh = Math.floor(h / pas), out = nouvelle(nw, nh);
+    const bornes = (i) => [Math.ceil(i * pas - 0.5), Math.ceil((i + 1) * pas - 0.5)];
+    const lum = (c) => 0.3 * ((c >> 16) & 255) + 0.59 * ((c >> 8) & 255) + 0.11 * (c & 255);
+    for (let j = 0; j < nh; j++) {
+      const [y0, y1] = bornes(j);
+      for (let i = 0; i < nw; i++) {
+        const [x0, x1] = bornes(i);
+        const poids = new Map();
+        let opaques = 0, tous = 0;
+        for (let y = y0; y < Math.min(y1, h); y++) {
+          for (let x = x0; x < Math.min(x1, w); x++) {
+            const p = (y * w + x) * 4;
+            tous++;
+            if (d[p + 3] < 128) continue;
+            opaques++;
+            const c = rgbInt(d, p);
+            poids.set(c, (poids.get(c) || 0) + (lum(c) < 41 ? 2 : 1));
+          }
+        }
+        if (!opaques || opaques * 2 < tous) continue;
+        let best = -1, bv = -1;
+        for (const [c, v] of poids) if (v > bv || (v === bv && lum(c) < lum(best))) { best = c; bv = v; }
+        out.data.set([(best >> 16) & 255, (best >> 8) & 255, best & 255, 255], (j * nw + i) * 4);
+      }
+    }
+    return out;
+  }
+
   // ------------------------------------------------------------ chaîne complète (CLI et page)
   // Sprite seul déjà en pixel art agrandi (f px par pixel dessiné ; f <= 0 : déjà natif) ->
   // résolution native, recadrée sur le sprite. ph : décalage de la grille ; b : boîte gardée.
-  function natifSprite(hd, f) {
-    if (!(f > 0)) return { nat: hd, ph: [0, 0], b: [0, 0, hd.width, hd.height] };
-    const ph = phaseGrille(hd, f);
-    let nat = echantillonner(hd, f, ph);
+  // grille : grilleEcran() pour réduire à la taille vue en jeu (facultatif)
+  function natifSprite(hd, f, grille) {
+    if (!(f > 0) && !grille) return { nat: hd, ph: [0, 0], b: [0, 0, hd.width, hd.height] };
+    const ecran = grille && !grille.natif;
+    const ph = ecran ? [0, 0] : phaseGrille(hd, f);
+    let nat = ecran ? echantillonnerEcran(hd, grille.pas) : echantillonner(hd, f, ph);
     const b = boite(nat, 1);
     if (!b) throw new Error('image vide (aucun pixel opaque)');
     nat = rogner(nat, b);
@@ -1653,12 +1697,14 @@
   // Frames d'UNE animation -> même toile calée en bas au centre (origine (0,5 ; 1) du jeu), UNE
   // grille (phase de la 1re frame), puis recadrage sur l'union des boîtes. f <= 0 : pas de
   // rééchantillonnage (frames déjà natives, ou image peinte réduite ensuite).
-  function natifsAnimation(hds, f) {
+  function natifsAnimation(hds, f, grille) {
     const W = Math.max(...hds.map((i) => i.width)), H = Math.max(...hds.map((i) => i.height));
     const decal = hds.map((i) => [Math.floor((W - i.width) / 2), H - i.height]);
     let canv = hds.map((i, k) => { const c = nouvelle(W, H); coller(c, i, decal[k][0], decal[k][1]); return c; });
     let ph = [0, 0];
-    if (f > 0) {
+    if (grille && !grille.natif) {
+      canv = canv.map((c) => echantillonnerEcran(c, grille.pas));
+    } else if (f > 0) {
       ph = phaseGrille(canv[0], f);
       canv = canv.map((c) => echantillonner(c, f, ph));
     }
@@ -1844,7 +1890,7 @@
   const PERSO_MAX = 400;          // px natifs au plus sur un côté (temps de calcul)
   const PERSO_COULEURS = 64;      // au-delà : image peinte, palette réduite à 32 couleurs
   function traiterImages(ims, reglages) {
-    const reg = Object.assign({ fond: true, tol: 24, facteur: 0 }, reglages || {});
+    const reg = Object.assign({ fond: true, tol: 24, facteur: 0, echelleJeu: 0 }, reglages || {});
     const messages = [];
     let frames = ims.map(nettoyerAlpha);
     const aDuVide = (im) => { for (let p = 0; p < im.width * im.height; p++) if (im.data[p * 4 + 3] < 128) return true; return false; };
@@ -1865,9 +1911,11 @@
       f = d.f; auto = true;
       if (f <= 1) messages.push('Pas de grille de pixels détectée : image prise telle quelle (1 pixel = 1 pixel dessiné). Si c\'est du pixel art agrandi, indiquer la taille d\'un pixel.');
     }
+    // échelle du jeu donnée : cartes à la taille vue en jeu
+    const grille = reg.echelleJeu > 0 ? grilleEcran(reg.echelleJeu, f) : null;
     let canv;
-    if (frames.length > 1) canv = natifsAnimation(frames, f > 1 ? f : 0).canv;
-    else if (f > 1) canv = [natifSprite(frames[0], f).nat];
+    if (frames.length > 1) canv = natifsAnimation(frames, f > 1 ? f : 0, grille).canv;
+    else if (f > 1 || grille) canv = [natifSprite(frames[0], f, grille).nat];
     else {
       const b = boite(frames[0], 1);
       if (!b) throw new Error('image vide (aucun pixel opaque)');
@@ -1888,7 +1936,7 @@
     if (ech > 1) messages.push(`Grand sprite : réglages en pixels multipliés par ${ech} (zones, lissages, carte contre-jour, neutre détaillé).`);
     const res = canv.length > 1 ? sectionsAnimation(canv, [], [], peint, ech).frames : [analyse(canv[0], [], [], peint, null, ech)];
     return {
-      f, auto, peint, messages, s: ech,
+      f, auto, peint, messages, s: ech, np: grille ? grille.np : 1,
       frames: canv.map((nat, i) => {
         const c = cartes(nat, res[i], ech);
         const masque = new Uint8Array(nat.width * nat.height);
@@ -1900,5 +1948,5 @@
     };
   }
 
-  return { echelleSprite, ECHELLE_REF, neutreDetaille, traiterImages, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
+  return { grilleEcran, echantillonnerEcran, echelleSprite, ECHELLE_REF, neutreDetaille, traiterImages, natifSprite, natifsAnimation, sectionsAnimation, cartes, nettoyerAlpha, retirerFond, detecterFacteur, compterCouleurs, reduireCouleurs, N4, N8, N8_ET_SOI, pyRound, pyMod, compter, plusFrequent, LAB, lin, lab, dist3, hexc, parseHex, rgbInt, M64, XXP1, hashTuple, ordreSet, DIRS, TILT_INC, GBLUR_MIN, RAMP_SPAN, PART_DL, W_GLOBAL, hsv, SECTIONS, sectionNormal, encodeNormal, quantize, nearestCode, f32, rayonGauss, ligneBoite, flouLignes, flouGaussien, hueDiff, clusterRamps, rampBase, offsetsTries, nearestVectors, heriterBord, modeFilter, mergeSmall, analyse, nouvelle, boite, rogner, coller, saveMaps, CJ_PORTEE, CJ_SOMBRE, CJ_CONTOUR, CJ_FRANGE, CJ_LISSE, tasPlusPetit, tasAjouter, tasRetirer, decomposer, voisinDouble, hypotPy, carteCj, pyModF, hsvVersRgb, rgbVersHsv, cjApercu, cjDepuisApercu, normalesDepuisSections, eclairer, planche, miroir, kmeans, paletteLab, appliquerPalette, phaseGrille, echantillonner, accord, calerAxe, calerGrille, meilleurDecalage, lisserTemps };
 });

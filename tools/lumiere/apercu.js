@@ -99,6 +99,7 @@ function construirePage(donnees, test) {
   <label title="Fond uni (couleur des 4 coins) effacé depuis les bords ; un blanc enfermé, comme un œil, reste."><input type="checkbox" id="p-fond" checked> Retirer le fond</label>
   <label title="Écart de couleur accepté avec la couleur des coins (0-255)">tolérance <input type="number" id="p-tol" min="0" max="255" value="24"></label>
   <label title="Pixels de l'image par pixel dessiné. Vide = détection automatique de la grille.">Taille d'un pixel dessiné <input type="text" id="p-facteur" placeholder="auto"></label>
+  <label title="setScale du sprite dans le jeu (ex. 0,24). Vide = résolution dessinée. Rempli : cartes à la taille vue en jeu ; cocher ensuite « Taille reelle en jeu ».">Échelle en jeu <input type="text" id="p-echelle" placeholder="aucune"></label>
   <span id="p-detecte"></span>
   <input type="file" id="p-fichier" accept="image/png,image/jpeg" multiple hidden>
   <div id="p-etat"></div>
@@ -164,8 +165,8 @@ function main() {
     es.sort((x, y) => (x.i || 0) - (y.i || 0));
     const frames = es.map((e) => ({ images: images(e) }));
     assets.push(frames.length > 1
-      ? { nom, frames, fps: es[0].fps || 12, vitesse: es[0].vitesse || 0, regarde: a.regarde, s: es[0].s || 1 }
-      : { nom, images: frames[0].images, regarde: a.regarde, s: es[0].s || 1 });
+      ? { nom, frames, fps: es[0].fps || 12, vitesse: es[0].vitesse || 0, regarde: a.regarde, s: es[0].s || 1, np: es[0].np || 1 }
+      : { nom, images: frames[0].images, regarde: a.regarde, s: es[0].s || 1, np: es[0].np || 1 });
   }
   const titre = a.titre || (assets.length === 1 ? assets[0].nom : 'Sprites en sections');
   const donnees = { titre, echelle: a.echelle, assets, geoPad: GEO.GEO_PAD };

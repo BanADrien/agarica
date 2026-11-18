@@ -6,7 +6,8 @@
      ECARTS AU GABARIT (grands sprites, a reporter dans le skill) : 1) normaleLisse() echantillonne
      ses 5 x 5 voisins tous les uPasLisse pixels (= round(s) de l'asset, 1 pour les sprites de la
      demo : calcul identique) ; 2) plages des reglages adaptees a l'asset affiche : portee jusqu'a
-     3 x sa diagonale (800 au moins), profondeur +- diagonale / 6 (60 au moins). -->
+     3 x sa diagonale (800 au moins), profondeur +- diagonale / 6 (60 au moins) ; 3) case « Taille reelle
+     en jeu » : 1 pixel du jeu = 1 pixel d'ecran, une case de carte = np pixels (asset.np). -->
 <html lang="fr">
 <head>
 <meta charset="utf-8">
@@ -119,6 +120,7 @@
         </select></div>
       <div class="ligne"><span>Agrandissement <span class="pale" id="echelle-eff"></span></span>
         <select id="echelle"></select></div>
+      <label class="c" title="Comme en jeu : sans agrandissement, 1 pixel du jeu = 1 pixel d'ecran."><input type="checkbox" id="reel"> Taille reelle en jeu</label>
     </fieldset>
     <fieldset>
       <legend>2e lumiere</legend>
@@ -425,7 +427,7 @@ void main() {
   const NOMS = ["neutre", "normales", "origine", "sections", "geo", "cj"];
   // un asset = une image fixe ({ images }) ou une animation ({ frames: [{ images }], fps, vitesse, regarde })
   const assets = D.assets.map((a) => ({
-    nom: a.nom, fps: a.fps || 0, vitesse: a.vitesse || 0, regarde: a.regarde || "droite", pasLisse: Math.max(1, Math.round(a.s || 1)),
+    nom: a.nom, fps: a.fps || 0, vitesse: a.vitesse || 0, regarde: a.regarde || "droite", pasLisse: Math.max(1, Math.round(a.s || 1)), np: Math.max(1, Math.round(a.np || 1)),
     frames: (a.frames || [{ images: a.images }]).map((f) => ({ images: f.images, tex: {}, taille: [1, 1] })),
   }));
   let aCharger = assets.reduce((s, a) => s + a.frames.length, 0) * NOMS.length;
@@ -579,6 +581,7 @@ void main() {
     o.textContent = affichages[id](e.value);
   }
   $("paliers").onchange = dessiner;
+  $("reel").onchange = dessiner;
   $("ancien").onchange = dessiner;
 
   $("l2").onchange = dessiner;
@@ -606,10 +609,11 @@ void main() {
   const ECART = 12; // px du sprite entre deux assets
   function disposition() {
     const liste = etat.tous ? assets : [assets[etat.courant]];
-    const lw = liste.reduce((s, a) => s + a.taille[0], 0) + ECART * (liste.length - 1);
-    const lh = Math.max(...liste.map((a) => a.taille[1]));
+    const m = (a) => ($("reel").checked ? a.np : 1);   // taille reelle : une case = np pixels du jeu
+    const lw = liste.reduce((s, a) => s + a.taille[0] * m(a), 0) + ECART * (liste.length - 1);
+    const lh = Math.max(...liste.map((a) => a.taille[1] * m(a)));
     let x = 0;
-    const places = liste.map((a) => { const p = { a, x, y: lh - a.taille[1] }; x += a.taille[0] + ECART; return p; });
+    const places = liste.map((a) => { const p = { a, x, y: lh - a.taille[1] * m(a), m: m(a) }; x += a.taille[0] * m(a) + ECART; return p; });
     return { places, lw, lh };
   }
 
@@ -633,8 +637,9 @@ void main() {
     // echelle entiere ; reduite si l'ensemble ne tient pas dans la scene
     let e = echelle;
     while (e > 1 && (lw * e > canvas.clientWidth * 0.94 || lh * e > canvas.clientHeight * 0.88)) e--;
-    $("echelle-eff").textContent = e !== echelle ? "(x" + e + " pour tenir)" : "";
-    const s = Math.max(1, Math.round(e * dpr)); // entier en pixels ecran : pixels nets
+    const reel = $("reel").checked;
+    $("echelle-eff").textContent = reel ? "(taille du jeu)" : e !== echelle ? "(x" + e + " pour tenir)" : "";
+    const s = reel ? 1 : Math.max(1, Math.round(e * dpr)); // entier en pixels ecran : pixels nets
     const ox = Math.floor((W - lw * s) / 2), oy = Math.floor((H - lh * s) / 2);
     geo = { ox, oy, s, dpr, lw, lh };
     const L = etat.lumieres.map(([fx, fy]) => [ox + fx * lw * s, oy + fy * lh * s]);
@@ -681,7 +686,8 @@ void main() {
       gl.uniform2f(U.uTaille, p.a.taille[0], p.a.taille[1]);
       gl.uniform1f(U.uPasLisse, p.a.pasLisse);
       gl.uniform2f(U.uOrigineEcr, x, y);
-      gl.uniform4f(U.uRect, x, y, p.a.taille[0] * s, p.a.taille[1] * s);
+      gl.uniform1f(U.uEchelle, s * p.m);
+      gl.uniform4f(U.uRect, x, y, p.a.taille[0] * s * p.m, p.a.taille[1] * s * p.m);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
     gl.uniform1f(U.uFlip, 0);

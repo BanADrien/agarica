@@ -41,6 +41,18 @@
 // Objet éclairé sans carte (frame non préparée) : même lumière de face, normale de face (à
 // plat), pas de contre-jour.
 
+// Cases d'une carte « taille écran » calées sur les pixels d'écran. Phaser arrondit les coins du sprite
+// au pixel (camera.roundPixels) : la largeur affichée Q est entière mais pas exactement W x échelle,
+// ce qui décalerait les cases d'une colonne çà et là. On recalcule leur pas et leur coin dans l'image
+// pour que chaque case couvre exactement np pixels d'écran. bas : axe y (arrondi inverse du vertex shader).
+function grilleSurEcran(debut, W, echelle, g, np, bas) {
+  const rond = bas ? (v) => Math.ceil(v - 0.5) : (v) => Math.floor(v + 0.5);
+  const Q = rond(debut + W * echelle) - rond(debut);
+  if (Q <= 0) return null;
+  const tau = W / Q;
+  return { pas: np * tau, coin: Math.round(g * echelle) * tau };
+}
+
 const LightKit = (() => {
   const NOM_PIPELINE = 'LumiereSections';
 
@@ -273,6 +285,7 @@ void main() {
 
       // un appel de dessin par objet éclairé : ses lampes sont exprimées dans SON repère natif
       batchSprite(go, camera, parent) {
+        this._camera = camera;
         // d'abord se lier (vide le pipeline précédent) : les uniforms ci-dessous changent le
         // programme GL, il ne faut pas que le lot en attente d'un autre pipeline le subisse
         this.manager.set(this, go);
@@ -299,6 +312,16 @@ void main() {
         // « devant » à « derrière » (seuils en px de la grille) au changement de frame
         const fx = e ? e.fx : 1 / sx, fy = e ? e.fy : 1 / sy, gx = e ? e.gx : 0, gy = e ? e.gy : 0;
         const w = e ? e.w : W * sx, h = e ? e.h : H * sy;
+        let cx = gx, cy = gy, px = fx, py = fy;
+        const cam = this._camera, flipC = !!go.flipX;
+        // carte à la taille écran, affichée à son échelle, sans rotation ni zoom : cases sur les pixels
+        if (e && e.np && cam && cam.roundPixels && cam.zoom === 1 && !go.rotation && !go.parentContainer
+          && Math.abs(sx - e.ech) < 0.002 && Math.abs(sy - e.ech) < 0.002) {
+          const gauche = go.x - (flipC ? W - go.displayOriginX : go.displayOriginX) * sx - cam.scrollX * go.scrollFactorX;
+          const haut = go.y - go.displayOriginY * sy - cam.scrollY * go.scrollFactorY;
+          const ax = grilleSurEcran(gauche, W, sx, gx, e.np, false), ay = grilleSurEcran(haut, H, sy, gy, e.np, true);
+          if (ax && ay) { px = ax.pas; cx = ax.coin; py = ay.pas; cy = ay.coin; }
+        }
         const flip = !!go.flipX;
         const kx = sx * fx, ky = sy * fy;                  // px du monde par pixel natif
         const k = (kx + ky) / 2;
@@ -308,8 +331,8 @@ void main() {
           const L = lampes[i];
           m.applyInverse(L.x, L.y, this._pt);
           const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
-          const tx = flip ? w - (W - D - gx) / fx : (D - gx) / fx;
-          const ty = (Dy - gy) / fy;
+          const tx = flip ? w - (W - D - cx) / px : (D - cx) / px;
+          const ty = (Dy - cy) / py;
           const z = (L.profondeur ?? DEFAUTS.profondeur) / k;
           if (z < 15) derriere = 1;
           const nom = `uLumieres[${i}].`;
@@ -325,8 +348,8 @@ void main() {
         this.set2f('uTaille', w, h);
         this.set2f('uTailleTex', frame.source.width, frame.source.height);
         this.set2f('uCoin', frame.cutX, frame.cutY);
-        this.set2f('uGrille', gx, gy);
-        this.set2f('uPas', fx, fy);
+        this.set2f('uGrille', cx, cy);
+        this.set2f('uPas', px, py);
         this._textures = c;
       }
 
@@ -524,4 +547,4 @@ void main() {
 })();
 
 // Node (npm run lumiere:tests) lit le shader pour le comparer au gabarit et à la version CPU.
-if (typeof module !== 'undefined' && module.exports) module.exports = LightKit;
+if (typeof module !== 'undefined' && module.exports) { module.exports = LightKit; LightKit.grilleSurEcran = grilleSurEcran; }

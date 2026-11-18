@@ -82,12 +82,12 @@ function main() {
   const kai = [0, 1, 2, 3].map((i) => PNG.lirePng(asset(`kainati_frames/kainati_row0_${i}.png`)));
   const marche = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => PNG.lirePng(asset(`agarica_walk_frames/agarica_walk_${i}.png`)));
   const cas = [
-    { nom: 'grizzly du jeu (auto)', ims: [griz], reglages: {}, jeu: ['grizzly_frames/_lumiere/grizzly_row0_0'] },
-    { nom: 'grizzly (pose 2) natif x4 sur fond blanc (auto)', ims: [surFondBlanc(grizNat, 4)], reglages: {}, jeu: ['grizzly_frames/_lumiere/grizzly_row0_2'] },
-    { nom: 'marche d\'Agarica, 8 images (auto)', ims: marche, reglages: {}, jeu: marche.map((_, i) => `agarica_walk_frames/_lumiere/agarica_walk_${i}`) },
+    { nom: 'grizzly du jeu (auto)', ims: [griz], reglages: {}, jeu: null },
+    { nom: 'grizzly (pose 2) natif x4 sur fond blanc (auto)', ims: [surFondBlanc(grizNat, 4)], reglages: {}, jeu: null },
+    { nom: 'marche d\'Agarica, 8 images (auto)', ims: marche, reglages: { facteur: 3.76, echelleJeu: 0.24, fond: false }, jeu: marche.map((_, i) => `agarica_walk_frames/_lumiere/agarica_walk_${i}`) },
     // grand sprite (s > 1) : réglages en pixels à l'échelle ; facteur 1,08 du registre imposé
     { nom: 'Kainati, grand sprite seul (facteur 1,08)', ims: [kai[0]], reglages: { facteur: 1.08 }, jeu: null },
-    { nom: 'Kainati, 4 images (facteur 1,08)', ims: kai, reglages: { facteur: 1.08 }, jeu: kai.map((_, i) => `kainati_frames/_lumiere/kainati_row0_${i}`) },
+    { nom: 'Kainati, 4 images (facteur 1,08)', ims: kai, reglages: { facteur: 1.08, echelleJeu: 0.6, fond: false }, jeu: kai.map((_, i) => `kainati_frames/_lumiere/kainati_row0_${i}`) },
   ];
   const page = construirePage({ titre: 'essai', echelle: 6, assets: [], geoPad: 10 },
     cas.map((c) => ({ nom: c.nom, reglages: c.reglages, images: c.ims.map(url) })));
