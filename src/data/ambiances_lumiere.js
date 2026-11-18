@@ -24,8 +24,5 @@ const AMBIANCE_PAR_ZONE = {
   ForetSombre1Scene: 'foret',
   ForetSombre2Scene: 'foret',
   ForetFlottante1Scene: 'foret',
-  ForetFlottante2Scene: 'foret',
-  ClairierePlanteScene: 'foret',
-  HutteMorgatScene: 'foret',
   ForetCorrompue1Scene: 'foret',
 };
