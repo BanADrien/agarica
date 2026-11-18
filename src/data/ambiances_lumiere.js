@@ -20,4 +20,12 @@ const AMBIANCES_LUMIERE = {
 };
 
 // Ambiance de chaque zone (clé de scène -> nom dans AMBIANCES_LUMIERE). Une zone absente de cette liste garde son rendu.
-const AMBIANCE_PAR_ZONE = {};
+const AMBIANCE_PAR_ZONE = {
+  ForetSombre1Scene: 'foret',
+  ForetSombre2Scene: 'foret',
+  ForetFlottante1Scene: 'foret',
+  ForetFlottante2Scene: 'foret',
+  ClairierePlanteScene: 'foret',
+  HutteMorgatScene: 'foret',
+  ForetCorrompue1Scene: 'foret',
+};
