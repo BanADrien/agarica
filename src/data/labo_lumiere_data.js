@@ -19,7 +19,7 @@ const LABO_LUMIERE_DATA = {
   "totems": [],
   "enemies": [],
   // Champignons lumineux de la forêt sombre, sous leurs lampes (partie nuit)
-  "props": [180, 470, 760, 1100, 1480].map((x) => ({ type: 'foret_sombre_champignons_lumineux', x, y: 448 })),
+  "props": [170, 590, 850, 1380, 1760].map((x) => ({ type: 'foret_sombre_champignons_lumineux', x, y: 448 })),
   "campfires": [],
   "playerSpawn": { "x": 240, "y": 380 },
   "exits": [],

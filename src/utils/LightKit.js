@@ -314,21 +314,27 @@ void main() {
         const w = e ? e.w : W * sx, h = e ? e.h : H * sy;
         let cx = gx, cy = gy, px = fx, py = fy;
         const cam = this._camera, flipC = !!go.flipX;
-        // carte à la taille écran, affichée à son échelle, sans rotation ni zoom : cases sur les pixels
-        if (e && e.np && cam && cam.roundPixels && cam.zoom === 1 && !go.rotation && !go.parentContainer
+        // carte à la taille écran, affichée à son échelle, sans rotation, zoom entier : cases sur les pixels
+        if (e && e.np && cam && cam.roundPixels && Number.isInteger(cam.zoom) && !go.rotation && !go.parentContainer
           && Math.abs(sx - e.ech) < 0.002 && Math.abs(sy - e.ech) < 0.002) {
-          const gauche = go.x - (flipC ? W - go.displayOriginX : go.displayOriginX) * sx - cam.scrollX * go.scrollFactorX;
-          const haut = go.y - go.displayOriginY * sy - cam.scrollY * go.scrollFactorY;
-          const ax = grilleSurEcran(gauche, W, sx, gx, e.np, false), ay = grilleSurEcran(haut, H, sy, gy, e.np, true);
+          const z = cam.zoom, ox = cam.width * cam.originX, oy = cam.height * cam.originY;
+          const gauche = cam.x + ox + z * (go.x - (flipC ? W - go.displayOriginX : go.displayOriginX) * sx - cam.scrollX * go.scrollFactorX - ox);
+          const haut = cam.y + oy + z * (go.y - go.displayOriginY * sy - cam.scrollY * go.scrollFactorY - oy);
+          const ax = grilleSurEcran(gauche, W, sx * z, gx, e.np * z, false), ay = grilleSurEcran(haut, H, sy * z, gy, e.np * z, true);
           if (ax && ay) { px = ax.pas; cx = ax.coin; py = ay.pas; cy = ay.coin; }
         }
         const flip = !!go.flipX;
         const kx = sx * fx, ky = sy * fy;                  // px du monde par pixel natif
         const k = (kx + ky) / 2;
-        const lampes = this._lampes, nb = Math.min(lampes.length, this.renderer.config.maxLights);
-        let derriere = 0;
-        for (let i = 0; i < nb; i++) {
-          const L = lampes[i];
+        const lampes = this._lampes, maxi = this.renderer.config.maxLights;
+        // Seules les lampes qui peuvent atteindre l'objet (au-delà de la portée, leur lumière vaut 0) :
+        // même image, beaucoup moins de calcul quand de nombreux objets sont éclairés
+        const rayonObjet = Math.hypot(W * sx, H * sy);
+        let derriere = 0, nb = 0;
+        for (let j = 0; j < lampes.length && nb < maxi; j++) {
+          const L = lampes[j], atteinte = L.radius + rayonObjet;
+          if (Math.abs(L.x - go.x) > atteinte || Math.abs(L.y - go.y) > atteinte) continue;
+          const i = nb++;
           m.applyInverse(L.x, L.y, this._pt);
           const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
           const tx = flip ? w - (W - D - cx) / px : (D - cx) / px;

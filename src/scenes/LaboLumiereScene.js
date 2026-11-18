@@ -3,20 +3,23 @@
 // l'autre : NUIT (champignons, lucioles, feu de camp), SOLEIL (plein jour, auvent d'ombre), BANC D'ESSAI
 // (torche au pointeur, lune, tests en boucle). Mannequins immobiles à leur échelle du jeu dans chaque
 // partie. Seule cette scène active ce code : le jeu normal n'y passe jamais.
-// Touches libres dans le jeu : U / J réglage, H / L valeur, N groupe de lampes, Y partie suivante,
+// Touches : U / J réglage, H / L valeur, N groupe de lampes, Y partie suivante, Z zoom (x1, x1,5, x2),
 // G éclairage, O sprites d'origine, V décor éclairé, T écran net, C copier, W panneau.
+// Zoom : le labo rend en 1920 x 1080 avec une caméra à zoom ENTIER (2, 3, 4), donc x1,5 garde des pixels
+// réguliers ; l'interface passe par une 2e caméra. Taille d'origine rendue en quittant la zone.
 
 // Mannequins : images du manifeste SECTIONS_LUMIERE, échelle = celle du code de chaque personnage.
 const LABO_MANNEQUINS = [
-  { id: 'loup', dx: 360, choix: (e) => e.anim === 'loup_run', echelle: () => WOLF_SCALE },
-  { id: 'grizzly', dx: 640, choix: (e) => e.anim === 'grizzly_run', echelle: () => (getAssetManifest().grizzly || {}).scale || 0.4214 },
-  { id: 'crapaud', dx: 880, choix: (e) => e.anim === 'crapaud', echelle: () => CRAPAUD_SCALE, origineX: () => CRAPAUD_ORIGIN_X },
+  { id: 'loup', dx: 360, nuit: 420, choix: (e) => e.anim === 'loup_run', echelle: () => WOLF_SCALE },
+  { id: 'grizzly', dx: 640, nuit: 720, choix: (e) => e.anim === 'grizzly_run', echelle: () => (getAssetManifest().grizzly || {}).scale || 0.4214 },
+  { id: 'crapaud', dx: 880, nuit: 1130, choix: (e) => e.anim === 'crapaud', echelle: () => CRAPAUD_SCALE, origineX: () => CRAPAUD_ORIGIN_X },
   { id: 'kainati', dx: 1560, choix: (e) => e.anim === 'kainati_idle', echelle: () => (getAssetManifest().kainati || {}).scale || 0.6 },
 ];
+const LABO_ZOOMS = [{ nom: 'x1', camera: 2 }, { nom: 'x1,5', camera: 3 }, { nom: 'x2', camera: 4 }];
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
 const LABO_PARTIES = [
-  { id: 'nuit', nom: 'NUIT', ambiance: 0.16, teinte: [0.72, 0.82, 1.25], fond: [5, 6, 15], contre: 1.5, paliers: 4 },
+  { id: 'nuit', nom: 'NUIT', ambiance: 0.3, teinte: [0.72, 0.82, 1.25], fond: [8, 10, 24], contre: 1.5, paliers: 4 },
   { id: 'soleil', nom: 'SOLEIL', ambiance: 0.58, teinte: [1, 1, 1.04], fond: [143, 184, 216], contre: 1.5, paliers: 4 },
   { id: 'banc', nom: 'BANC D\'ESSAI', ambiance: 0.36, teinte: [1, 1, 1], fond: [13, 11, 26], contre: 1.5, paliers: 4 },
 ];
@@ -58,11 +61,12 @@ class LaboLumiereScene extends Phaser.Scene {
   laboConstruire() {
     const ok = LightKit.activer(this, { ambiance: 0x292a40 });
     const st = {
-      ok, groupes: [], lampes: [], ligne: 0, choix: [0, 0, 0], partie: 0, eclairage: true, origine: false, decor: true, net: false,
+      ok, zoom: 0, vus: new WeakSet(), groupes: [], lampes: [], ligne: 0, choix: [0, 0, 0], partie: 0, eclairage: true, origine: false, decor: true, net: false,
       visible: true, sprites: [], extras: [], decors: [], messages: [], note: '', image: 0, actives: 0,
       parties: LABO_PARTIES.map((p) => ({ ...p })), max: ok ? this.game.renderer.config.maxLights : 0,
     };
     this.__labo = st;
+    this.laboEcran(st);
     this.laboMannequins(st);
     this.laboDecors(st);
     if (ok) this.laboLampes(st); else st.messages.push('WebGL indisponible : pas d\'eclairage');
@@ -72,12 +76,34 @@ class LaboLumiereScene extends Phaser.Scene {
     this.laboAppliquer(st);
     st.texte = this.add.text(10, 64, '', {
       fontFamily: 'monospace', fontSize: '11px', color: '#e8e2f2', backgroundColor: '#0d0b1acc', padding: { x: 8, y: 6 },
-    }).setScrollFactor(0).setDepth(100000);
+    }).setScrollFactor(0).setDepth(100000).setResolution(2);
     st.texte.lookRole = 'ui';
     this.laboTouches(st);
-    this.events.once('shutdown', () => { if (this.game.canvas) this.game.canvas.style.imageRendering = ''; });
+    this.events.once('shutdown', () => {
+      if (this.game.canvas) this.game.canvas.style.imageRendering = '';
+      this.game.scale.setGameSize(st.tailleJeu[0], st.tailleJeu[1]);
+    });
     this.laboImage(this.time.now);
     this.laboPanneau(st);
+  }
+
+  // Rendu interne 1920 x 1080 : caméra du monde à zoom entier, 2e caméra pour l'interface (repère 960 x 540)
+  laboEcran(st) {
+    const sc = this.game.scale;
+    st.tailleJeu = [sc.gameSize.width, sc.gameSize.height];
+    sc.setGameSize(st.tailleJeu[0] * 2, st.tailleJeu[1] * 2);
+    this.cameras.main.setLerp(1, 0);
+    st.camUi = this.cameras.add(0, 0, st.tailleJeu[0] * 2, st.tailleJeu[1] * 2).setOrigin(0, 0).setZoom(2);
+    this.laboRepartir(st);
+  }
+
+  // Chaque objet est vu par une seule caméra : fixé à l'écran = interface, sinon monde
+  laboRepartir(st) {
+    for (const o of this.children.list) {
+      if (st.vus.has(o)) continue;
+      st.vus.add(o);
+      (o.scrollFactorX === 0 ? this.cameras.main : st.camUi).ignore(o);
+    }
   }
 
   // Sol du labo : haut des tuiles, comme la marche d'Agarica
@@ -105,20 +131,25 @@ class LaboLumiereScene extends Phaser.Scene {
   laboMannequins(st) {
     LABO_PARTIES.forEach((p, i) => {
       for (const def of LABO_MANNEQUINS) {
-        const m = this.laboPoser(st, def.id, i * LABO_LARGEUR + def.dx, def.choix, def.echelle(), def.origineX ? def.origineX() : undefined);
+        const m = this.laboPoser(st, def.id, i * LABO_LARGEUR + (i === 0 && def.nuit ? def.nuit : def.dx), def.choix, def.echelle(), def.origineX ? def.origineX() : undefined);
         if (m) st.sprites.push({ ...m, partie: i });
       }
     });
     // Banc : Agarica retournée gauche / droite sous une lampe fixe
     st.retournee = this.laboPoser(st, 'agarica', 2 * LABO_LARGEUR + 190, (e) => e.anim === 'agarica_idle', HUMAN_SCALE);
-    if (st.retournee) st.extras.push(st.retournee.sp);
+    if (st.retournee) {
+      st.extras.push(st.retournee.sp);
+      // Étiquette : ce mannequin n'est pas la joueuse
+      this.add.text(st.retournee.sp.x, this.laboSol() - 96, 'test : retournement', { fontFamily: 'monospace', fontSize: '10px', color: '#d9d4e3', backgroundColor: '#0d0b1acc', padding: { x: 3, y: 1 } })
+        .setOrigin(0.5, 1).setResolution(4).setDepth(CHARACTER_DEPTH + 1);
+    }
   }
 
   // Décors du dépôt : feu de camp (animation du jeu, sans son menu), lucioles (fx_luciole) ; l'auvent
   // du soleil est un simple marqueur dessiné (aucun décor du dépôt n'en fait office)
   laboDecors(st) {
     const sol = this.laboSol();
-    st.feuX = 1320;
+    st.feuX = 960;
     if (typeof ensureCampfireAnimation === 'function') {
       ensureCampfireAnimation(this);
       const feu = this.add.sprite(st.feuX, sol + GROUND_CONTACT_SINK, `${CAMPFIRE_TEXTURE_PREFIX}0`).setOrigin(0.5, 1).setScale(CAMPFIRE_SCALE).setDepth(CHARACTER_DEPTH - 2);
@@ -155,12 +186,12 @@ class LaboLumiereScene extends Phaser.Scene {
     const X = (p, dx) => p * LABO_LARGEUR + dx;
     const fixe = () => ({});
     // ---- NUIT
-    const champis = [180, 470, 760, 1100, 1480].map((dx) => ({ x: X(0, dx), y: sol - 14 }));
-    this.laboGroupe(st, 0, 'champignons', { profondeur: 10, portee: 90, intensite: 0.8, couleur: 0x5cf0d0 }, champis,
+    const champis = [170, 590, 850, 1380, 1760].map((dx) => ({ x: X(0, dx), y: sol - 60 }));
+    this.laboGroupe(st, 0, 'champignons', { profondeur: 32, portee: 280, intensite: 0.7, couleur: 0x5cf0d0 }, champis,
       (t, i) => ({ force: 0.75 + 0.25 * Math.sin(t / 1100 + i * 1.7) }));
     const lucioles = [260, 560, 830, 1040, 1390, 1700].map((dx, i) => ({ x: X(0, dx), y: sol - 70 - (i * 37) % 100 }));
     st.lucioles = [];
-    this.laboGroupe(st, 0, 'lucioles', { profondeur: 12, portee: 70, intensite: 1, couleur: 0xd8ff6a }, lucioles, (t, i, pos) => {
+    this.laboGroupe(st, 0, 'lucioles', { profondeur: 30, portee: 150, intensite: 0.7, couleur: 0xd8ff6a }, lucioles, (t, i, pos) => {
       const x = pos.x + 28 * Math.sin(t / 1700 + i * 2.1) + 14 * Math.sin(t / 730 + i), y = pos.y + 18 * Math.sin(t / 1300 + i * 1.3);
       const f = Math.max(0, Math.sin(t / 2300 + i * 2.6)); const force = f * f;
       const sp = st.lucioles[i];
@@ -174,7 +205,7 @@ class LaboLumiereScene extends Phaser.Scene {
         return sp;
       });
     }
-    this.laboGroupe(st, 0, 'feu de camp', { profondeur: 14, portee: 360, intensite: 1.1, couleur: 0xffb35c }, [{ x: st.feuX, y: sol - 26 }], (t, i, pos) => {
+    this.laboGroupe(st, 0, 'feu de camp', { profondeur: 55, portee: 520, intensite: 1.05, couleur: 0xffb35c }, [{ x: st.feuX, y: sol - 40 }], (t, i, pos) => {
       const v = Math.sin(t / 90) * 0.4 + Math.sin(t / 37 + 1) * 0.35 + Math.sin(t / 211) * 0.25;
       return { x: pos.x + v * 3, y: pos.y + v * 2, force: 0.86 + 0.14 * v };
     }, true);
@@ -183,8 +214,8 @@ class LaboLumiereScene extends Phaser.Scene {
       (t, i, pos) => ({ x: pos.x + 160 * Math.sin(t / 2600) }), true);
     // ---- SOLEIL : très loin, suit la caméra pour garder la même direction sur toute la partie
     const soleil = this.laboGroupe(st, 1, 'soleil', { profondeur: 1700, portee: 9000, intensite: 0.5, couleur: 0xfff1d6 }, [{ x: X(1, 960), y: -1400 }], () => {
-      const c = this.cameras.main;
-      return { x: c.scrollX + c.width / 2 - 500, y: c.scrollY + c.height / 2 - 1400 };
+      const v = this.cameras.main.worldView;
+      return { x: v.centerX - 500, y: v.centerY - 1400 };
     }, true);
     // Ombre de l'auvent : le soleil baisse sur ce qui passe dessous (bords adoucis sur 48 px)
     const { x0, x1 } = st.ombre;
@@ -226,6 +257,7 @@ class LaboLumiereScene extends Phaser.Scene {
     sur('L', () => this.laboChanger(st, 1));
     sur('N', () => { st.choix[st.partie] = Phaser.Math.Wrap(st.choix[st.partie] + 1, 0, Math.max(1, this.laboGroupes(st).length)); });
     sur('Y', () => this.laboTeleporter(st));
+    sur('Z', () => { st.zoom = (st.zoom + 1) % LABO_ZOOMS.length; });
     sur('G', bascule('eclairage'));
     sur('O', bascule('origine'));
     sur('V', bascule('decor'));
@@ -290,19 +322,19 @@ class LaboLumiereScene extends Phaser.Scene {
       return r.groupe ? (g ? g[r.id] : '-') : p[r.id];
     };
     const oui = (b) => (b ? 'oui' : 'non');
-    const lignes = [`LABO LUMIERE : ${p.nom}   [Y] partie suivante`, `groupe [N] : ${g ? `${g.nom} (${g.lampes.length})` : 'aucun'}`];
+    const lignes = [`LABO LUMIERE : ${p.nom}   [Y] partie suivante   [Z] zoom ${LABO_ZOOMS[st.zoom].nom}`, `groupe [N] : ${g ? `${g.nom} (${g.lampes.length})` : 'aucun'}`];
     LABO_REGLAGES.forEach((r, i) => lignes.push(`${i === st.ligne ? '>' : ' '} ${r.id.padEnd(11)} ${aff(r)}`));
     lignes.push('U/J reglage  H/L valeur  C copier  W panneau');
     lignes.push(`G eclairage ${oui(st.eclairage)}  O origine ${oui(st.origine)}  V decor ${oui(st.decor)}  T net ${oui(st.net)}`);
     lignes.push(`lampes actives ${st.actives} / ${st.max}`);
     lignes.push('taille ecran, px ecran par case de carte :');
     for (const m of st.sprites.filter((s) => s.partie === st.partie)) {
-      lignes.push(`  ${m.id.padEnd(8)} ${Math.round(m.e.w * (m.e.np || 1))} x ${Math.round(m.e.h * (m.e.np || 1))}  ${(LightKit.pixelEcran(m.sp) || 0).toFixed(2)}`);
+      lignes.push(`  ${m.id.padEnd(8)} ${Math.round(m.e.w * (m.e.np || 1))} x ${Math.round(m.e.h * (m.e.np || 1))}  ${((LightKit.pixelEcran(m.sp) || 0) / 2).toFixed(2)}`);
     }
     const j = this.player;
     if (j && j.frame) {
       const k = LightKit.pixelEcran(j);
-      lignes.push(`agarica : ${j.frame.texture.key} ${k ? k.toFixed(2) : 'SANS CARTE (eclairee a plat)'}`);
+      lignes.push(`agarica : ${j.frame.texture.key} ${k ? (k / 2).toFixed(2) : 'SANS CARTE (eclairee a plat)'}`);
     }
     for (const m of st.messages) lignes.push(`! ${m}`);
     if (st.note) lignes.push(st.note);
@@ -322,6 +354,16 @@ class LaboLumiereScene extends Phaser.Scene {
   // À chaque image : fondu d'ambiance, lampes animées, et seulement les plus utiles allumées
   laboImage(t) {
     const st = this.__labo, cam = this.cameras.main;
+    this.laboRepartir(st);
+    // Zoom imposé à chaque image (le fondu d'entrée de zone remet la caméra à 1). Bas de la vue : bas de
+    // la zone à x1, 60 px sous le sol en zoomant (les personnages restent au milieu de l'écran)
+    const zc = LABO_ZOOMS[st.zoom].camera, hVue = cam.height / zc;
+    if (cam.zoom !== zc) cam.setZoom(zc);
+    cam.scrollY = Math.min(540, this.laboSol() + 60 + (st.zoom === 0 ? 540 : 0)) - hVue - (cam.height - hVue) / 2;
+    // Hors de la vue : rien à dessiner (les corps physiques du sol ne dépendent pas de l'affichage)
+    const vueX = cam.scrollX + cam.width / 2, demi = cam.width / zc / 2;
+    for (const o of st.decors) o.setVisible(Math.abs(o.x - vueX) < demi + 160);
+    for (const m of st.sprites) m.sp.setVisible(Math.abs(m.sp.x - vueX) < demi + 420);
     const x = this.player ? this.player.x : 0;
     const poids = this.laboPoids(x);
     st.partie = poids.indexOf(Math.max(...poids));
@@ -333,7 +375,7 @@ class LaboLumiereScene extends Phaser.Scene {
       const courant = st.parties[st.partie];
       LightKit.reglerRendu(this, { contre: courant.contre, paliers: courant.paliers });
       // Lampes candidates : partie présente, cercle dans la vue ; les prioritaires d'abord puis les plus proches
-      const cx = cam.scrollX + cam.width / 2, cy = cam.scrollY + cam.height / 2;
+      const vue = cam.worldView, cx = vue.centerX, cy = vue.centerY;
       const candidates = [];
       for (const l of st.lampes) {
         const m = l.maj(t, l.i, l.pos) || {};
@@ -343,7 +385,7 @@ class LaboLumiereScene extends Phaser.Scene {
         l.L.setRadius(l.g.portee);
         const force = poids[l.g.partie] * (m.force ?? 1);
         l.L.setIntensity(l.g.intensite * force);
-        const dx = Math.max(Math.abs(px - cx) - cam.width / 2, 0), dy = Math.max(Math.abs(py - cy) - cam.height / 2, 0);
+        const dx = Math.max(Math.abs(px - cx) - vue.width / 2, 0), dy = Math.max(Math.abs(py - cy) - vue.height / 2, 0);
         const utile = force > 0.02 && dx * dx + dy * dy < l.g.portee * l.g.portee;
         l.L.setVisible(false);
         if (utile) candidates.push({ l, d: Math.hypot(px - cx, py - cy) - (l.prioritaire ? 1e6 : 0) });
