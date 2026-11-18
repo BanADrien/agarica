@@ -1646,6 +1646,26 @@ Conception : `MONDE_V2_PIECES.md`. Zone d'essai : `ZonePiecesScene` (`src/data/z
   talismans dans « À ramasser ». Champ « Apparaît » (`showIf`) des coffres, trésors et objets : les cibles de la zone
   (`EditeurListes.drapeauxCibles`).
 
+### Monde V2 : le Bosquet (2026-11-18, en blocs, rétro-compatible)
+Conception : `PLAN_MONDE_V2.md` § 7. Zones `v2_village`, `v2_source`, `v2_hauts_bosquet`, `v2_caves` : données
+`src/data/v2_<zone>_data.js`, scènes gabarit `src/scenes/V2<Nom>Scene.js`, histoire `src/story/v2_bosquet.js`.
+Robot : `python tools/robot/v2_bosquet.py prologue|caves|sauvegarde`. L'ancienne version ne change pas.
+- **`MONDE_V2_ZONES`** (StoryKit) : zones d'histoire du monde V2, lues par `storyZoneEntry` ; hors de `DEMO_ZONES`
+  (menu des chapitres, carte et liste des zones de l'ancienne version inchangés).
+- **Sauvegarde séparée** : clé `SAVE_STORAGE_KEY_V2` (`agarica-save-monde-v2`), choisie par `saveStorageKey()`.
+  `resetStoryState` suit la scène construite (`saveSlotSuivreScene`) ; `mondeV2Basculer(actif)`, `mondeV2Actif()`,
+  `mondeV2ASauvegarde()`. `mondeV2Quitter(game)` (écran-titre) rend le registre à l'ancienne partie.
+- **Lancement** : `mondeV2Lancer(titre, { recommencer })`, entrées « Monde V2 (chantier) » et « Monde V2 : recommencer »
+  de `LEGACY_TEST_ZONES` (clés facultatives `lancer(titre)` et `visible()`). `?zone=v2_village` marche aussi ;
+  `&load` y lit la sauvegarde V2. `PrologueScene` accepte `{ suite: 'CleDeScene' }` (défaut : `BosquetScene`).
+- **`V2SuiteScene`** : écran « Suite en construction » au bout de la porte de l'Est (provisoire).
+- **`v2Mousses: [{ x, y, w, h }]`** : mousse toxique suspendue (x, y = coin haut gauche), non solide, un cœur au contact.
+- **`v2Portes: [{ id, x, y, w, h, cote: 'dedans'|'dehors', flag }]`** : porte barrée (x = milieu, y = sol). Solide tant que
+  `flag` est faux ; [E] la débarre du côté `dedans`, simple remarque du côté `dehors`.
+- **`breakables[].ronces: true`** : voile d'épines dessiné sur une haie cassable à la dague (`v2PoserRonces`).
+- **Drapeaux** : `v2SourceLibree`, `v2Nuit`, `v2PorteCavesOuverte`, plus ceux de l'ancien bosquet (`talismanOurs`,
+  `idoleVolee`, `amaniteCouverte`, `banished`). Cinématiques `v2_*` ; le jugement et ses répliques viennent de `acte1.js`.
+
 ### Éclairage de toute une zone (`src/utils/LightKit.js`, 2026-11-17, rétro-compatible, opt-in)
 Mode d'emploi des sprites et du modèle : skill `eclairage-sections`. Rien ne change tant qu'une scène n'appelle pas
 `LightKit.activer` (le mode `?lumiere` est inchangé). Ajouts :
