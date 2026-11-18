@@ -9,6 +9,7 @@ const FORET_REGLAGES = [
   { id: 'teinte', pas: 0.02, min: 0, max: 0.5, val: FORET_AMBIANCE.teinte },
   { id: 'rayons', pas: 0.05, min: 0, max: 2, val: FORET_AMBIANCE.rayons },
   { id: 'lueurCorps', pas: 0.01, min: 0, max: 0.4, val: FORET_AMBIANCE.lueurCorps },
+  { id: 'rayonAvant', pas: 0.05, min: 0, max: 1, val: FORET_AMBIANCE.rayonAvant },
   { id: 'densite', pas: 0.02, min: 0.04, max: 0.7, val: FORET_AMBIANCE.densite, masque: true },
   { id: 'largeur', pas: 2, min: 6, max: 90, val: FORET_AMBIANCE.largeur, masque: true },
   { id: 'faisceaux', pas: 0.02, min: 0, max: 0.6, val: FORET_AMBIANCE.faisceaux },

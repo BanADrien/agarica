@@ -227,6 +227,22 @@ les cartes de son animation à son premier affichage (éclairé à plat en atten
 
 Sources de lumière : `LightKit.emissif(objet, seuil)` garde un objet à pleine luminosité (avec `seuil`, seuls ses pixels vifs : flammes du feu, bûches éclairées) ; `LightKit.sourcesLumineuses(scene, { max })` reconnaît feux de camp et champignons lumineux, leur donne une lumière vacillante, allume les plus proches de la caméra et les fait apparaître en fondu (`scanner()` et `maj(dt)` à chaque image).
 
+### Règle : une source visible éclaire depuis une forme, jamais depuis un point
+
+Tout élément lumineux visible éclaire depuis une forme calée sur ses limites opaques. Chaque pixel reçoit la lumière du point de la forme le plus proche de lui ; un pixel dans la forme la reçoit de derrière, ce qui allume régulièrement le tour d'un personnage passé devant la source et laisse son milieu sombre.
+
+Le triangle d'un feu couvre ses flammes, pas ses bûches (`base` : part de la largeur opaque). Une source de décor derrière ou à côté d'un personnage POSÉ AU SOL n'éclaire pas le dessous de son corps, plans et bords tournés vers le sol (`horsDessous()`, test 21 de `lumiere:tests`). En l'air, pendant un saut, le dessous reçoit la lumière (`partAuSol()`, fondu de 120 ms). Une lumière disparaît avec son élément : cassé, caché, transparent, désactivé ou détruit, il n'éclaire plus (`sourcePresente()`, test 22).
+
+| Élément | `forme` |
+|---|---|
+| Flamme | `'triangle'` : base sur le foyer, pointe à la hauteur moyenne des flammes |
+| Groupe large (champignons) | `'rectangle'` : rectangle arrondi sur les limites du groupe |
+| Élément rond isolé | `'cercle'` |
+
+Déclarer une nouvelle source : ajouter une entrée à `SOURCES` dans `src/utils/LightKit.js` avec sa `forme`, puis la reconnaître dans `scanner()` (nom de son image). Les limites sont mesurées sur l'image, à l'échelle de l'objet : aucune coordonnée à écrire. `npm run lumiere:tests` échoue (test 20) si une entrée de `SOURCES` n'a pas de forme valide.
+
+La forme reste fixe : un objet animé prend la moyenne de toutes ses frames, sans suivi image par image, et le vacillement reste à part. La portée se mesure depuis le bord de la forme. Le point reste réservé aux lampes sans objet visible (`LightKit.ajouterLumiere`).
+
 ## Retoucher les cartes à la main
 
 Toujours dans cet ordre : d'abord les sections (lumière de face), puis la carte contre-jour,

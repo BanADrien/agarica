@@ -77,7 +77,50 @@ function directionnel(n, d, lumBase, U) {
 
 // expositionDecor() du shader : une source de décor derrière le sprite n'allume pas ses plans de face
 function expositionDecor(n, ex) {
-  return ex * (1.0 - smoothstep(0.9, 0.97, n.z));
+  return min(ex * 1.5, 1.0) * (1.0 - smoothstep(0.9, 0.97, n.z));
+}
+
+// horsDessous() du shader : le dessous du corps (plans et bords tournés vers le sol) reste dans l'ombre d'une source de décor
+function horsDessous(n, cjm) {
+  const bas = max(-n.y, 1.0 - cjm.g * 2.0);
+  return 1.0 - smoothstep(0.35, 0.7, bas);
+}
+
+const moinsV = (a, b) => vec2(a.x - b.x, a.y - b.y);
+const plusV = (a, b) => vec2(a.x + b.x, a.y + b.y);
+
+// procheSegment() du shader : point du segment a-b le plus proche de p
+function procheSegment(p, a, b) {
+  const ab = moinsV(b, a);
+  return plusV(a, mul(ab, clamp(dot(moinsV(p, a), ab) / max(dot(ab, ab), 0.0001), 0.0, 1.0)));
+}
+
+// pointForme() du shader : point de la forme le plus proche du pixel p (p lui-même s'il est dedans).
+// forme : 0 point, 1 triangle, 2 rectangle arrondi. fa, fb : { x, y, z, w }
+function pointForme(p, lp, forme, fa, fb) {
+  if (forme < 0.5) return lp;
+  if (forme < 1.5) {
+    const s1 = vec2(fa.x, fa.y);
+    const s2 = vec2(fa.z, fa.w);
+    const s3 = vec2(fb.x, fb.y);
+    const c1 = (s2.x - s1.x) * (p.y - s1.y) - (s2.y - s1.y) * (p.x - s1.x);
+    const c2 = (s3.x - s2.x) * (p.y - s2.y) - (s3.y - s2.y) * (p.x - s2.x);
+    const c3 = (s1.x - s3.x) * (p.y - s3.y) - (s1.y - s3.y) * (p.x - s3.x);
+    if (min(c1, min(c2, c3)) >= 0.0 || max(c1, max(c2, c3)) <= 0.0) return p;
+    const q1 = procheSegment(p, s1, s2);
+    const q2 = procheSegment(p, s2, s3);
+    const q3 = procheSegment(p, s3, s1);
+    const d1 = dot(moinsV(p, q1), moinsV(p, q1));
+    const d2 = dot(moinsV(p, q2), moinsV(p, q2));
+    const d3 = dot(moinsV(p, q3), moinsV(p, q3));
+    if (d1 <= d2 && d1 <= d3) return q1;
+    return d2 <= d3 ? q2 : q3;
+  }
+  const q = vec2(clamp(p.x, fa.x - fa.z + fb.x, fa.x + fa.z - fb.x), clamp(p.y, fa.y - fa.w + fb.x, fa.y + fa.w - fb.x));
+  const v = moinsV(p, q);
+  const l = length(v);
+  if (l <= fb.x) return p;
+  return plusV(q, mul(v, fb.x / l));
 }
 
 // corpsAuDessus() du shader : part du corps traversée en remontant vers le soleil. opaqueEn(q) : le pixel q est-il plein ?
@@ -96,7 +139,8 @@ function rayonCorps(n, d, lb, e, ms, cjm, U) {
   const bord = sub(mul(rg(cjm), 2.0), 1.0);
   const expose = smoothstep(0.05, 0.45, cjm.b) * smoothstep(0.1, 0.6, bord.y);
   const v = directionnel(n, d, lb, U) * smoothstep(0.1, 0.65, n.y) * expose * libre * ms;
-  return max(palier(v, U), U.uLueurCorps * ms);
+  const devant = max(n.x * d.x * 0.45 + n.y * d.y * 0.45 + n.z * 0.9, 0.0);
+  return max(max(palier(v, U), palier(devant * U.uRayonAvant, U) * ms), U.uLueurCorps * ms);
 }
 
 // Référence « lumière de face » : Light2D de Phaser avec la lampe à la profondeur z, N.L x att.
@@ -144,4 +188,4 @@ function sprite(carte, pas = 1) {
   return { w, h, N, NL, lum, CJ, brute };
 }
 
-module.exports = { ambianceHemi, epaule, directionnel, expositionDecor, corpsAuDessus, rayonCorps, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };
+module.exports = { pointForme, procheSegment, ambianceHemi, epaule, directionnel, expositionDecor, horsDessous, corpsAuDessus, rayonCorps, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };

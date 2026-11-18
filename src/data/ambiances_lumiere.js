@@ -11,6 +11,7 @@ const AMBIANCES_LUMIERE = {
     teinte: 0.14,         // part de vert
     rayons: 0.95,         // force des rayons sur les personnages et le décor
     lueurCorps: 0.12,     // lueur uniforme du corps dans un rayon (part de sa force) ; le dessus reçoit le rayon franc
+    rayonAvant: 0.5,      // éclairage de l'avant du corps dans un rayon (visage, torse, flanc)
     densite: 0.12,        // part de la canopée ouverte (nombre de rayons)
     largeur: 24,          // largeur moyenne d'un rayon (px du monde)
     faisceaux: 0.1,       // visibilité des faisceaux dans l'air

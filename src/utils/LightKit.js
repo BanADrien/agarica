@@ -61,7 +61,7 @@ const LightKit = (() => {
   // imposées (reglerRendu : ciel, sol en [r, g, b] de 0 à 1). detail : part du dessin d'origine dans l'ambiance.
   // epaule : valeur à partir de laquelle les hautes lumières sont tassées vers le blanc sans l'atteindre (1 = aucune).
   // ombre(objet) : facteur d'ambiance propre à un objet, 0 à 1 (sous un auvent), uniforme sur tout le sprite.
-  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.05, detail: 0.7, ciel: null, sol: null, epaule: 0.8, ombre: null, lueurCorps: 0 };
+  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.05, detail: 0.7, ciel: null, sol: null, epaule: 0.8, ombre: null, lueurCorps: 0, rayonAvant: 0 };
   // Soleil : direction VERS le soleil (x droite, y haut, z vers le spectateur). Avec une ambiance uniforme vers 0,71 :
   // dessus éclairé, flancs intermédiaires, dessous dans une ombre douce
   const SOLEIL = { direction: { x: -0.25, y: 0.75, z: 0.6 }, couleur: 0xfff1d6, intensite: 0.57 };
@@ -160,6 +160,9 @@ struct Lumiere {
   float decor;     // 1 = source de decor derriere le personnage : jamais sur ses plans de face
   vec3 couleur;    // couleur x intensite
   float portee;    // portee native
+  float forme;     // 0 = point (position), 1 = triangle, 2 = rectangle arrondi (cercle : demi-cotes = rayon)
+  vec4 formeA;     // triangle : sommets 1 et 2 ; rectangle : centre, demi-largeur, demi-hauteur
+  vec4 formeB;     // triangle : sommet 3 dans x, y ; rectangle : rayon des coins dans x
 };
 const int kMaxLights = %LIGHT_COUNT%;
 uniform sampler2D uMainSampler;   // image du jeu (objet sans carte)
@@ -172,13 +175,15 @@ uniform float uDetail;            // part du dessin d'origine dans l'ambiance
 uniform float uEpaule;            // debut de l'epaule des hautes lumieres (1 = aucune)
 uniform float uEmissif;           // > 0 : les pixels au moins aussi vifs gardent leur couleur (flammes du feu)
 uniform float uLueurCorps;        // rayon de canopee : lueur uniforme du corps, part de la force du rayon
+uniform float uRayonAvant;        // rayon de canopee : force sur les plans tournes vers l'avant, par sections
 uniform float uOmbreSoleil;       // rayon de canopee : distance remontee vers le soleil dans la silhouette (cases)
 uniform float uPerso;             // 1 = personnage sans cartes : le rayon se pose sur le haut de sa silhouette
 ${FRAG_MASQUE}
 uniform Lumiere uLumieres[kMaxLights];
 uniform int uNbLumieres;
 uniform float uPaliers, uContre;
-uniform float uCarte;             // 1 = sprite avec cartes, 0 = a plat
+uniform float uAuSol;             // 1 = personnage pose au sol (rien sous lui), 0 = en l'air (le dessous recoit la lumiere)
+uniform float uCarte;            // 1 = sprite avec cartes, 0 = a plat
 uniform float uDerriere;          // 1 = au moins une lampe derriere (normale lissee utile)
 uniform float uFlip;              // 1 = flipX : miroir ET normal.x inverse
 uniform float uPasLisse;          // ecart des echantillons de la normale lissee (round(s), 1 = demo)
@@ -230,7 +235,46 @@ ${FRAG_ECLAIRAGE}
 
 // Source de decor derriere un personnage : la carte contre-jour ne compte pas sur les plans tournes vers le spectateur
 float expositionDecor(vec3 n, float ex) {
-  return ex * (1.0 - smoothstep(0.9, 0.97, n.z));
+  return min(ex * 1.5, 1.0) * (1.0 - smoothstep(0.9, 0.97, n.z));
+}
+
+// Source de decor derriere ou a cote d'un personnage : le dessous du corps (plans et bords tournes vers le sol) reste dans l'ombre
+float horsDessous(vec3 n, vec4 cjm) {
+  float bas = max(-n.y, 1.0 - cjm.g * 2.0);
+  return 1.0 - smoothstep(0.35, 0.7, bas);
+}
+
+// Point du segment a-b le plus proche de p
+vec2 procheSegment(vec2 p, vec2 a, vec2 b) {
+  vec2 ab = b - a;
+  return a + ab * clamp(dot(p - a, ab) / max(dot(ab, ab), 0.0001), 0.0, 1.0);
+}
+
+// Source visible : la lumiere part du point de sa forme le plus proche du pixel p, ou de p lui-meme s'il est dans la forme
+vec2 pointForme(vec2 p, vec2 lp, float forme, vec4 fa, vec4 fb) {
+  if (forme < 0.5) return lp;
+  if (forme < 1.5) {
+    vec2 s1 = vec2(fa.x, fa.y);
+    vec2 s2 = vec2(fa.z, fa.w);
+    vec2 s3 = vec2(fb.x, fb.y);
+    float c1 = (s2.x - s1.x) * (p.y - s1.y) - (s2.y - s1.y) * (p.x - s1.x);
+    float c2 = (s3.x - s2.x) * (p.y - s2.y) - (s3.y - s2.y) * (p.x - s2.x);
+    float c3 = (s1.x - s3.x) * (p.y - s3.y) - (s1.y - s3.y) * (p.x - s3.x);
+    if (min(c1, min(c2, c3)) >= 0.0 || max(c1, max(c2, c3)) <= 0.0) return p;
+    vec2 q1 = procheSegment(p, s1, s2);
+    vec2 q2 = procheSegment(p, s2, s3);
+    vec2 q3 = procheSegment(p, s3, s1);
+    float d1 = dot(p - q1, p - q1);
+    float d2 = dot(p - q2, p - q2);
+    float d3 = dot(p - q3, p - q3);
+    if (d1 <= d2 && d1 <= d3) return q1;
+    return d2 <= d3 ? q2 : q3;
+  }
+  vec2 q = vec2(clamp(p.x, fa.x - fa.z + fb.x, fa.x + fa.z - fb.x), clamp(p.y, fa.y - fa.w + fb.x, fa.y + fa.w - fb.x));
+  vec2 v = p - q;
+  float l = length(v);
+  if (l <= fb.x) return p;
+  return q + v * fb.x / l;
 }
 
 // Rayon de canopee sur un personnage : il vient d'en haut, touche le dessus du corps et s'arrete la.
@@ -257,7 +301,8 @@ float rayonCorps(vec3 n, vec3 d, float lb, float e, float ms, vec4 cjm) {
   vec2 bord = cjm.rg * 2.0 - 1.0;
   float expose = smoothstep(0.05, 0.45, cjm.b) * smoothstep(0.1, 0.6, bord.y);
   float v = directionnel(n, d, lb) * smoothstep(0.1, 0.65, n.y) * expose * libre * ms;
-  return max(palier(v), uLueurCorps * ms);
+  float devant = max(n.x * d.x * 0.45 + n.y * d.y * 0.45 + n.z * 0.9, 0.0);
+  return max(max(palier(v), palier(devant * uRayonAvant) * ms), uLueurCorps * ms);
 }
 
 // Personnage sans cartes (aucune orientation connue) : haut de la silhouette seulement
@@ -316,7 +361,9 @@ void main() {
       } else {
         // personnages (cartes) : paliers ; decor sans carte : fondu continu, sinon les paliers y dessinent des cercles
         vec4 cjL = L.decor > 0.5 ? vec4(cjm.rg, expositionDecor(n, cjm.b), cjm.a) : cjm;
-        float e = eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjL);
+        vec2 lp = pointForme(tc, L.position.xy, L.forme, L.formeA, L.formeB);
+        float e = eclairage(n, uCarte > 0.5 ? nl : n, tc, lp, L.position.z, L.portee, lb, cjL);
+        if (L.decor > 0.5) e *= mix(1.0, horsDessous(n, cjm), uAuSol);
         l += L.couleur * (uCarte > 0.5 ? palier(e) : smoothstep(0.0, 1.0, e));
       }
     }
@@ -562,6 +609,7 @@ void main() {
         // Rayon de canopée : il se pose sur 6 à 12 px du monde sous le haut du corps, selon la taille du sprite
         this.set1f('uOmbreSoleil', Math.max(6, Math.min(12, 0.14 * Math.min(w * kx, h * ky))) / k);
         this.set1f('uLueurCorps', this._reglages.lueurCorps ?? 0);
+        this.set1f('uRayonAvant', this._reglages.rayonAvant ?? 0);
         this.set1f('uPerso', !e && go.type === 'Sprite' ? 1 : 0);
         const lampes = this._lampes, maxi = this.renderer.config.maxLights;
         // Seules les lampes qui peuvent atteindre l'objet (au-delà de la portée, leur lumière vaut 0) :
@@ -579,23 +627,49 @@ void main() {
           }
           if (Math.abs(L.x - go.x) > atteinte || Math.abs(L.y - go.y) > atteinte) continue;
           const i = nb++;
-          m.applyInverse(L.x, L.y, this._pt);
-          const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
-          const tx = flip ? w - (W - D - cx) / px : (D - cx) / px;
-          const ty = (Dy - cy) / py;
+          // Point du monde -> repère natif affiché du sprite (lampe et sommets de sa forme)
+          const natif = (X, Y) => {
+            m.applyInverse(X, Y, this._pt);
+            const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
+            return [flip ? w - (W - D - cx) / px : (D - cx) / px, (Dy - cy) / py];
+          };
+          const [tx, ty] = natif(L.x, L.y);
           const z = zLampe(L, go, !!e || go.type === 'Sprite', k);
           if (z < 15) derriere = 1;
           const nom = `uLumieres[${i}].`;
           this.set3f(nom + 'position', tx, ty, z);
           this.set1f(nom + 'soleil', 0);
-          this.set1f(nom + 'decor', z < 0 && L.sourceObjet ? 1 : 0);
+          // Personnage affiché devant la source : mêmes règles qu'il soit dans son axe ou à côté, sans saut entre les deux
+          const dos = z < 0 || (!!L.sourceObjet && (!!e || go.type === 'Sprite') && L.sourceObjet.depth < go.depth);
+          this.set1f(nom + 'decor', dos && L.sourceObjet ? 1 : 0);
           // L.attenuation(objet), facultatif : lampe masquée pour cet objet (ombre d'un auvent), 0 à 1
-          const force = L.intensity * (L.attenuation ? L.attenuation(go) : 1);
+          // Source de décor : gain propre au décor autour d'elle, et au contre-jour d'un personnage passé devant
+          let gain = L.sourceObjet ? (dos ? L.gainContre : L.gainDecor) || 1 : 1;
+          // À côté de la source, le flanc reçoit une lumière franche ; derrière, seul le contour reste discret
+          if (dos && L.cote && L.gainCote) {
+            const zDos = Math.min(L.arriere / k, -15), t = Math.min(Math.max((z - zDos) / (L.cote.z - zDos), 0), 1);
+            gain += (L.gainCote - gain) * t;
+          }
+          const force = gain * L.intensity * (L.attenuation ? L.attenuation(go) : 1);
           this.set3f(nom + 'couleur', L.color.r * force, L.color.g * force, L.color.b * force);
-          this.set1f(nom + 'portee', L.radius / k);
+          // La lumière part du bord de la forme : portée réduite d'autant, le bout de la lumière reste au même endroit
+          const F = L.forme;
+          this.set1f(nom + 'portee', (L.radius - (F ? F.demi : 0)) / k);
+          this.set1f(nom + 'forme', F ? F.type : 0);
+          if (F && F.type === 1) {
+            const [a, b] = natif(F.points[0], F.points[1]), [c2, d] = natif(F.points[2], F.points[3]), [e3, f3] = natif(F.points[4], F.points[5]);
+            this.set4f(nom + 'formeA', a, b, c2, d);
+            this.set4f(nom + 'formeB', e3, f3, 0, 0);
+          } else if (F) {
+            const [a, b] = natif(F.cx, F.cy);
+            this.set4f(nom + 'formeA', a, b, F.hx / (sx * px), F.hy / (sy * py));
+            this.set4f(nom + 'formeB', F.r / ((sx * px + sy * py) / 2), 0, 0, 0);
+          }
         }
         this.set1i('uNbLumieres', nb);
         this.set1f('uCarte', e ? 1 : 0);
+        const boucle = go.scene.game.loop;
+        this.set1f('uAuSol', partAuSol(go, boucle.delta, boucle.frame));
         this.set1f('uDerriere', derriere);
         this.set1f('uFlip', flip ? 1 : 0);
         this.set1f('uPasLisse', e && e.s > 1 ? Math.round(e.s) : 1);
@@ -632,8 +706,40 @@ void main() {
   // Profondeur d'une lampe pour un objet, en pixels natifs (k : px du monde par pixel natif). Une source de décor affichée
   // derrière un personnage l'éclaire par l'arrière, donc par sa carte contre-jour seule : -15 natif au moins, le seuil où
   // la lumière de face s'éteint complètement. Le décor, sur le même plan que la source, garde sa profondeur positive.
+  // L.cote, facultatif : en s'écartant de la source (de `de` à `a` px du monde, depuis le bord de sa forme), la lampe glisse de derrière le personnage
+  // à son côté, jusqu'à `z` natif : le flanc tourné vers elle s'allume, les plans de face restent sous le premier palier.
   function zLampe(L, go, perso, k) {
-    if (perso && L.sourceObjet && L.sourceObjet.depth < go.depth) return Math.min(L.arriere / k, -15);
+    return zLampeCalcul(L, go, perso, k);
+  }
+
+  // Règle « rien sous le sprite » : 1 pour un objet posé au sol ou sans corps mobile, 0 en l'air, en fondu de 120 ms.
+  // image : numéro de l'image du jeu, pour n'avancer le fondu qu'une fois par image même avec plusieurs caméras.
+  function partAuSol(go, ms, image) {
+    const b = go.body;
+    const pose = !b || b.physicsType === 1 || !!(b.blocked && b.blocked.down) || !!(b.touching && b.touching.down);
+    const cible = pose ? 1 : 0;
+    if (go.__lumiereAuSol === undefined) go.__lumiereAuSol = cible;
+    else if (go.__lumiereImage !== image) {
+      const pas = Math.min(ms / 120, 1);
+      go.__lumiereAuSol += Math.max(-pas, Math.min(pas, cible - go.__lumiereAuSol));
+    }
+    go.__lumiereImage = image;
+    return go.__lumiereAuSol;
+  }
+
+  function zLampeCalcul(L, go, perso, k) {
+    if (perso && L.sourceObjet && L.sourceObjet.depth < go.depth) {
+      const dos = Math.min(L.arriere / k, -15);
+      if (!L.cote) return dos;
+      // avec une forme : écart mesuré depuis son bord
+      const ecart = L.forme ? Math.abs(L.forme.cx - go.x) - L.forme.demi : Math.abs(L.x - go.x);
+      const t = Math.min(Math.max((ecart - L.cote.de) / (L.cote.a - L.cote.de), 0), 1);
+      // Personnage tourné vers la source : la lampe passe devant lui, son visage et sa poitrine reçoivent la lumière.
+      // Le sens vient de facingDir / facing, car flipX dépend du sens dans lequel chaque animation est dessinée.
+      const sens = go.facingDir ?? go.facing, cx = L.forme ? L.forme.cx : L.x;
+      const tourne = L.cote.zFace !== undefined && !!sens && sens * (cx - go.x) > 0;
+      return dos + ((tourne ? L.cote.zFace : L.cote.z) - dos) * t * t * (3 - 2 * t);
+    }
     return (L.profondeur ?? DEFAUTS.profondeur) / k;
   }
 
@@ -720,11 +826,75 @@ void main() {
   const EMISSIFS = /champignons_lumineux|mousse_lumineuse|lanterne_allumee|luciole|cristal|portail|^item-fx_|juice-glow|halo|lueur|glow/;
   const FEU_DE_CAMP = /^decor-campfire-/;
   const SEUIL_FLAMMES = 0.62;
+  // RÈGLE : toute source visible déclare sa `forme` (clé de FORMES), calée sur les limites opaques de son image :
+  // flamme = triangle, groupe large = rectangle, élément rond isolé = cercle. Jamais un point (test 20 de lumiere:tests).
+  const FORMES = { triangle: 1, rectangle: 2, cercle: 2 };
   const SOURCES = {
     // profondeur : pour le décor du même plan ; arriere : pour un personnage affiché devant la source (contre-jour seul)
-    feu: { couleur: 0xffc46e, intensite: 1.05, portee: 310, profondeur: 60, arriere: -18, vacille: 0.1, halo: 240 },
-    champignon: { couleur: 0x5cf0d0, intensite: 0.85, portee: 150, profondeur: 30, arriere: -14, vacille: 0.05, halo: 0 },
+    feu: { forme: 'triangle', base: 0.45, couleur: 0xffc46e, intensite: 0.85, gainDecor: 1.4, gainContre: 1.2, gainCote: 1.9, portee: 317, profondeur: 60, arriere: -18, cote: { de: 0, a: 24, z: 8, zFace: 30 }, vacille: 0.1, halo: 280 },
+    champignon: { forme: 'rectangle', couleur: 0x1caada, intensite: 0.85, portee: 112, profondeur: 30, arriere: -14, vacille: 0.05, halo: 0 },
   };
+
+  // Limites opaques d'une image RGBA : colonnes et lignes extrêmes ; haut : première ligne assez pleine (15 % de la plus
+  // large), pour ne pas compter une étincelle isolée au-dessus des flammes
+  function limitesAlpha(data, w, h) {
+    const lignes = new Array(h).fill(0);
+    let x0 = w, x1 = 0, y1 = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] < 128) continue;
+        lignes[y]++;
+        if (x < x0) x0 = x;
+        if (x + 1 > x1) x1 = x + 1;
+        y1 = y + 1;
+      }
+    }
+    const large = lignes.reduce((a, b) => Math.max(a, b), 0);
+    return large ? { x0, x1, haut: lignes.findIndex((v) => v >= large * 0.15), bas: y1 } : { x0: 0, x1: w, haut: 0, bas: h };
+  }
+
+  // Limites opaques d'une frame, en px de la frame (mesurées une fois sur une copie réduite)
+  const LIMITES = new Map();
+  function limitesFrame(frame) {
+    const cle = `${frame.texture.key}:${frame.name}`;
+    if (LIMITES.has(cle)) return LIMITES.get(cle);
+    const W = frame.cutWidth, H = frame.cutHeight, r = Math.min(1, 160 / Math.max(W, H));
+    let lim = { x0: 0, x1: W, haut: 0, bas: H };
+    try {
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(W * r));
+      c.height = Math.max(1, Math.round(H * r));
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(frame.source.image, frame.cutX, frame.cutY, W, H, 0, 0, c.width, c.height);
+      const m = limitesAlpha(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      const kx = W / c.width, ky = H / c.height;
+      lim = { x0: m.x0 * kx, x1: m.x1 * kx, haut: m.haut * ky, bas: m.bas * ky };
+    } catch (err) { /* image illisible : la frame entière */ }
+    LIMITES.set(cle, lim);
+    return lim;
+  }
+
+  // Limites d'un objet dans le monde. Animé : moyenne de toutes ses frames (forme fixe, sans suivi image par image)
+  function limitesMonde(o) {
+    const anim = o.anims && o.anims.currentAnim;
+    const liste = (anim ? anim.frames.map((f) => f.frame) : [o.frame]).map(limitesFrame);
+    const moy = (k) => liste.reduce((a, l) => a + l[k], 0) / liste.length;
+    const W = o.frame.realWidth;
+    const mx = (x) => o.x + ((o.flipX ? W - x : x) - o.displayOriginX) * o.scaleX;
+    const my = (y) => o.y + (y - o.displayOriginY) * o.scaleY;
+    const a = mx(moy('x0')), b = mx(moy('x1'));
+    return { gauche: Math.min(a, b), droite: Math.max(a, b), haut: my(moy('haut')), bas: my(Math.max(...liste.map((l) => l.bas))) };
+  }
+
+  // Forme d'une source à partir de ses limites dans le monde. demi : demi-largeur, depuis laquelle se mesurent portée et écart
+  // base : part de la largeur opaque occupée par le triangle (un feu : ses flammes, pas ses bûches)
+  function formeMonde(nom, { gauche, droite, haut, bas }, base = 1) {
+    const cx = (gauche + droite) / 2, cy = (haut + bas) / 2, hx = (droite - gauche) / 2, hy = (bas - haut) / 2;
+    if (nom === 'triangle') { const b = hx * base; return { type: FORMES.triangle, points: [cx - b, bas, cx + b, bas, cx, haut], cx, cy, demi: b }; }
+    if (nom === 'cercle') { const r = (hx + hy) / 2; return { type: FORMES.cercle, cx, cy, hx: r, hy: r, r, demi: r }; }
+    return { type: FORMES.rectangle, cx, cy, hx, hy, r: Math.min(hx, hy) / 2, demi: hx };
+  }
 
   // Affiche un objet avec ses couleurs d'origine. seuil : seuls les pixels au moins aussi vifs (0 à 1) restent émissifs
   function emissif(objets, seuil) {
@@ -757,6 +927,11 @@ void main() {
     return cle;
   }
 
+  // Un élément lumineux n'éclaire que tant qu'il est à l'écran : ni détruit, ni désactivé, ni caché, ni transparent
+  function sourcePresente(o) {
+    return !!(o && o.scene && o.active && o.visible && o.alpha > 0);
+  }
+
   // Sources de la scène : feux de camp et champignons lumineux créent chacun leur lumière. Au plus `max` allumées,
   // les plus proches de la caméra, avec un fondu pour qu'aucune n'apparaisse d'un coup.
   function sourcesLumineuses(scene, { max = 4 } = {}) {
@@ -768,6 +943,10 @@ void main() {
       L.setVisible(false);
       L.sourceObjet = o;
       L.arriere = def.arriere;
+      L.gainDecor = def.gainDecor;
+      L.gainContre = def.gainContre;
+      L.cote = def.cote;
+      L.gainCote = def.gainCote;
       const s = { o, type, def, L, force: 0, allumee: false, ph: liste.length * 2.4, halo: null };
       if (def.halo) {
         s.halo = scene.add.image(o.x, o.y, textureHalo(scene)).setDisplaySize(def.halo, def.halo).setTint(def.couleur)
@@ -794,19 +973,32 @@ void main() {
     };
     const maj = (dt) => {
       const v = scene.cameras.main.midPoint, t = scene.time.now / 1000;
-      const proches = liste.filter((s) => s.o.active && Math.abs(s.o.x - v.x) < 900)
+      const proches = liste.filter((s) => sourcePresente(s.o) && Math.abs(s.o.x - v.x) < 900)
         .sort((a, b) => Math.abs(a.o.x - v.x) - Math.abs(b.o.x - v.x)).slice(0, max);
       let libres = max - liste.filter((s) => s.allumee && !proches.includes(s)).length;
       for (const s of proches) { if (s.allumee) libres--; }
       for (const s of liste) {
+        // Élément cassé, caché ou détruit : sa lumière s'éteint avec lui, sans fondu
+        if (!sourcePresente(s.o)) {
+          s.force = 0;
+          s.allumee = false;
+          s.L.setVisible(false).setIntensity(0);
+          if (s.halo) s.halo.setVisible(false).setAlpha(0);
+          continue;
+        }
         let cible = proches.includes(s) ? 1 : 0;
         if (cible && !s.allumee) { if (libres > 0) { s.allumee = true; libres--; } else cible = 0; }
         s.force += (cible - s.force) * (1 - Math.exp(-dt * 5));
         if (!cible && s.force < 0.01) { s.force = 0; s.allumee = false; }
+        if (s.placeX !== s.o.x || s.placeY !== s.o.y) {
+          s.placeX = s.o.x;
+          s.placeY = s.o.y;
+          s.L.forme = formeMonde(s.def.forme, limitesMonde(s.o), s.def.base);
+        }
         const b = s.o.getBounds(), y = b.y + b.height * 0.6;
         const flamme = 1 + s.def.vacille * (0.5 * Math.sin(t * 7.3 + s.ph) + 0.3 * Math.sin(t * 13.1 + s.ph * 2) + 0.2 * Math.sin(t * 3.1 + s.ph));
         s.L.setPosition(s.o.x, y).setVisible(s.allumee).setIntensity(s.def.intensite * s.force * flamme);
-        if (s.halo) s.halo.setPosition(Math.round(s.o.x), Math.round(y)).setVisible(actives).setAlpha(0.18 * s.force * flamme);
+        if (s.halo) s.halo.setPosition(Math.round(s.o.x), Math.round(y)).setVisible(actives).setAlpha(0.24 * s.force * flamme);
       }
     };
     scanner();
@@ -920,7 +1112,7 @@ void main() {
 
   return {
     NOM_PIPELINE, DEFAUTS, SOLEIL, FRAG_MASQUE, masqueSoleil: masqueSoleilJs, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
-    zLampe, chargerCartes, filtrerCartes, demanderCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
+    zLampe, partAuSol, sourcePresente, FORMES, SOURCES, formeMonde, limitesAlpha, chargerCartes, filtrerCartes, demanderCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
     ajouterLumiere, ajouterSoleil, emissif, sourcesLumineuses, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();

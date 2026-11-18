@@ -203,7 +203,7 @@ void main() {
   function appliquerRendu(st) {
     const { scene, v } = st, a = v.ambiance, t = v.teinte;
     const ciel = [a * (1 - t), a * (1 + t * 0.25), a * (1 - t * 0.7)];
-    LightKit.reglerRendu(scene, { ciel, sol: ciel.map((c) => c * 0.94), detail: 1, epaule: 0.85, paliers: 4, lueurCorps: v.lueurCorps });
+    LightKit.reglerRendu(scene, { ciel, sol: ciel.map((c) => c * 0.94), detail: 1, epaule: 0.85, paliers: 4, lueurCorps: v.lueurCorps, rayonAvant: v.rayonAvant });
     LightKit.regler(st.soleil, { intensite: v.rayons });
     st.teinteFond = Phaser.Display.Color.GetColor(...ciel.map((c) => Math.round(Math.min(1, c) * 255)));
     for (const o of st.teintes) if (o.active) teinter(st, o);

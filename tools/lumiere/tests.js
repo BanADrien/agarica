@@ -501,7 +501,7 @@ function tMasque() {
 // reçoit que la lueur uniforme ; les plans de face non plus ; le dessus reçoit le rayon ; flipX donne le miroir exact.
 function tRayonCorps(sp) {
   const d = CPU.normalize(CPU.vec3(-0.28, 0.8, 0.2)), lueur = 0.12;
-  const UR = { ...U, uOmbreSoleil: 6, uLueurCorps: lueur };
+  const UR = { ...U, uOmbreSoleil: 6, uLueurCorps: lueur, uRayonAvant: 0 };
   const plein = (q) => (sp.has(q.x, q.y) ? 1 : 0);
   const miroir = (q) => plein({ x: sp.w - 1 - q.x, y: q.y });
   let masques = 0, recus = 0, face = 0, dessus = 0, flip = 0;
@@ -533,11 +533,83 @@ function tSourceDerriere(sp) {
   }
   return { faces, nbFaces, bords, interieurs };
 }
+// 21 : source de décor derrière ou à côté du sprite : aucun plan ni bord tourné vers le sol ne garde sa lumière ; le dessus la garde.
+function tSousSprite(sp) {
+  let dessous = 0, allumes = 0, dessus = 0, coupes = 0;
+  for (const p of sp.pts) {
+    const id = sp.id(p), n = sp.N.get(id), cj = sp.CJ.get(id), f = CPU.horsDessous(n, cj);
+    if (Math.max(-n.y, 1 - cj.g * 2) >= 0.7) { dessous++; if (f > 0) allumes++; }
+    if (n.y >= 0 && cj.g >= 0.5) { dessus++; if (f < 1) coupes++; }
+  }
+  return { dessous, allumes, dessus, coupes };
+}
+// 21 : la règle ne vaut qu'au sol : en l'air le dessous reçoit la lumière, avec un fondu sans saut, une seule avance par image.
+function tAuSol() {
+  const air = { body: { blocked: { down: false }, touching: { down: false } } };
+  const sol = { body: { blocked: { down: true }, touching: { down: false } } };
+  const debut = [LightKit.partAuSol(air, 16, 1) === 0, LightKit.partAuSol(sol, 16, 1) === 1, LightKit.partAuSol({}, 16, 1) === 1,
+    LightKit.partAuSol({ body: { physicsType: 1 } }, 16, 1) === 1];
+  sol.body.blocked.down = false;
+  const v1 = LightKit.partAuSol(sol, 60, 2), v1bis = LightKit.partAuSol(sol, 60, 2), v2 = LightKit.partAuSol(sol, 60, 3);
+  return [...debut, v1 === 0.5, v1bis === 0.5, v2 === 0].every(Boolean);
+}
+// 22 : une lumière disparaît avec son élément (cassé, caché, transparent, désactivé, détruit)
+function tSourcePresente() {
+  const o = (v) => ({ scene: {}, active: true, visible: true, alpha: 1, ...v });
+  return [LightKit.sourcePresente(o()), !LightKit.sourcePresente(o({ visible: false })), !LightKit.sourcePresente(o({ alpha: 0 })),
+    !LightKit.sourcePresente(o({ active: false })), !LightKit.sourcePresente(o({ scene: undefined })), !LightKit.sourcePresente(null)].every(Boolean);
+}
 function tProfondeurSource() {
   const L = { profondeur: 60, arriere: -18, sourceObjet: { depth: 0 } };
   return [LightKit.zLampe(L, { depth: 10 }, true, 1) <= -15, LightKit.zLampe(L, { depth: 10 }, true, 2) <= -15,
     LightKit.zLampe(L, { depth: 10 }, false, 1) > 0, LightKit.zLampe({ ...L, sourceObjet: { depth: 20 } }, { depth: 10 }, true, 1) > 0,
-    LightKit.zLampe({ profondeur: -20 }, { depth: 10 }, true, 1) === -20].every(Boolean);
+    LightKit.zLampe({ profondeur: -20 }, { depth: 10 }, true, 1) === -20,
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8 } }, { depth: 10, x: 110 }, true, 1) <= -15,
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8 } }, { depth: 10, x: 200 }, true, 1) === 8,
+    // tourné vers la source : lampe devant lui ; dos tourné ou sens inconnu : lampe sur le côté
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 200, facingDir: -1 }, true, 1) === 30,
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 200, facingDir: 1 }, true, 1) === 8,
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 200 }, true, 1) === 8,
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 110, facingDir: -1 }, true, 1) <= -15].every(Boolean);
+}
+
+// 20 : sources visibles. La lumière part du point de la forme le plus proche du pixel ; jamais d'un point unique.
+function tFormes() {
+  const P = (x, y) => vec2(x, y), Q = (x, y, z, w) => ({ x, y, z, w });
+  const proche = (a, b) => Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.y - b.y) < 1e-9;
+  const lp = P(3, 4), zero = Q(0, 0, 0, 0);
+  const triA = Q(0, 10, 10, 10), triB = Q(5, 0, 0, 0);                 // base en bas, pointe en haut
+  const rectA = Q(10, 10, 5, 3), rectB = Q(1, 0, 0, 0);                // centre (10, 10), demi-côtés 5 x 3, coins de rayon 1
+  const cercleA = Q(0, 0, 4, 4), cercleB = Q(4, 0, 0, 0);
+  const f = CPU.pointForme;
+  const point = proche(f(P(50, 50), lp, 0, zero, zero), lp);
+  const interieur = proche(f(P(5, 7), lp, 1, triA, triB), P(5, 7)) && proche(f(P(11, 10), lp, 2, rectA, rectB), P(11, 10)) && proche(f(P(1, 1), lp, 2, cercleA, cercleB), P(1, 1));
+  const triangle = proche(f(P(5, 20), lp, 1, triA, triB), P(5, 10)) && proche(f(P(-5, 12), lp, 1, triA, triB), P(0, 10)) && proche(f(P(5, -6), lp, 1, triA, triB), P(5, 0));
+  // coin du rectangle : centre de l'arrondi (14, 12), pixel sur sa diagonale
+  const coin = f(P(34, 32), lp, 2, rectA, rectB);
+  const rectangle = proche(f(P(30, 10), lp, 2, rectA, rectB), P(15, 10)) && proche(f(P(10, 30), lp, 2, rectA, rectB), P(10, 13))
+    && proche(coin, P(14 + Math.SQRT1_2, 12 + Math.SQRT1_2)) && proche(f(P(10, 0), lp, 2, cercleA, cercleB), P(4, 0));
+  // Miroir horizontal de la forme et du pixel : le résultat est le miroir exact
+  const m = (v) => P(40 - v.x, v.y);
+  let miroir = true;
+  for (let x = -6; x <= 46; x += 3.7) {
+    for (let y = -6; y <= 26; y += 3.3) {
+      const a = m(f(P(x, y), lp, 1, triA, triB)), b = f(m(P(x, y)), lp, 1, Q(40, 10, 30, 10), Q(35, 0, 0, 0));
+      const d = m(f(P(x, y), lp, 2, rectA, rectB)), e = f(m(P(x, y)), lp, 2, Q(30, 10, 5, 3), rectB);
+      if (!proche(a, b) || !proche(d, e)) miroir = false;
+    }
+  }
+  return { point, interieur, triangle, rectangle, miroir };
+}
+function tSourcesAvecForme() {
+  const noms = Object.keys(LightKit.SOURCES);
+  const sans = noms.filter((n) => !Object.prototype.hasOwnProperty.call(LightKit.FORMES, LightKit.SOURCES[n].forme));
+  const lim = { gauche: 0, droite: 20, haut: 0, bas: 10 };
+  const t = LightKit.formeMonde('triangle', lim), r = LightKit.formeMonde('rectangle', lim), c = LightKit.formeMonde('cercle', lim);
+  const calage = t.type === 1 && t.points.join() === '0,10,20,10,10,0' && r.type === 2 && r.hx === 10 && r.hy === 5 && r.r <= 5 && c.type === 2 && c.hx === c.hy && c.r === c.hx;
+  const L = { arriere: -18, sourceObjet: { depth: 0 }, x: 100, cote: { de: 0, a: 50, z: 8 }, forme: { cx: 100, demi: 40 } };
+  const bord = LightKit.zLampe(L, { depth: 10, x: 130 }, true, 1) <= -15 && LightKit.zLampe(L, { depth: 10, x: 200 }, true, 1) === 8;
+  return { noms, sans, calage, bord };
 }
 
 function tSymetrie() {
@@ -556,7 +628,7 @@ function tSymetrie() {
 
 // ---------------------------------------------------------------- alignement du code
 function corps(src, nom) {
-  const i = src.search(new RegExp(`(float|vec3|function)\\s+${nom}\\s*\\(`));
+  const i = src.search(new RegExp(`(float|vec2|vec3|function)\\s+${nom}\\s*\\(`));
   if (i < 0) return null;
   let k = src.indexOf('{', i), n = 0, j = k;
   for (; j < src.length; j++) { if (src[j] === '{') n++; else if (src[j] === '}' && --n === 0) break; }
@@ -592,8 +664,8 @@ function suite(src) {
 function alignementCpu() {
   const cpu = fs.readFileSync(path.join(__dirname, 'cpu.js'), 'utf8');
   const jeu = fs.readFileSync(path.join(ROOT, 'src', 'utils', 'LightKit.js'), 'utf8');
-  const a = suite(corps(LightKit.FRAG, 'ambianceHemi') + corps(LightKit.FRAG, 'epaule') + corps(LightKit.FRAG, 'directionnel') + corps(LightKit.FRAG, 'expositionDecor') + corps(LightKit.FRAG, 'corpsAuDessus') + corps(LightKit.FRAG, 'rayonCorps') + corps(LightKit.FRAG_MASQUE, 'masqueSoleil') + corps(LightKit.FRAG_ECLAIRAGE, 'eclairage'));
-  const b = suite(corps(cpu, 'ambianceHemi') + corps(cpu, 'epaule') + corps(cpu, 'directionnel') + corps(cpu, 'expositionDecor') + corps(cpu, 'corpsAuDessus') + corps(cpu, 'rayonCorps') + corps(jeu, 'masqueSoleilJs').replace(/const \{ floor, sin \} = Math, fract = \(v\) => v - Math\.floor\(v\);/, '') + corps(cpu, 'eclairage'));
+  const a = suite(corps(LightKit.FRAG, 'ambianceHemi') + corps(LightKit.FRAG, 'epaule') + corps(LightKit.FRAG, 'directionnel') + corps(LightKit.FRAG, 'expositionDecor') + corps(LightKit.FRAG, 'horsDessous') + corps(LightKit.FRAG, 'procheSegment') + corps(LightKit.FRAG, 'pointForme') + corps(LightKit.FRAG, 'corpsAuDessus') + corps(LightKit.FRAG, 'rayonCorps') + corps(LightKit.FRAG_MASQUE, 'masqueSoleil') + corps(LightKit.FRAG_ECLAIRAGE, 'eclairage'));
+  const b = suite(corps(cpu, 'ambianceHemi') + corps(cpu, 'epaule') + corps(cpu, 'directionnel') + corps(cpu, 'expositionDecor') + corps(cpu, 'horsDessous') + corps(cpu, 'procheSegment') + corps(cpu, 'pointForme') + corps(cpu, 'corpsAuDessus') + corps(cpu, 'rayonCorps') + corps(jeu, 'masqueSoleilJs').replace(/const \{ floor, sin \} = Math, fract = \(v\) => v - Math\.floor\(v\);/, '') + corps(cpu, 'eclairage'));
   let i = 0;
   while (i < a.length && a[i] === b[i]) i++;
   return { n: a.length, ok: a.length === b.length && i === a.length, ecart: i < Math.max(a.length, b.length) ? `GLSL ${a[i]} / CPU ${b[i]} (élément ${i + 1})` : '' };
@@ -606,7 +678,7 @@ function main() {
   const am = alignementModele();
   ajout('0 shader du jeu = page validée', 'LightKit.js / apercu.html', !am.length, am.length ? `écart : ${am.join(', ')}` : 'ambianceHemi, epaule, palier, normaleLisse, eclairage identiques');
   const ac = alignementCpu();
-  ajout('0 alignement GLSL <-> CPU', 'ambianceHemi(), epaule(), directionnel(), expositionDecor(), corpsAuDessus(), rayonCorps(), masqueSoleil(), eclairage()', ac.ok, ac.ok ? `${ac.n} appels et nombres identiques` : ac.ecart);
+  ajout('0 alignement GLSL <-> CPU', 'ambianceHemi(), epaule(), directionnel(), expositionDecor(), procheSegment(), pointForme(), corpsAuDessus(), rayonCorps(), masqueSoleil(), eclairage()', ac.ok, ac.ok ? `${ac.n} appels et nombres identiques` : ac.ecart);
   const man = manifeste();
   let charges = 0;
   for (const [nom, url] of SPRITES) {
@@ -657,6 +729,9 @@ function main() {
     const sd = tSourceDerriere(sp);
     ajout('19 source derriere le sprite : aucun plan de face', nom, sd.faces === 0 && sd.interieurs === 0 && sd.bords > 0,
       `plans de face allumes : ${sd.faces} / ${sd.nbFaces} ; pixels sans exposition allumes : ${sd.interieurs} ; pixels allumes : ${sd.bords}`);
+    const ss = tSousSprite(sp);
+    ajout('21 source de decor : rien sous le sprite', nom, ss.allumes === 0 && ss.coupes === 0 && ss.dessous > 0,
+      `plans et bords du dessous encore eclaires : ${ss.allumes} / ${ss.dessous} ; dessus coupe a tort : ${ss.coupes} / ${ss.dessus}`);
     const [mi, md, ni] = tMilieu(sp);
     ajout('12 milieu sombre', nom, mi === 0, `pixels intérieurs allumés : ${mi.toFixed(1)} % (pire ${md || '-'}) ; ${ni} px intérieurs`);
     ajout('11 fidélité à +49', nom, ok11, `plans exposés à -49 : [${ex.join(', ')}] ; paliers 0/1/2/3 en % (moyenne) ; saut max ; sauts >= 2 ; largeur -- +49 : ${fmt(p49)} | -49 : ${fmt(m49)}`);
@@ -666,7 +741,15 @@ function main() {
   const mq = tMasque();
   ajout('17 masque de canopee', 'rayon et camera', mq.dans === 1 && mq.hors === 0 && mq.sousSol === 0 && mq.ecarts === 0,
     `dans le rayon ${mq.dans} ; hors du rayon ${mq.hors} ; sous le sol ${mq.sousSol} ; points differents selon la camera : ${mq.ecarts} / 400`);
+  ajout('22 la lumiere disparait avec son element', 'LightKit.sourcePresente', tSourcePresente(), 'casse, cache, transparent, desactive ou detruit : plus de lumiere');
+  ajout('21 rien sous le sprite : seulement au sol', 'LightKit.partAuSol', tAuSol(), 'au sol : dessous sombre ; en l\'air : dessous eclaire, en fondu');
   ajout('19 source derriere le sprite : profondeur selon le plan', 'LightKit.zLampe', tProfondeurSource(), 'derriere un personnage : contre-jour ; decor ou source au premier plan : devant');
+  const fo = tFormes();
+  ajout('20 forme de lumiere : point le plus proche', 'pointForme', fo.point && fo.interieur && fo.triangle && fo.rectangle && fo.miroir,
+    `point inchange ${fo.point} ; interieur ${fo.interieur} ; triangle ${fo.triangle} ; rectangle et cercle ${fo.rectangle} ; miroir flipX ${fo.miroir}`);
+  const sf = tSourcesAvecForme();
+  ajout('20 chaque source visible declare sa forme', 'LightKit.SOURCES', sf.noms.length > 0 && !sf.sans.length && sf.calage && sf.bord,
+    `${sf.noms.length} sources${sf.sans.length ? `, sans forme valide : ${sf.sans.join(', ')}` : ''} ; calage sur les limites ${sf.calage} ; ecart depuis le bord ${sf.bord}`);
   const sy = tSymetrie();
   ajout('3 symétrie demi-sphère', 'demi-sphère', sy < 0.02, `écart max gauche/droite en miroir ${sy.toFixed(4)}`);
   const cle = (t) => t.replace(/^(\d+)/, (m) => m.padStart(2, '0'));
