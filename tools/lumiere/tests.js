@@ -478,6 +478,25 @@ function tBlancs(sp, L) {
   return { ecart: nb ? 100 * (rendu / nb - origine / nb) / (origine / nb) : 0, nb, clairs, blancs: 100 * blancs / sp.pts.length, pas, niveaux };
 }
 
+// 17 : masque de canopée. Hors d'un rayon, aucun soleil ; le résultat ne dépend pas de la position de la caméra
+function tMasque() {
+  const n = 400, d = new Uint8Array(n * 3);
+  for (let i = 0; i < n; i++) { d[i * 3] = i >= 100 && i < 120 ? 255 : 0; d[i * 3 + 1] = Math.round(448 / 1020 * 255); d[i * 3 + 2] = 128; }
+  const M = { pente: 0.5, u0: 0, cel: 2, n, amp: 0, t: 0, bande: 12,
+    lire: (v) => { const i = Math.min(n - 1, Math.max(0, Math.floor(v * n))); return { r: d[i * 3] / 255, g: d[i * 3 + 1] / 255, b: d[i * 3 + 2] / 255 }; } };
+  const k = (x, y) => LightKit.masqueSoleil({ x, y }, M);
+  const soleil = (x, y) => k(x, y) * 0.95;   // part du soleil reçue par le pixel
+  const dans = k(220 + 0.5 * 200, 200), hors = soleil(40 + 0.5 * 200, 200), sousSol = soleil(220 + 0.5 * 500, 500);
+  // Même point du monde vu depuis deux caméras (échelle 3, défilement entier) : même valeur
+  const vu = (wx, wy, sx, sy) => { const px = (wx - sx) * 3 + 0.5, py = (wy - sy) * 3 + 0.5; return k(px / 3 + sx, py / 3 + sy); };
+  let ecarts = 0;
+  for (let i = 0; i < 400; i++) {
+    const wx = 150 + i * 1.5, wy = (i * 7) % 440;
+    if (vu(wx, wy, 0, 0) !== vu(wx, wy, 137, 31) || vu(wx, wy, 0, 0) !== vu(wx, wy, -90, 12)) ecarts++;
+  }
+  return { dans, hors, sousSol, ecarts };
+}
+
 function tSymetrie() {
   const sp = demiSphere(20);
   const cy = (sp.y0 + sp.y1) / 2 + 0.5, W = sp.x0 + sp.x1;
@@ -518,7 +537,7 @@ function alignementModele() {
 }
 
 // GLSL <-> CPU : même suite d'appels de fonctions GLSL et de nombres dans eclairage()
-const APPELS = ['exp', 'smoothstep', 'normalize', 'mix', 'vec3', 'vec2', 'length', 'max', 'min', 'clamp', 'dot', 'abs', 'sqrt', 'floor'];
+const APPELS = ['sin', 'fract', 'exp', 'smoothstep', 'normalize', 'mix', 'vec3', 'vec2', 'length', 'max', 'min', 'clamp', 'dot', 'abs', 'sqrt', 'floor'];
 function suite(src) {
   const s = sansCommentaires(src);
   const re = new RegExp(`\\b(${APPELS.join('|')})\\s*\\(|(\\d+\\.\\d+|\\b\\d+\\b)`, 'g');
@@ -529,8 +548,9 @@ function suite(src) {
 }
 function alignementCpu() {
   const cpu = fs.readFileSync(path.join(__dirname, 'cpu.js'), 'utf8');
-  const a = suite(corps(LightKit.FRAG, 'ambianceHemi') + corps(LightKit.FRAG, 'epaule') + corps(LightKit.FRAG, 'directionnel') + corps(LightKit.FRAG_ECLAIRAGE, 'eclairage'));
-  const b = suite(corps(cpu, 'ambianceHemi') + corps(cpu, 'epaule') + corps(cpu, 'directionnel') + corps(cpu, 'eclairage'));
+  const jeu = fs.readFileSync(path.join(ROOT, 'src', 'utils', 'LightKit.js'), 'utf8');
+  const a = suite(corps(LightKit.FRAG, 'ambianceHemi') + corps(LightKit.FRAG, 'epaule') + corps(LightKit.FRAG, 'directionnel') + corps(LightKit.FRAG_MASQUE, 'masqueSoleil') + corps(LightKit.FRAG_ECLAIRAGE, 'eclairage'));
+  const b = suite(corps(cpu, 'ambianceHemi') + corps(cpu, 'epaule') + corps(cpu, 'directionnel') + corps(jeu, 'masqueSoleilJs').replace(/const \{ floor, sin \} = Math, fract = \(v\) => v - Math\.floor\(v\);/, '') + corps(cpu, 'eclairage'));
   let i = 0;
   while (i < a.length && a[i] === b[i]) i++;
   return { n: a.length, ok: a.length === b.length && i === a.length, ecart: i < Math.max(a.length, b.length) ? `GLSL ${a[i]} / CPU ${b[i]} (élément ${i + 1})` : '' };
@@ -543,7 +563,7 @@ function main() {
   const am = alignementModele();
   ajout('0 shader du jeu = page validée', 'LightKit.js / apercu.html', !am.length, am.length ? `écart : ${am.join(', ')}` : 'ambianceHemi, epaule, palier, normaleLisse, eclairage identiques');
   const ac = alignementCpu();
-  ajout('0 alignement GLSL <-> CPU', 'ambianceHemi(), epaule(), directionnel(), eclairage()', ac.ok, ac.ok ? `${ac.n} appels et nombres identiques` : ac.ecart);
+  ajout('0 alignement GLSL <-> CPU', 'ambianceHemi(), epaule(), directionnel(), masqueSoleil(), eclairage()', ac.ok, ac.ok ? `${ac.n} appels et nombres identiques` : ac.ecart);
   const man = manifeste();
   let charges = 0;
   for (const [nom, url] of SPRITES) {
@@ -594,6 +614,9 @@ function main() {
   }
   const di = tDirectionnel();
   ajout('16 soleil directionnel : meme resultat quelle que soit la position', 'shader et LightKit', di.shader && di.envoi, 'aucune position, portee ni camera dans directionnel() et dans son envoi au shader');
+  const mq = tMasque();
+  ajout('17 masque de canopee', 'rayon et camera', mq.dans === 1 && mq.hors === 0 && mq.sousSol === 0 && mq.ecarts === 0,
+    `dans le rayon ${mq.dans} ; hors du rayon ${mq.hors} ; sous le sol ${mq.sousSol} ; points differents selon la camera : ${mq.ecarts} / 400`);
   const sy = tSymetrie();
   ajout('3 symétrie demi-sphère', 'demi-sphère', sy < 0.02, `écart max gauche/droite en miroir ${sy.toFixed(4)}`);
   const cle = (t) => t.replace(/^(\d+)/, (m) => m.padStart(2, '0'));

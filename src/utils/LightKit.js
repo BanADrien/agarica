@@ -102,6 +102,41 @@ float eclairage(vec3 n, vec3 nLisse, vec2 t, vec2 lp, float z, float portee, flo
   return min(diff + cj, 1.0);
 }`;
 
+  // Masque de soleil (canopée) : une ligne de cellules projetée le long de la direction du soleil. R = trouée,
+  // G = hauteur où le rayon touche le décor (/ 1020), B = irrégularité des bords. Même calcul en JS : masqueSoleilJs.
+  const FRAG_MASQUE = `
+uniform sampler2D uMasque;
+uniform vec4 uMasqueGeo;    // pente, debut, taille d'une cellule, nombre de cellules
+uniform vec4 uMasqueAnim;   // balancement (px), temps, bande eclairee sous l'arrivee, actif
+uniform vec4 uMondeEcran;   // px du monde par px du canvas, decalage x, decalage y, hauteur du canvas
+vec2 pointMonde() {
+  return vec2(gl_FragCoord.x, uMondeEcran.w - gl_FragCoord.y) * uMondeEcran.x + uMondeEcran.yz;
+}
+vec4 texMasque(float v) {
+  return texture2D(uMasque, vec2(v, 0.5));
+}
+float masqueSoleil(vec2 m) {
+  float rangee = floor(m.y / 6.0);
+  float j = (texMasque(fract(rangee * 0.0731)).b - 0.5) * 2.0 * uMasqueGeo.z;
+  float u = m.x - uMasqueGeo.x * m.y + j;
+  float bal = uMasqueAnim.x * sin(uMasqueAnim.y * 0.7 + u * 0.011);
+  vec4 c = texMasque((floor((u + bal - uMasqueGeo.y) / uMasqueGeo.z) + 0.5) / uMasqueGeo.w);
+  if (m.y > c.g * 1020.0 + uMasqueAnim.z) return 0.0;
+  return c.r;
+}`;
+
+  // masqueSoleil() du shader, ligne à ligne. M : { lire(v) -> { r, g, b }, pente, u0, cel, n, amp, t, bande }
+  function masqueSoleilJs(m, M) {
+    const { floor, sin } = Math, fract = (v) => v - Math.floor(v);
+    const rangee = floor(m.y / 6.0);
+    const j = (M.lire(fract(rangee * 0.0731)).b - 0.5) * 2.0 * M.cel;
+    const u = m.x - M.pente * m.y + j;
+    const bal = M.amp * sin(M.t * 0.7 + u * 0.011);
+    const c = M.lire((floor((u + bal - M.u0) / M.cel) + 0.5) / M.n);
+    if (m.y > c.g * 1020.0 + M.bande) return 0.0;
+    return c.r;
+  }
+
   const FRAG = `
 #define SHADER_NAME LUMIERE_SECTIONS_FS
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -125,6 +160,7 @@ uniform sampler2D uNatif;         // _lumiere/<n>_natif.png (dessin d'origine, m
 uniform vec3 uCiel, uSol;         // ambiance : plans tournes vers le haut / vers le bas
 uniform float uDetail;            // part du dessin d'origine dans l'ambiance
 uniform float uEpaule;            // debut de l'epaule des hautes lumieres (1 = aucune)
+${FRAG_MASQUE}
 uniform Lumiere uLumieres[kMaxLights];
 uniform int uNbLumieres;
 uniform float uPaliers, uContre;
@@ -212,10 +248,11 @@ void main() {
   float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
   vec3 l = vec3(0.0);
   vec3 ls = vec3(0.0);   // soleils : eclairent le dessin, meme gain relatif pour toutes les matieres
+  float ms = uMasqueAnim.w > 0.5 ? masqueSoleil(pointMonde()) : 1.0;   // canopee : hors des rayons, pas de soleil
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      if (L.soleil > 0.5) ls += L.couleur * palier(directionnel(n, L.position, lb));
+      if (L.soleil > 0.5) ls += L.couleur * ms * (uCarte > 0.5 || uMasqueAnim.w < 0.5 ? palier(directionnel(n, L.position, lb)) : 0.55);
       else l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
     }
   }
@@ -353,6 +390,14 @@ void main() {
         this.set3f('uCiel', this._ciel[0] * ombre, this._ciel[1] * ombre, this._ciel[2] * ombre);
         this.set3f('uSol', this._sol[0] * ombre, this._sol[1] * ombre, this._sol[2] * ombre);
         this.set1f('uDetail', this._detail);
+        const mq = this._reglages.masque;
+        this.set4f('uMasqueAnim', mq ? mq.amp : 0, mq ? mq.t : 0, mq ? mq.bande : 0, mq ? 1 : 0);
+        if (mq) {
+          const Mc = this._camera.matrix;
+          this.set1i('uMasque', 6);
+          this.set4f('uMasqueGeo', mq.pente, mq.u0, mq.cel, mq.n);
+          this.set4f('uMondeEcran', 1 / Mc.a, this._camera.scrollX - Mc.e / Mc.a, this._camera.scrollY - Mc.f / Mc.d, this.renderer.height);
+        }
         this.set1f('uEpaule', this._epaule);
         this.set1f('uPaliers', this._reglages.paliers);
         this.set1f('uContre', this._reglages.contre);
@@ -428,9 +473,11 @@ void main() {
       // juste avant le dessin : cartes natives sur les unités 2, 3 et 4 (Phaser n'utilise que 0
       // et 1 dans ce pipeline ; les autres pipelines revalident leurs unités en se liant)
       onBeforeFlush() {
+        const gl = this.gl;
+        const mq = this._reglages.masque;
+        if (mq) { gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, mq.tex.webGLTexture); gl.activeTexture(gl.TEXTURE0); }
         const c = this._textures;
         if (!c) return;
-        const gl = this.gl;
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, c.neutre.webGLTexture);
         gl.activeTexture(gl.TEXTURE3);
@@ -588,7 +635,7 @@ void main() {
     scene.lights.setAmbientColor(couleurDe(couleur));
   }
 
-  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour, hemi, detail, ciel, sol, epaule, ombre }.
+  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour, hemi, detail, ciel, sol, epaule, ombre, masque }.
   function reglerRendu(scene, reglages) {
     if (scene.__lumiere) Object.assign(scene.__lumiere.reglages, reglages);
   }
@@ -628,7 +675,7 @@ void main() {
   }
 
   return {
-    NOM_PIPELINE, DEFAUTS, SOLEIL, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
+    NOM_PIPELINE, DEFAUTS, SOLEIL, FRAG_MASQUE, masqueSoleil: masqueSoleilJs, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
     chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
     ajouterLumiere, ajouterSoleil, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
