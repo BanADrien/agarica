@@ -19,9 +19,10 @@ const LABO_ZOOMS = [{ nom: 'x1', camera: 2 }, { nom: 'x1,5', camera: 3 }, { nom:
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
 const LABO_PARTIES = [
-  { id: 'nuit', nom: 'NUIT', ambiance: 0.3, teinte: [0.72, 0.82, 1.25], fond: [8, 10, 24], contre: 1.5, paliers: 4 },
-  { id: 'soleil', nom: 'SOLEIL', ambiance: 0.58, teinte: [1, 1, 1.04], fond: [143, 184, 216], contre: 1.5, paliers: 4 },
-  { id: 'banc', nom: 'BANC D\'ESSAI', ambiance: 0.36, teinte: [1, 1, 1], fond: [13, 11, 26], contre: 1.5, paliers: 4 },
+  // Ambiance : ciel (plans tournés vers le haut) et sol (vers le bas), niveau x teinte ; detail = dessin d'origine dans l'ambiance
+  { id: 'nuit', nom: 'NUIT', ciel: 0.4, cielT: [0.72, 0.82, 1.25], sol: 0.12, solT: [0.6, 0.66, 1], detail: 0.7, fond: [8, 10, 24], contre: 1.5, paliers: 4 },
+  { id: 'soleil', nom: 'SOLEIL', ciel: 0.66, cielT: [0.97, 1, 1.08], sol: 0.26, solT: [1, 0.88, 0.76], detail: 0.75, fond: [143, 184, 216], contre: 1.5, paliers: 4 },
+  { id: 'banc', nom: 'BANC D\'ESSAI', ciel: 0.5, cielT: [1, 1, 1], sol: 0.2, solT: [1, 1, 1], detail: 0.7, fond: [13, 11, 26], contre: 1.5, paliers: 4 },
 ];
 const LABO_COULEURS = [0xffb35c, 0x9fb8ff, 0xffffff, 0xfff1d6, 0x5cf0d0, 0xd8ff6a, 0x7dff8a, 0xff5c5c, 0x5c8cff];
 const LABO_PALIERS = [2, 3, 4, 5, 0];   // 0 = lisse
@@ -31,7 +32,9 @@ const LABO_REGLAGES = [
   { id: 'portee', groupe: true, pas: 20, min: 20, max: 12000 },
   { id: 'intensite', groupe: true, pas: 0.05, min: 0, max: 3 },
   { id: 'couleur', groupe: true },
-  { id: 'ambiance', pas: 0.02, min: 0, max: 1 },
+  { id: 'ciel', pas: 0.02, min: 0, max: 1.2 },
+  { id: 'sol', pas: 0.02, min: 0, max: 1.2 },
+  { id: 'detail', pas: 0.05, min: 0, max: 1 },
   { id: 'contre', pas: 0.1, min: 0, max: 3 },
   { id: 'paliers' },
 ];
@@ -213,9 +216,9 @@ class LaboLumiereScene extends Phaser.Scene {
     this.laboGroupe(st, 0, 'derriere Kainati', { profondeur: -24, portee: 300, intensite: 0.9, couleur: 0xffb35c }, [kai(0)],
       (t, i, pos) => ({ x: pos.x + 160 * Math.sin(t / 2600) }), true);
     // ---- SOLEIL : très loin, suit la caméra pour garder la même direction sur toute la partie
-    const soleil = this.laboGroupe(st, 1, 'soleil', { profondeur: 1700, portee: 9000, intensite: 0.5, couleur: 0xfff1d6 }, [{ x: X(1, 960), y: -1400 }], () => {
+    const soleil = this.laboGroupe(st, 1, 'soleil', { profondeur: 1000, portee: 9000, intensite: 0.9, couleur: 0xfff1d6 }, [{ x: X(1, 960), y: -1400 }], () => {
       const v = this.cameras.main.worldView;
-      return { x: v.centerX - 500, y: v.centerY - 1400 };
+      return { x: v.centerX - 800, y: v.centerY - 1300 };
     }, true);
     // Ombre de l'auvent : le soleil baisse sur ce qui passe dessous (bords adoucis sur 48 px)
     const { x0, x1 } = st.ombre;
@@ -294,7 +297,7 @@ class LaboLumiereScene extends Phaser.Scene {
   laboReglagesPartie(st) {
     const p = st.parties[st.partie];
     return {
-      partie: p.id, ambiance: p.ambiance, teinte: p.teinte, contre: p.contre, paliers: p.paliers,
+      partie: p.id, ciel: p.ciel, cielTeinte: p.cielT, sol: p.sol, solTeinte: p.solT, detail: p.detail, contre: p.contre, paliers: p.paliers,
       lampes: this.laboGroupes(st).map((g) => ({
         nom: g.nom, nombre: g.lampes.length, profondeur: g.profondeur, portee: g.portee, intensite: g.intensite,
         couleur: g.couleur === null ? 'plusieurs' : `#${g.couleur.toString(16).padStart(6, '0')}`,
@@ -370,10 +373,11 @@ class LaboLumiereScene extends Phaser.Scene {
     if (st.retournee) st.retournee.sp.setFlipX(Math.floor(t / 1400) % 2 === 1);
     if (st.ok) {
       const melange = (f) => [0, 1, 2].map((k) => st.parties.reduce((s, p, i) => s + poids[i] * f(p, k), 0));
-      const amb = melange((p, k) => Math.min(1, p.ambiance * p.teinte[k])).map((v) => Math.round(v * 255));
-      LightKit.ambiance(this, (amb[0] << 16) | (amb[1] << 8) | amb[2]);
       const courant = st.parties[st.partie];
-      LightKit.reglerRendu(this, { contre: courant.contre, paliers: courant.paliers });
+      LightKit.reglerRendu(this, {
+        ciel: melange((p, k) => p.ciel * p.cielT[k]), sol: melange((p, k) => p.sol * p.solT[k]),
+        detail: st.parties.reduce((s, p, i) => s + poids[i] * p.detail, 0), contre: courant.contre, paliers: courant.paliers,
+      });
       // Lampes candidates : partie présente, cercle dans la vue ; les prioritaires d'abord puis les plus proches
       const vue = cam.worldView, cx = vue.centerX, cy = vue.centerY;
       const candidates = [];
