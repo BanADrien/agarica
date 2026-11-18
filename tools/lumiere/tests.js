@@ -381,13 +381,13 @@ function tMilieu(sp) {
 // le dessin d'origine reste lisible : écart de luminance à la moyenne 5 x 5, ambiance contre neutre seul
 function tOmbre(sp, carte) {
   const V = (o) => CPU.vec3(o, o, o);
-  const UA = { uCiel: V(0.64), uSol: V(0.62) }, DETAIL = LightKit.DEFAUTS.detail;
+  const UA = { uCiel: V(0.72), uSol: V(0.7) }, DETAIL = LightKit.DEFAUTS.detail;
   const lum = (d, i) => 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
   let haut = 0, nh = 0, bas = 0, nb = 0;
   const compo = new Float64Array(sp.w * sp.h), neutre = new Float64Array(sp.w * sp.h);
   for (const p of sp.pts) {
     const i = sp.id(p), n = sp.N.get(i), a = CPU.ambianceHemi(n, UA).x;
-    const v = (lum(carte.neutre, i * 4) * (1 - DETAIL) + lum(carte.natif, i * 4) * DETAIL) * a / 0.63;
+    const v = (lum(carte.neutre, i * 4) * (1 - DETAIL) + lum(carte.natif, i * 4) * DETAIL) * a / 0.71;
     compo[i] = v; neutre[i] = lum(carte.neutre, i * 4);
     if (sp.lumP(p) < 0.16) continue;
     if (n.y > 0.3) { haut += a; nh++; } else if (n.y < -0.3) { bas += a; nb++; }
@@ -412,9 +412,9 @@ const LUMIERES = {
   'lampe forte': { ciel: CPU.vec3(0.44, 0.44, 0.44), sol: CPU.vec3(0.4, 0.4, 0.4), detail: 0.7, c: [1.3, 1.3, 1.3], lp: [-120, -160], z: 120, portee: 2000 },
 };
 // 15 : soleil du labo. Ambiance uniforme sur le dessin d'origine ; par rapport à l'origine, palier par palier :
-// dessous 62 à 68 %, intermédiaire vers 82 %, flancs 95 à 106 %, dessus 123 à 135 % (l'épaule retient les couleurs vives), aucun pixel sous 58 %
+// dessous 70 à 72 %, intermédiaire 85 à 91 %, flancs 100 à 108 %, dessus 122 à 130 % (l'épaule retient les couleurs vives), aucun pixel sous 66 %
 const SOLEIL_LABO = { d: CPU.normalize(CPU.vec3(LightKit.SOLEIL.direction.x, LightKit.SOLEIL.direction.y, LightKit.SOLEIL.direction.z)),
-  c: [LightKit.SOLEIL.intensite, LightKit.SOLEIL.intensite * 0.945, LightKit.SOLEIL.intensite * 0.839], epaule: 0.85, ciel: CPU.vec3(0.64, 0.64, 0.64), sol: CPU.vec3(0.62, 0.62, 0.62) };
+  c: [LightKit.SOLEIL.intensite, LightKit.SOLEIL.intensite * 0.945, LightKit.SOLEIL.intensite * 0.839], epaule: 0.85, ciel: CPU.vec3(0.72, 0.72, 0.72), sol: CPU.vec3(0.7, 0.7, 0.7) };
 function pixelSoleil(sp, p, force) {
   const i = sp.id(p) * 4, nat = sp.carte.natif, S = SOLEIL_LABO;
   const v = force ?? palier(CPU.directionnel(sp.N.get(sp.id(p)), S.d, sp.lumP(p), U));
@@ -585,8 +585,8 @@ function main() {
     }
     const so = tSoleil(sp);
     const dans = (v, a, b) => v === null || (v >= a && v <= b);
-    ajout('15 soleil : contraste par paliers', nom, dans(so.niv[0], 62, 68) && dans(so.niv[1], 78, 86) && dans(so.niv[2], 95, 106) && dans(so.niv[3], 123, 135)
-      && so.mini >= 58 && so.blancs <= 2 && (so.nbClairs < 30 || so.pasBlancs >= 0.02),
+    ajout('15 soleil : contraste par paliers', nom, dans(so.niv[0], 70, 72) && dans(so.niv[1], 85, 91) && dans(so.niv[2], 100, 108) && dans(so.niv[3], 122, 130)
+      && so.mini >= 66 && so.blancs <= 2 && (so.nbClairs < 30 || so.pasBlancs >= 0.02),
       `dessous ${so.niv[0] === null ? '-' : so.niv[0].toFixed(1)} % ; intermediaire ${so.niv[1] === null ? '-' : so.niv[1].toFixed(0)} % ; flancs ${so.niv[2] === null ? '-' : so.niv[2].toFixed(1)} % ; dessus ${so.niv[3] === null ? '-' : so.niv[3].toFixed(1)} % ; pixel le plus sombre ${so.mini.toFixed(0)} % ; ecart mini entre nuances claires ${so.pasBlancs === Infinity ? '-' : so.pasBlancs.toFixed(3)} ; blanc pur ajoute ${so.blancs.toFixed(2)} %`);
     const [mi, md, ni] = tMilieu(sp);
     ajout('12 milieu sombre', nom, mi === 0, `pixels intérieurs allumés : ${mi.toFixed(1)} % (pire ${md || '-'}) ; ${ni} px intérieurs`);
