@@ -32,9 +32,40 @@ const ZoomKit = (() => {
   actualiser();
   const actif = () => ZOOM_BASE !== 1;
 
+  // ---------------------------------------------------------------- objets hors du cadre
+  // Une image ou un sprite entièrement hors du cadre visible n'est pas envoyé au dessin. Seul le DESSIN est coupé : mises à
+  // jour, animations, physique, déclencheurs et minuteries tournent comme avant. Marge large : un objet ne peut pas apparaître
+  // au bord. Rien n'est coupé pendant un tremblement, un zoom ou une rotation de caméra, ni dans un conteneur.
+  // `?sansmasquage` dans l'adresse : tout est dessiné (comparaisons).
+  const MARGE_CADRE = 96;
+  const masquage = typeof window === 'undefined' || !new URLSearchParams(window.location.search).has('sansmasquage');
+  function horsDuCadre(o, cam, v) {
+    if ((o.type !== 'Image' && o.type !== 'Sprite') || o.parentContainer) return false;
+    if (o.originX < 0 || o.originX > 1 || o.originY < 0 || o.originY > 1) return false;
+    // Rayon qui couvre l'objet quels que soient son origine et sa rotation
+    const r = Math.hypot(o.displayWidth, o.displayHeight) + MARGE_CADRE;
+    const x = o.x - cam.scrollX * (o.scrollFactorX - 1), y = o.y - cam.scrollY * (o.scrollFactorY - 1);
+    return x + r < v.left || x - r > v.right || y + r < v.top || y - r > v.bottom;
+  }
+  function installerMasquage() {
+    if (!masquage) return;
+    Phaser.Cameras.Scene2D.CameraManager.prototype.getVisibleChildren = function (enfants, cam) {
+      const libre = cam.zoom === 1 && cam.rotation === 0 && !cam.shakeEffect.isRunning;
+      const ref = cam.__zoomMondeRef, secousse = ref && ref.shakeEffect.isRunning;
+      const v = libre && !secousse ? vueVisible(cam) : null;
+      const vus = [];
+      for (let i = 0; i < enfants.length; i++) {
+        const o = enfants[i];
+        if (o.willRender(cam) && !(v && horsDuCadre(o, cam, v))) vus.push(o);
+      }
+      return vus;
+    };
+  }
+
   // ---------------------------------------------------------------- avant la création du jeu
   function installer() {
     if (!actif()) return;
+    installerMasquage();
     const C = Phaser.Cameras.Scene2D.Camera.prototype;
     // Les caméras gardent 960 x 540 quand le canvas change de taille
     Phaser.Cameras.Scene2D.CameraManager.prototype.onResize = function () {};
