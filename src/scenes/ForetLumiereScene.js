@@ -7,15 +7,16 @@
 const FORET_CELLULE = 2;          // largeur d'une cellule du masque (px du monde)
 const FORET_U0 = -400;            // début du masque sur l'axe de projection
 const FORET_BANDE = 12;           // épaisseur éclairée sous le point où le rayon touche le sol
-const FORET_SOLEIL = { x: -0.4, y: 0.8, z: 0.7 };
+const FORET_AMBIANCE = AMBIANCES_LUMIERE.foret;   // valeurs de départ : src/data/ambiances_lumiere.js
+const FORET_SOLEIL = FORET_AMBIANCE.soleil;
 const FORET_REGLAGES = [
-  { id: 'ambiance', pas: 0.02, min: 0.1, max: 1, val: 0.46 },
-  { id: 'teinte', pas: 0.02, min: 0, max: 0.5, val: 0.14 },
-  { id: 'rayons', pas: 0.05, min: 0, max: 2, val: 0.95 },
-  { id: 'densite', pas: 0.02, min: 0.04, max: 0.7, val: 0.18, masque: true },
-  { id: 'largeur', pas: 2, min: 6, max: 90, val: 24, masque: true },
-  { id: 'faisceaux', pas: 0.02, min: 0, max: 0.6, val: 0.1 },
-  { id: 'balancement', pas: 0.5, min: 0, max: 10, val: 3 },
+  { id: 'ambiance', pas: 0.02, min: 0.1, max: 1, val: FORET_AMBIANCE.ambiance },
+  { id: 'teinte', pas: 0.02, min: 0, max: 0.5, val: FORET_AMBIANCE.teinte },
+  { id: 'rayons', pas: 0.05, min: 0, max: 2, val: FORET_AMBIANCE.rayons },
+  { id: 'densite', pas: 0.02, min: 0.04, max: 0.7, val: FORET_AMBIANCE.densite, masque: true },
+  { id: 'largeur', pas: 2, min: 6, max: 90, val: FORET_AMBIANCE.largeur, masque: true },
+  { id: 'faisceaux', pas: 0.02, min: 0, max: 0.6, val: FORET_AMBIANCE.faisceaux },
+  { id: 'balancement', pas: 0.5, min: 0, max: 10, val: FORET_AMBIANCE.balancement },
 ];
 
 // Faisceaux visibles : lumière douce aux bords fondus, découpée par le même masque
