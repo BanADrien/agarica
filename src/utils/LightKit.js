@@ -254,7 +254,11 @@ void main() {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
       if (L.soleil > 0.5) ls += L.couleur * ms * (uCarte > 0.5 || uMasqueAnim.w < 0.5 ? palier(directionnel(n, L.position, lb)) : 0.55);
-      else l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
+      else {
+        // personnages (cartes) : paliers ; decor sans carte : fondu continu, sinon les paliers y dessinent des cercles
+        float e = eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm);
+        l += L.couleur * (uCarte > 0.5 ? palier(e) : smoothstep(0.0, 1.0, e));
+      }
     }
   }
   // ambiance sur le dessin d'origine (detail dans l'ombre), lampes sur le neutre (pas d'ombrage double)
@@ -579,7 +583,7 @@ void main() {
   const FEU_DE_CAMP = /^decor-campfire-/;
   const SEUIL_FLAMMES = 0.62;
   const SOURCES = {
-    feu: { couleur: 0xff9a45, intensite: 1.7, portee: 310, profondeur: 60, vacille: 0.1, halo: 190 },
+    feu: { couleur: 0xffc46e, intensite: 1.7, portee: 310, profondeur: 60, vacille: 0.1, halo: 240 },
     champignon: { couleur: 0x5cf0d0, intensite: 0.85, portee: 150, profondeur: 30, vacille: 0.05, halo: 0 },
   };
 
@@ -593,20 +597,24 @@ void main() {
     return objets;
   }
 
-  // Halo en paliers nets autour d'un feu : trois disques de pixels
+  // Halo autour d'un feu : fondu continu jusqu'à zéro, aucun bord visible
   function textureHalo(scene) {
-    const cle = 'lumiere-halo';
+    const cle = 'lumiere-halo-doux';
     if (scene.textures.exists(cle)) return cle;
-    const T = 48, tex = scene.textures.createCanvas(cle, T, T), ctx = tex.getContext();
+    const T = 128, tex = scene.textures.createCanvas(cle, T, T), ctx = tex.getContext();
+    const img = ctx.createImageData(T, T);
     for (let y = 0; y < T; y++) {
       for (let x = 0; x < T; x++) {
-        const d = Math.hypot(x + 0.5 - T / 2, y + 0.5 - T / 2) / (T / 2);
-        const a = d < 0.42 ? 1 : d < 0.7 ? 0.55 : d < 1 ? 0.25 : 0;
-        if (a) { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(x, y, 1, 1); }
+        const d = Math.min(1, Math.hypot(x + 0.5 - T / 2, y + 0.5 - T / 2) / (T / 2));
+        const v = (1 - d * d) * (1 - d * d) * (1 - d);
+        const i = (x + y * T) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(255 * v);
       }
     }
+    ctx.putImageData(img, 0, 0);
     tex.refresh();
-    tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
     return cle;
   }
 
