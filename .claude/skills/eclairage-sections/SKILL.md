@@ -32,7 +32,8 @@ autre PC.
      dossier quand il ne contient que cette animation, frames triées 0, 1, 2... 10) ;
    - un sprite seul (ou des frames de facteurs différents, comme le grizzly) :
      `npm run sections -- assets/sprites/grizzly_frames/grizzly_row0_0.png`
-   - image encore peinte (absente de `pixel_fixed.js`) : `--echelle-jeu <setScale du code>`
+   - TOUJOURS ajouter `--echelle-jeu <setScale du code>` (voir « Taille à l'écran ») ; image encore peinte
+     (absente de `pixel_fixed.js`) : même option
      (demande sharp : `npm install` dans `tools/pixel-fixer`) ; mieux : la passer d'abord dans
      pixel-fixer.
    - options : `--apercu` (planche origine / neutre / sections / éclairé g. / d.),
@@ -107,32 +108,61 @@ Mode de test sans toucher au code : `index.html?zone=foret_sombre_1&lumiere` (Ag
 sprite préparé éclairés, nuit, torche au pointeur, molette = profondeur, lune) ;
 `&lumiere=-20` = profondeur de départ.
 
+## Taille à l'écran (règle des cartes)
+
+Le jeu affiche ses sprites bien plus petits que la page de test : les cartes sont faites À LA TAILLE VUE
+EN JEU, une case = np pixels d'écran entiers (np = max(1, round(échelle × f))). Toujours passer
+`--echelle-jeu <setScale du code>` ; `npm run lumiere:cartes` refait tous les sprites préparés avec
+leurs échelles (`tools/lumiere/cartes-jeu.js`, à compléter pour un nouveau sprite).
+
+| Asset | Fichier | f pixel-fixer | setScale | Zoom | À l'écran | Px écran par pixel dessiné, avant -> cartes |
+|---|---|---|---|---|---|---|
+| Agarica (marche) | 261 x 357 | 3,76 | 0,24 | 1 | 61 x 85 | 0,90 -> 1 |
+| Loup | 422 x 267 | 2,5 | 0,4 | 1 | 116 x 69 | 1 -> 1 |
+| Grizzly | 352 x 319 | 4,75 / 4,13 / 3,65 | 0,4214 | 1 | 146 x 110 | 2 / 1,74 / 1,54 -> 2 |
+| Crapaud | 1434 x 237 | 2,5 | 0,26 | 1 | 369 x 58 | 0,65 -> 1 |
+| Kainati | 388 x 396 | 1,08 | 0,6 | 1 | 199 x 218 | 0,65 -> 1 |
+
+- Réduction : chaque case prend la couleur la plus présente (traits sombres comptés double, couleurs de
+  l'image gardées) ; si la grille dessinée tombe déjà juste (loup), elle est gardée telle quelle.
+- L'échelle s des grands sprites se calcule donc sur la taille à l'écran (Kainati : 1,69).
+- En jeu, LightKit cale les cases sur les pixels d'écran (caméra à zoom 1, sans rotation).
+- Page de test : case « Taille reelle en jeu » ; pour vos images, champ « Échelle en jeu ».
+- À reporter dans `sections.py` : `grilleEcran` et `echantillonnerEcran` de `coeur.js`, champs `ech` et
+  `np` du manifeste, `--echelle-jeu` sur un sprite pixel-fixer.
+
 ## Labo d'éclairage en jeu (zone de test)
 
-`index.html?zone=labo_lumiere&lumiere` : salle fermée construite comme une vraie zone
-(`src/data/labo_lumiere_data.js`, `src/scenes/LaboLumiereScene.js`), Agarica jouable, mannequins
-immobiles à leur échelle du jeu (loup, grizzly, crapaud, Kainati), trois lampes : torche au pointeur,
-lune fixe, lampe derrière Kainati. Aucun lien depuis le jeu ; sans `?lumiere` ni cette zone, les
-cartes ne sont même pas chargées (`TOUJOURS` dans LightKit.js le jour où une vraie zone éclaire).
+`index.html?zone=labo_lumiere&lumiere` : zone fermée construite comme une vraie zone
+(`src/data/labo_lumiere_data.js`, `src/scenes/LaboLumiereScene.js`), Agarica jouable, loup, grizzly, crapaud
+et Kainati immobiles à leur échelle du jeu dans chaque partie. Trois parties de 1920 px, ambiance et
+lampes en fondu au passage (sur 360 px) :
+- **Nuit** : champignons lumineux (décor du jeu, pulsation lente), lucioles (`fx_luciole`, s'allument et
+  s'éteignent), feu de camp (animation du jeu, sans son menu, vacille), lampe qui passe derrière Kainati ;
+- **Soleil** : lumière haute et lointaine qui garde la même direction, ambiance de jour, auvent (marqueur
+  dessiné) : le soleil baisse sur ce qui passe dessous (`L.attenuation`) ;
+- **Banc d'essai** : torche au pointeur, lune, lampe derrière Kainati, lampe qui passe de devant à derrière
+  (loup), lampe tournante (grizzly), trois couleurs (crapaud), Agarica retournée sous une lampe fixe.
+
+Au plus 10 lampes à la fois (`maxLights` de Phaser) : le labo n'allume que celles qui atteignent la vue,
+les prioritaires puis les plus proches. Aucun lien depuis le jeu ; sans `?lumiere` ni cette zone, les cartes
+ne sont même pas chargées (`TOUJOURS` dans LightKit.js le jour où une vraie zone éclaire).
 
 | Touche | Effet |
 |---|---|
 | U / J | réglage précédent / suivant (profondeur, portée, intensité, couleur, ambiance, contre-jour, paliers) |
 | H / L | baisser / monter la valeur |
-| N | lampe suivante (profondeur, portée, intensité et couleur sont par lampe) |
+| N | groupe de lampes suivant dans la partie |
+| Y | aller à la partie suivante |
 | G | éclairage activé / désactivé (comparaison immédiate) |
 | O | sprites d'origine (personnages sans éclairage, décor toujours éclairé) |
 | V | décor éclairé à plat ou non |
-| B | pixels entiers : un pixel dessiné = un nombre entier de pixels d'écran (mannequins seulement) |
 | T | écran net (canvas agrandi sans lissage du navigateur) |
-| C | copie les réglages (presse-papiers et console) : à transmettre tels quels |
+| C | copie les réglages de la partie (presse-papiers et console) : à transmettre tels quels |
 | W | masquer le panneau |
 
-Le panneau affiche aussi, pour chaque mannequin, les pixels d'écran couverts par un pixel dessiné,
-et la frame d'Agarica si elle n'a pas de cartes. Valeurs du jeu : loup 1,00 ; grizzly 2,00 (1,74 et
-1,54 sur deux poses de sa course : facteurs pixel-fixer différents) ; Agarica 0,90 ; crapaud et
-Kainati 0,65. **Sous 1, des pixels dessinés sautent à l'affichage** : les sections et les paliers
-paraissent irréguliers, ce que la page d'aperçu (agrandie x6) ne montre pas. À juger avec B.
+Le panneau affiche la partie, les lampes actives, la taille à l'écran de chaque mannequin, ses pixels
+d'écran par case, et la frame d'Agarica si elle n'a pas de cartes.
 
 ## Retoucher les cartes à la main
 
