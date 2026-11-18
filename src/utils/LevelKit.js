@@ -367,8 +367,10 @@ function addMoonlitDecor(scene, width, height, levelWidth, avoidRanges = [], bac
   scene.__farBackground = far;
   // Caméra qui défile verticalement (tallLevel, camera.vertical) ou fond
   // décalé : bords haut/bas prolongés dans la couleur de l'image (plus de
-  // bande vide en haut de l'écran quand on monte).
-  if (camHigh < camLow || baseline != null) addFarBackgroundCaps(scene, far, bgKey, { top, height, coverWidth, camLow, camHigh, farScroll, skyFade: !!sky });
+  // bande vide en haut de l'écran quand on monte). (Au zoom de base, une zone
+  // d'un écran a aussi camHigh < camLow, mais sa vue reste dans l'image.)
+  const vertical = backdrop.vertical ?? camHigh < camLow;
+  if (vertical || baseline != null) addFarBackgroundCaps(scene, far, bgKey, { top, height, coverWidth, camLow, camHigh, farScroll, skyFade: !!sky });
   if (sky) addSkyRevealBackLayers(scene, sky, { levelWidth, camLow, camHigh });
   // Lointains peints (clé `farLayers`) : entre le ciel et la forêt du fond.
   scene.__farLayers = null;
@@ -409,7 +411,8 @@ function zoneBackgroundId(data) {
   const bg = data && data.background;
   return bg && typeof bg === 'object' ? bg.id || null : bg || null;
 }
-function zoneBackdropSpec(data, { camLow = 0, camHigh = 0 } = {}) {
+// `vertical` : la caméra défile verticalement (tallLevel, camera.vertical).
+function zoneBackdropSpec(data, { camLow = 0, camHigh = 0, vertical = camHigh < camLow } = {}) {
   const bg = data.background && typeof data.background === 'object' ? data.background : {};
   const baseline = bg.baseline ?? data.backgroundBaseline ?? null;
   const id = zoneBackgroundId(data);
@@ -420,7 +423,7 @@ function zoneBackdropSpec(data, { camLow = 0, camHigh = 0 } = {}) {
   // (sauf `rays: true` explicite dans la zone).
   if (sky && sky.rays === undefined && BACKGROUNDS_WITH_SUN.has(id)) sky.rays = false;
   const farLayers = Array.isArray(data.farLayers) && data.farLayers.length ? data.farLayers : null;
-  return { baseline, groundLine, camLow, camHigh, sky, farLayers };
+  return { baseline, groundLine, camLow, camHigh, vertical, sky, farLayers };
 }
 
 // ---------------------------------------------------------------------------
@@ -1067,6 +1070,141 @@ function spawnSkyLeaf(scene) {
 }
 
 // ---------------------------------------------------------------------------
+// ZOOM DE LA CAMÉRA DE JEU (2026-11-17, demande utilisateur : « rezoom le jeu
+// pour tout le jeu, moins de champ de vision »). Toutes les zones de jeu
+// (buildLevelFromData, anciennes zones et zones de test comprises) : la caméra
+// principale est agrandie de CAMERA_ZOOM -- Agarica et le décor plus grands à
+// l'écran, moins de terrain autour d'elle. Ne changent pas (scènes à part, ou
+// exclues ci-dessous) : titre, menus, carte, sac, éditeur, écran de fin.
+// Ce qui suit le zoom : l'interface garde sa taille et sa place (uiZoomSetup),
+// les effets qui zooment partent de ce zoom et y reviennent (levelCameraZoom),
+// bornes, suivi vertical, cadrage au bord, fonds et secousses sont calculés
+// avec la vue réelle (960 x 540 / zoom px du monde).
+// CAMERA_ZOOM = LE réglage à changer pour choisir une autre valeur (1 = vue
+// d'origine, à l'identique). `?zoom=1.5` dans l'adresse : essai sans toucher
+// au fichier (entre 1 et 3).
+// ---------------------------------------------------------------------------
+const CAMERA_ZOOM = 1.33;
+// Éditeur de niveaux : il construit la zone avec buildLevelFromData mais règle
+// lui-même sa vue (molette) -- ni zoom de jeu, ni interface recalée.
+const CAMERA_ZOOM_EXCLUDED_SCENES = new Set(['EditeurScene', 'EditorScene']);
+
+function cameraZoomSetting() {
+  try {
+    const z = Number(new URLSearchParams(window.location.search).get('zoom'));
+    if (z >= 1 && z <= 3) return z;
+  } catch (e) { /* pas de fenêtre (outils Node) */ }
+  return CAMERA_ZOOM;
+}
+
+// Zoom de BASE de la caméra de la zone (1 hors des zones de jeu et dans
+// l'éditeur). Le zoom courant (`cam.zoom`) peut s'en écarter un instant
+// (posé d'entrée de zone, juiceZoomPulse) : ces effets partent de lui et y
+// reviennent.
+function levelCameraZoom(scene) {
+  return (scene && scene.__cameraZoom) || 1;
+}
+
+// Début de buildLevelFromData (avant le fondu d'entrée, qui zoome à partir de lui).
+function setupLevelCameraZoom(scene) {
+  const key = scene.sys && scene.sys.settings && scene.sys.settings.key;
+  if (CAMERA_ZOOM_EXCLUDED_SCENES.has(key)) { scene.__cameraZoom = 1; return; }
+  const z = cameraZoomSetting();
+  scene.__cameraZoom = z;
+  scene.cameras.main.setZoom(z);
+  if (z !== 1) uiZoomSetup(scene);
+}
+
+// Px du monde entre `scrollY` (ou `scrollX`) et le haut (ou le bord gauche)
+// de ce que la caméra montre : Phaser agrandit autour du centre de l'écran,
+// `scrollY` reste « centre de la vue - 270 » quel que soit le zoom.
+function cameraViewPad(size, zoom) {
+  return (size - size / zoom) / 2;
+}
+
+// --- Interface au zoom 1 -------------------------------------------------------
+// La caméra de la zone est zoomée, mais pendant son rendu (et seulement
+// pendant), chaque objet FIXÉ À L'ÉCRAN (scrollFactor 0 sur les deux axes :
+// HUD, toasts, bandeaux, voiles, vignette, ciel fixe) est ramené à sa place
+// et sa taille du zoom 1 (rapproché du centre de l'écran, échelle divisée par
+// le zoom), et chaque INTERFACE POSÉE DANS LE MONDE (invites « E », textes
+// flottants, bulles : uiZoomFree, posé par keepWorldUiInView) garde sa place
+// -- son ancre suit le monde -- mais retrouve sa taille du zoom 1 (échelle
+// divisée autour de son origine). Valeurs d'origine remises juste après le
+// rendu des caméras : tweens, mises en page et collisions ne voient jamais
+// la compensation (même principe que juiceRender, emboîté DANS lui : posée
+// après tous les 'prerender', retirée avant les 'render').
+// Pourquoi pas une 2e caméra d'interface : elle dessinerait l'interface APRÈS
+// tout le monde (le voile d'ambiance, à 900, et la vignette, à 999,5,
+// passeraient devant les plantes du premier plan, à 1000), sans les fondus,
+// flashs ni secousses de la caméra principale (à recopier un par un), et les
+// invites posées dans le monde auraient quand même demandé ce calcul.
+// Compensation faite avec le zoom de BASE : pendant un posé ou un
+// juiceZoomPulse, l'interface grandit avec le monde, comme avant.
+function uiZoomSetup(scene) {
+  const cams = scene.sys && scene.sys.cameras;
+  if (!cams || cams.__uiZoom) return;
+  // Le gestionnaire de caméras vit autant que l'instance de scène (les
+  // caméras, elles, sont recréées à chaque visite) : posé une fois.
+  const saved = [];
+  cams.__uiZoom = saved;
+  const render = cams.render;
+  cams.render = function uiZoomRender(renderer, displayList) {
+    const n = uiZoomApply(scene, saved);
+    try {
+      render.call(this, renderer, displayList);
+    } finally {
+      if (n) uiZoomRestore(saved);
+    }
+  };
+}
+
+function uiZoomApply(scene, saved) {
+  saved.length = 0;
+  const base = levelCameraZoom(scene);
+  const cam = scene.cameras.main;
+  if (!cam || Math.abs(base - 1) < 1e-6) return 0;
+  const k = 1 / base;
+  // Centre du zoom (cf. Camera.preRender : agrandit autour de width x originX).
+  const cx = cam.width * cam.originX;
+  const cy = cam.height * cam.originY;
+  const list = scene.sys.displayList.list;
+  for (let i = 0; i < list.length; i++) {
+    const o = list[i];
+    if (!o.visible) continue;
+    const fixed = o.scrollFactorX === 0 && o.scrollFactorY === 0;
+    if (!fixed && !o.__uiZoomFree) continue;
+    saved.push(o, o.x, o.y, o.scaleX, o.scaleY);
+    if (fixed) {
+      o.x = cx + (o.x - cx) * k;
+      o.y = cy + (o.y - cy) * k;
+    }
+    o.scaleX *= k;
+    o.scaleY *= k;
+  }
+  return saved.length;
+}
+
+function uiZoomRestore(saved) {
+  for (let i = 0; i < saved.length; i += 5) {
+    const o = saved[i];
+    o.x = saved[i + 1];
+    o.y = saved[i + 2];
+    o.scaleX = saved[i + 3];
+    o.scaleY = saved[i + 4];
+  }
+  saved.length = 0;
+}
+
+// Objet du MONDE dessiné à sa taille du zoom 1 autour de sa position (cf.
+// uiZoomApply) : interface qui suit un objet (invite, texte flottant, bulle).
+// Sa place dans la vue se calcule avec worldUiShownBounds.
+function uiZoomFree(obj) {
+  if (obj) obj.__uiZoomFree = true;
+  return obj;
+}
+
+// ---------------------------------------------------------------------------
 // Caméra de zone (clé `camera`) : { vertical: true, deadzoneTop: 0.35,
 // deadzoneBottom: 0.7, lerp | smoothTime, lookAhead: 60, lookAheadX: 0 }.
 // Horizontal : suivi historique (centré, immédiat). Vertical : zone morte --
@@ -1078,10 +1216,26 @@ function spawnSkyLeaf(scene) {
 const ZONE_CAMERA_DEFAULTS = { deadzoneTop: 0.35, deadzoneBottom: 0.7, smoothTime: 0.24, lookAhead: 60, lookAheadX: 0 };
 const ZONE_CAMERA_FOCUS_ABOVE_FEET = 40;
 
+// Réglages de la caméra de zone, ou null (suivi centré historique).
+// Zoom de base > 1 : une zone d'UN écran de haut dépasse maintenant la vue
+// (540 / zoom px) -- la vue la suit en hauteur avec la zone morte et le
+// ressort d'une caméra verticale (réglages par défaut, bornes inchangées :
+// 0 -> 540) plutôt que de coller à chacun de ses sauts. Zone haute
+// (`tallLevel`, racines du grand arbre) : suivi centré d'avant, avec son
+// cadrage au bord (frameFeetY).
+function zoneCameraConfig(scene, data) {
+  if (data.camera && data.camera.vertical) {
+    const c = { ...ZONE_CAMERA_DEFAULTS, ...data.camera };
+    // `lerp` (par image à 60 i/s, façon Phaser) -> temps de lissage équivalent.
+    if (data.camera.smoothTime == null && data.camera.lerp) c.smoothTime = Phaser.Math.Clamp(1 / (data.camera.lerp * 60), 0.05, 1.5);
+    return c;
+  }
+  if (levelCameraZoom(scene) > 1 && !data.tallLevel) return { ...ZONE_CAMERA_DEFAULTS, auto: true };
+  return null;
+}
+
 function setupZoneCamera(scene, data, { camLow = 0, camHigh = 0 } = {}) {
-  const c = data.camera && data.camera.vertical ? { ...ZONE_CAMERA_DEFAULTS, ...data.camera } : null;
-  // `lerp` (par image à 60 i/s, façon Phaser) -> temps de lissage équivalent.
-  if (c && data.camera.smoothTime == null && data.camera.lerp) c.smoothTime = Phaser.Math.Clamp(1 / (data.camera.lerp * 60), 0.05, 1.5);
+  const c = zoneCameraConfig(scene, data);
   scene.__zoneCamera = c || scene.__sky ? { cfg: c, vel: 0, target: null, look: 0, lookX: 0, camLow, camHigh } : null;
   cameraFollowPlayer(scene, { snap: true });
   if (scene.__zoneCamera && !scene.__zoneCameraHook) {
@@ -1111,7 +1265,11 @@ function cameraFollowPlayer(scene, { snap = false } = {}) {
   zc.target = null;
   if (snap) {
     const focus = p.y - ZONE_CAMERA_FOCUS_ABOVE_FEET;
-    cam.scrollY = cam.clampY(focus - ((zc.cfg.deadzoneTop + zc.cfg.deadzoneBottom) / 2) * cam.height);
+    // Fractions de la VUE (540 / zoom px de haut, dont le haut est à
+    // scrollY + pad, cf. cameraViewPad) ; zoom 1 : pad 0, vue = écran.
+    const vh = cam.height / cam.zoom;
+    const pad = cameraViewPad(cam.height, cam.zoom);
+    cam.scrollY = cam.clampY(focus - ((zc.cfg.deadzoneTop + zc.cfg.deadzoneBottom) / 2) * vh - pad);
   } else {
     cam.scrollY = keepY;
   }
@@ -1143,13 +1301,19 @@ function updateZoneCamera(scene, dt) {
     zc.target = null;
     return;
   }
+  // Le vertical est à la caméra de zone : un script qui a relancé le suivi
+  // complet (startFollow(p, true, 1, 1) : combat de Ghil't) le lui rend.
+  if (cam.lerp.y !== 0) cam.lerp.y = 0;
   const c = zc.cfg;
-  const h = cam.height;
+  // Zone morte en fractions de la VUE : haut de la vue = scrollY + pad (cf.
+  // cameraViewPad), hauteur 540 / zoom ; zoom 1 : comme avant.
+  const h = cam.height / cam.zoom;
+  const pad = cameraViewPad(cam.height, cam.zoom);
   const focus = p.y - ZONE_CAMERA_FOCUS_ABOVE_FEET;
-  let target = zc.target == null ? cam.scrollY : zc.target;
+  let target = (zc.target == null ? cam.scrollY : zc.target) + pad;
   if (focus < target + c.deadzoneTop * h) target = focus - c.deadzoneTop * h;
   else if (focus > target + c.deadzoneBottom * h) target = focus - c.deadzoneBottom * h;
-  zc.target = cam.clampY(target);
+  zc.target = cam.clampY(target - pad);
   // Regard : un peu plus haut en pleine montée, plus bas en chute rapide.
   const vy = p.body.velocity.y;
   const want = vy < -150 ? -c.lookAhead * Phaser.Math.Clamp((-vy - 150) / 450, 0, 1)
@@ -2258,9 +2422,29 @@ const WORLD_UI_MARGIN = 8;
 // et le bas de l'invite.
 const WORLD_UI_HEAD_GAP = 8;
 
+// Px du monde par px d'écran pour l'interface (zoom de la caméra de jeu,
+// cf. CAMERA_ZOOM) : marges, écarts et tailles de l'interface sont en px
+// d'écran, l'interface posée dans le monde est dessinée à sa taille du zoom 1
+// (uiZoomFree). 1 au zoom 1 (rien ne change).
+function worldUiScale(scene) {
+  return 1 / levelCameraZoom(scene);
+}
+
+// Rectangle (monde) où un objet de l'interface est DESSINÉ : une interface
+// uiZoomFree l'est worldUiScale fois plus petite autour de sa position (cf.
+// uiZoomApply), getBounds() donne sa taille « logique ».
+function worldUiShownBounds(obj, k = 1) {
+  const r = obj.getBounds();
+  if (!obj.__uiZoomFree || k === 1) return r;
+  const x = obj.x;
+  const y = obj.y;
+  return new Phaser.Geom.Rectangle(x + (r.x - x) * k, y + (r.y - y) * k, r.width * k, r.height * k);
+}
+
 // Vue de la caméra principale EN CE MOMENT, en coordonnées monde, marge
-// déduite. Calculée depuis scrollX/scrollY (et non `worldView`, qui n'est
-// remis à jour qu'au rendu) ; même formule que Camera.preRender (zoom compris).
+// déduite (px d'écran, cf. worldUiScale). Calculée depuis scrollX/scrollY (et
+// non `worldView`, qui n'est remis à jour qu'au rendu) ; même formule que
+// Camera.preRender (zoom compris).
 function worldUiView(scene, margin = WORLD_UI_MARGIN) {
   const cam = scene && scene.cameras && scene.cameras.main;
   if (!cam) return null;
@@ -2268,7 +2452,8 @@ function worldUiView(scene, margin = WORLD_UI_MARGIN) {
   const h = cam.height / cam.zoom;
   const left = cam.scrollX + (cam.width - w) / 2;
   const top = cam.scrollY + (cam.height - h) / 2;
-  return { left: left + margin, top: top + margin, right: left + w - margin, bottom: top + h - margin };
+  const m = margin * worldUiScale(scene);
+  return { left: left + m, top: top + m, right: left + w - m, bottom: top + h - m };
 }
 
 // Décalage qui ramène le segment [a, b] dans [min, max] (centré s'il est
@@ -2293,7 +2478,7 @@ function worldUiHeadY(scene, item) {
     if (box) top = box.top;
   }
   if (top === null) top = p.getBounds().y;
-  const raw = top - WORLD_UI_HEAD_GAP;
+  const raw = top - WORLD_UI_HEAD_GAP * worldUiScale(scene);
   const frame = scene.game.loop.frame;
   if (item.head == null || Math.abs(raw - item.head) > 40) item.head = raw;
   else if (item.headFrame !== frame) item.head += (raw - item.head) * 0.3;
@@ -2327,6 +2512,8 @@ function keepWorldUiInView(obj, { prompt = false } = {}) {
   const scene = obj.scene;
   const st = worldUiState(scene);
   worldUiHookCamera(scene);
+  // Interface : dessinée à sa taille du zoom 1 (cf. uiZoomApply).
+  uiZoomFree(obj);
   const known = obj.__worldUiItem;
   if (known && st.items.has(known)) {
     known.prompt = known.prompt || prompt;
@@ -2391,9 +2578,17 @@ function worldUiHudRects(scene) {
       screen.push({ left: r.x, right: r.right, top: r.y, bottom: r.bottom });
     }
   }
+  // Écran -> monde. Zoom de base : un objet fixé à l'écran en (x, y) est
+  // dessiné en (x, y) (cf. uiZoomApply) ; le monde sous ce point est à
+  // centre + (x - 480) / zoom. Zoom 1 : scrollX + x, comme avant.
+  const k = worldUiScale(scene);
+  const cx = cam.width * cam.originX;
+  const cy = cam.height * cam.originY;
+  const ox = cam.scrollX + cx;
+  const oy = cam.scrollY + cy;
   return screen.map((r) => ({
-    left: cam.scrollX + r.left - pad, right: cam.scrollX + r.right + pad,
-    top: cam.scrollY + r.top - pad, bottom: cam.scrollY + r.bottom + pad, hud: true,
+    left: ox + (r.left - pad - cx) * k, right: ox + (r.right + pad - cx) * k,
+    top: oy + (r.top - pad - cy) * k, bottom: oy + (r.bottom + pad - cy) * k, hud: true,
   }));
 }
 
@@ -2505,7 +2700,9 @@ function worldUiClampItem(scene, item, view, obstacles = [], characters = []) {
   }
   item.last = null;
   if (!obj.visible || obj.alpha <= 0) return;
-  const b = obj.getBounds();
+  // Taille DESSINÉE (zoom de la caméra, cf. worldUiShownBounds).
+  const k = worldUiScale(scene);
+  const b = worldUiShownBounds(obj, k);
   let dy = 0;
   if (item.prompt && b.y < view.top) {
     const headY = worldUiHeadY(scene, item);
@@ -2522,7 +2719,7 @@ function worldUiClampItem(scene, item, view, obstacles = [], characters = []) {
   // recherche (au-dessus / au-dessous seulement) finissait sur l'une d'elles.
   let ox = 0;
   if (obstacles.length) {
-    const free = worldUiFreeSpot({ left: b.x + dx, right: b.right + dx, top: b.y + dy, bottom: b.bottom + dy }, view, obstacles, characters);
+    const free = worldUiFreeSpot({ left: b.x + dx, right: b.right + dx, top: b.y + dy, bottom: b.bottom + dy }, view, obstacles, characters, WORLD_UI_OBSTACLE_GAP * k);
     ox = free.dx;
     dy += free.dy;
   }
@@ -4536,14 +4733,22 @@ const EDGE_FRAMING_SLACK = 160;
 function edgeFramingTarget(scene, player) {
   const lim = scene.__edgeLimits;
   if (!lim) return 0;
-  const half = scene.cameras.main.height / 2;
+  const cam = scene.cameras.main;
+  const H = cam.height;
+  // Zoom de base : `frameFeetY` (px d'écran au zoom 1) se lit « pieds à
+  // H - frameFeetY px du MONDE au-dessus du bas de la vue » -- là où les
+  // montre la zone d'arrivée d'un écran de haut, caméra posée en bas (arène
+  // de Kainati : pieds à 448 au zoom 1, à 540 - 92 x zoom au zoom de base).
+  // Décalage du suivi : moitié de la vue moins cette hauteur ; zoom 1 :
+  // frameFeetY - 270, comme avant.
+  const half = H / 2 / levelCameraZoom(scene);
   let best = 0;
   for (const exit of scene.__exits || []) {
     if (!exit || exit.frameFeetY == null || !edgeExitIsLateral(exit.edge)) continue;
     if (player.y < (exit.from ?? -Infinity) - EDGE_FRAMING_SLACK || player.y > (exit.to ?? Infinity) + EDGE_FRAMING_SLACK) continue;
     const dist = exit.edge === 'right' ? lim.right - player.x : player.x - lim.left;
     const t = Phaser.Math.Clamp(1 - dist / EDGE_FRAMING_RANGE, 0, 1);
-    const off = (exit.frameFeetY - half) * t * t * (3 - 2 * t);
+    const off = (half - (H - exit.frameFeetY)) * t * t * (3 - 2 * t);
     if (Math.abs(off) > Math.abs(best)) best = off;
   }
   return best;
@@ -5271,6 +5476,9 @@ function buildLevelFromData(scene, data, sceneData) {
   scene.__juiceFx = null;
   scene.__hudFx = null;
   scene.__juiceZooming = false;
+  // Zoom de la caméra de jeu (CAMERA_ZOOM) : avant le fondu, dont le « posé »
+  // part de lui.
+  setupLevelCameraZoom(scene);
   // Arrivée par un bord : fondu court, sans zoom (cf. EDGE_FADE_MS).
   fadeInScene(scene, sceneData && sceneData.edgeArrival ? { ms: EDGE_FADE_MS } : { zoom: 1.03 });
   // Un pas de physique par image sur les écrans rapides (cf. applyDisplayPhysicsFps).
@@ -5333,8 +5541,13 @@ function buildLevelFromData(scene, data, sceneData) {
   const verticalCamera = !!(data.tallLevel || (data.camera && data.camera.vertical));
   const cameraTop = verticalCamera ? levelTop : 0;
   const cameraHeight = verticalCamera ? (levelHeight - levelTop) : height;
-  const camLow = cameraTop + cameraHeight - height;
-  const camHigh = cameraTop;
+  // camLow / camHigh = `scrollY` de la caméra au plus bas / au plus haut. Au
+  // zoom de base, la vue (540 / zoom de haut) descend et monte de
+  // cameraViewPad de plus qu'un écran entier (cf. Camera.clampY) : les fonds
+  // calés « caméra au plus bas » le restent. Zoom 1 : comme avant.
+  const zoomPadY = cameraViewPad(height, levelCameraZoom(scene));
+  const camLow = cameraTop + cameraHeight - height + zoomPadY;
+  const camHigh = cameraTop - zoomPadY;
   scene.__sky = null;
   scene.liquidFloor = null;
   if (data.decor !== false) {
@@ -5344,7 +5557,7 @@ function buildLevelFromData(scene, data, sceneData) {
     // sombre ; les autres zones de la démo le coupent. Sans la clé : comme avant.
     const foregroundPlants = data.foregroundPlants !== false;
     addMoonlitDecor(scene, width, height, levelWidth, data.avoidRanges || [], zoneBackgroundId(data), data.largeTrees !== false,
-      data.treesAtScreenBottom === true, zoneBackdropSpec(data, { camLow, camHigh }), foregroundPlants);
+      data.treesAtScreenBottom === true, zoneBackdropSpec(data, { camLow, camHigh, vertical: verticalCamera }), foregroundPlants);
     // (addCaveCeiling ne pose que les lianes suspendues : aucun vrai plafond à garder.)
     if (foregroundPlants && zoneBackgroundId(data) !== 'fond_foret_flottante') addCaveCeiling(scene, levelWidth);
   }
@@ -5825,8 +6038,12 @@ function renderSnapSetup(scene) {
       base.call(this);
       snap.tx = this.scrollX;
       snap.ty = this.scrollY;
-      snap.rx = Math.round(this.scrollX);
-      snap.ry = Math.round(this.scrollY);
+      // Zoom de base : c'est le défilement À L'ÉCRAN (zoom x scroll) qui doit
+      // tomber sur un pixel entier -- défilement arrondi au 1/zoom de px du
+      // monde. (Éditeur : zoom de base 1, arrondi au px comme avant.)
+      const z = levelCameraZoom(scene);
+      snap.rx = Math.round(this.scrollX * z) / z;
+      snap.ry = Math.round(this.scrollY * z) / z;
       this.scrollX = snap.rx;
       this.scrollY = snap.ry;
       snap.on = true;
@@ -5851,8 +6068,10 @@ function renderSnapObjectSize(o) {
   const fw = o.frame.realWidth;
   const fh = o.frame.realHeight;
   if (!(fw > 0 && fh > 0) || !o.scaleX || !o.scaleY) return;
-  const w = Math.max(1, Math.round(Math.abs(o.scaleX) * fw));
-  const h = Math.max(1, Math.round(Math.abs(o.scaleY) * fh));
+  // Taille À L'ÉCRAN entière : au zoom de base, taille du monde x zoom.
+  const z = levelCameraZoom(o.scene);
+  const w = Math.max(1, Math.round(Math.abs(o.scaleX) * fw * z)) / z;
+  const h = Math.max(1, Math.round(Math.abs(o.scaleY) * fh * z)) / z;
   // Échelle d'origine gardée (mesures « avant », et pour qui voudrait la relire).
   o.__lkSnapScale = [o.scaleX, o.scaleY];
   o.setScale(Math.sign(o.scaleX) * (w / fw), Math.sign(o.scaleY) * (h / fh));
@@ -6284,7 +6503,11 @@ function juiceShakeFactor() {
   if (proto.__juiceShakeGuard) return;
   const original = proto.shake;
   proto.shake = function shake(duration, intensity, force, callback, context) {
-    const f = juiceShakeFactor();
+    // Zoom de la caméra : Phaser multiplie le décalage de la secousse par le
+    // zoom, que la caméra agrandit ensuite encore (zoom² à l'écran) ; divisée
+    // d'autant, une secousse garde ses px d'écran d'avant à tous les zooms.
+    const z = this.zoom > 0 ? this.zoom : 1;
+    const f = juiceShakeFactor() / (z * z);
     let k = intensity;
     if (f !== 1) {
       if (intensity === undefined) k = 0.05 * f;
@@ -6309,7 +6532,9 @@ function juiceShake(scene, force = 'light', ms) {
   const f = juiceShakeFactor();
   if (f <= 0) return;
   const eff = cam.shakeEffect;
-  if (eff && eff.isRunning && eff.intensity && preset[1] * f < eff.intensity.x) return;
+  // (Intensité en cours déjà divisée par zoom², cf. juiceInstallShakeGuard.)
+  const z2 = cam.zoom > 0 ? cam.zoom * cam.zoom : 1;
+  if (eff && eff.isRunning && eff.intensity && (preset[1] * f) / z2 < eff.intensity.x) return;
   cam.shake(ms || preset[0], preset[1], true);
 }
 
@@ -6379,14 +6604,17 @@ function juiceSlowMo(scene, { ms = 500, physics = 2.5, anims = 0.4 } = {}) {
   juiceUpdateTime(scene);
 }
 
-// Petit zoom aller-retour de la caméra (mort de boss, gros éclat).
+// Petit zoom aller-retour de la caméra (mort de boss, gros éclat). `zoom` :
+// facteur par rapport au zoom de base de la zone (levelCameraZoom), d'où il
+// part et où il revient.
 function juiceZoomPulse(scene, { zoom = 1.05, ms = 900, ease = 'Sine.easeInOut' } = {}) {
   const cam = scene && scene.cameras && scene.cameras.main;
-  if (!cam || scene.__juiceZooming || Math.abs(cam.zoom - 1) > 0.001) return;
+  const base = levelCameraZoom(scene);
+  if (!cam || scene.__juiceZooming || Math.abs(cam.zoom - base) > 0.001) return;
   scene.__juiceZooming = true;
   scene.tweens.add({
-    targets: cam, zoom, duration: ms * 0.35, hold: ms * 0.3, yoyo: true, ease,
-    onComplete: () => { cam.setZoom(1); scene.__juiceZooming = false; },
+    targets: cam, zoom: base * zoom, duration: ms * 0.35, hold: ms * 0.3, yoyo: true, ease,
+    onComplete: () => { cam.setZoom(base); scene.__juiceZooming = false; },
   });
 }
 
@@ -7220,8 +7448,10 @@ function juiceFadeIn(scene, { ms = JUICE_FADE_IN_MS, zoom = 0 } = {}) {
   scene.tweens.add({ targets: veil, alpha: 0, duration: ms, ease: 'Sine.easeOut', onComplete: () => veil.destroy() });
   const cam = scene.cameras.main;
   if (zoom && cam) {
-    cam.setZoom(zoom);
-    scene.tweens.add({ targets: cam, zoom: 1, duration: ms + 260, ease: 'Sine.easeOut', onComplete: () => cam.setZoom(1) });
+    // Posé : `zoom` = facteur du zoom de base de la zone, qui revient à lui.
+    const base = levelCameraZoom(scene);
+    cam.setZoom(base * zoom);
+    scene.tweens.add({ targets: cam, zoom: base, duration: ms + 260, ease: 'Sine.easeOut', onComplete: () => cam.setZoom(base) });
   }
 }
 
@@ -7231,7 +7461,8 @@ function juiceFadeOut(scene, ms, onDone, { zoom = true } = {}) {
     .setDepth(JUICE_VEIL_DEPTH).setAlpha(0);
   scene.tweens.add({ targets: veil, alpha: 1, duration: ms, ease: 'Sine.easeIn', onComplete: onDone });
   const cam = scene.cameras.main;
-  if (zoom && cam && Math.abs(cam.zoom - 1) < 0.001) scene.tweens.add({ targets: cam, zoom: 1.025, duration: ms, ease: 'Sine.easeIn' });
+  const base = levelCameraZoom(scene);
+  if (zoom && cam && Math.abs(cam.zoom - base) < 0.001) scene.tweens.add({ targets: cam, zoom: base * 1.025, duration: ms, ease: 'Sine.easeIn' });
 }
 
 // Remise à zéro par visite (instance de scène réutilisée) + crochet caméra +

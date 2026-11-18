@@ -596,6 +596,43 @@ Clés de zone toutes optionnelles (LevelKit) ; sans elles, rendu et caméra hist
   jour) ; épreuve du singe `backgroundBaseline: 492`, `liquidFloor: { y: 476, style: 'mousse' }`
   (remplace `epreuveDrawToxicMoss`).
 
+### Zoom de la caméra de jeu (2026-11-17, rétro-compatible)
+Demande utilisateur : « rezoom le jeu pour tout le jeu, moins de champ de vision ». LevelKit,
+section « ZOOM DE LA CAMÉRA DE JEU ».
+- **Réglage** : `CAMERA_ZOOM` (LevelKit.js, défaut 1,33) = zoom de la caméra principale de
+  TOUTES les zones construites par `buildLevelFromData` (chemin, anciennes zones, zones de
+  test, « Jouer » de l'éditeur). 1 = vue d'origine, à l'identique. `?zoom=1.5` dans l'adresse
+  essaie une autre valeur (entre 1 et 3) sans toucher au fichier. Inchangés : titre, menus,
+  carte, sac, feu de camp, dialogues (scènes à part), écran de fin, éditeur (scènes
+  `CAMERA_ZOOM_EXCLUDED_SCENES` : il règle sa vue lui-même).
+- `levelCameraZoom(scene)` → zoom de BASE de la zone (1 ailleurs). Les effets qui zooment
+  partent de lui et y reviennent : `juiceZoomPulse({ zoom })` et le posé d'entrée/sortie
+  (`juiceFadeIn` / `juiceFadeOut`) prennent un FACTEUR de ce zoom (1,05 = 5 % de plus).
+- **Interface au zoom 1** (`uiZoomSetup`, posé par `buildLevelFromData`) : pendant le rendu des
+  caméras de la zone SEULEMENT, tout objet à `scrollFactor` 0 sur les deux axes (HUD, toasts,
+  bandeaux, voiles, vignette, ciel fixe) retrouve sa place et sa taille du zoom 1, et toute
+  interface posée dans le monde marquée `uiZoomFree(obj)` (posé d'office par
+  `keepWorldUiInView` : invites « E », textes flottants ; bulles fixes de StoryKit) garde son
+  ancre dans le monde mais sa taille du zoom 1. Valeurs remises juste après le rendu (la
+  logique ne voit rien). Un objet fixé à l'écran se place donc toujours en px d'écran
+  960x540, quel que soit le zoom. Pas de 2e caméra : ordre de dessin, fondus, flashs et
+  secousses inchangés.
+- **Règle « interface dans l'écran »** : `worldUiScale(scene)` (= 1 / zoom de base) = px du
+  monde par px d'écran ; marges et écarts restent en px d'écran ; `worldUiShownBounds(obj, k)`
+  = rectangle (monde) où une interface `uiZoomFree` est dessinée ; `worldUiHudRects` convertit
+  l'écran en monde avec le zoom. Un objet fixé à l'écran qui suit un point du monde doit
+  convertir avec le zoom : écran = 480 + (x - centre de la vue) × zoom (idem en y, 270).
+- **Caméra** : bornes inchangées (Phaser tient compte du zoom : jamais de vide hors de la
+  zone). Une zone d'un écran de haut (sans `tallLevel` ni `camera.vertical`) reçoit au zoom
+  de base une caméra de zone automatique (zone morte et ressort par défaut de `camera`,
+  bornes 0 → 540) : la vue suit Agarica en hauteur sans coller à chaque saut. Zone morte,
+  `cameraFollowPlayer` et `camLow` / `camHigh` (fonds, ciel) calculés sur la VUE réelle
+  (540 / zoom de haut, `cameraViewPad`). `frameFeetY` se lit au zoom de base « pieds à
+  540 - frameFeetY px du monde au-dessus du bas de la vue » (même cadrage que la zone
+  d'arrivée posée en bas). Secousses divisées par zoom² (Phaser les agrandit deux fois) :
+  mêmes px d'écran qu'avant. Défilement arrondi au rendu au 1/zoom de px (rendu sans
+  tremblement, `renderSnapSetup`).
+
 ### Juice — « game feel » (2026-10-23, rétro-compatible)
 Effets PUREMENT visuels, regroupés en fin de `src/utils/LevelKit.js` (section « JUICE ») : aucun
 ne change une hitbox, une vitesse, un timing de combat (horloge de scène) ni la durée d'une

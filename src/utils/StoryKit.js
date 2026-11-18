@@ -1920,6 +1920,9 @@ function buildFixedSpeechBubble(scene, text, speaker) {
   const parts = [bg, g, ...face, ring, nameT, label].filter(Boolean);
   const c = scene.add.container(0, 0, parts).setDepth(SPEECH_BUBBLE_DEPTH).setAlpha(0);
   c.lookRole = 'ui';
+  // Zoom de la caméra de jeu (LevelKit, CAMERA_ZOOM) : dessinée à sa taille
+  // du zoom 1, rangée en conséquence (layoutFixedSpeechBubbles).
+  if (typeof uiZoomFree === 'function') uiZoomFree(c);
   return { container: c, g, label, w, h, bg, tail: null, fixed: true };
 }
 
@@ -2258,13 +2261,19 @@ function layoutFixedSpeechBubbles(scene, view, hud) {
   const meet = (a, r) => a.left < r.right && a.right > r.left && a.top < r.bottom && a.bottom > r.top;
   const frame = scene.game.loop.frame;
   const laid = [];
+  // Zoom de la caméra de jeu : la bulle est dessinée à sa taille du zoom 1
+  // (uiZoomFree), soit `k` px du monde par px d'écran (1 au zoom 1).
+  const k = typeof worldUiScale === 'function' ? worldUiScale(scene) : 1;
+  const gap = SPEECH_BUBBLE_FIXED_GAP * k;
   let y = view.top;
   for (const { b } of live) {
-    let rect = { left: view.right - b.w, right: view.right, top: y, bottom: y + b.h };
+    const bw = b.w * k;
+    const bh = b.h * k;
+    let rect = { left: view.right - bw, right: view.right, top: y, bottom: y + bh };
     for (let guard = 0; guard < 6; guard++) {
       const hit = hud.find((r) => meet(rect, r));
       if (!hit) break;
-      rect = { left: rect.left, right: rect.right, top: hit.bottom + SPEECH_BUBBLE_FIXED_GAP, bottom: hit.bottom + SPEECH_BUBBLE_FIXED_GAP + b.h };
+      rect = { left: rect.left, right: rect.right, top: hit.bottom + gap, bottom: hit.bottom + gap + bh };
     }
     const goal = rect.top - view.top;
     if (b.fixedFrame !== frame) {
@@ -2273,13 +2282,13 @@ function layoutFixedSpeechBubbles(scene, view, hud) {
       if (Math.abs(goal - b.fixedY) < 0.5) b.fixedY = goal;
     }
     const top = view.top + b.fixedY;
-    b.rect = { left: rect.left, right: rect.right, top, bottom: top + b.h };
+    b.rect = { left: rect.left, right: rect.right, top, bottom: top + bh };
     b.tip = null;
-    b.container.setPosition((rect.left + rect.right) / 2, top + b.h / 2);
+    b.container.setPosition((rect.left + rect.right) / 2, top + bh / 2);
     drawSpeechBubble(b, null);
     laid.push(b);
     // La suivante se range sous la place VISÉE (pas sous la place glissée).
-    y = rect.bottom + SPEECH_BUBBLE_FIXED_GAP;
+    y = rect.bottom + gap;
   }
   return laid.filter((b) => b.container.alpha > 0).map((b) => b.rect);
 }
