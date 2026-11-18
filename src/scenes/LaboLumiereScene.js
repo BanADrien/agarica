@@ -8,6 +8,8 @@
 // Zoom : le labo rend en 1920 x 1080 avec une caméra à zoom ENTIER (2, 3, 4), donc x1,5 garde des pixels
 // réguliers ; l'interface passe par une 2e caméra. Taille d'origine rendue en quittant la zone.
 // Panneau : élément HTML posé sur le canvas, donc indépendant des caméras et du zoom.
+// Formes à l'essai : grizzly (Maj), aigle (double saut), ours polaire (A). Rien n'est gardé : la sauvegarde
+// et le registre trouvés à l'entrée sont remis en sortant (cf. laboProtegerPartie).
 
 // Mannequins : images du manifeste SECTIONS_LUMIERE, échelle = celle du code de chaque personnage.
 const LABO_MANNEQUINS = [
@@ -54,6 +56,7 @@ class LaboLumiereScene extends Phaser.Scene {
   create(sceneData) {
     this.__laboLumiere = true;   // LightKit.modeTest laisse la main à cette scène
     this.__labo = null;
+    this.laboProtegerPartie();   // AVANT la création du joueur : son constructeur écrit déjà l'état
     resolveZoneData('labo_lumiere', LABO_LUMIERE_DATA).then((data) => {
       buildLevelFromData(this, data, sceneData);
       this.laboConstruire();
@@ -65,6 +68,44 @@ class LaboLumiereScene extends Phaser.Scene {
     if (this.__labo) this.laboImage(this.time.now);
   }
 
+  // Rien de ce qu'on essaie ici ne reste : sauvegarde du navigateur (comme la zone des ours) et registre
+  // remis tels quels à la sortie, sans événement (l'interface de la zone est déjà en cours de fermeture)
+  laboProtegerPartie() {
+    zoneOursProtectSave(this);
+    const reg = this.registry;
+    const avant = JSON.parse(JSON.stringify(Object.fromEntries(saveableRegistryEntries(reg))));
+    this.events.once('shutdown', () => {
+      for (const [k] of saveableRegistryEntries(reg)) {
+        if (k in avant) continue;
+        delete reg.list[k];
+        delete reg.values[k];
+      }
+      for (const [k, v] of Object.entries(avant)) {
+        if (k in reg.list) reg.list[k] = v; else reg.set(k, v);
+      }
+    });
+  }
+
+  // Formes du labo, sur ce joueur seulement : grizzly au sol, aigle en l'air, ours polaire en compétence 1
+  laboFormes() {
+    const p = this.player;
+    if (!p) return;
+    p.hasGrizzlyForm = true;
+    p.hasEagleForm = true;
+    p.airFormsSeen.eagle = true;
+    p.equipForm('grizzly');
+    p.applyAirForm('eagle');
+    p.unlockedSkills.add('ours_polaire');
+    p.skillSlots = ['ours_polaire', null, null];
+    if (typeof ursideEnsureSkillArt === 'function') ursideEnsureSkillArt(this, SKILL_DEFS.ours_polaire);
+  }
+
+  laboFormeActive() {
+    const p = this.player;
+    if (p.skillTransformActive && p.activeSkillId === 'ours_polaire') return 'ours polaire';
+    return { agarica: 'Agarica', grizzly: 'grizzly', eagle: 'aigle' }[p.form] || p.form;
+  }
+
   laboConstruire() {
     const ok = LightKit.activer(this, { ambiance: 0x292a40 });
     const st = {
@@ -73,6 +114,7 @@ class LaboLumiereScene extends Phaser.Scene {
       parties: LABO_PARTIES.map((p) => ({ ...p })), max: ok ? this.game.renderer.config.maxLights : 0,
     };
     this.__labo = st;
+    this.laboFormes();
     this.laboEcran(st);
     this.laboMannequins(st);
     this.laboDecors(st);
@@ -337,6 +379,9 @@ class LaboLumiereScene extends Phaser.Scene {
     lignes.push('U/J reglage  H/L valeur  C copier  W panneau');
     lignes.push(`G eclairage ${oui(st.eclairage)}  O origine ${oui(st.origine)}  V decor ${oui(st.decor)}  T net ${oui(st.net)}`);
     lignes.push(`lampes actives ${st.actives} / ${st.max}`);
+    if (this.player) lignes.push(`forme : ${this.laboFormeActive()}`);
+    lignes.push('  Maj + direction grizzly   A ours polaire');
+    lignes.push('  Espace x2 aigle (tenir : plane, S : pique)');
     lignes.push('taille ecran, px ecran par case de carte :');
     for (const m of st.sprites.filter((s) => s.partie === st.partie)) {
       lignes.push(`  ${m.id.padEnd(8)} ${Math.round(m.e.w * (m.e.np || 1))} x ${Math.round(m.e.h * (m.e.np || 1))}  ${((LightKit.pixelEcran(m.sp) || 0) / 2).toFixed(2)}`);
@@ -401,6 +446,8 @@ class LaboLumiereScene extends Phaser.Scene {
     for (const o of st.decors) o.setVisible(Math.abs(o.x - vueX) < demi + 160);
     for (const m of st.sprites) m.sp.setVisible(Math.abs(m.sp.x - vueX) < demi + 420);
     const x = this.player ? this.player.x : 0;
+    // Énergie toujours pleine : l'ours polaire reste disponible pendant les essais
+    if (this.player && this.player.energy < ENERGY_MAX) { this.player.energy = ENERGY_MAX; this.registry.set('energy', ENERGY_MAX); }
     const poids = this.laboPoids(x);
     st.partie = poids.indexOf(Math.max(...poids));
     if (st.retournee) st.retournee.sp.setFlipX(Math.floor(t / 1400) % 2 === 1);
