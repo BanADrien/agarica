@@ -146,14 +146,8 @@ float masqueDoux(vec2 m, float r) {
     return c.r;
   }
 
-  const FRAG = `
-#define SHADER_NAME LUMIERE_SECTIONS_FS
-#ifdef GL_FRAGMENT_PRECISION_HIGH
-precision highp float;
-#else
-precision mediump float;
-#endif
-struct Lumiere {
+  // Morceaux communs au shader complet et au shader du décor (mêmes formules, écrites une seule fois)
+  const FRAG_STRUCT_LUMIERE = `struct Lumiere {
   vec3 position;   // x, y : repere natif affiche du sprite (y vers le bas) ; z : profondeur native
                    // soleil : direction normalisee vers le soleil (x droite, y haut, z vers le spectateur)
   float soleil;    // 1 = directionnelle : ni position, ni portee, ni attenuation
@@ -164,39 +158,9 @@ struct Lumiere {
   vec4 formeA;     // triangle : sommets 1 et 2 ; rectangle : centre, demi-largeur, demi-hauteur
   vec4 formeB;     // triangle : sommet 3 dans x, y ; rectangle : rayon des coins dans x
 };
-const int kMaxLights = %LIGHT_COUNT%;
-uniform sampler2D uMainSampler;   // image du jeu (objet sans carte)
-uniform sampler2D uNeutre;        // _lumiere/<n>_neutre.png
-uniform sampler2D uNormales;      // _lumiere/<n>_n.png
-uniform sampler2D uCj;            // _lumiere/<n>_cj.png (carte contre-jour)
-uniform sampler2D uNatif;         // _lumiere/<n>_natif.png (dessin d'origine, meme grille)
-uniform vec3 uCiel, uSol;         // ambiance : plans tournes vers le haut / vers le bas
-uniform float uDetail;            // part du dessin d'origine dans l'ambiance
-uniform float uEpaule;            // debut de l'epaule des hautes lumieres (1 = aucune)
-uniform float uEmissif;           // > 0 : les pixels au moins aussi vifs gardent leur couleur (flammes du feu)
-uniform float uLueurCorps;        // rayon de canopee : lueur uniforme du corps, part de la force du rayon
-uniform float uRayonAvant;        // rayon de canopee : force sur les plans tournes vers l'avant, par sections
-uniform float uOmbreSoleil;       // rayon de canopee : distance remontee vers le soleil dans la silhouette (cases)
-uniform float uPerso;             // 1 = personnage sans cartes : le rayon se pose sur le haut de sa silhouette
-${FRAG_MASQUE}
-uniform Lumiere uLumieres[kMaxLights];
-uniform int uNbLumieres;
-uniform float uPaliers, uContre;
-uniform float uAuSol;             // 1 = personnage pose au sol (rien sous lui), 0 = en l'air (le dessous recoit la lumiere)
-uniform float uCarte;            // 1 = sprite avec cartes, 0 = a plat
-uniform float uDerriere;          // 1 = au moins une lampe derriere (normale lissee utile)
-uniform float uFlip;              // 1 = flipX : miroir ET normal.x inverse
-uniform float uPasLisse;          // ecart des echantillons de la normale lissee (round(s), 1 = demo)
-uniform vec2 uTaille;             // taille native (sans carte : taille de la frame en px du monde)
-uniform vec2 uTailleTex;          // taille de l'image source
-uniform vec2 uCoin;               // coin de la frame dans l'image source
-uniform vec2 uGrille, uPas;       // grille dans la frame : coin et taille d'une case
-varying vec2 outTexCoord;
-varying float outTexId;
-varying float outTintEffect;
-varying vec4 outTint;
+`;
 
-vec3 ambianceHemi(vec3 n) {
+  const FRAG_AMBIANCE = `vec3 ambianceHemi(vec3 n) {
   return mix(uSol, uCiel, 0.5 + 0.5 * n.y);
 }
 
@@ -205,35 +169,9 @@ float epaule(float v) {
   float e = 1.0 - uEpaule;
   return uEpaule + e * (1.0 - exp((uEpaule - v) / e));
 }
+`;
 
-float directionnel(vec3 n, vec3 d, float lumBase) {
-  float diff = max(dot(n, d), 0.0);
-  if (lumBase < 0.16) return min(diff, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
-  return diff;
-}
-
-float palier(float v) {
-  if (uPaliers < 1.5) return v;
-  return min(floor(v * uPaliers), uPaliers - 1.0) / (uPaliers - 1.0);
-}
-
-vec3 normaleLisse(vec2 ts) {
-  vec3 acc = vec3(0.0);
-  for (int dy = -2; dy <= 2; dy++) {
-    for (int dx = -2; dx <= 2; dx++) {
-      vec2 q = ts + vec2(float(dx), float(dy)) * uPasLisse;
-      if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) continue;
-      vec4 nn = texture2D(uNormales, (q + 0.5) / uTaille);
-      if (nn.a < 0.5) continue;
-      acc += nn.rgb * 2.0 - 1.0;
-    }
-  }
-  if (uFlip > 0.5) acc.x = -acc.x;
-  return length(acc) > 0.001 ? normalize(acc) : vec3(0.0, 0.0, 1.0);
-}
-${FRAG_ECLAIRAGE}
-
-// Source de decor derriere un personnage : la carte contre-jour ne compte pas sur les plans tournes vers le spectateur
+  const FRAG_SOURCES = `// Source de decor derriere un personnage : la carte contre-jour ne compte pas sur les plans tournes vers le spectateur
 float expositionDecor(vec3 n, float ex) {
   return min(ex * 1.5, 1.0) * (1.0 - smoothstep(0.9, 0.97, n.z));
 }
@@ -276,7 +214,76 @@ vec2 pointForme(vec2 p, vec2 lp, float forme, vec4 fa, vec4 fb) {
   if (l <= fb.x) return p;
   return q + v * fb.x / l;
 }
+`;
 
+  const FRAG = `
+#define SHADER_NAME LUMIERE_SECTIONS_FS
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+${FRAG_STRUCT_LUMIERE}const int kMaxLights = %LIGHT_COUNT%;
+uniform sampler2D uMainSampler;   // image du jeu (objet sans carte)
+uniform sampler2D uNeutre;        // _lumiere/<n>_neutre.png
+uniform sampler2D uNormales;      // _lumiere/<n>_n.png
+uniform sampler2D uCj;            // _lumiere/<n>_cj.png (carte contre-jour)
+uniform sampler2D uNatif;         // _lumiere/<n>_natif.png (dessin d'origine, meme grille)
+uniform vec3 uCiel, uSol;         // ambiance : plans tournes vers le haut / vers le bas
+uniform float uDetail;            // part du dessin d'origine dans l'ambiance
+uniform float uEpaule;            // debut de l'epaule des hautes lumieres (1 = aucune)
+uniform float uEmissif;           // > 0 : les pixels au moins aussi vifs gardent leur couleur (flammes du feu)
+uniform float uLueurCorps;        // rayon de canopee : lueur uniforme du corps, part de la force du rayon
+uniform float uRayonAvant;        // rayon de canopee : force sur les plans tournes vers l'avant, par sections
+uniform float uOmbreSoleil;       // rayon de canopee : distance remontee vers le soleil dans la silhouette (cases)
+uniform float uPerso;             // 1 = personnage sans cartes : le rayon se pose sur le haut de sa silhouette
+${FRAG_MASQUE}
+uniform Lumiere uLumieres[kMaxLights];
+uniform int uNbLumieres;
+uniform float uPaliers, uContre;
+uniform float uAuSol;             // 1 = personnage pose au sol (rien sous lui), 0 = en l'air (le dessous recoit la lumiere)
+uniform float uCarte;            // 1 = sprite avec cartes, 0 = a plat
+uniform float uDerriere;          // 1 = au moins une lampe derriere (normale lissee utile)
+uniform float uFlip;              // 1 = flipX : miroir ET normal.x inverse
+uniform float uPasLisse;          // ecart des echantillons de la normale lissee (round(s), 1 = demo)
+uniform vec2 uTaille;             // taille native (sans carte : taille de la frame en px du monde)
+uniform vec2 uTailleTex;          // taille de l'image source
+uniform vec2 uCoin;               // coin de la frame dans l'image source
+uniform vec2 uGrille, uPas;       // grille dans la frame : coin et taille d'une case
+varying vec2 outTexCoord;
+varying float outTexId;
+varying float outTintEffect;
+varying vec4 outTint;
+
+${FRAG_AMBIANCE}
+float directionnel(vec3 n, vec3 d, float lumBase) {
+  float diff = max(dot(n, d), 0.0);
+  if (lumBase < 0.16) return min(diff, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
+  return diff;
+}
+
+float palier(float v) {
+  if (uPaliers < 1.5) return v;
+  return min(floor(v * uPaliers), uPaliers - 1.0) / (uPaliers - 1.0);
+}
+
+vec3 normaleLisse(vec2 ts) {
+  vec3 acc = vec3(0.0);
+  for (int dy = -2; dy <= 2; dy++) {
+    for (int dx = -2; dx <= 2; dx++) {
+      vec2 q = ts + vec2(float(dx), float(dy)) * uPasLisse;
+      if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) continue;
+      vec4 nn = texture2D(uNormales, (q + 0.5) / uTaille);
+      if (nn.a < 0.5) continue;
+      acc += nn.rgb * 2.0 - 1.0;
+    }
+  }
+  if (uFlip > 0.5) acc.x = -acc.x;
+  return length(acc) > 0.001 ? normalize(acc) : vec3(0.0, 0.0, 1.0);
+}
+${FRAG_ECLAIRAGE}
+
+${FRAG_SOURCES}
 // Rayon de canopee sur un personnage : il vient d'en haut, touche le dessus du corps et s'arrete la.
 float opaqueEn(vec2 q) {
   if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) return 0.0;
@@ -375,6 +382,66 @@ void main() {
   float m = max(c.r, max(c.g, c.b));
   if (m > 0.0) c *= epaule(m) / m;
   if (uEmissif > 0.0 && max(dessin.r, max(dessin.g, dessin.b)) >= uEmissif * base.a) c = dessin;
+  vec4 color = vec4(c, base.a) * texel;
+  if (outTintEffect == 1.0) color.rgb = outTint.bgr * outTint.a * base.a;   // setTintFill
+  else if (outTintEffect == 2.0) color = texel;
+  gl_FragColor = color;
+}`;
+
+  // Décor sans carte (Image) : le shader complet ci-dessus, réduit à ce qui compte pour lui. Le compilateur D3D aplatit
+  // les branches du shader complet : chaque pixel y payait aussi les cartes, le contre-jour et les dix lampes, même
+  // inutilisés (un arbre du fond coûtait 20 ms sur Intel UHD). Mêmes formules, donc même image.
+  // masque : rayons de canopée (décor au plan du jeu) ; lampes : au moins une lampe atteint l'objet.
+  const fragDecor = (masque, lampes, maxLampes) => `
+#define SHADER_NAME LUMIERE_DECOR_FS
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform sampler2D uMainSampler;
+uniform vec3 uCiel, uSol;
+uniform float uEpaule;
+varying vec2 outTexCoord;
+varying float outTintEffect;
+varying vec4 outTint;
+${FRAG_AMBIANCE}
+${masque ? `${FRAG_MASQUE}
+uniform vec3 uSoleilDecor;        // somme des soleils qui atteignent l'objet` : ''}
+${lampes ? `${FRAG_STRUCT_LUMIERE}
+uniform Lumiere uLumieres[${maxLampes}];
+uniform int uNbLumieres;
+uniform float uPaliers, uContre, uAuSol, uFlip;
+uniform vec2 uTaille, uTailleTex, uCoin, uGrille, uPas;
+${FRAG_ECLAIRAGE}
+${FRAG_SOURCES}` : ''}
+void main() {
+  vec4 texel = vec4(outTint.bgr * outTint.a, outTint.a);
+  vec4 base = texture2D(uMainSampler, outTexCoord);   // alpha premultiplie (Phaser)
+  if (base.a <= 0.0) discard;
+  vec3 n = vec3(0.0, 0.0, 1.0);
+  vec3 ls = vec3(0.0);
+  vec3 l = vec3(0.0);
+${masque ? '  ls = uSoleilDecor * masqueDoux(pointMonde(), 14.0) * 0.55;' : ''}
+${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
+  vec2 ts = floor((outTexCoord * uTailleTex - uCoin - uGrille) / uPas);
+  vec2 t = ts;
+  if (uFlip > 0.5) t.x = uTaille.x - 1.0 - ts.x;
+  vec2 tc = t + 0.5;
+  float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
+  for (int i = 0; i < ${maxLampes}; ++i) {
+    if (i < uNbLumieres) {
+      Lumiere L = uLumieres[i];
+      vec4 cjL = L.decor > 0.5 ? vec4(cjm.rg, expositionDecor(n, cjm.b), cjm.a) : cjm;
+      vec2 lp = pointForme(tc, L.position.xy, L.forme, L.formeA, L.formeB);
+      float e = eclairage(n, n, tc, lp, L.position.z, L.portee, lb, cjL);
+      if (L.decor > 0.5) e *= mix(1.0, horsDessous(n, cjm), uAuSol * (1.0 - smoothstep(8.0, 30.0, L.position.z)));
+      l += L.couleur * smoothstep(0.0, 1.0, e);
+    }
+  }` : ''}
+  vec3 c = base.rgb * (ambianceHemi(n) + ls) + base.rgb * l;
+  float m = max(c.r, max(c.g, c.b));
+  if (m > 0.0) c *= epaule(m) / m;
   vec4 color = vec4(c, base.a) * texel;
   if (outTintEffect == 1.0) color.rgb = outTint.bgr * outTint.a * base.a;   // setTintFill
   else if (outTintEffect == 2.0) color = texel;
@@ -501,6 +568,37 @@ void main() {
 
   // ---------------------------------------------------------------- pipeline (créé à la demande)
   let PipelineClasse = null;
+  const nomDecor = (masque, lampes) => `LumiereDecor${masque ? 'M' : ''}${lampes ? 'L' : ''}`;
+
+  // Quatre variantes compilées à l'activation (pas d'à-coup en jeu). Sans lampe, tout est commun à la caméra : les objets
+  // voisins de même image partent dans le même appel de dessin.
+  function creerPipelinesDecor(r, game) {
+    const SP = Phaser.Renderer.WebGL.Pipelines.SinglePipeline;
+    class LumiereDecorPipeline extends SP {
+      constructor(masque, lampes) {
+        super({ game, fragShader: fragDecor(masque, lampes, r.config.maxLights) });
+        this.avecMasque = masque;
+        this.avecLampes = lampes;
+        this.masqueTex = null;
+        this.imageVue = -1;
+        this.cameraVue = null;
+      }
+
+      onBeforeFlush() {
+        if (!this.avecMasque || !this.masqueTex) return;
+        const gl = this.gl;
+        gl.activeTexture(gl.TEXTURE6);
+        gl.bindTexture(gl.TEXTURE_2D, this.masqueTex.webGLTexture);
+        gl.activeTexture(gl.TEXTURE0);
+      }
+    }
+    for (const masque of [false, true]) {
+      for (const lampes of [false, true]) {
+        if (!r.pipelines.has(nomDecor(masque, lampes))) r.pipelines.add(nomDecor(masque, lampes), new LumiereDecorPipeline(masque, lampes));
+      }
+    }
+  }
+
   function classePipeline() {
     if (PipelineClasse) return PipelineClasse;
     const LP = Phaser.Renderer.WebGL.Pipelines.LightPipeline;
@@ -512,6 +610,7 @@ void main() {
         this._m2 = new TM();
         this._pt = new Phaser.Math.Vector2();
         this._lampes = [];
+        this._atteintes = [];
         this._textures = null;
         this._reglages = DEFAUTS;
         this._ciel = [1, 1, 1];
@@ -550,12 +649,123 @@ void main() {
       batchSprite(go, camera, parent) {
         if (!parent && this.horsCadre(go, camera)) return;
         this._camera = camera;
+        if (this.dessinerDecor(go, camera, parent)) return;
         // d'abord se lier (vide le pipeline précédent) : les uniforms ci-dessous changent le
         // programme GL, il ne faut pas que le lot en attente d'un autre pipeline le subisse
         this.manager.set(this, go);
         if (this.vertexCount > 0) this.flush();
         this.preparer(go);
         super.batchSprite(go, camera, parent);
+      }
+
+      // Décor sans carte : shader réduit. false = cas particulier, laissé au shader complet (carte, sprite animé, partie
+      // émissive, soleil sans canopée, ombre propre à l'objet, plus de lampes que le shader n'en reçoit).
+      dessinerDecor(go, camera, parent) {
+        const mq = this._reglages.masque;
+        if (go.type !== 'Image' || !mq || go.__lumiereEmissif || this._reglages.ombre || cartesDe(this.game, go.frame.texture.key)) return false;
+        const lampes = this._lampes, maxi = this.renderer.config.maxLights, atteintes = this._atteintes;
+        const W = go.frame.realWidth, H = go.frame.realHeight, m = go.getWorldTransformMatrix(this._m1, this._m2);
+        const sx = Math.hypot(m.a, m.b) || 1, sy = Math.hypot(m.c, m.d) || 1, rayonObjet = Math.hypot(W * sx, H * sy);
+        let sr = 0, sg = 0, sb = 0, soleils = 0;
+        atteintes.length = 0;
+        for (let j = 0; j < lampes.length; j++) {
+          const L = lampes[j], atteinte = L.radius + rayonObjet;
+          if (L.soleil) {
+            const f = L.intensity * (L.attenuation ? L.attenuation(go) : 1);
+            soleils++;
+            sr += L.color.r * f; sg += L.color.g * f; sb += L.color.b * f;
+          } else if (Math.abs(L.x - go.x) <= atteinte && Math.abs(L.y - go.y) <= atteinte) atteintes.push(L);
+        }
+        if (soleils + atteintes.length > maxi) return false;
+        const avecMasque = sr > 0 || sg > 0 || sb > 0, avecLampes = atteintes.length > 0;
+        const pl = this.renderer.pipelines.get(nomDecor(avecMasque, avecLampes));
+        this.manager.set(pl, go);
+        // Un changement d'uniforme ne doit pas toucher le lot en attente
+        const image = this.game.loop.frame;
+        if (pl.imageVue !== image || pl.cameraVue !== camera) {
+          if (pl.vertexCount > 0) pl.flush();
+          pl.imageVue = image;
+          pl.cameraVue = camera;
+          pl.set1i('uMainSampler', 0);
+          pl.set3f('uCiel', this._ciel[0], this._ciel[1], this._ciel[2]);
+          pl.set3f('uSol', this._sol[0], this._sol[1], this._sol[2]);
+          pl.set1f('uEpaule', this._epaule);
+          if (avecMasque) {
+            const Mc = camera.matrix;
+            pl.masqueTex = mq.tex;
+            pl.set1i('uMasque', 6);
+            pl.set4f('uMasqueAnim', mq.amp, mq.t, mq.bande, 1);
+            pl.set4f('uMasqueGeo', mq.pente, mq.u0, mq.cel, mq.n);
+            pl.set2f('uMasqueHaut', mq.haut, mq.plage);
+            pl.set4f('uMondeEcran', 1 / Mc.a, camera.scrollX - Mc.e / Mc.a, camera.scrollY - Mc.f / Mc.d, this.renderer.height);
+          }
+          if (avecLampes) { pl.set1f('uPaliers', this._reglages.paliers); pl.set1f('uContre', this._reglages.contre); }
+        }
+        if (avecMasque && (pl.soleilR !== sr || pl.soleilV !== sg || pl.soleilB !== sb)) {
+          if (pl.vertexCount > 0) pl.flush();
+          pl.soleilR = sr; pl.soleilV = sg; pl.soleilB = sb;
+          pl.set3f('uSoleilDecor', sr, sg, sb);
+        }
+        if (avecLampes) {
+          if (pl.vertexCount > 0) pl.flush();
+          const frame = go.frame, flip = !!go.flipX, px = 1 / sx, py = 1 / sy;
+          const G = { m, e: null, W, w: W * sx, cx: 0, cy: 0, px, py, sx, sy, k: 1, flip };
+          for (let i = 0; i < atteintes.length; i++) this.envoyerLampe(pl, i, atteintes[i], go, G);
+          pl.set1i('uNbLumieres', atteintes.length);
+          const boucle = go.scene.game.loop;
+          pl.set1f('uAuSol', partAuSol(go, boucle.delta, boucle.frame));
+          pl.set1f('uFlip', flip ? 1 : 0);
+          pl.set2f('uTaille', W * sx, H * sy);
+          pl.set2f('uTailleTex', frame.source.width, frame.source.height);
+          pl.set2f('uCoin', frame.cutX, frame.cutY);
+          pl.set2f('uGrille', 0, 0);
+          pl.set2f('uPas', px, py);
+        }
+        pl.batchSprite(go, camera, parent);
+        return true;
+      }
+
+      // Une lampe (hors soleil) dans le repère natif de l'objet. cible : le pipeline qui la reçoit. Renvoie sa profondeur native.
+      envoyerLampe(cible, i, L, go, G) {
+        const { m, e, W, w, cx, cy, px, py, sx, sy, k, flip } = G;
+        // Point du monde -> repère natif affiché du sprite (lampe et sommets de sa forme)
+        const natif = (X, Y) => {
+          m.applyInverse(X, Y, this._pt);
+          const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
+          return [flip ? w - (W - D - cx) / px : (D - cx) / px, (Dy - cy) / py];
+        };
+        const [tx, ty] = natif(L.x, L.y);
+        const z = zLampe(L, go, !!e || go.type === 'Sprite', k);
+        const nom = `uLumieres[${i}].`;
+        cible.set3f(nom + 'position', tx, ty, z);
+        cible.set1f(nom + 'soleil', 0);
+        // Personnage affiché devant la source : mêmes règles qu'il soit dans son axe ou à côté, sans saut entre les deux
+        const dos = z < 0 || (!!L.sourceObjet && (!!e || go.type === 'Sprite') && L.sourceObjet.depth < go.depth);
+        cible.set1f(nom + 'decor', dos && L.sourceObjet ? 1 : 0);
+        // L.attenuation(objet), facultatif : lampe masquée pour cet objet (ombre d'un auvent), 0 à 1
+        // Source de décor : gain propre au décor autour d'elle, et au contre-jour d'un personnage passé devant
+        let gain = L.sourceObjet ? (dos ? L.gainContre : L.gainDecor) || 1 : 1;
+        // À côté de la source, le flanc reçoit une lumière franche ; derrière, seul le contour reste discret
+        if (dos && L.cote && L.gainCote) {
+          const zDos = Math.min(L.arriere / k, -15), t = Math.min(Math.max((z - zDos) / (L.cote.z - zDos), 0), 1);
+          gain += (L.gainCote - gain) * t;
+        }
+        const force = gain * L.intensity * (L.attenuation ? L.attenuation(go) : 1);
+        cible.set3f(nom + 'couleur', L.color.r * force, L.color.g * force, L.color.b * force);
+        // La lumière part du bord de la forme : portée réduite d'autant, le bout de la lumière reste au même endroit
+        const F = L.forme;
+        cible.set1f(nom + 'portee', (L.radius - (F ? F.demi : 0)) / k);
+        cible.set1f(nom + 'forme', F ? F.type : 0);
+        if (F && F.type === 1) {
+          const [a, b] = natif(F.points[0], F.points[1]), [c2, d] = natif(F.points[2], F.points[3]), [e3, f3] = natif(F.points[4], F.points[5]);
+          cible.set4f(nom + 'formeA', a, b, c2, d);
+          cible.set4f(nom + 'formeB', e3, f3, 0, 0);
+        } else if (F) {
+          const [a, b] = natif(F.cx, F.cy);
+          cible.set4f(nom + 'formeA', a, b, F.hx / (sx * px), F.hy / (sy * py));
+          cible.set4f(nom + 'formeB', F.r / ((sx * px + sy * py) / 2), 0, 0, 0);
+        }
+        return z;
       }
 
       preparer(go) {
@@ -616,6 +826,7 @@ void main() {
         // Seules les lampes qui peuvent atteindre l'objet (au-delà de la portée, leur lumière vaut 0) :
         // même image, beaucoup moins de calcul quand de nombreux objets sont éclairés
         const rayonObjet = Math.hypot(W * sx, H * sy);
+        const G = { m, e, W, w, cx, cy, px, py, sx, sy, k, flip };
         let derriere = 0, nb = 0;
         for (let j = 0; j < lampes.length && nb < maxi; j++) {
           const L = lampes[j], atteinte = L.radius + rayonObjet;
@@ -627,45 +838,7 @@ void main() {
             continue;
           }
           if (Math.abs(L.x - go.x) > atteinte || Math.abs(L.y - go.y) > atteinte) continue;
-          const i = nb++;
-          // Point du monde -> repère natif affiché du sprite (lampe et sommets de sa forme)
-          const natif = (X, Y) => {
-            m.applyInverse(X, Y, this._pt);
-            const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
-            return [flip ? w - (W - D - cx) / px : (D - cx) / px, (Dy - cy) / py];
-          };
-          const [tx, ty] = natif(L.x, L.y);
-          const z = zLampe(L, go, !!e || go.type === 'Sprite', k);
-          if (z < 15) derriere = 1;
-          const nom = `uLumieres[${i}].`;
-          this.set3f(nom + 'position', tx, ty, z);
-          this.set1f(nom + 'soleil', 0);
-          // Personnage affiché devant la source : mêmes règles qu'il soit dans son axe ou à côté, sans saut entre les deux
-          const dos = z < 0 || (!!L.sourceObjet && (!!e || go.type === 'Sprite') && L.sourceObjet.depth < go.depth);
-          this.set1f(nom + 'decor', dos && L.sourceObjet ? 1 : 0);
-          // L.attenuation(objet), facultatif : lampe masquée pour cet objet (ombre d'un auvent), 0 à 1
-          // Source de décor : gain propre au décor autour d'elle, et au contre-jour d'un personnage passé devant
-          let gain = L.sourceObjet ? (dos ? L.gainContre : L.gainDecor) || 1 : 1;
-          // À côté de la source, le flanc reçoit une lumière franche ; derrière, seul le contour reste discret
-          if (dos && L.cote && L.gainCote) {
-            const zDos = Math.min(L.arriere / k, -15), t = Math.min(Math.max((z - zDos) / (L.cote.z - zDos), 0), 1);
-            gain += (L.gainCote - gain) * t;
-          }
-          const force = gain * L.intensity * (L.attenuation ? L.attenuation(go) : 1);
-          this.set3f(nom + 'couleur', L.color.r * force, L.color.g * force, L.color.b * force);
-          // La lumière part du bord de la forme : portée réduite d'autant, le bout de la lumière reste au même endroit
-          const F = L.forme;
-          this.set1f(nom + 'portee', (L.radius - (F ? F.demi : 0)) / k);
-          this.set1f(nom + 'forme', F ? F.type : 0);
-          if (F && F.type === 1) {
-            const [a, b] = natif(F.points[0], F.points[1]), [c2, d] = natif(F.points[2], F.points[3]), [e3, f3] = natif(F.points[4], F.points[5]);
-            this.set4f(nom + 'formeA', a, b, c2, d);
-            this.set4f(nom + 'formeB', e3, f3, 0, 0);
-          } else if (F) {
-            const [a, b] = natif(F.cx, F.cy);
-            this.set4f(nom + 'formeA', a, b, F.hx / (sx * px), F.hy / (sy * py));
-            this.set4f(nom + 'formeB', F.r / ((sx * px + sy * py) / 2), 0, 0, 0);
-          }
+          if (this.envoyerLampe(this, nb++, L, go, G) < 15) derriere = 1;
         }
         this.set1i('uNbLumieres', nb);
         this.set1f('uCarte', e ? 1 : 0);
@@ -759,7 +932,10 @@ void main() {
   function activer(scene, options = {}) {
     const r = webgl(scene);
     if (!r) return false;
-    if (!r.pipelines.has(NOM_PIPELINE)) r.pipelines.add(NOM_PIPELINE, new (classePipeline())(scene.game));
+    if (!r.pipelines.has(NOM_PIPELINE)) {
+      r.pipelines.add(NOM_PIPELINE, new (classePipeline())(scene.game));
+      creerPipelinesDecor(r, scene.game);
+    }
     const reglages = Object.assign({}, DEFAUTS, options);
     scene.__lumiere = { reglages, objets: new Set(), suivis: [] };
     scene.lights.enable();

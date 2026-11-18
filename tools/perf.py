@@ -5,6 +5,8 @@
     python tools/perf.py mesure --racine C:/copie      mesure une autre version du code (src/ et index.html de ce dossier)
     python tools/perf.py mesure --query sansculling    ajoute des options à l'adresse du jeu
     python tools/perf.py comparer avant.json apres.json     tableau avant / après
+    python tools/perf.py images --sortie DOSSIER [--racine ...] [--query ...]   images figées (hasard et temps fixés)
+    python tools/perf.py ecarts DOSSIER_A DOSSIER_B [--planche x.png]           pixels différents entre deux séries
 
 Edge sans fenêtre, sans limite d'images ni synchronisation écran. Deux passes par état :
   - débit : images/s moyennes, file d'attente de la carte graphique comprise ;
@@ -226,6 +228,148 @@ def cmd_comparer(a):
         print(f"| {ZONES[zone]['nom']} | {etat} | {x['ips']:.0f} | **{y['ips']:.0f}** | {x['cout']:.1f} | {y['cout']:.1f} | {x['ms95']:.1f} | {y['ms95']:.1f} | {x['dessins']} | {y['dessins']} |")
 
 
+# Images figées : la boucle du jeu est arrêtée et avancée à la main, pas fixe de 1/60 s, horloge et hasard imposés.
+# Les cartes de lumière sont toutes chargées avant la première image : deux passes donnent le même état au pixel près.
+FIGER = r"""
+(() => {
+  const g = window.__game, DT = 1000 / 60, T0 = 100000;
+  g.loop.stop();
+  let T = T0, graine = 1;
+  performance.now = () => T;
+  Date.now = () => 1700000000000 + T;
+  Math.random = () => { graine = (graine * 16807) % 2147483647; return (graine - 1) / 2147483646; };
+  const attente = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const pas = (n) => { for (let i = 0; i < n; i++) { T += DT; g.loop.time = T; g.loop.now = T; g.loop.delta = DT; g.loop.rawDelta = DT; g.loop.frame++; g.step(T, DT); } };
+  const touche = (type, code, kc) => window.dispatchEvent(new KeyboardEvent(type, { code, key: code, keyCode: kc, which: kc, bubbles: true }));
+  let scene = null;
+  window.__fige = {
+    async demarrer(cle, flags, data) {
+      for (const [k, v] of Object.entries(flags)) g.registry.set(k, v);
+      for (const s of g.scene.getScenes(true)) if (s.scene.key !== cle) g.scene.stop(s.scene.key);
+      scene = g.scene.getScene(cle);
+      // Le hasard repart de la même graine juste avant la construction de la zone (décor placé au hasard), et plus aucune
+      // image n'avance tant qu'elle se construit : le nombre d'images du chargement ne compte plus
+      const creer = scene.create;
+      scene.create = function (...a) { graine = 1; Phaser.Math.RND.sow(['agarica']); scene.create = creer; return creer.apply(this, a); };
+      g.scene.start(cle, data || undefined);
+      for (let i = 0; i < 8000 && !(scene.sys.isActive() && scene.player && scene.children.list.length > 50); i++) { if (!scene.sys.isActive()) pas(1); await attente(5); }
+      await attente(500);
+      LightKit.demanderCartes(g, /./);
+      const urls = Object.keys(SECTIONS_LUMIERE), pretes = () => urls.filter((u) => g.textures.exists('lumiere:neutre:' + u)).length;
+      let avant = -1, stable = 0;
+      for (let i = 0; i < 600 && stable < 12; i++) { await attente(250); const n = pretes(); stable = n === avant ? stable + 1 : 0; avant = n; }
+      T = T0;
+      const feux = (scene.__campfires || []).map((f) => (f.sprite || f.image || f).x).filter((v) => typeof v === 'number');
+      return { x: scene.player.x, y: scene.player.y, largeur: scene.physics.world.bounds.width, cartes: avant, total: urls.length, feu: feux.length ? feux[0] : null };
+    },
+    placer(x, y) { const p = scene.player; p.setPosition(x, y); p.body.reset(x, y); },
+    // Une boîte de dialogue ouverte par la zone cacherait la moitié de l'image : elle n'est pas dessinée sur la capture
+    avancer(n) {
+      pas(n - 1);
+      const d = g.scene.getScene('DialogueScene');
+      if (d && d.sys.isActive()) d.sys.setVisible(false);
+      pas(1);
+      return g.canvas.toDataURL('image/png');
+    },
+    marcher(oui) { touche(oui ? 'keydown' : 'keyup', 'ArrowRight', 39); },
+    secouer() { scene.cameras.main.shake(600, 0.015); },
+    etat() { return { scene: scene.scene.key, x: scene.player.x, y: scene.player.y, camX: scene.cameras.main.scrollX, camY: scene.cameras.main.scrollY }; },
+  };
+})()
+"""
+
+
+def enregistrer(page, chemin, n):
+    import base64
+    url = page.evaluate('(n) => window.__fige.avancer(n)', n)
+    with open(chemin, 'wb') as f:
+        f.write(base64.b64decode(url.split(',', 1)[1]))
+
+
+def captures_zone(nav, port, zone, sortie, query):
+    z = ZONES[zone]
+    ctx = nav.new_context(viewport={'width': 1366, 'height': 768})
+    page = ctx.new_page()
+    erreurs = []
+    page.on('pageerror', lambda e: erreurs.append(str(e)[:200]))
+    q = 'muet&physfps=165' + (('&' + query) if query else '')
+    page.goto(f'http://127.0.0.1:{port}/index.html?{q}', timeout=120000)
+    page.wait_for_function("window.__game && window.__game.scene.getScenes(true).some((s) => s.scene.key !== 'BootScene')", timeout=240000)
+    page.evaluate(FIGER)
+    d = page.evaluate('([c, f, o]) => window.__fige.demarrer(c, f, o)', [z['scene'], z.get('flags', {}), z.get('data')])
+    fichier = lambda nom: os.path.join(sortie, f'{zone}_{nom}.png')
+    enregistrer(page, fichier('1_depart'), 120)
+    # Endroits de la zone, plus loin à droite
+    bord = max(d['x'], d['largeur'] - 260)
+    for i, dx in enumerate((700, 1500)):
+        page.evaluate('([x, y]) => window.__fige.placer(x, y)', [min(d['x'] + dx, bord), d['y'] - 80])
+        enregistrer(page, fichier(f'2_endroit{i}'), 120)
+    # En marchant : les objets entrent par le bord du cadre
+    page.evaluate('([x, y]) => window.__fige.placer(x, y)', [d['x'] + 200, d['y'] - 40])
+    enregistrer(page, fichier('4_marche0'), 60)
+    page.evaluate('window.__fige.marcher(true)')
+    for k in range(1, 5):
+        enregistrer(page, fichier(f'4_marche{k}'), 17)
+    page.evaluate('window.__fige.marcher(false)')
+    # Tremblement de caméra
+    page.evaluate('window.__fige.secouer()')
+    for k in range(4):
+        enregistrer(page, fichier(f'5_secousse{k}'), 7)
+    # En dernier : le feu peut déclencher un dialogue qui bloque ensuite les déplacements
+    if d['feu'] is not None:
+        page.evaluate('([x, y]) => window.__fige.placer(x, y)', [d['feu'] - 70, d['y'] - 80])
+        enregistrer(page, fichier('3_feu'), 150)
+    ctx.close()
+    return d, erreurs
+
+
+def cmd_images(a):
+    from playwright.sync_api import sync_playwright
+    os.makedirs(a.sortie, exist_ok=True)
+    httpd = servir(a.port, a.racine)
+    with sync_playwright() as p:
+        nav = lancer_navigateur(p)
+        for zone in a.zones.split(','):
+            d, erreurs = captures_zone(nav, a.port, zone, a.sortie, a.query)
+            print(zone, 'cartes', d['cartes'], '/', d['total'], 'feu', d['feu'], ('ERREURS ' + str(erreurs[:2])) if erreurs else '', flush=True)
+        nav.close()
+    httpd.shutdown()
+
+
+def cmd_ecarts(a):
+    import numpy as np
+    from PIL import Image
+    noms = sorted(f for f in os.listdir(a.a) if f.endswith('.png'))
+    lignes, pires = [], []
+    for nom in noms:
+        cible = os.path.join(a.b, nom)
+        if not os.path.exists(cible):
+            print('absent :', nom)
+            continue
+        x = np.asarray(Image.open(os.path.join(a.a, nom)).convert('RGB'), dtype=np.int16)
+        y = np.asarray(Image.open(cible).convert('RGB'), dtype=np.int16)
+        d = np.abs(x - y).max(axis=2)
+        lignes.append((nom, int((d > 0).sum()), int(d.max()), int((d > 2).sum())))
+        pires.append((int(d.max()), int((d > 0).sum()), nom))
+    total = sum(l[1] for l in lignes)
+    for nom, n, m, n2 in lignes:
+        if n or a.tout:
+            print(f'{nom:32} {n:8d} pixels différents, écart max {m:3d}, au-delà de 2 : {n2}')
+    print(f'{len(lignes)} images comparées, {sum(1 for l in lignes if l[1])} avec un écart, {total} pixels différents, écart maximal {max((l[2] for l in lignes), default=0)}')
+    if a.planche and lignes:
+        choix = sorted(pires, reverse=True)[:a.nb]
+        L, H = 740, 416
+        pl = Image.new('RGB', (L * 3 + 20, (H + 10) * len(choix)), (20, 20, 28))
+        for i, (_, _, nom) in enumerate(choix):
+            ia, ib = [Image.open(os.path.join(r, nom)).convert('RGB') for r in (a.a, a.b)]
+            d = np.abs(np.asarray(ia, dtype=np.int16) - np.asarray(ib, dtype=np.int16)).max(axis=2)
+            amp = Image.fromarray(np.clip(d * a.ampli, 0, 255).astype(np.uint8)).convert('RGB')
+            for k, im in enumerate((ia, ib, amp)):
+                pl.paste(im.resize((L, H), Image.NEAREST), (k * (L + 10), i * (H + 10)))
+        pl.save(a.planche)
+        print('planche :', a.planche, '(avant | après | différence x%d)' % a.ampli)
+
+
 def main():
     for st in (sys.stdout, sys.stderr):
         if hasattr(st, 'reconfigure'):
@@ -245,6 +389,21 @@ def main():
     c.add_argument('avant')
     c.add_argument('apres')
     c.set_defaults(f=cmd_comparer)
+    i = sub.add_parser('images')
+    i.add_argument('--port', type=int, default=9783)
+    i.add_argument('--zones', default=','.join(ZONES))
+    i.add_argument('--racine', default=None)
+    i.add_argument('--query', default='')
+    i.add_argument('--sortie', required=True)
+    i.set_defaults(f=cmd_images)
+    e = sub.add_parser('ecarts')
+    e.add_argument('a')
+    e.add_argument('b')
+    e.add_argument('--planche', default=None)
+    e.add_argument('--nb', type=int, default=6, help='images montrées sur la planche (les plus différentes)')
+    e.add_argument('--ampli', type=int, default=32, help='amplification de la différence')
+    e.add_argument('--tout', action='store_true')
+    e.set_defaults(f=cmd_ecarts)
     a = ap.parse_args()
     a.f(a)
 
