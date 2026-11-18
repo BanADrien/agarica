@@ -91,9 +91,9 @@ precision highp float;
 precision mediump float;
 #endif
 struct Lumiere {
-  vec3 position;   // x, y : repère natif affiché du sprite (y vers le bas) ; z : profondeur native
-  vec3 couleur;    // couleur x intensité
-  float portee;    // portée native
+  vec3 position;   // x, y : repere natif affiche du sprite (y vers le bas) ; z : profondeur native
+  vec3 couleur;    // couleur x intensite
+  float portee;    // portee native
 };
 const int kMaxLights = %LIGHT_COUNT%;
 uniform sampler2D uMainSampler;   // image du jeu (objet sans carte)
@@ -104,14 +104,14 @@ uniform vec3 uAmbiance;
 uniform Lumiere uLumieres[kMaxLights];
 uniform int uNbLumieres;
 uniform float uPaliers, uContre;
-uniform float uCarte;             // 1 = sprite avec cartes, 0 = à plat
-uniform float uDerriere;          // 1 = au moins une lampe derrière (normale lissée utile)
-uniform float uFlip;              // 1 = flipX : miroir ET normal.x inversé
-uniform float uPasLisse;          // écart des échantillons de la normale lissée (round(s), 1 = démo)
-uniform vec2 uTaille;             // taille native (ou de la frame sans carte)
+uniform float uCarte;             // 1 = sprite avec cartes, 0 = a plat
+uniform float uDerriere;          // 1 = au moins une lampe derriere (normale lissee utile)
+uniform float uFlip;              // 1 = flipX : miroir ET normal.x inverse
+uniform float uPasLisse;          // ecart des echantillons de la normale lissee (round(s), 1 = demo)
+uniform vec2 uTaille;             // taille native (sans carte : taille de la frame en px du monde)
 uniform vec2 uTailleTex;          // taille de l'image source
 uniform vec2 uCoin;               // coin de la frame dans l'image source
-uniform vec2 uGrille, uPas;       // grille native dans la frame : coin et taille d'un pixel natif
+uniform vec2 uGrille, uPas;       // grille dans la frame : coin et taille d'une case
 varying vec2 outTexCoord;
 varying float outTexId;
 varying float outTintEffect;
@@ -144,7 +144,7 @@ void main() {
   vec4 base;
   vec3 n = vec3(0.0, 0.0, 1.0);
   vec3 nl = n;
-  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);                // sans carte : aucune exposition arrière
+  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);                // sans carte : aucune exposition arriere
   vec2 ts;
   if (uCarte > 0.5) {
     ts = floor((px - uGrille) / uPas);
@@ -159,9 +159,9 @@ void main() {
     if (uDerriere > 0.5) nl = normaleLisse(ts);
     cjm = texture2D(uCj, uv);
   } else {
-    base = texture2D(uMainSampler, outTexCoord);      // alpha prémultiplié (Phaser)
+    base = texture2D(uMainSampler, outTexCoord);      // alpha premultiplie (Phaser)
     if (base.a <= 0.0) discard;
-    ts = floor(px);
+    ts = floor((px - uGrille) / uPas);
   }
   vec2 t = ts;
   if (uFlip > 0.5) t.x = uTaille.x - 1.0 - ts.x;
@@ -186,10 +186,21 @@ void main() {
   const manifeste = () => (typeof SECTIONS_LUMIERE !== 'undefined' ? SECTIONS_LUMIERE : {});
   const cleCarte = (url, quoi) => `lumiere:${quoi}:${url}`;
 
+  // Aucune scène du jeu normal n'éclaire encore : les cartes ne sont chargées qu'avec `?lumiere`
+  // ou dans le labo (`?zone=labo_lumiere`). Le jour où une vraie zone s'en sert : TOUJOURS = true.
+  const TOUJOURS = false;
+  function cartesVoulues() {
+    if (TOUJOURS) return true;
+    if (typeof window === 'undefined') return false;
+    const q = new URLSearchParams(window.location.search);
+    return q.has('lumiere') || q.get('zone') === 'labo_lumiere';
+  }
+
   // preload de BootScene : charge neutre, normales et carte contre-jour de chaque sprite du
   // manifeste (la carte contre-jour seulement si le manifeste l'annonce : `cj`) et note
   // quelle clé de texture correspond à quelle image (le manifeste parle en fichiers).
   function chargerCartes(scene) {
+    if (!cartesVoulues()) return;
     const man = manifeste();
     for (const [url, e] of Object.entries(man)) {
       scene.load.image(cleCarte(url, 'neutre'), `${e.d}/${e.n}_neutre.png`);
@@ -213,7 +224,7 @@ void main() {
     }
   }
 
-  const cacheCartes = {};
+  const cacheCartes = Object.create(null);
   function cartesDe(game, cleTexture) {
     if (cleTexture in cacheCartes) return cacheCartes[cleTexture];
     const url = cleVersUrl[cleTexture];
@@ -246,6 +257,8 @@ void main() {
         this._pt = new Phaser.Math.Vector2();
         this._lampes = [];
         this._textures = null;
+        this._reglages = DEFAUTS;
+        this._ambiance = { r: 1, g: 1, b: 1 };
       }
 
       onRender(scene, camera) {
@@ -254,15 +267,8 @@ void main() {
         // jamais d'objet invisible : sans lumières actives, plein jour (ambiance 1, aucune lampe)
         this.lightsActive = true;
         this._lampes = actif ? lm.getLights(camera).map((o) => o.light) : [];
-        const reg = (scene.__lumiere && scene.__lumiere.reglages) || DEFAUTS;
-        this.set1i('uMainSampler', 0);
-        this.set1i('uNeutre', 2);
-        this.set1i('uNormales', 3);
-        this.set1i('uCj', 4);
-        if (actif) this.set3f('uAmbiance', lm.ambientColor.r, lm.ambientColor.g, lm.ambientColor.b);
-        else this.set3f('uAmbiance', 1, 1, 1);
-        this.set1f('uPaliers', reg.paliers);
-        this.set1f('uContre', reg.contre);
+        this._reglages = (scene.__lumiere && scene.__lumiere.reglages) || DEFAUTS;
+        this._ambiance = actif ? lm.ambientColor : { r: 1, g: 1, b: 1 };
       }
 
       // un appel de dessin par objet éclairé : ses lampes sont exprimées dans SON repère natif
@@ -276,14 +282,23 @@ void main() {
       }
 
       preparer(go) {
+        this.set1i('uMainSampler', 0);
+        this.set1i('uNeutre', 2);
+        this.set1i('uNormales', 3);
+        this.set1i('uCj', 4);
+        this.set3f('uAmbiance', this._ambiance.r, this._ambiance.g, this._ambiance.b);
+        this.set1f('uPaliers', this._reglages.paliers);
+        this.set1f('uContre', this._reglages.contre);
         const frame = go.frame;
         const c = cartesDe(this.game, frame.texture.key);
         const e = c && c.e;
         const W = frame.realWidth, H = frame.realHeight;
-        const fx = e ? e.fx : 1, fy = e ? e.fy : 1, gx = e ? e.gx : 0, gy = e ? e.gy : 0;
-        const w = e ? e.w : W, h = e ? e.h : H;
         const m = go.getWorldTransformMatrix(this._m1, this._m2);
         const sx = Math.hypot(m.a, m.b) || 1, sy = Math.hypot(m.c, m.d) || 1;
+        // frame sans carte : une case = 1 px du monde. En px de l'image, une même lampe passait de
+        // « devant » à « derrière » (seuils en px de la grille) au changement de frame
+        const fx = e ? e.fx : 1 / sx, fy = e ? e.fy : 1 / sy, gx = e ? e.gx : 0, gy = e ? e.gy : 0;
+        const w = e ? e.w : W * sx, h = e ? e.h : H * sy;
         const flip = !!go.flipX;
         const kx = sx * fx, ky = sy * fy;                  // px du monde par pixel natif
         const k = (kx + ky) / 2;
@@ -398,6 +413,18 @@ void main() {
     }
   }
 
+  // Clé de texture du jeu d'une image du manifeste (null si elle n'est pas chargée)
+  function cleDe(url) {
+    for (const k of Object.keys(cleVersUrl)) if (cleVersUrl[k] === url) return k;
+    return null;
+  }
+
+  // Pixels d'écran couverts par un pixel dessiné, à l'échelle actuelle (null sans carte)
+  function pixelEcran(o) {
+    const c = o && o.frame ? cartesDe(o.scene.game, o.frame.texture.key) : null;
+    return c ? Math.abs(o.scaleX) * c.e.fx * (o.scene.cameras.main.zoom || 1) : null;
+  }
+
   // A une carte (sprite préparé par tools/sections.js) ? Utile pour n'éclairer que ceux-là.
   function aDesCartes(o) {
     return !!(o && o.frame && cartesDe(o.scene.game, o.frame.texture.key));
@@ -462,7 +489,7 @@ void main() {
   function modeTest(scene) {
     if (typeof window === 'undefined') return;
     const q = new URLSearchParams(window.location.search);
-    if (!q.has('lumiere') || !activer(scene, { ambiance: 'nuit' })) return;
+    if (scene.__laboLumiere || !q.has('lumiere') || !activer(scene, { ambiance: 'nuit' })) return;
     const z0 = Number(q.get('lumiere'));
     const torche = ajouterLumiere(scene, 'torche', { profondeur: Number.isFinite(z0) && q.get('lumiere') !== '' ? z0 : 8 });
     const lune = ajouterLumiere(scene, 'lune');
@@ -470,7 +497,6 @@ void main() {
       .setScrollFactor(0).setDepth(100000);
     const afficher = () => texte.setText(`lumiere : profondeur ${torche.profondeur > 0 ? '+' : ''}${torche.profondeur} (molette)`);
     afficher();
-    scene.input.on('pointermove', (p) => deplacer(torche, p.worldX, p.worldY));
     scene.input.on('wheel', (p, objs, dx, dy) => {
       torche.profondeur = Phaser.Math.Clamp(torche.profondeur + (dy > 0 ? -2 : 2), -60, 60);
       afficher();
@@ -478,6 +504,9 @@ void main() {
     let n = 0;
     const balayer = () => {
       const cam = scene.cameras.main;
+      // recalculé à chaque image : p.worldX n'est à jour que quand la souris bouge, pas quand la caméra défile
+      const pt = scene.input.activePointer.positionToCamera(cam);
+      deplacer(torche, pt.x, pt.y);
       deplacer(lune, cam.worldView.x + 120, cam.worldView.y - 250);
       if (n++ % 30) return;
       for (const o of scene.children.list) if (o.type === 'Sprite' && (o === scene.player || aDesCartes(o))) eclairer(o);
@@ -489,7 +518,7 @@ void main() {
 
   return {
     NOM_PIPELINE, DEFAUTS, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
-    chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes,
+    chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
     ajouterLumiere, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();
