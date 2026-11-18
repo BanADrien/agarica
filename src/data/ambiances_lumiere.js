@@ -10,6 +10,6 @@ const AMBIANCES_LUMIERE = {
     largeur: 24,          // largeur moyenne d'un rayon (px du monde)
     faisceaux: 0.1,       // visibilité des faisceaux dans l'air
     balancement: 3,       // mouvement des feuilles (px)
-    soleil: { x: -0.28, y: 0.8, z: 0.7 },   // direction fixe : plus x est petit, plus les rayons tombent droit
+    soleil: { x: -0.28, y: 0.8, z: 0.2 },   // direction fixe : plus x est petit, plus les rayons tombent droit ; z faible : ils viennent d'en haut, pas de devant
   },
 };

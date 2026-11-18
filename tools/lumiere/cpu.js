@@ -75,6 +75,11 @@ function directionnel(n, d, lumBase, U) {
   return diff;
 }
 
+// expositionDecor() du shader : une source de décor derrière le sprite n'allume pas ses plans de face
+function expositionDecor(n, ex) {
+  return ex * (1.0 - smoothstep(0.9, 0.97, n.z));
+}
+
 // corpsAuDessus() du shader : part du corps traversée en remontant vers le soleil. opaqueEn(q) : le pixel q est-il plein ?
 function corpsAuDessus(ts, d, opaqueEn, U) {
   const dir = normalize(vec2(U.uFlip > 0.5 ? -d.x : d.x, -d.y));
@@ -86,9 +91,11 @@ function corpsAuDessus(ts, d, opaqueEn, U) {
 }
 
 // rayonCorps() du shader : le rayon se pose sur les plans du dessus, le reste du corps garde une lueur uniforme
-function rayonCorps(n, d, lb, e, ms, U) {
+function rayonCorps(n, d, lb, e, ms, cjm, U) {
   const libre = 1.0 - smoothstep(0.3, 0.95, e);
-  const v = directionnel(n, d, lb, U) * smoothstep(0.1, 0.65, n.y) * libre * ms;
+  const bord = sub(mul(rg(cjm), 2.0), 1.0);
+  const expose = smoothstep(0.05, 0.45, cjm.b) * smoothstep(0.1, 0.6, bord.y);
+  const v = directionnel(n, d, lb, U) * smoothstep(0.1, 0.65, n.y) * expose * libre * ms;
   return max(palier(v, U), U.uLueurCorps * ms);
 }
 
@@ -137,4 +144,4 @@ function sprite(carte, pas = 1) {
   return { w, h, N, NL, lum, CJ, brute };
 }
 
-module.exports = { ambianceHemi, epaule, directionnel, corpsAuDessus, rayonCorps, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };
+module.exports = { ambianceHemi, epaule, directionnel, expositionDecor, corpsAuDessus, rayonCorps, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };

@@ -156,6 +156,7 @@ struct Lumiere {
   vec3 position;   // x, y : repere natif affiche du sprite (y vers le bas) ; z : profondeur native
                    // soleil : direction normalisee vers le soleil (x droite, y haut, z vers le spectateur)
   float soleil;    // 1 = directionnelle : ni position, ni portee, ni attenuation
+  float decor;     // 1 = source de decor derriere le personnage : jamais sur ses plans de face
   vec3 couleur;    // couleur x intensite
   float portee;    // portee native
 };
@@ -226,6 +227,11 @@ vec3 normaleLisse(vec2 ts) {
 }
 ${FRAG_ECLAIRAGE}
 
+// Source de decor derriere un personnage : la carte contre-jour ne compte pas sur les plans tournes vers le spectateur
+float expositionDecor(vec3 n, float ex) {
+  return ex * (1.0 - smoothstep(0.9, 0.97, n.z));
+}
+
 // Rayon de canopee sur un personnage : il vient d'en haut, touche le dessus du corps et s'arrete la.
 float opaqueEn(vec2 q) {
   if (q.x < 0.0 || q.y < 0.0 || q.x >= uTaille.x || q.y >= uTaille.y) return 0.0;
@@ -243,10 +249,13 @@ float corpsAuDessus(vec2 ts, vec3 d) {
   return plein / 8.0;
 }
 
-// Sprite a cartes : plans du dessus seulement, un seul palier a la fin ; le reste du corps garde une lueur uniforme
-float rayonCorps(vec3 n, vec3 d, float lb, float e, float ms) {
+// Sprite a cartes : plans du dessus exposes en haut de la silhouette (carte contre-jour), un seul palier a la fin ;
+// le reste du corps garde une lueur uniforme
+float rayonCorps(vec3 n, vec3 d, float lb, float e, float ms, vec4 cjm) {
   float libre = 1.0 - smoothstep(0.3, 0.95, e);
-  float v = directionnel(n, d, lb) * smoothstep(0.1, 0.65, n.y) * libre * ms;
+  vec2 bord = cjm.rg * 2.0 - 1.0;
+  float expose = smoothstep(0.05, 0.45, cjm.b) * smoothstep(0.1, 0.6, bord.y);
+  float v = directionnel(n, d, lb) * smoothstep(0.1, 0.65, n.y) * expose * libre * ms;
   return max(palier(v), uLueurCorps * ms);
 }
 
@@ -301,11 +310,12 @@ void main() {
         else if (!perso) ls += L.couleur * ms * 0.55;                                          // taches de lumiere du decor
         else if (ms > 0.0) {
           float e = corpsAuDessus(ts, L.position);
-          ls += L.couleur * (uCarte > 0.5 ? rayonCorps(n, L.position, lb, e, ms) : rayonSilhouette(e, ms));
+          ls += L.couleur * (uCarte > 0.5 ? rayonCorps(n, L.position, lb, e, ms, cjm) : rayonSilhouette(e, ms));
         }
       } else {
         // personnages (cartes) : paliers ; decor sans carte : fondu continu, sinon les paliers y dessinent des cercles
-        float e = eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm);
+        vec4 cjL = L.decor > 0.5 ? vec4(cjm.rg, expositionDecor(n, cjm.b), cjm.a) : cjm;
+        float e = eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjL);
         l += L.couleur * (uCarte > 0.5 ? palier(e) : smoothstep(0.0, 1.0, e));
       }
     }
@@ -507,11 +517,12 @@ void main() {
           const D = this._pt.x + go.displayOriginX, Dy = this._pt.y + go.displayOriginY;
           const tx = flip ? w - (W - D - cx) / px : (D - cx) / px;
           const ty = (Dy - cy) / py;
-          const z = (L.profondeur ?? DEFAUTS.profondeur) / k;
+          const z = zLampe(L, go, !!e || go.type === 'Sprite', k);
           if (z < 15) derriere = 1;
           const nom = `uLumieres[${i}].`;
           this.set3f(nom + 'position', tx, ty, z);
           this.set1f(nom + 'soleil', 0);
+          this.set1f(nom + 'decor', z < 0 && L.sourceObjet ? 1 : 0);
           // L.attenuation(objet), facultatif : lampe masquée pour cet objet (ombre d'un auvent), 0 à 1
           const force = L.intensity * (L.attenuation ? L.attenuation(go) : 1);
           this.set3f(nom + 'couleur', L.color.r * force, L.color.g * force, L.color.b * force);
@@ -550,6 +561,14 @@ void main() {
       }
     };
     return PipelineClasse;
+  }
+
+  // Profondeur d'une lampe pour un objet, en pixels natifs (k : px du monde par pixel natif). Une source de décor affichée
+  // derrière un personnage l'éclaire par l'arrière, donc par sa carte contre-jour seule : -15 natif au moins, le seuil où
+  // la lumière de face s'éteint complètement. Le décor, sur le même plan que la source, garde sa profondeur positive.
+  function zLampe(L, go, perso, k) {
+    if (perso && L.sourceObjet && L.sourceObjet.depth < go.depth) return Math.min(L.arriere / k, -15);
+    return (L.profondeur ?? DEFAUTS.profondeur) / k;
   }
 
   function webgl(scene) {
@@ -636,8 +655,9 @@ void main() {
   const FEU_DE_CAMP = /^decor-campfire-/;
   const SEUIL_FLAMMES = 0.62;
   const SOURCES = {
-    feu: { couleur: 0xffc46e, intensite: 1.05, portee: 310, profondeur: 60, vacille: 0.1, halo: 240 },
-    champignon: { couleur: 0x5cf0d0, intensite: 0.85, portee: 150, profondeur: 30, vacille: 0.05, halo: 0 },
+    // profondeur : pour le décor du même plan ; arriere : pour un personnage affiché devant la source (contre-jour seul)
+    feu: { couleur: 0xffc46e, intensite: 1.05, portee: 310, profondeur: 60, arriere: -18, vacille: 0.1, halo: 240 },
+    champignon: { couleur: 0x5cf0d0, intensite: 0.85, portee: 150, profondeur: 30, arriere: -14, vacille: 0.05, halo: 0 },
   };
 
   // Affiche un objet avec ses couleurs d'origine. seuil : seuls les pixels au moins aussi vifs (0 à 1) restent émissifs
@@ -680,6 +700,8 @@ void main() {
       const def = SOURCES[type];
       const L = ajouterLumiere(scene, { x: o.x, y: o.y, portee: def.portee, couleur: def.couleur, intensite: 0, profondeur: def.profondeur });
       L.setVisible(false);
+      L.sourceObjet = o;
+      L.arriere = def.arriere;
       const s = { o, type, def, L, force: 0, allumee: false, ph: liste.length * 2.4, halo: null };
       if (def.halo) {
         s.halo = scene.add.image(o.x, o.y, textureHalo(scene)).setDisplaySize(def.halo, def.halo).setTint(def.couleur)
@@ -832,7 +854,7 @@ void main() {
 
   return {
     NOM_PIPELINE, DEFAUTS, SOLEIL, FRAG_MASQUE, masqueSoleil: masqueSoleilJs, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
-    chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
+    zLampe, chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
     ajouterLumiere, ajouterSoleil, emissif, sourcesLumineuses, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();

@@ -500,20 +500,44 @@ function tMasque() {
 // 18 : rayon de canopée sur un sprite à cartes. Un pixel qui a du corps au-dessus de lui dans la direction du soleil ne
 // reçoit que la lueur uniforme ; les plans de face non plus ; le dessus reçoit le rayon ; flipX donne le miroir exact.
 function tRayonCorps(sp) {
-  const d = CPU.normalize(CPU.vec3(-0.28, 0.8, 0.7)), lueur = 0.12;
+  const d = CPU.normalize(CPU.vec3(-0.28, 0.8, 0.2)), lueur = 0.12;
   const UR = { ...U, uOmbreSoleil: 6, uLueurCorps: lueur };
   const plein = (q) => (sp.has(q.x, q.y) ? 1 : 0);
   const miroir = (q) => plein({ x: sp.w - 1 - q.x, y: q.y });
   let masques = 0, recus = 0, face = 0, dessus = 0, flip = 0;
   for (const p of sp.pts) {
     const n = sp.N.get(sp.id(p)), ts = vec2(p[0], p[1]);
-    const e = CPU.corpsAuDessus(ts, d, plein, UR), v = CPU.rayonCorps(n, d, sp.lumP(p), e, 1, UR);
+    const e = CPU.corpsAuDessus(ts, d, plein, UR), v = CPU.rayonCorps(n, d, sp.lumP(p), e, 1, sp.CJ.get(sp.id(p)), UR);
     if (e === 1) { masques++; if (v > lueur + 1e-9) recus++; }
     if (Math.abs(n.y) < 0.1 && v > lueur + 1e-9) face++;
     if (v > lueur + 1e-9) dessus++;
     if (CPU.corpsAuDessus(vec2(sp.w - 1 - p[0], p[1]), d, miroir, { ...UR, uFlip: 1 }) !== e) flip++;
   }
   return { masques, recus, face, dessus, flip };
+}
+
+// 19 : source de décor affichée derrière le sprite (feu, champignon). Aucun plan de face ne reçoit sa lumière, même au bord
+// de la silhouette, et aucun pixel sans exposition dans la carte contre-jour.
+function tSourceDerriere(sp) {
+  const [cx, cy] = sp.centre();
+  let faces = 0, nbFaces = 0, bords = 0, interieurs = 0;
+  for (const [dx, dy] of [[-40, -10], [40, -10], [0, -60], [-20, 30], [20, 30], [0, 0]]) {
+    for (const z of [-15, -20, -30]) {
+      for (const p of sp.pts) {
+        const id = sp.id(p), n = sp.N.get(id), cj = sp.CJ.get(id);
+        const v = CPU.eclairage(n, sp.NL.get(id), vec2(p[0] + 0.5, p[1] + 0.5), vec2(cx + dx, cy + dy), z, 220, sp.lumP(p), { ...cj, b: CPU.expositionDecor(n, cj.b) }, U);
+        if (n.z > 0.97) { nbFaces++; if (v > 1e-9) faces++; }
+        if (palier(v) > 0) { bords++; if (cj.b === 0) interieurs++; }
+      }
+    }
+  }
+  return { faces, nbFaces, bords, interieurs };
+}
+function tProfondeurSource() {
+  const L = { profondeur: 60, arriere: -18, sourceObjet: { depth: 0 } };
+  return [LightKit.zLampe(L, { depth: 10 }, true, 1) <= -15, LightKit.zLampe(L, { depth: 10 }, true, 2) <= -15,
+    LightKit.zLampe(L, { depth: 10 }, false, 1) > 0, LightKit.zLampe({ ...L, sourceObjet: { depth: 20 } }, { depth: 10 }, true, 1) > 0,
+    LightKit.zLampe({ profondeur: -20 }, { depth: 10 }, true, 1) === -20].every(Boolean);
 }
 
 function tSymetrie() {
@@ -568,8 +592,8 @@ function suite(src) {
 function alignementCpu() {
   const cpu = fs.readFileSync(path.join(__dirname, 'cpu.js'), 'utf8');
   const jeu = fs.readFileSync(path.join(ROOT, 'src', 'utils', 'LightKit.js'), 'utf8');
-  const a = suite(corps(LightKit.FRAG, 'ambianceHemi') + corps(LightKit.FRAG, 'epaule') + corps(LightKit.FRAG, 'directionnel') + corps(LightKit.FRAG, 'corpsAuDessus') + corps(LightKit.FRAG, 'rayonCorps') + corps(LightKit.FRAG_MASQUE, 'masqueSoleil') + corps(LightKit.FRAG_ECLAIRAGE, 'eclairage'));
-  const b = suite(corps(cpu, 'ambianceHemi') + corps(cpu, 'epaule') + corps(cpu, 'directionnel') + corps(cpu, 'corpsAuDessus') + corps(cpu, 'rayonCorps') + corps(jeu, 'masqueSoleilJs').replace(/const \{ floor, sin \} = Math, fract = \(v\) => v - Math\.floor\(v\);/, '') + corps(cpu, 'eclairage'));
+  const a = suite(corps(LightKit.FRAG, 'ambianceHemi') + corps(LightKit.FRAG, 'epaule') + corps(LightKit.FRAG, 'directionnel') + corps(LightKit.FRAG, 'expositionDecor') + corps(LightKit.FRAG, 'corpsAuDessus') + corps(LightKit.FRAG, 'rayonCorps') + corps(LightKit.FRAG_MASQUE, 'masqueSoleil') + corps(LightKit.FRAG_ECLAIRAGE, 'eclairage'));
+  const b = suite(corps(cpu, 'ambianceHemi') + corps(cpu, 'epaule') + corps(cpu, 'directionnel') + corps(cpu, 'expositionDecor') + corps(cpu, 'corpsAuDessus') + corps(cpu, 'rayonCorps') + corps(jeu, 'masqueSoleilJs').replace(/const \{ floor, sin \} = Math, fract = \(v\) => v - Math\.floor\(v\);/, '') + corps(cpu, 'eclairage'));
   let i = 0;
   while (i < a.length && a[i] === b[i]) i++;
   return { n: a.length, ok: a.length === b.length && i === a.length, ecart: i < Math.max(a.length, b.length) ? `GLSL ${a[i]} / CPU ${b[i]} (élément ${i + 1})` : '' };
@@ -582,7 +606,7 @@ function main() {
   const am = alignementModele();
   ajout('0 shader du jeu = page validée', 'LightKit.js / apercu.html', !am.length, am.length ? `écart : ${am.join(', ')}` : 'ambianceHemi, epaule, palier, normaleLisse, eclairage identiques');
   const ac = alignementCpu();
-  ajout('0 alignement GLSL <-> CPU', 'ambianceHemi(), epaule(), directionnel(), corpsAuDessus(), rayonCorps(), masqueSoleil(), eclairage()', ac.ok, ac.ok ? `${ac.n} appels et nombres identiques` : ac.ecart);
+  ajout('0 alignement GLSL <-> CPU', 'ambianceHemi(), epaule(), directionnel(), expositionDecor(), corpsAuDessus(), rayonCorps(), masqueSoleil(), eclairage()', ac.ok, ac.ok ? `${ac.n} appels et nombres identiques` : ac.ecart);
   const man = manifeste();
   let charges = 0;
   for (const [nom, url] of SPRITES) {
@@ -630,6 +654,9 @@ function main() {
     const rc = tRayonCorps(sp);
     ajout('18 rayon de canopee : seul le dessus du corps', nom, rc.recus === 0 && rc.face === 0 && rc.dessus > 0 && rc.flip === 0,
       `corps au-dessus : ${rc.recus} px eclaires sur ${rc.masques} ; plans de face eclaires : ${rc.face} ; dessus eclaire : ${rc.dessus} px ; ecarts flipX : ${rc.flip}`);
+    const sd = tSourceDerriere(sp);
+    ajout('19 source derriere le sprite : aucun plan de face', nom, sd.faces === 0 && sd.interieurs === 0 && sd.bords > 0,
+      `plans de face allumes : ${sd.faces} / ${sd.nbFaces} ; pixels sans exposition allumes : ${sd.interieurs} ; pixels allumes : ${sd.bords}`);
     const [mi, md, ni] = tMilieu(sp);
     ajout('12 milieu sombre', nom, mi === 0, `pixels intérieurs allumés : ${mi.toFixed(1)} % (pire ${md || '-'}) ; ${ni} px intérieurs`);
     ajout('11 fidélité à +49', nom, ok11, `plans exposés à -49 : [${ex.join(', ')}] ; paliers 0/1/2/3 en % (moyenne) ; saut max ; sauts >= 2 ; largeur -- +49 : ${fmt(p49)} | -49 : ${fmt(m49)}`);
@@ -639,6 +666,7 @@ function main() {
   const mq = tMasque();
   ajout('17 masque de canopee', 'rayon et camera', mq.dans === 1 && mq.hors === 0 && mq.sousSol === 0 && mq.ecarts === 0,
     `dans le rayon ${mq.dans} ; hors du rayon ${mq.hors} ; sous le sol ${mq.sousSol} ; points differents selon la camera : ${mq.ecarts} / 400`);
+  ajout('19 source derriere le sprite : profondeur selon le plan', 'LightKit.zLampe', tProfondeurSource(), 'derriere un personnage : contre-jour ; decor ou source au premier plan : devant');
   const sy = tSymetrie();
   ajout('3 symétrie demi-sphère', 'demi-sphère', sy < 0.02, `écart max gauche/droite en miroir ${sy.toFixed(4)}`);
   const cle = (t) => t.replace(/^(\d+)/, (m) => m.padStart(2, '0'));
