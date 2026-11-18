@@ -66,6 +66,13 @@ function epaule(v, U) {
   return U.uEpaule + e * (1.0 - exp((U.uEpaule - v) / e));
 }
 
+// directionnel() du shader : soleil, même direction d pour tous les pixels (aucune position, aucune portée)
+function directionnel(n, d, lumBase, U) {
+  const diff = max(dot(n, d), 0.0);
+  if (lumBase < 0.16) return min(diff, U.uPaliers < 1.5 ? 0.34 : 1.0 / (U.uPaliers - 1.0));
+  return diff;
+}
+
 // Référence « lumière de face » : Light2D de Phaser avec la lampe à la profondeur z, N.L x att.
 function reference(n, t, lp, z, portee) {
   const d = vec3(lp.x - t.x, t.y - lp.y, z);
@@ -111,4 +118,4 @@ function sprite(carte, pas = 1) {
   return { w, h, N, NL, lum, CJ, brute };
 }
 
-module.exports = { ambianceHemi, epaule, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };
+module.exports = { ambianceHemi, epaule, directionnel, eclairage, palier, reference, sprite, vec2, vec3, normalize, smoothstep };

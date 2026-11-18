@@ -20,11 +20,13 @@ const LABO_ZOOMS = [{ nom: 'x1', camera: 2 }, { nom: 'x1,5', camera: 3 }, { nom:
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
 const LABO_BAS_MONDE = 540;  // bas du monde : la caméra ne montre jamais en dessous
+const LABO_OMBRE_AUVENT = 0.82;   // ambiance sous l'auvent, uniforme (1 = sprite d'origine)
 const LABO_PARTIES = [
   // Ambiance : ciel (plans tournés vers le haut) et sol (vers le bas), niveau x teinte ; detail = dessin d'origine dans l'ambiance
-  { id: 'nuit', nom: 'NUIT', ciel: 0.4, cielT: [0.72, 0.82, 1.25], sol: 0.12, solT: [0.6, 0.66, 1], detail: 0.7, fond: [8, 10, 24], contre: 1.5, paliers: 4 },
-  { id: 'soleil', nom: 'SOLEIL', ciel: 0.66, cielT: [0.97, 1, 1.08], sol: 0.26, solT: [1, 0.88, 0.76], detail: 0.75, fond: [143, 184, 216], contre: 1.5, paliers: 4 },
-  { id: 'banc', nom: 'BANC D\'ESSAI', ciel: 0.5, cielT: [1, 1, 1], sol: 0.2, solT: [1, 1, 1], detail: 0.7, fond: [13, 11, 26], contre: 1.5, paliers: 4 },
+  { id: 'nuit', nom: 'NUIT', ciel: 0.36, cielT: [0.72, 0.82, 1.25], sol: 0.32, solT: [0.72, 0.82, 1.25], detail: 0.7, epaule: 0.8, fond: [8, 10, 24], contre: 1.5, paliers: 4 },
+  // Soleil : ciel = sol = 1 et détail 1 redonnent le sprite d'origine ; le soleil n'ajoute qu'une très faible lumière dessus
+  { id: 'soleil', nom: 'SOLEIL', ciel: 1, cielT: [1, 1, 1], sol: 1, solT: [1, 1, 1], detail: 1, epaule: 0.95, fond: [143, 184, 216], contre: 1.5, paliers: 4 },
+  { id: 'banc', nom: 'BANC D\'ESSAI', ciel: 0.44, cielT: [1, 1, 1], sol: 0.4, solT: [1, 1, 1], detail: 0.7, epaule: 0.8, fond: [13, 11, 26], contre: 1.5, paliers: 4 },
 ];
 const LABO_COULEURS = [0xffb35c, 0x9fb8ff, 0xffffff, 0xfff1d6, 0x5cf0d0, 0xd8ff6a, 0x7dff8a, 0xff5c5c, 0x5c8cff];
 const LABO_PALIERS = [2, 3, 4, 5, 0];   // 0 = lisse
@@ -179,7 +181,8 @@ class LaboLumiereScene extends Phaser.Scene {
   laboGroupe(st, partie, nom, base, positions, maj, prioritaire) {
     const g = { partie, nom, ...base, lampes: [] };
     positions.forEach((pos, i) => {
-      const L = LightKit.ajouterLumiere(this, { x: pos.x, y: pos.y, portee: base.portee, couleur: pos.couleur ?? base.couleur, intensite: base.intensite, profondeur: base.profondeur });
+      const L = base.direction ? LightKit.ajouterSoleil(this, { direction: base.direction, couleur: base.couleur, intensite: base.intensite })
+        : LightKit.ajouterLumiere(this, { x: pos.x, y: pos.y, portee: base.portee, couleur: pos.couleur ?? base.couleur, intensite: base.intensite, profondeur: base.profondeur });
       const lampe = { L, g, i, pos, prioritaire: !!prioritaire, maj };
       g.lampes.push(lampe);
       st.lampes.push(lampe);
@@ -219,14 +222,13 @@ class LaboLumiereScene extends Phaser.Scene {
     const kai = (p) => ({ x: X(p, 1560), y: sol - 130 });
     this.laboGroupe(st, 0, 'derriere Kainati', { profondeur: -24, portee: 300, intensite: 0.9, couleur: 0xffb35c }, [kai(0)],
       (t, i, pos) => ({ x: pos.x + 160 * Math.sin(t / 2600) }), true);
-    // ---- SOLEIL : très loin, suit la caméra pour garder la même direction sur toute la partie
-    const soleil = this.laboGroupe(st, 1, 'soleil', { profondeur: 1000, portee: 9000, intensite: 0.9, couleur: 0xfff1d6 }, [{ x: X(1, 960), y: -1400 }], () => {
-      const v = this.cameras.main.worldView;
-      return { x: v.centerX - 800, y: v.centerY - 1300 };
-    }, true);
-    // Ombre de l'auvent : le soleil baisse sur ce qui passe dessous (bords adoucis sur 48 px)
+    // ---- SOLEIL : lumière directionnelle fixe, même direction partout, indépendante de la caméra et du joueur
+    const soleil = this.laboGroupe(st, 1, 'soleil', { direction: LightKit.SOLEIL.direction, intensite: LightKit.SOLEIL.intensite, couleur: LightKit.SOLEIL.couleur }, [{ x: 0, y: 0 }], fixe, true);
+    // Auvent : plus de soleil dessous, ambiance un peu plus basse et uniforme (bords adoucis sur 48 px)
     const { x0, x1 } = st.ombre;
-    soleil.lampes[0].L.attenuation = (o) => 1 - 0.8 * laboDoux((o.x - (x0 - 24)) / 48) * laboDoux(((x1 + 24) - o.x) / 48);
+    const dessous = (o) => laboDoux((o.x - (x0 - 24)) / 48) * laboDoux(((x1 + 24) - o.x) / 48);
+    soleil.lampes[0].L.attenuation = (o) => 1 - dessous(o);
+    LightKit.reglerRendu(this, { ombre: (o) => 1 - (1 - LABO_OMBRE_AUVENT) * dessous(o) });
     // ---- BANC D'ESSAI
     this.laboGroupe(st, 2, 'torche (pointeur)', { profondeur: 8, portee: 220, intensite: 1, couleur: 0xffb35c }, [{ x: X(2, 300), y: 300 }], () => {
       const pt = this.input.activePointer.positionToCamera(this.cameras.main);
@@ -294,6 +296,7 @@ class LaboLumiereScene extends Phaser.Scene {
       p.paliers = LABO_PALIERS[Phaser.Math.Wrap(LABO_PALIERS.indexOf(p.paliers) + sens, 0, LABO_PALIERS.length)];
     } else {
       const cible = r.groupe ? g : p;
+      if (cible[r.id] == null) return;   // le soleil n'a ni profondeur ni portée
       cible[r.id] = Phaser.Math.Clamp(Math.round((cible[r.id] + sens * r.pas) * 100) / 100, r.min, r.max);
     }
   }
@@ -303,7 +306,7 @@ class LaboLumiereScene extends Phaser.Scene {
     return {
       partie: p.id, ciel: p.ciel, cielTeinte: p.cielT, sol: p.sol, solTeinte: p.solT, detail: p.detail, contre: p.contre, paliers: p.paliers,
       lampes: this.laboGroupes(st).map((g) => ({
-        nom: g.nom, nombre: g.lampes.length, profondeur: g.profondeur, portee: g.portee, intensite: g.intensite,
+        nom: g.nom, nombre: g.lampes.length, direction: g.direction, profondeur: g.profondeur, portee: g.portee, intensite: g.intensite,
         couleur: g.couleur === null ? 'plusieurs' : `#${g.couleur.toString(16).padStart(6, '0')}`,
       })),
       eclairage: st.eclairage, origine: st.origine, decor: st.decor, ecranNet: st.net,
@@ -326,7 +329,7 @@ class LaboLumiereScene extends Phaser.Scene {
     const aff = (r) => {
       if (r.id === 'couleur') return !g ? '-' : g.couleur === null ? 'plusieurs' : `#${g.couleur.toString(16).padStart(6, '0')}`;
       if (r.id === 'paliers') return p.paliers || 'lisse';
-      return r.groupe ? (g ? g[r.id] : '-') : p[r.id];
+      return r.groupe ? (g ? g[r.id] ?? '-' : '-') : p[r.id];
     };
     const oui = (b) => (b ? 'oui' : 'non');
     const lignes = [`LABO LUMIERE : ${p.nom}   [Y] partie suivante   [Z] zoom ${LABO_ZOOMS[st.zoom].nom}`, `groupe [N] : ${g ? `${g.nom} (${g.lampes.length})` : 'aucun'}`];
@@ -404,9 +407,10 @@ class LaboLumiereScene extends Phaser.Scene {
     if (st.ok) {
       const melange = (f) => [0, 1, 2].map((k) => st.parties.reduce((s, p, i) => s + poids[i] * f(p, k), 0));
       const courant = st.parties[st.partie];
+      const moyenne = (nom) => st.parties.reduce((s, p, i) => s + poids[i] * p[nom], 0);
       LightKit.reglerRendu(this, {
         ciel: melange((p, k) => p.ciel * p.cielT[k]), sol: melange((p, k) => p.sol * p.solT[k]),
-        detail: st.parties.reduce((s, p, i) => s + poids[i] * p.detail, 0), contre: courant.contre, paliers: courant.paliers,
+        detail: moyenne('detail'), epaule: moyenne('epaule'), contre: courant.contre, paliers: courant.paliers,
       });
       // Lampes candidates : partie présente, cercle dans la vue ; les prioritaires d'abord puis les plus proches
       const vue = cam.worldView, cx = vue.centerX, cy = vue.centerY;
@@ -414,13 +418,15 @@ class LaboLumiereScene extends Phaser.Scene {
       for (const l of st.lampes) {
         const m = l.maj(t, l.i, l.pos) || {};
         const px = m.x ?? l.pos.x, py = m.y ?? l.pos.y;
-        l.L.setPosition(px, py);
-        l.L.profondeur = l.g.profondeur + (m.z || 0);
-        l.L.setRadius(l.g.portee);
+        if (!l.g.direction) {
+          l.L.setPosition(px, py);
+          l.L.profondeur = l.g.profondeur + (m.z || 0);
+          l.L.setRadius(l.g.portee);
+        }
         const force = poids[l.g.partie] * (m.force ?? 1);
         l.L.setIntensity(l.g.intensite * force);
         const dx = Math.max(Math.abs(px - cx) - vue.width / 2, 0), dy = Math.max(Math.abs(py - cy) - vue.height / 2, 0);
-        const utile = force > 0.02 && dx * dx + dy * dy < l.g.portee * l.g.portee;
+        const utile = force > 0.02 && (!!l.g.direction || dx * dx + dy * dy < l.g.portee * l.g.portee);
         l.L.setVisible(false);
         if (utile) candidates.push({ l, d: Math.hypot(px - cx, py - cy) - (l.prioritaire ? 1e6 : 0) });
       }

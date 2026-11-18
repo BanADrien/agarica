@@ -60,7 +60,10 @@ const LightKit = (() => {
   // Ambiance hémisphérique : ciel = ambiance x (1 + hemi), sol = ambiance x (1 - hemi), sauf couleurs
   // imposées (reglerRendu : ciel, sol en [r, g, b] de 0 à 1). detail : part du dessin d'origine dans l'ambiance.
   // epaule : valeur à partir de laquelle les hautes lumières sont tassées vers le blanc sans l'atteindre (1 = aucune).
-  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.45, detail: 0.7, ciel: null, sol: null, epaule: 0.8 };
+  // ombre(objet) : facteur d'ambiance propre à un objet, 0 à 1 (sous un auvent), uniforme sur tout le sprite.
+  const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.05, detail: 0.7, ciel: null, sol: null, epaule: 0.8, ombre: null };
+  // Soleil : direction VERS le soleil (x droite, y haut, z vers le spectateur), lumière discrète sur le dessus
+  const SOLEIL = { direction: { x: -0.25, y: 0.95, z: 0.2 }, couleur: 0xfff1d6, intensite: 0.09 };
 
   // Préréglages de lampes (couleurs de la page de test : Torche, Lune, Blanc).
   // Torche : près du plan (8 px devant, comme la page ; plus loin devant, le sommet des formes
@@ -107,6 +110,8 @@ precision mediump float;
 #endif
 struct Lumiere {
   vec3 position;   // x, y : repere natif affiche du sprite (y vers le bas) ; z : profondeur native
+                   // soleil : direction normalisee vers le soleil (x droite, y haut, z vers le spectateur)
+  float soleil;    // 1 = directionnelle : ni position, ni portee, ni attenuation
   vec3 couleur;    // couleur x intensite
   float portee;    // portee native
 };
@@ -143,6 +148,12 @@ float epaule(float v) {
   if (v <= uEpaule || uEpaule >= 1.0) return v;
   float e = 1.0 - uEpaule;
   return uEpaule + e * (1.0 - exp((uEpaule - v) / e));
+}
+
+float directionnel(vec3 n, vec3 d, float lumBase) {
+  float diff = max(dot(n, d), 0.0);
+  if (lumBase < 0.16) return min(diff, uPaliers < 1.5 ? 0.34 : 1.0 / (uPaliers - 1.0));
+  return diff;
 }
 
 float palier(float v) {
@@ -202,7 +213,8 @@ void main() {
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      l += L.couleur * palier(eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm));
+      float e = L.soleil > 0.5 ? directionnel(n, L.position, lb) : eclairage(n, uCarte > 0.5 ? nl : n, tc, L.position.xy, L.position.z, L.portee, lb, cjm);
+      l += L.couleur * palier(e);
     }
   }
   // ambiance sur le dessin d'origine (detail dans l'ombre), lampes sur le neutre (pas d'ombrage double)
@@ -307,7 +319,9 @@ void main() {
         const actif = !!(lm && lm.active);
         // jamais d'objet invisible : sans lumières actives, plein jour (ambiance 1, aucune lampe)
         this.lightsActive = true;
-        this._lampes = actif ? lm.getLights(camera).map((o) => o.light) : [];
+        // les soleils d'abord : ils éclairent partout, quelle que soit la distance à la caméra
+        const proches = actif ? lm.getLights(camera).map((o) => o.light).filter((L) => !L.soleil) : [];
+        this._lampes = actif ? lm.lights.filter((L) => L.soleil && L.visible).concat(proches) : [];
         this._reglages = (scene.__lumiere && scene.__lumiere.reglages) || DEFAUTS;
         const r = this._reglages, a = actif ? lm.ambientColor : { r: 1, g: 1, b: 1 }, h = actif ? r.hemi ?? DEFAUTS.hemi : 0;
         this._ciel = (actif && r.ciel) || [a.r * (1 + h), a.g * (1 + h), a.b * (1 + h)];
@@ -333,8 +347,9 @@ void main() {
         this.set1i('uNormales', 3);
         this.set1i('uCj', 4);
         this.set1i('uNatif', 5);
-        this.set3f('uCiel', this._ciel[0], this._ciel[1], this._ciel[2]);
-        this.set3f('uSol', this._sol[0], this._sol[1], this._sol[2]);
+        const ombre = this._reglages.ombre ? this._reglages.ombre(go) : 1;
+        this.set3f('uCiel', this._ciel[0] * ombre, this._ciel[1] * ombre, this._ciel[2] * ombre);
+        this.set3f('uSol', this._sol[0] * ombre, this._sol[1] * ombre, this._sol[2] * ombre);
         this.set1f('uDetail', this._detail);
         this.set1f('uEpaule', this._epaule);
         this.set1f('uPaliers', this._reglages.paliers);
@@ -370,6 +385,13 @@ void main() {
         let derriere = 0, nb = 0;
         for (let j = 0; j < lampes.length && nb < maxi; j++) {
           const L = lampes[j], atteinte = L.radius + rayonObjet;
+          if (L.soleil) {
+            const nomS = `uLumieres[${nb++}].`, f = L.intensity * (L.attenuation ? L.attenuation(go) : 1);
+            this.set3f(nomS + 'position', L.soleil.x, L.soleil.y, L.soleil.z);
+            this.set1f(nomS + 'soleil', 1);
+            this.set3f(nomS + 'couleur', L.color.r * f, L.color.g * f, L.color.b * f);
+            continue;
+          }
           if (Math.abs(L.x - go.x) > atteinte || Math.abs(L.y - go.y) > atteinte) continue;
           const i = nb++;
           m.applyInverse(L.x, L.y, this._pt);
@@ -380,6 +402,7 @@ void main() {
           if (z < 15) derriere = 1;
           const nom = `uLumieres[${i}].`;
           this.set3f(nom + 'position', tx, ty, z);
+          this.set1f(nom + 'soleil', 0);
           // L.attenuation(objet), facultatif : lampe masquée pour cet objet (ombre d'un auvent), 0 à 1
           const force = L.intensity * (L.attenuation ? L.attenuation(go) : 1);
           this.set3f(nom + 'couleur', L.color.r * force, L.color.g * force, L.color.b * force);
@@ -509,13 +532,27 @@ void main() {
     return L;
   }
 
+  // Soleil : lumière DIRECTIONNELLE fixe. Même direction pour tous les pixels, indépendante de la caméra, du
+  // joueur et de la position du sprite, sans portée ni atténuation. direction = vers le soleil (x droite,
+  // y haut, z vers le spectateur). Ex. : LightKit.ajouterSoleil(this, { direction: { x: -0.25, y: 0.95, z: 0.2 } });
+  // L.attenuation(objet), facultatif, le masque pour un objet (auvent). Ne pas le déplacer : il n'a pas de position.
+  function ajouterSoleil(scene, options = {}) {
+    const o = Object.assign({}, SOLEIL, options);
+    const L = scene.lights.addLight(0, 0, 1, couleurDe(o.couleur), o.intensite);
+    return regler(L, { direction: o.direction });
+  }
+
   function deplacer(lumiere, x, y, profondeur) {
     lumiere.setPosition(x, y);
     if (profondeur !== undefined) lumiere.profondeur = profondeur;
     return lumiere;
   }
 
-  function regler(lumiere, { couleur, intensite, portee, profondeur } = {}) {
+  function regler(lumiere, { couleur, intensite, portee, profondeur, direction } = {}) {
+    if (direction !== undefined) {
+      const k = Math.hypot(direction.x, direction.y, direction.z) || 1;
+      lumiere.soleil = { x: direction.x / k, y: direction.y / k, z: direction.z / k };
+    }
     if (couleur !== undefined) lumiere.setColor(couleurDe(couleur));
     if (intensite !== undefined) lumiere.setIntensity(intensite);
     if (portee !== undefined) lumiere.setRadius(portee);
@@ -547,7 +584,7 @@ void main() {
     scene.lights.setAmbientColor(couleurDe(couleur));
   }
 
-  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour, hemi, detail, ciel, sol, epaule }.
+  // Réglages de rendu : { paliers: 2-5 ou 0 (lisse), contre: force du contre-jour, hemi, detail, ciel, sol, epaule, ombre }.
   function reglerRendu(scene, reglages) {
     if (scene.__lumiere) Object.assign(scene.__lumiere.reglages, reglages);
   }
@@ -587,9 +624,9 @@ void main() {
   }
 
   return {
-    NOM_PIPELINE, DEFAUTS, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
+    NOM_PIPELINE, DEFAUTS, SOLEIL, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
     chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
-    ajouterLumiere, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
+    ajouterLumiere, ajouterSoleil, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();
 
