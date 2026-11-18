@@ -357,6 +357,7 @@ function lookSetEnabled(on) {
   // Zone en cours, éventuellement en pause (le menu Options s'ouvre depuis la
   // pause) ; depuis l'écran-titre il n'y en a pas : prochaine zone seulement.
   if (!scene || !scene.sys || !(scene.sys.isActive() || scene.sys.isPaused())) return;
+  if (typeof AmbianceKit !== 'undefined') AmbianceKit.optionEffets(scene, on);
   if (on) lookAttach(scene, null);
   else lookDetach(scene);
 }

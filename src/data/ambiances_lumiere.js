@@ -1,4 +1,9 @@
 // Ambiances d'éclairage du jeu : une seule source pour les réglages validés dans les zones de test.
+
+// Interrupteur général : false coupe toutes les ambiances, le jeu retrouve son rendu d'origine.
+// Pour comparer sans toucher au code : ajouter `?sanslumiere` à l'adresse.
+const AMBIANCE_ACTIVE = true;
+
 // foret : sous la canopée, plus sombre et légèrement verte, avec des rayons entre les feuilles.
 const AMBIANCES_LUMIERE = {
   foret: {
@@ -13,3 +18,6 @@ const AMBIANCES_LUMIERE = {
     soleil: { x: -0.28, y: 0.8, z: 0.2 },   // direction fixe : plus x est petit, plus les rayons tombent droit ; z faible : ils viennent d'en haut, pas de devant
   },
 };
+
+// Ambiance de chaque zone (clé de scène -> nom dans AMBIANCES_LUMIERE). Une zone absente de cette liste garde son rendu.
+const AMBIANCE_PAR_ZONE = {};

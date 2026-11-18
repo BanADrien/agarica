@@ -482,7 +482,7 @@ function tBlancs(sp, L) {
 function tMasque() {
   const n = 400, d = new Uint8Array(n * 3);
   for (let i = 0; i < n; i++) { d[i * 3] = i >= 100 && i < 120 ? 255 : 0; d[i * 3 + 1] = Math.round(448 / 1020 * 255); d[i * 3 + 2] = 128; }
-  const M = { pente: 0.5, u0: 0, cel: 2, n, amp: 0, t: 0, bande: 12,
+  const M = { pente: 0.5, u0: 0, cel: 2, n, amp: 0, t: 0, bande: 12, haut: 0, plage: 1020,
     lire: (v) => { const i = Math.min(n - 1, Math.max(0, Math.floor(v * n))); return { r: d[i * 3] / 255, g: d[i * 3 + 1] / 255, b: d[i * 3 + 2] / 255 }; } };
   const k = (x, y) => LightKit.masqueSoleil({ x, y }, M);
   const soleil = (x, y) => k(x, y) * 0.95;   // part du soleil reçue par le pixel

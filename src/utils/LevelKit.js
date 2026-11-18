@@ -5102,6 +5102,8 @@ function startZoneAmbience(scene, data) {
 }
 
 function buildLevelFromData(scene, data, sceneData) {
+  // Ambiance d'éclairage de la zone (src/data/ambiances_lumiere.js) : elle remplace le voile et le rendu LookKit.
+  if (typeof AmbianceKit !== 'undefined') data = AmbianceKit.preparerDonnees(scene, data);
   ZoomKit.entrerNiveau(scene);
   // État « juice » de la visite précédente (émetteurs, HUD) : objets déjà
   // détruits avec la scène, repartir de zéro.
@@ -5555,6 +5557,8 @@ function buildLevelFromData(scene, data, sceneData) {
   renderSnapSetup(scene);
   // Première baie dans le sac : la touche pour la manger (cf. bagHintSetup).
   bagHintSetup(scene);
+  // En dernier : l'ambiance range tous les objets de la zone, ceux créés plus tard le sont à leur première image.
+  if (typeof AmbianceKit !== 'undefined') AmbianceKit.attacher(scene, data);
 }
 
 // --- Astuce du sac (retour joueurs 2026-11-08) ---------------------------------

@@ -103,11 +103,12 @@ float eclairage(vec3 n, vec3 nLisse, vec2 t, vec2 lp, float z, float portee, flo
 }`;
 
   // Masque de soleil (canopée) : une ligne de cellules projetée le long de la direction du soleil. R = trouée,
-  // G = hauteur où le rayon touche le décor (/ 1020), B = irrégularité des bords. Même calcul en JS : masqueSoleilJs.
+  // G = hauteur où le rayon touche le décor (de haut à haut + plage), B = irrégularité des bords. Même calcul en JS : masqueSoleilJs.
   const FRAG_MASQUE = `
 uniform sampler2D uMasque;
 uniform vec4 uMasqueGeo;    // pente, debut, taille d'une cellule, nombre de cellules
 uniform vec4 uMasqueAnim;   // balancement (px), temps, bande eclairee sous l'arrivee, actif
+uniform vec2 uMasqueHaut;   // hauteur du debut du masque, plage de hauteurs couverte (px du monde)
 uniform vec4 uMondeEcran;   // px du monde par px du canvas, decalage x, decalage y, hauteur du canvas
 vec2 pointMonde() {
   return vec2(gl_FragCoord.x, uMondeEcran.w - gl_FragCoord.y) * uMondeEcran.x + uMondeEcran.yz;
@@ -121,7 +122,7 @@ float masqueSoleil(vec2 m) {
   float u = m.x - uMasqueGeo.x * m.y + j;
   float bal = uMasqueAnim.x * sin(uMasqueAnim.y * 0.7 + u * 0.011);
   vec4 c = texMasque((floor((u + bal - uMasqueGeo.y) / uMasqueGeo.z) + 0.5) / uMasqueGeo.w);
-  if (m.y > c.g * 1020.0 + uMasqueAnim.z) return 0.0;
+  if (m.y > uMasqueHaut.x + c.g * uMasqueHaut.y + uMasqueAnim.z) return 0.0;
   return c.r;
 }
 // Moyenne du masque autour du point : bords fondus pour les faisceaux et les taches du decor (r : rayon en px du monde)
@@ -133,7 +134,7 @@ float masqueDoux(vec2 m, float r) {
   return s / 8.0;
 }`;
 
-  // masqueSoleil() du shader, ligne à ligne. M : { lire(v) -> { r, g, b }, pente, u0, cel, n, amp, t, bande }
+  // masqueSoleil() du shader, ligne à ligne. M : { lire(v) -> { r, g, b }, pente, u0, cel, n, amp, t, bande, haut, plage }
   function masqueSoleilJs(m, M) {
     const { floor, sin } = Math, fract = (v) => v - Math.floor(v);
     const rangee = floor(m.y / 6.0);
@@ -141,7 +142,7 @@ float masqueDoux(vec2 m, float r) {
     const u = m.x - M.pente * m.y + j;
     const bal = M.amp * sin(M.t * 0.7 + u * 0.011);
     const c = M.lire((floor((u + bal - M.u0) / M.cel) + 0.5) / M.n);
-    if (m.y > c.g * 1020.0 + M.bande) return 0.0;
+    if (m.y > M.haut + c.g * M.plage + M.bande) return 0.0;
     return c.r;
   }
 
@@ -338,11 +339,9 @@ void main() {
   const manifeste = () => (typeof SECTIONS_LUMIERE !== 'undefined' ? SECTIONS_LUMIERE : {});
   const cleCarte = (url, quoi) => `lumiere:${quoi}:${url}`;
 
-  // Aucune scène du jeu normal n'éclaire encore : les cartes ne sont chargées qu'avec `?lumiere`
-  // ou dans le labo (`?zone=labo_lumiere`). Le jour où une vraie zone s'en sert : TOUJOURS = true.
-  const TOUJOURS = false;
+  // Chargées d'un bloc au démarrage seulement avec `?lumiere` ou dans le labo. Dans le jeu normal, rien ne s'ajoute
+  // au démarrage : les zones à ambiance les demandent en fond, au fil des besoins (demanderCartes).
   function cartesVoulues() {
-    if (TOUJOURS) return true;
     if (typeof window === 'undefined') return false;
     const q = new URLSearchParams(window.location.search);
     return q.has('lumiere') || q.get('zone') === 'labo_lumiere' || q.get('zone') === 'LaboLumiereScene';
@@ -352,13 +351,14 @@ void main() {
   // manifeste (la carte contre-jour seulement si le manifeste l'annonce : `cj`) et note
   // quelle clé de texture correspond à quelle image (le manifeste parle en fichiers).
   function chargerCartes(scene) {
-    if (!cartesVoulues()) return;
     const man = manifeste();
-    for (const [url, e] of Object.entries(man)) {
-      scene.load.image(cleCarte(url, 'neutre'), `${e.d}/${e.n}_neutre.png`);
-      scene.load.image(cleCarte(url, 'n'), `${e.d}/${e.n}_n.png`);
-      scene.load.image(cleCarte(url, 'natif'), `${e.d}/${e.n}_natif.png`);
-      if (e.cj) scene.load.image(cleCarte(url, 'cj'), `${e.d}/${e.n}_cj.png`);
+    if (cartesVoulues()) {
+      for (const [url, e] of Object.entries(man)) {
+        scene.load.image(cleCarte(url, 'neutre'), `${e.d}/${e.n}_neutre.png`);
+        scene.load.image(cleCarte(url, 'n'), `${e.d}/${e.n}_n.png`);
+        scene.load.image(cleCarte(url, 'natif'), `${e.d}/${e.n}_natif.png`);
+        if (e.cj) scene.load.image(cleCarte(url, 'cj'), `${e.d}/${e.n}_cj.png`);
+      }
     }
     scene.load.on(Phaser.Loader.Events.FILE_LOAD, (file) => {
       if (!file || file.type !== 'image' || typeof file.url !== 'string') return;
@@ -375,6 +375,59 @@ void main() {
         if (scene.textures.exists(k)) scene.textures.get(k).setFilter(Phaser.Textures.FilterMode.NEAREST);
       }
     }
+  }
+
+  // Chargement en fond, hors du chargeur des scènes (il survit aux changements de zone). Les cartes d'un sprite
+  // entrent ensemble dans le jeu : un sprite n'est jamais éclairé avec une partie de ses cartes.
+  const MAX_CARTES_EN_COURS = 6;
+  const cartesDemandees = new Set();
+  const fileCartes = [];
+  let cartesEnCours = 0;
+
+  function imageCarte(adresse) {
+    return new Promise((ok, ko) => {
+      const im = new Image();
+      im.onload = () => ok(im);
+      im.onerror = ko;
+      im.src = adresse;
+    });
+  }
+
+  function pomperCartes(game) {
+    const v = typeof ASSET_VERSION !== 'undefined' ? `?v=${ASSET_VERSION}` : '';
+    while (cartesEnCours < MAX_CARTES_EN_COURS && fileCartes.length) {
+      const url = fileCartes.shift(), e = manifeste()[url];
+      const quoi = ['neutre', 'n', 'natif'].concat(e.cj ? ['cj'] : []);
+      cartesEnCours++;
+      Promise.all(quoi.map((q) => imageCarte(`${e.d}/${e.n}_${q}.png${v}`))).then((images) => {
+        quoi.forEach((q, i) => {
+          const k = cleCarte(url, q);
+          if (!game.textures.exists(k)) game.textures.addImage(k, images[i]).setFilter(Phaser.Textures.FilterMode.NEAREST);
+        });
+      }).catch(() => { /* carte absente : le sprite reste éclairé à plat */ }).then(() => {
+        cartesEnCours--;
+        pomperCartes(game);
+      });
+    }
+  }
+
+  // Demande les cartes des images du manifeste dont le nom de carte correspond (RegExp), ou d'une seule image (adresse)
+  function demanderCartes(game, quoi) {
+    const man = manifeste();
+    const urls = typeof quoi === 'string' ? [quoi] : Object.keys(man).filter((u) => quoi.test(man[u].n));
+    for (const url of urls) {
+      if (cartesDemandees.has(url) || !man[url] || game.textures.exists(cleCarte(url, 'neutre'))) continue;
+      cartesDemandees.add(url);
+      fileCartes.push(url);
+    }
+    pomperCartes(game);
+  }
+
+  // Toute l'animation d'une image affichée sans ses cartes : agarica_walk_3 -> agarica_walk_0 à 7
+  function demanderAnimation(game, url) {
+    const n = manifeste()[url].n.replace(/_\d+$/, '');
+    demanderCartes(game, new RegExp(`^${n}_\\d+$`));
+    demanderCartes(game, url);
   }
 
   const cacheCartes = Object.create(null);
@@ -394,6 +447,7 @@ void main() {
     }
     // pas de cache tant que les cartes ne sont pas prêtes (chargement en cours)
     if (r || !e) cacheCartes[cleTexture] = r;
+    else if (!cartesDemandees.has(url)) demanderAnimation(game, url);
     return r;
   }
 
@@ -432,10 +486,21 @@ void main() {
         this._sol = (actif && r.sol) || [a.r * (1 - h), a.g * (1 - h), a.b * (1 - h)];
         this._detail = actif ? r.detail ?? DEFAUTS.detail : 1;
         this._epaule = actif ? r.epaule ?? DEFAUTS.epaule : 1;
+        this._vue = ZoomKit.vueVisible(camera);
+      }
+
+      // Hors du cadre visible (marge large : secousses, fondu avec zoom) : rien à dessiner. Phaser ne trie pas ces
+      // objets et chaque objet éclairé coûte un appel de dessin : sans ça, toute la zone serait dessinée à chaque image.
+      horsCadre(go, camera) {
+        const r = Math.hypot(go.displayWidth, go.displayHeight) + 64, v = this._vue;
+        const x = go.x - camera.scrollX * go.scrollFactorX, y = go.y - camera.scrollY * go.scrollFactorY;
+        return x + r < v.left - camera.scrollX || x - r > v.right - camera.scrollX
+          || y + r < v.top - camera.scrollY || y - r > v.bottom - camera.scrollY;
       }
 
       // un appel de dessin par objet éclairé : ses lampes sont exprimées dans SON repère natif
       batchSprite(go, camera, parent) {
+        if (!parent && this.horsCadre(go, camera)) return;
         this._camera = camera;
         // d'abord se lier (vide le pipeline précédent) : les uniforms ci-dessous changent le
         // programme GL, il ne faut pas que le lot en attente d'un autre pipeline le subisse
@@ -462,6 +527,7 @@ void main() {
           const Mc = this._camera.matrix;
           this.set1i('uMasque', 6);
           this.set4f('uMasqueGeo', mq.pente, mq.u0, mq.cel, mq.n);
+          this.set2f('uMasqueHaut', mq.haut, mq.plage);
           this.set4f('uMondeEcran', 1 / Mc.a, this._camera.scrollX - Mc.e / Mc.a, this._camera.scrollY - Mc.f / Mc.d, this.renderer.height);
         }
         this.set1f('uEpaule', this._epaule);
@@ -854,7 +920,7 @@ void main() {
 
   return {
     NOM_PIPELINE, DEFAUTS, SOLEIL, FRAG_MASQUE, masqueSoleil: masqueSoleilJs, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
-    zLampe, chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
+    zLampe, chargerCartes, filtrerCartes, demanderCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
     ajouterLumiere, ajouterSoleil, emissif, sourcesLumineuses, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();
