@@ -123,6 +123,14 @@ float masqueSoleil(vec2 m) {
   vec4 c = texMasque((floor((u + bal - uMasqueGeo.y) / uMasqueGeo.z) + 0.5) / uMasqueGeo.w);
   if (m.y > c.g * 1020.0 + uMasqueAnim.z) return 0.0;
   return c.r;
+}
+// Moyenne du masque autour du point : bords fondus pour les faisceaux et les taches du decor (r : rayon en px du monde)
+float masqueDoux(vec2 m, float r) {
+  float s = masqueSoleil(m) * 2.0;
+  s += masqueSoleil(m + vec2(-1.0, -0.35) * r) + masqueSoleil(m + vec2(1.0, 0.35) * r);
+  s += masqueSoleil(m + vec2(-0.66, 0.25) * r) + masqueSoleil(m + vec2(0.66, -0.25) * r);
+  s += masqueSoleil(m + vec2(-0.33, -0.2) * r) + masqueSoleil(m + vec2(0.33, 0.2) * r);
+  return s / 8.0;
 }`;
 
   // masqueSoleil() du shader, ligne à ligne. M : { lire(v) -> { r, g, b }, pente, u0, cel, n, amp, t, bande }
@@ -249,7 +257,8 @@ void main() {
   float lb = dot(base.rgb, vec3(0.3, 0.59, 0.11));
   vec3 l = vec3(0.0);
   vec3 ls = vec3(0.0);   // soleils : eclairent le dessin, meme gain relatif pour toutes les matieres
-  float ms = uMasqueAnim.w > 0.5 ? masqueSoleil(pointMonde()) : 1.0;   // canopee : hors des rayons, pas de soleil
+  // canopee : hors des rayons, pas de soleil ; bords nets sur les personnages, fondus sur le decor
+  float ms = uMasqueAnim.w > 0.5 ? (uCarte > 0.5 ? masqueSoleil(pointMonde()) : masqueDoux(pointMonde(), 14.0)) : 1.0;
   for (int i = 0; i < kMaxLights; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];

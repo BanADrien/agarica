@@ -18,7 +18,7 @@ const FORET_REGLAGES = [
   { id: 'balancement', pas: 0.5, min: 0, max: 10, val: 3 },
 ];
 
-// Faisceaux visibles : bandes de pixels nettes, quantifiées, découpées par le même masque
+// Faisceaux visibles : lumière douce aux bords fondus, découpée par le même masque
 class ForetRayonsPipeline extends Phaser.Renderer.WebGL.Pipelines.SinglePipeline {
   constructor(game) {
     super({
@@ -32,11 +32,10 @@ varying vec2 outTexCoord;
 ${LightKit.FRAG_MASQUE}
 void main() {
   vec2 m = pointMonde();
-  float k = masqueSoleil(m) * step(0.0, texture2D(uMainSampler, outTexCoord).a);
+  float k = min(masqueDoux(m, 18.0) * 1.5, 1.0) * step(0.0, texture2D(uMainSampler, outTexCoord).a);
   if (k <= 0.0) discard;
   float h = clamp(1.0 - m.y / 640.0, 0.3, 1.0);
-  float rangee = mod(floor(m.y / 16.0) + floor((m.x - uMasqueGeo.x * m.y) / 22.0), 3.0);
-  float a = floor((k * h + 0.1 * rangee) * 3.0 + 0.5) / 3.0 * uFaisceau;
+  float a = k * h * uFaisceau;
   gl_FragColor = vec4(vec3(1.0, 0.92, 0.66) * a, a);
 }`,
     });
