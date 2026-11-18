@@ -363,7 +363,8 @@ void main() {
         vec4 cjL = L.decor > 0.5 ? vec4(cjm.rg, expositionDecor(n, cjm.b), cjm.a) : cjm;
         vec2 lp = pointForme(tc, L.position.xy, L.forme, L.formeA, L.formeB);
         float e = eclairage(n, uCarte > 0.5 ? nl : n, tc, lp, L.position.z, L.portee, lb, cjL);
-        if (L.decor > 0.5) e *= mix(1.0, horsDessous(n, cjm), uAuSol);
+        // lampe passee devant un personnage tourne vers elle : le menton et le bas du visage gardent sa lumiere
+        if (L.decor > 0.5) e *= mix(1.0, horsDessous(n, cjm), uAuSol * (1.0 - smoothstep(8.0, 30.0, L.position.z)));
         l += L.couleur * (uCarte > 0.5 ? palier(e) : smoothstep(0.0, 1.0, e));
       }
     }
@@ -831,7 +832,7 @@ void main() {
   const FORMES = { triangle: 1, rectangle: 2, cercle: 2 };
   const SOURCES = {
     // profondeur : pour le décor du même plan ; arriere : pour un personnage affiché devant la source (contre-jour seul)
-    feu: { forme: 'triangle', base: 0.45, couleur: 0xffc46e, intensite: 0.85, gainDecor: 1.4, gainContre: 1.2, gainCote: 1.9, portee: 317, profondeur: 60, arriere: -18, cote: { de: 0, a: 24, z: 8, zFace: 30 }, vacille: 0.1, halo: 280 },
+    feu: { forme: 'triangle', base: 0.45, couleur: 0xffc46e, intensite: 0.85, gainDecor: 1.4, gainContre: 1.2, gainCote: 1.3, portee: 317, profondeur: 60, arriere: -18, cote: { de: 0, a: 24, z: 8, zFace: 30 }, vacille: 0.1, halo: 280 },
     champignon: { forme: 'rectangle', couleur: 0x1caada, intensite: 0.85, portee: 112, profondeur: 30, arriere: -14, vacille: 0.05, halo: 0 },
   };
 
