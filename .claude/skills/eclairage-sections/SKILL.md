@@ -90,7 +90,7 @@ LightKit.suivre(torche, this.player, 30, -40);           // ou LightKit.deplacer
 LightKit.ajouterLumiere(this, 'lune', { x: 200, y: -300 });
 LightKit.regler(torche, { profondeur: -20, portee: 300 }); // couleur, intensite, portee, profondeur
 LightKit.reglerRendu(this, { paliers: 4, contre: 1.5, hemi: 0.05, detail: 0.7, epaule: 0.8 }); // ou ciel / sol : [r, g, b]
-const soleil = LightKit.ajouterSoleil(this, { direction: { x: -0.25, y: 0.75, z: 0.6 }, intensite: 0.4 });
+const soleil = LightKit.ajouterSoleil(this, { direction: { x: -0.25, y: 0.75, z: 0.6 }, intensite: 0.66 });
 ```
 
 Lampe = `{ x, y, profondeur, couleur, intensite, portee }` en px du MONDE ; `profondeur` < 0 =
@@ -101,10 +101,10 @@ profondeur 8), `lune` (0x9fb8ff, 0,8, portée 900, profondeur 30), `blanc`, `con
 **Soleil** (`ajouterSoleil`) : lumière DIRECTIONNELLE fixe, même direction pour tous les pixels, sans position,
 portée ni atténuation : le rendu ne change ni avec la caméra, ni avec le joueur, ni avec la place du sprite.
 `direction` pointe VERS le soleil (x droite, y haut, z vers le spectateur). Il éclaire le DESSIN d'origine (même gain
-relatif pour toutes les matières). Plein jour : `ciel` 0,78, `sol` 0,74, `detail` 1, `epaule` 0,9, soleil 0,4 : par
-rapport au sprite d'origine, dessus +15 %, flancs +1 %, palier intermédiaire 89 %, dessous 75 %. Sous un abri :
-`soleil.attenuation = (o) => dessous(o) ? 0 : 1` et `reglerRendu(this, { ombre: (o) => dessous(o) ? 1.08 : 1 })`
-(facteur sur l'ambiance, uniforme sur tout le sprite : 82 % de l'origine avec ces réglages).
+relatif pour toutes les matières). Plein jour : `ciel` 0,64, `sol` 0,62, `detail` 1, `epaule` 0,85, soleil 0,66 : par
+rapport au sprite d'origine, dessus 126 %, flancs 105 %, palier intermédiaire 84 %, dessous 63 %. Sous un abri :
+`soleil.attenuation = (o) => dessous(o) ? 0 : 1` et `reglerRendu(this, { ombre: (o) => dessous(o) ? 1.11 : 1 })`
+(facteur sur l'ambiance, uniforme sur tout le sprite : 70 % de l'origine avec ces réglages).
 
 Réglages conseillés : torche à **+8** (près du plan) ; lune loin et haut, grande portée ;
 contre-jour entre **-10 et -40**, contre 1,5 ; ambiance 0,3-0,4 la nuit ; 4 paliers.
@@ -149,7 +149,7 @@ lampes en fondu au passage (sur 360 px) :
 - **Nuit** : champignons lumineux (décor du jeu, pulsation lente), lucioles (`fx_luciole`, s'allument et
   s'éteignent), feu de camp (animation du jeu, sans son menu, vacille), lampe qui passe derrière Kainati ;
 - **Soleil** : ambiance uniforme sur le dessin d'origine et soleil directionnel qui dessine le volume par paliers ;
-  auvent (marqueur dessiné) : plus de soleil dessous, sprite uniformément à 82 % ;
+  auvent (marqueur dessiné) : plus de soleil dessous, sprite uniformément à 70 % ;
 - **Banc d'essai** : torche au pointeur, lune, lampe derrière Kainati, lampe qui passe de devant à derrière
   (loup), lampe tournante (grizzly), trois couleurs (crapaud), Agarica retournée sous une lampe fixe.
 

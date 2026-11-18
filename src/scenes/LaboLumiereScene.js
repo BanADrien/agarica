@@ -22,12 +22,12 @@ const LABO_ZOOMS = [{ nom: 'x1', camera: 2 }, { nom: 'x1,5', camera: 3 }, { nom:
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
 const LABO_BAS_MONDE = 540;  // bas du monde : la caméra ne montre jamais en dessous
-const LABO_OMBRE_AUVENT = 1.08;   // ambiance sous l'auvent : x 1,08 sur celle du soleil, soit 82 % du sprite d'origine, uniforme
+const LABO_OMBRE_AUVENT = 1.11;   // ambiance sous l'auvent : x 1,11 sur celle du soleil, soit 70 % du sprite d'origine, uniforme
 const LABO_PARTIES = [
   // Ambiance : ciel (plans tournés vers le haut) et sol (vers le bas), niveau x teinte ; detail = dessin d'origine dans l'ambiance
   { id: 'nuit', nom: 'NUIT', ciel: 0.36, cielT: [0.72, 0.82, 1.25], sol: 0.32, solT: [0.72, 0.82, 1.25], detail: 0.7, epaule: 0.8, fond: [8, 10, 24], contre: 1.5, paliers: 4 },
   // Soleil : ambiance uniforme sur le dessin d'origine (ombre douce), le soleil dessine le volume par paliers
-  { id: 'soleil', nom: 'SOLEIL', ciel: 0.78, cielT: [1, 1, 1], sol: 0.74, solT: [1, 1, 1], detail: 1, epaule: 0.9, fond: [143, 184, 216], contre: 1.5, paliers: 4 },
+  { id: 'soleil', nom: 'SOLEIL', ciel: 0.64, cielT: [1, 1, 1], sol: 0.62, solT: [1, 1, 1], detail: 1, epaule: 0.85, fond: [143, 184, 216], contre: 1.5, paliers: 4 },
   { id: 'banc', nom: 'BANC D\'ESSAI', ciel: 0.44, cielT: [1, 1, 1], sol: 0.4, solT: [1, 1, 1], detail: 0.7, epaule: 0.8, fond: [13, 11, 26], contre: 1.5, paliers: 4 },
 ];
 const LABO_COULEURS = [0xffb35c, 0x9fb8ff, 0xffffff, 0xfff1d6, 0x5cf0d0, 0xd8ff6a, 0x7dff8a, 0xff5c5c, 0x5c8cff];

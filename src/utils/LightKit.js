@@ -62,9 +62,9 @@ const LightKit = (() => {
   // epaule : valeur à partir de laquelle les hautes lumières sont tassées vers le blanc sans l'atteindre (1 = aucune).
   // ombre(objet) : facteur d'ambiance propre à un objet, 0 à 1 (sous un auvent), uniforme sur tout le sprite.
   const DEFAUTS = { paliers: 4, contre: 1.5, ambiance: 0x5c5c5c, profondeur: 8, hemi: 0.05, detail: 0.7, ciel: null, sol: null, epaule: 0.8, ombre: null };
-  // Soleil : direction VERS le soleil (x droite, y haut, z vers le spectateur). Avec une ambiance uniforme vers 0,76 :
+  // Soleil : direction VERS le soleil (x droite, y haut, z vers le spectateur). Avec une ambiance uniforme vers 0,63 :
   // dessus éclairé, flancs intermédiaires, dessous dans une ombre douce
-  const SOLEIL = { direction: { x: -0.25, y: 0.75, z: 0.6 }, couleur: 0xfff1d6, intensite: 0.4 };
+  const SOLEIL = { direction: { x: -0.25, y: 0.75, z: 0.6 }, couleur: 0xfff1d6, intensite: 0.66 };
 
   // Préréglages de lampes (couleurs de la page de test : Torche, Lune, Blanc).
   // Torche : près du plan (8 px devant, comme la page ; plus loin devant, le sommet des formes
