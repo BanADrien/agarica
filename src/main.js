@@ -15,6 +15,10 @@ const config = {
   height: ZoomKit.rendu()[1],
   parent: 'game-container',
   backgroundColor: '#0d0b1a',
+  // PC à deux cartes graphiques : demande la plus puissante au navigateur (sans effet sur l'image).
+  // `?faiblelatence` dans l'adresse : essai d'un affichage moins différé (canvas désynchronisé), à comparer à la main.
+  render: Object.assign({ powerPreference: 'high-performance' },
+    new URLSearchParams(window.location.search).has('faiblelatence') ? { desynchronized: true } : {}),
   // Résolution de design fixe (960x540) mise à l'échelle pour remplir la
   // fenêtre (canvas restait minuscule sur un grand écran sans ça).
   scale: {
