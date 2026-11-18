@@ -73,6 +73,8 @@ const config = {
     IleDuGardienScene, MaraisBrumesScene, RacinesSuspenduesScene, NidCoconsScene, CanopeeMaladeScene,
     // Zone de test de l'éclairage par sections (src/data/grotte_lumiere_data.js).
     GrotteLumiereScene,
+    // Monde V2 (chantier) : le Bosquet d'Émeraude, puis l'écran d'attente de la suite.
+    V2VillageScene, V2SourceScene, V2HautsBosquetScene, V2CavesScene, V2SuiteScene,
   ],
 };
 
