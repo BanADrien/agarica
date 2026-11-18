@@ -14,9 +14,11 @@ class PrologueScene extends Phaser.Scene {
     super('PrologueScene');
   }
 
-  create() {
+  // `data.suite` : scène lancée à la fin du texte (monde V2) ; sans elle, le bosquet.
+  create(data) {
     const { width, height } = this.scale;
     this.__transitioningAway = false;
+    this.suite = (data && data.suite) || 'BosquetScene';
     fadeInScene(this);
     if (this.textures.exists('titre-fond')) {
       // Même fond peint que le titre et le chargement (image de l'utilisateur,
@@ -67,6 +69,6 @@ class PrologueScene extends Phaser.Scene {
   advance() {
     if (this.revealNext()) return;
     this.autoTimer.remove();
-    goToScene(this, 'BosquetScene');
+    goToScene(this, this.suite);
   }
 }

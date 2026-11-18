@@ -30,6 +30,8 @@ class TitleScene extends Phaser.Scene {
     this.menuChildClosedAt = 0;
     this.input.keyboard.enabled = true;
     this.secretBuffer = '';
+    // Retour depuis le monde V2 : l'écran-titre retrouve l'ancienne partie.
+    mondeV2Quitter(this.game);
     menuNoteSaveProgress();
     fadeInScene(this);
     // Musique du menu (2026-11-15 : « The Village Dawn », fournie par l'utilisateur, mise en boucle) ; elle
@@ -496,12 +498,14 @@ class TitleScene extends Phaser.Scene {
     const { width } = this.scale;
     const layer = this.layers.test = this.add.container(0, 0).setDepth(50);
     const items = [];
-    LEGACY_TEST_ZONES.forEach((z, row) => items.push({ label: z.name, col: 0, row, action: () => goToScene(this, z.scene) }));
+    // `visible` / `lancer` : entrées du monde V2 (src/story/v2_bosquet.js).
+    const tests = LEGACY_TEST_ZONES.filter((z) => !z.visible || z.visible());
+    tests.forEach((z, row) => items.push({ label: z.name, col: 0, row, action: () => (z.lancer ? z.lancer(this) : goToScene(this, z.scene)) }));
     // Vague 3 : 25 zones de démo -> deux colonnes (13 lignes au plus), sinon
     // la liste sortait de l'écran par le bas.
     const perCol = Math.ceil(DEMO_ZONES.length / 2);
     DEMO_ZONES.forEach((z, i) => items.push({ label: `${i + 1}. ${z.name}`, col: 1 + Math.floor(i / perCol), row: i % perCol, action: () => goToScene(this, z.scene) }));
-    items.push({ label: '← Retour', col: 0, row: LEGACY_TEST_ZONES.length + 1, action: () => this.showMainMenu() });
+    items.push({ label: '← Retour', col: 0, row: tests.length + 1, action: () => this.showMainMenu() });
     const top = 84;
     const colX = [width / 2 - 300, width / 2 + 10, width / 2 + 290];
     for (const [x, label] of [[colX[0], 'Anciennes zones'], [(colX[1] + colX[2]) / 2, 'Démo (accès direct)']]) {

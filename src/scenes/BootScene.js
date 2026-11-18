@@ -670,6 +670,8 @@ class BootScene extends Phaser.Scene {
     // sauvegarde existante.
     const zone = params.get('zone');
     if (zone) {
+      // Monde V2 : `&load` lit sa propre sauvegarde, jamais celle de l'ancienne version.
+      mondeV2Basculer(MONDE_V2_ZONES.some((z) => z.zone === zone || z.scene === zone));
       if (params.has('load')) loadGame(this.game);
       for (const part of (params.get('flags') || '').split(',').filter(Boolean)) {
         const [k, raw] = part.split('=');

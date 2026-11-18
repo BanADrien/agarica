@@ -426,11 +426,22 @@ const LEGACY_TEST_ZONES = [
   { scene: 'ZonePiecesScene', name: 'Pièces du monde V2' },
 ];
 
+// Monde V2 (chantier, docs/production/PLAN_MONDE_V2.md) : zones de l'histoire à
+// part entière (sauvegarde, feux, Xara), mais hors de DEMO_ZONES pour que le menu
+// des chapitres, la carte et la liste des zones de l'ancienne version ne changent pas.
+const MONDE_V2_ZONES = [
+  { zone: 'v2_village', scene: 'V2VillageScene', region: 'bosquet', name: 'Le village' },
+  { zone: 'v2_source', scene: 'V2SourceScene', region: 'bosquet', name: 'La source' },
+  { zone: 'v2_hauts_bosquet', scene: 'V2HautsBosquetScene', region: 'bosquet', name: 'Les hauts du bosquet' },
+  { zone: 'v2_caves', scene: 'V2CavesScene', region: 'bosquet', name: 'Les caves du bosquet' },
+];
+
 // `sceneOrKey` : scène Phaser, clé de scène ('BosquetScene') ou id de zone ('bosquet').
 function storyZoneEntry(sceneOrKey) {
   if (!sceneOrKey) return null;
   const key = typeof sceneOrKey === 'string' ? sceneOrKey : sceneOrKey.scene && sceneOrKey.scene.key;
-  return DEMO_ZONES.find((z) => z.scene === key || z.zone === key) || null;
+  const match = (z) => z.scene === key || z.zone === key;
+  return DEMO_ZONES.find(match) || MONDE_V2_ZONES.find(match) || null;
 }
 
 function isStoryScene(scene) {
@@ -457,6 +468,53 @@ function shouldSpawnXara(scene, data) {
 // État persistant + sauvegarde localStorage
 // ---------------------------------------------------------------------------
 const SAVE_STORAGE_KEY = 'agarica-save-v1';
+// Monde V2 : sa partie vit sous sa propre clé, pour qu'elle n'écrase jamais une
+// partie de l'ancienne version (et inversement). Toute lecture ou écriture de
+// sauvegarde passe par saveStorageKey().
+const SAVE_STORAGE_KEY_V2 = 'agarica-save-monde-v2';
+let saveSlotV2 = false;
+
+function saveStorageKey() {
+  return saveSlotV2 ? SAVE_STORAGE_KEY_V2 : SAVE_STORAGE_KEY;
+}
+
+function mondeV2Actif() {
+  return saveSlotV2;
+}
+
+function mondeV2Basculer(actif) {
+  saveSlotV2 = !!actif;
+}
+
+// Chaque zone construite remet la bonne clé (appelé avant la création du joueur,
+// dont le constructeur écrit déjà l'état).
+function saveSlotSuivreScene(scene) {
+  const key = scene && scene.scene && scene.scene.key;
+  saveSlotV2 = MONDE_V2_ZONES.some((z) => z.scene === key);
+}
+
+function mondeV2ASauvegarde() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVE_STORAGE_KEY_V2) || 'null');
+    return !!(parsed && parsed.values && parsed.values.lastZone);
+  } catch (e) {
+    return false;
+  }
+}
+
+// Vide le registre de la partie en mémoire (les sauvegardes ne bougent pas).
+function saveSlotViderRegistre(game) {
+  const reg = game.registry;
+  for (const [k] of saveableRegistryEntries(reg)) reg.remove(k);
+}
+
+// Retour au titre depuis le monde V2 : le registre reprend l'ancienne partie.
+function mondeV2Quitter(game) {
+  if (!saveSlotV2) return;
+  saveSlotViderRegistre(game);
+  saveSlotV2 = false;
+  loadGame(game);
+}
 // Clés historiques du joueur (documentation : TOUTE valeur JSON du registre
 // est sauvegardée, ces clés-là comprises, ainsi que les flags d'histoire et
 // l'inventaire `inventory`).
@@ -542,7 +600,7 @@ function saveableRegistryEntries(reg) {
 function writeSaveData(reg) {
   try {
     const values = Object.fromEntries(saveableRegistryEntries(reg));
-    localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify({ version: 1, savedAt: Date.now(), values }));
+    localStorage.setItem(saveStorageKey(), JSON.stringify({ version: 1, savedAt: Date.now(), values }));
     return true;
   } catch (e) {
     console.warn('Sauvegarde impossible :', e);
@@ -552,7 +610,7 @@ function writeSaveData(reg) {
 
 function readSaveData() {
   try {
-    const raw = localStorage.getItem(SAVE_STORAGE_KEY);
+    const raw = localStorage.getItem(saveStorageKey());
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.values) return null;
@@ -589,7 +647,7 @@ function hasSaveGame() {
 // Nouvelle partie : efface la sauvegarde ET les données de jeu du registre
 // (les valeurs non sérialisables, internes à d'autres systèmes, sont gardées).
 function resetGame(game) {
-  try { localStorage.removeItem(SAVE_STORAGE_KEY); } catch (e) { /* stockage indisponible */ }
+  try { localStorage.removeItem(saveStorageKey()); } catch (e) { /* stockage indisponible */ }
   const reg = (game && game.registry) || storyRegistry();
   if (!reg) return;
   for (const [k] of saveableRegistryEntries(reg)) reg.remove(k);
@@ -3530,6 +3588,7 @@ const STORY_PROMPT_DEPTH = 1050;
 
 // Appelé par buildLevelFromData au début de chaque visite (instance de scène réutilisée).
 function resetStoryState(scene, data) {
+  saveSlotSuivreScene(scene);
   scene.__storyVisit = (scene.__storyVisit || 0) + 1;
   scene.__storyZoneId = data && data.zoneId ? data.zoneId : null;
   scene.__cutsceneLock = 0;
