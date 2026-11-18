@@ -37,9 +37,10 @@ _FF1 = dict(_ARENE, kainatiDefeated=True, mondeSpirituelFini=True, geraltMet=Tru
 _FC1 = dict(_FF1, amaniteMet=True, hasEagleForm=True, fleurPrelevee=True, clairiereArrivee=True, morgatVue=True, crashDone=True, fc1Reveil=True)
 
 ZONES = {
-    'fs1': dict(nom='Forêt sombre 1', scene='ForetSombre1Scene', flags=_BASE),
+    # trig_* : cinématique d'entrée déjà vue, sinon Agarica ne peut pas marcher pendant la mesure
+    'fs1': dict(nom='Forêt sombre 1', scene='ForetSombre1Scene', flags=dict(_BASE, trig_foret_sombre_1_desespoir=True)),
     'lumiere': dict(nom='Forêt de lumière', scene='ForetLumiereScene', flags=_BASE),
-    'racines': dict(nom='Racines du grand arbre', scene='GrandArbreRacinesScene', flags=_RAC),
+    'racines': dict(nom='Racines du grand arbre', scene='GrandArbreRacinesScene', flags=dict(_RAC, trig_grand_arbre_racines_intro=True)),
     'ff1': dict(nom='Forêt flottante 1', scene='ForetFlottante1Scene', flags=_FF1),
     'fc1': dict(nom='Forêt corrompue', scene='ForetCorrompue1Scene', flags=_FC1, data={'enterId': 'from_crash'}),
     'arene': dict(nom='Arène de Kainati (zoom 1)', scene='GrandArbreAreneScene', flags=_ARENE, data={'enterId': 'from_racines'}),

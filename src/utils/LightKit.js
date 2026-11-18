@@ -408,7 +408,7 @@ varying vec4 outTint;
 ${FRAG_AMBIANCE}
 ${masque ? `${FRAG_MASQUE}
 uniform vec3 uSoleilDecor;        // somme des soleils qui atteignent l'objet` : ''}
-${lampes ? `${FRAG_STRUCT_LUMIERE}
+${lampes ? `${FRAG_STRUCT_LUMIERE.replace('};', '  float atteinte;  // carre de la distance (px natifs) au-dela de laquelle cette lampe n\'apporte rien\n};')}
 uniform Lumiere uLumieres[${maxLampes}];
 uniform int uNbLumieres;
 uniform float uPaliers, uContre, uAuSol, uFlip;
@@ -432,11 +432,14 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
   for (int i = 0; i < ${maxLampes}; ++i) {
     if (i < uNbLumieres) {
       Lumiere L = uLumieres[i];
-      vec4 cjL = L.decor > 0.5 ? vec4(cjm.rg, expositionDecor(n, cjm.b), cjm.a) : cjm;
-      vec2 lp = pointForme(tc, L.position.xy, L.forme, L.formeA, L.formeB);
-      float e = eclairage(n, n, tc, lp, L.position.z, L.portee, lb, cjL);
-      if (L.decor > 0.5) e *= mix(1.0, horsDessous(n, cjm), uAuSol * (1.0 - smoothstep(8.0, 30.0, L.position.z)));
-      l += L.couleur * smoothstep(0.0, 1.0, e);
+      vec2 ecart = tc - L.position.xy;
+      if (dot(ecart, ecart) < L.atteinte) {
+        vec4 cjL = L.decor > 0.5 ? vec4(cjm.rg, expositionDecor(n, cjm.b), cjm.a) : cjm;
+        vec2 lp = pointForme(tc, L.position.xy, L.forme, L.formeA, L.formeB);
+        float e = eclairage(n, n, tc, lp, L.position.z, L.portee, lb, cjL);
+        if (L.decor > 0.5) e *= mix(1.0, horsDessous(n, cjm), uAuSol * (1.0 - smoothstep(8.0, 30.0, L.position.z)));
+        l += L.couleur * smoothstep(0.0, 1.0, e);
+      }
     }
   }` : ''}
   vec3 c = base.rgb * (ambianceHemi(n) + ls) + base.rgb * l;
@@ -686,6 +689,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
           if (pl.vertexCount > 0) pl.flush();
           pl.imageVue = image;
           pl.cameraVue = camera;
+          pl.soleilR = -1;   // renvoyé à chaque image : les uniforms sont perdus avec le contexte WebGL
           pl.set1i('uMainSampler', 0);
           pl.set3f('uCiel', this._ciel[0], this._ciel[1], this._ciel[2]);
           pl.set3f('uSol', this._sol[0], this._sol[1], this._sol[2]);
@@ -710,7 +714,12 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
           if (pl.vertexCount > 0) pl.flush();
           const frame = go.frame, flip = !!go.flipX, px = 1 / sx, py = 1 / sy;
           const G = { m, e: null, W, w: W * sx, cx: 0, cy: 0, px, py, sx, sy, k: 1, flip };
-          for (let i = 0; i < atteintes.length; i++) this.envoyerLampe(pl, i, atteintes[i], go, G);
+          for (let i = 0; i < atteintes.length; i++) {
+            this.envoyerLampe(pl, i, atteintes[i], go, G);
+            // Au-delà de sa portée, comptée depuis le point de sa forme le plus éloigné de son centre, la lampe vaut exactement 0
+            const L = atteintes[i], R = L.radius - (L.forme ? L.forme.demi : 0) + etendueForme(L);
+            pl.set1f(`uLumieres[${i}].atteinte`, R * R);
+          }
           pl.set1i('uNbLumieres', atteintes.length);
           const boucle = go.scene.game.loop;
           pl.set1f('uAuSol', partAuSol(go, boucle.delta, boucle.frame));
@@ -875,6 +884,17 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
       }
     };
     return PipelineClasse;
+  }
+
+  // Distance du centre d'une lampe au point de sa forme le plus éloigné (px du monde)
+  function etendueForme(L) {
+    const F = L.forme;
+    if (!F) return 0;
+    if (F.type === 1) {
+      const p = F.points;
+      return Math.max(Math.hypot(p[0] - L.x, p[1] - L.y), Math.hypot(p[2] - L.x, p[3] - L.y), Math.hypot(p[4] - L.x, p[5] - L.y));
+    }
+    return Math.hypot(Math.abs(F.cx - L.x) + F.hx, Math.abs(F.cy - L.y) + F.hy);
   }
 
   // Profondeur d'une lampe pour un objet, en pixels natifs (k : px du monde par pixel natif). Une source de décor affichée
