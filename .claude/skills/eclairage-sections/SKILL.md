@@ -107,6 +107,33 @@ Mode de test sans toucher au code : `index.html?zone=foret_sombre_1&lumiere` (Ag
 sprite préparé éclairés, nuit, torche au pointeur, molette = profondeur, lune) ;
 `&lumiere=-20` = profondeur de départ.
 
+## Labo d'éclairage en jeu (zone de test)
+
+`index.html?zone=labo_lumiere&lumiere` : salle fermée construite comme une vraie zone
+(`src/data/labo_lumiere_data.js`, `src/scenes/LaboLumiereScene.js`), Agarica jouable, mannequins
+immobiles à leur échelle du jeu (loup, grizzly, crapaud, Kainati), trois lampes : torche au pointeur,
+lune fixe, lampe derrière Kainati. Aucun lien depuis le jeu ; sans `?lumiere` ni cette zone, les
+cartes ne sont même pas chargées (`TOUJOURS` dans LightKit.js le jour où une vraie zone éclaire).
+
+| Touche | Effet |
+|---|---|
+| U / J | réglage précédent / suivant (profondeur, portée, intensité, couleur, ambiance, contre-jour, paliers) |
+| H / L | baisser / monter la valeur |
+| N | lampe suivante (profondeur, portée, intensité et couleur sont par lampe) |
+| G | éclairage activé / désactivé (comparaison immédiate) |
+| O | sprites d'origine (personnages sans éclairage, décor toujours éclairé) |
+| V | décor éclairé à plat ou non |
+| B | pixels entiers : un pixel dessiné = un nombre entier de pixels d'écran (mannequins seulement) |
+| T | écran net (canvas agrandi sans lissage du navigateur) |
+| C | copie les réglages (presse-papiers et console) : à transmettre tels quels |
+| W | masquer le panneau |
+
+Le panneau affiche aussi, pour chaque mannequin, les pixels d'écran couverts par un pixel dessiné,
+et la frame d'Agarica si elle n'a pas de cartes. Valeurs du jeu : loup 1,00 ; grizzly 2,00 (1,74 et
+1,54 sur deux poses de sa course : facteurs pixel-fixer différents) ; Agarica 0,90 ; crapaud et
+Kainati 0,65. **Sous 1, des pixels dessinés sautent à l'affichage** : les sections et les paliers
+paraissent irréguliers, ce que la page d'aperçu (agrandie x6) ne montre pas. À juger avec B.
+
 ## Retoucher les cartes à la main
 
 Toujours dans cet ordre : d'abord les sections (lumière de face), puis la carte contre-jour,

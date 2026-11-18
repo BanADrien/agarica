@@ -193,7 +193,7 @@ void main() {
     if (TOUJOURS) return true;
     if (typeof window === 'undefined') return false;
     const q = new URLSearchParams(window.location.search);
-    return q.has('lumiere') || q.get('zone') === 'labo_lumiere';
+    return q.has('lumiere') || q.get('zone') === 'labo_lumiere' || q.get('zone') === 'LaboLumiereScene';
   }
 
   // preload de BootScene : charge neutre, normales et carte contre-jour de chaque sprite du
