@@ -592,7 +592,7 @@ void main() {
   const FEU_DE_CAMP = /^decor-campfire-/;
   const SEUIL_FLAMMES = 0.62;
   const SOURCES = {
-    feu: { couleur: 0xffc46e, intensite: 1.7, portee: 310, profondeur: 60, vacille: 0.1, halo: 240 },
+    feu: { couleur: 0xffc46e, intensite: 1.05, portee: 310, profondeur: 60, vacille: 0.1, halo: 240 },
     champignon: { couleur: 0x5cf0d0, intensite: 0.85, portee: 150, profondeur: 30, vacille: 0.05, halo: 0 },
   };
 
@@ -674,7 +674,7 @@ void main() {
         const b = s.o.getBounds(), y = b.y + b.height * 0.6;
         const flamme = 1 + s.def.vacille * (0.5 * Math.sin(t * 7.3 + s.ph) + 0.3 * Math.sin(t * 13.1 + s.ph * 2) + 0.2 * Math.sin(t * 3.1 + s.ph));
         s.L.setPosition(s.o.x, y).setVisible(s.allumee).setIntensity(s.def.intensite * s.force * flamme);
-        if (s.halo) s.halo.setPosition(Math.round(s.o.x), Math.round(y)).setVisible(actives).setAlpha(0.3 * s.force * flamme);
+        if (s.halo) s.halo.setPosition(Math.round(s.o.x), Math.round(y)).setVisible(actives).setAlpha(0.18 * s.force * flamme);
       }
     };
     scanner();
