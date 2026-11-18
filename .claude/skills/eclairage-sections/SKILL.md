@@ -195,6 +195,8 @@ canvas 2220 x 1248, monde à l'échelle entière x3, interface sur une 2e camér
 projeté selon la direction du soleil, sert au shader par pixel, aux faisceaux visibles et aux poussières.
 Touches : U / J réglage, H / L valeur, C copier, W panneau, G éclairage coupé.
 
+Sources de lumière : `LightKit.emissif(objet, seuil)` garde un objet à pleine luminosité (avec `seuil`, seuls ses pixels vifs : flammes du feu, bûches éclairées) ; `LightKit.sourcesLumineuses(scene, { max })` reconnaît feux de camp et champignons lumineux, leur donne une lumière vacillante, allume les plus proches de la caméra et les fait apparaître en fondu (`scanner()` et `maj(dt)` à chaque image).
+
 ## Retoucher les cartes à la main
 
 Toujours dans cet ordre : d'abord les sections (lumière de face), puis la carte contre-jour,

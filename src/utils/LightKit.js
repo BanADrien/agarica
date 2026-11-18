@@ -160,6 +160,7 @@ uniform sampler2D uNatif;         // _lumiere/<n>_natif.png (dessin d'origine, m
 uniform vec3 uCiel, uSol;         // ambiance : plans tournes vers le haut / vers le bas
 uniform float uDetail;            // part du dessin d'origine dans l'ambiance
 uniform float uEpaule;            // debut de l'epaule des hautes lumieres (1 = aucune)
+uniform float uEmissif;           // > 0 : les pixels au moins aussi vifs gardent leur couleur (flammes du feu)
 ${FRAG_MASQUE}
 uniform Lumiere uLumieres[kMaxLights];
 uniform int uNbLumieres;
@@ -261,6 +262,7 @@ void main() {
   // epaule sur la composante la plus forte : teinte gardee, chaque palier reste distinct jusque dans les blancs
   float m = max(c.r, max(c.g, c.b));
   if (m > 0.0) c *= epaule(m) / m;
+  if (uEmissif > 0.0 && max(dessin.r, max(dessin.g, dessin.b)) >= uEmissif * base.a) c = dessin;
   vec4 color = vec4(c, base.a) * texel;
   if (outTintEffect == 1.0) color.rgb = outTint.bgr * outTint.a * base.a;   // setTintFill
   else if (outTintEffect == 2.0) color = texel;
@@ -390,6 +392,7 @@ void main() {
         this.set3f('uCiel', this._ciel[0] * ombre, this._ciel[1] * ombre, this._ciel[2] * ombre);
         this.set3f('uSol', this._sol[0] * ombre, this._sol[1] * ombre, this._sol[2] * ombre);
         this.set1f('uDetail', this._detail);
+        this.set1f('uEmissif', go.__lumiereEmissif || 0);
         const mq = this._reglages.masque;
         this.set4f('uMasqueAnim', mq ? mq.amp : 0, mq ? mq.t : 0, mq ? mq.bande : 0, mq ? 1 : 0);
         if (mq) {
@@ -569,6 +572,98 @@ void main() {
     return c ? Math.abs(o.scaleX) * c.e.fx * (o.scene.cameras.main.matrix.a || 1) : null;
   }
 
+  // ---------------------------------------------------------------- objets qui émettent de la lumière
+  // Une source de lumière n'est jamais assombrie par l'ambiance. Reconnue au nom de son image (ou à son mélange
+  // additif). Le feu de camp est à part : ses flammes restent vives, ses bûches reçoivent la lumière du feu.
+  const EMISSIFS = /champignons_lumineux|mousse_lumineuse|lanterne_allumee|luciole|cristal|portail|^item-fx_|juice-glow|halo|lueur|glow/;
+  const FEU_DE_CAMP = /^decor-campfire-/;
+  const SEUIL_FLAMMES = 0.62;
+  const SOURCES = {
+    feu: { couleur: 0xff9a45, intensite: 1.7, portee: 310, profondeur: 60, vacille: 0.1, halo: 190 },
+    champignon: { couleur: 0x5cf0d0, intensite: 0.85, portee: 150, profondeur: 30, vacille: 0.05, halo: 0 },
+  };
+
+  // Affiche un objet avec ses couleurs d'origine. seuil : seuls les pixels au moins aussi vifs (0 à 1) restent émissifs
+  function emissif(objets, seuil) {
+    for (const o of [].concat(objets || [])) {
+      if (!o) continue;
+      o.__lumiereEmissif = seuil || 0;
+      if (seuil) eclairer(o); else nePlusEclairer(o);
+    }
+    return objets;
+  }
+
+  // Halo en paliers nets autour d'un feu : trois disques de pixels
+  function textureHalo(scene) {
+    const cle = 'lumiere-halo';
+    if (scene.textures.exists(cle)) return cle;
+    const T = 48, tex = scene.textures.createCanvas(cle, T, T), ctx = tex.getContext();
+    for (let y = 0; y < T; y++) {
+      for (let x = 0; x < T; x++) {
+        const d = Math.hypot(x + 0.5 - T / 2, y + 0.5 - T / 2) / (T / 2);
+        const a = d < 0.42 ? 1 : d < 0.7 ? 0.55 : d < 1 ? 0.25 : 0;
+        if (a) { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(x, y, 1, 1); }
+      }
+    }
+    tex.refresh();
+    tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    return cle;
+  }
+
+  // Sources de la scène : feux de camp et champignons lumineux créent chacun leur lumière. Au plus `max` allumées,
+  // les plus proches de la caméra, avec un fondu pour qu'aucune n'apparaisse d'un coup.
+  function sourcesLumineuses(scene, { max = 4 } = {}) {
+    const liste = [];
+    let actives = true;
+    const ajouter = (o, type) => {
+      const def = SOURCES[type];
+      const L = ajouterLumiere(scene, { x: o.x, y: o.y, portee: def.portee, couleur: def.couleur, intensite: 0, profondeur: def.profondeur });
+      L.setVisible(false);
+      const s = { o, type, def, L, force: 0, allumee: false, ph: liste.length * 2.4, halo: null };
+      if (def.halo) {
+        s.halo = scene.add.image(o.x, o.y, textureHalo(scene)).setDisplaySize(def.halo, def.halo).setTint(def.couleur)
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(o.depth - 0.5).setAlpha(0);
+        s.halo.__lumiereEmissif = 0;
+      }
+      liste.push(s);
+    };
+    // Classe les objets apparus depuis le dernier passage
+    const scanner = () => {
+      for (const o of scene.children.list) {
+        if (o.__lumiereVu || !o.texture) continue;
+        o.__lumiereVu = true;
+        const cle = o.texture.key;
+        if (FEU_DE_CAMP.test(cle)) { emissif(o, SEUIL_FLAMMES); ajouter(o, 'feu'); }
+        else if (/champignons_lumineux/.test(cle)) { emissif(o); ajouter(o, 'champignon'); }
+        else if (o.blendMode === Phaser.BlendModes.ADD || EMISSIFS.test(cle)) emissif(o);
+      }
+      // Le halo en paliers remplace le halo doux et la flaque de lumière dessinés par le feu du jeu
+      for (const f of scene.__campfires || []) if (f.halo) f.halo.setVisible(false);
+      for (const o of scene.children.list) {
+        if (o.texture && o.texture.key === 'item-fx_lueur_sol' && liste.some((s) => s.type === 'feu' && Math.abs(s.o.x - o.x) < 40)) o.setVisible(false);
+      }
+    };
+    const maj = (dt) => {
+      const v = scene.cameras.main.midPoint, t = scene.time.now / 1000;
+      const proches = liste.filter((s) => s.o.active && Math.abs(s.o.x - v.x) < 900)
+        .sort((a, b) => Math.abs(a.o.x - v.x) - Math.abs(b.o.x - v.x)).slice(0, max);
+      let libres = max - liste.filter((s) => s.allumee && !proches.includes(s)).length;
+      for (const s of proches) { if (s.allumee) libres--; }
+      for (const s of liste) {
+        let cible = proches.includes(s) ? 1 : 0;
+        if (cible && !s.allumee) { if (libres > 0) { s.allumee = true; libres--; } else cible = 0; }
+        s.force += (cible - s.force) * (1 - Math.exp(-dt * 5));
+        if (!cible && s.force < 0.01) { s.force = 0; s.allumee = false; }
+        const b = s.o.getBounds(), y = b.y + b.height * 0.6;
+        const flamme = 1 + s.def.vacille * (0.5 * Math.sin(t * 7.3 + s.ph) + 0.3 * Math.sin(t * 13.1 + s.ph * 2) + 0.2 * Math.sin(t * 3.1 + s.ph));
+        s.L.setPosition(s.o.x, y).setVisible(s.allumee).setIntensity(s.def.intensite * s.force * flamme);
+        if (s.halo) s.halo.setPosition(Math.round(s.o.x), Math.round(y)).setVisible(actives).setAlpha(0.3 * s.force * flamme);
+      }
+    };
+    scanner();
+    return { liste, scanner, maj, actif: (oui) => { actives = oui; } };
+  }
+
   // A une carte (sprite préparé par tools/sections.js) ? Utile pour n'éclairer que ceux-là.
   function aDesCartes(o) {
     return !!(o && o.frame && cartesDe(o.scene.game, o.frame.texture.key));
@@ -677,7 +772,7 @@ void main() {
   return {
     NOM_PIPELINE, DEFAUTS, SOLEIL, FRAG_MASQUE, masqueSoleil: masqueSoleilJs, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
     chargerCartes, filtrerCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
-    ajouterLumiere, ajouterSoleil, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
+    ajouterLumiere, ajouterSoleil, emissif, sourcesLumineuses, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();
 

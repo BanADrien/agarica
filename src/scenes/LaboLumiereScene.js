@@ -17,6 +17,7 @@ const LABO_MANNEQUINS = [
 const LABO_ZOOMS = [{ nom: 'x1', zoom: 1 }, { nom: 'x1,3', zoom: 1.3 }, { nom: 'x1,5', zoom: 1.5 }, { nom: 'x2', zoom: 2 }];
 const LABO_ZOOM_DEPART = 1;   // x1,3 à l'entrée du labo
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
+const LABO_SOURCES = 4;      // lumières réservées aux feux et champignons (LightKit.sourcesLumineuses)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
 const LABO_BAS_MONDE = 540;  // bas du monde : la caméra ne montre jamais en dessous
 const LABO_OMBRE_AUVENT = 1.085;  // ambiance sous l'auvent : x 1,085 sur celle du soleil, soit 77 % du sprite d'origine, uniforme
@@ -115,7 +116,11 @@ class LaboLumiereScene extends Phaser.Scene {
     this.laboEcran(st);
     this.laboMannequins(st);
     this.laboDecors(st);
-    if (ok) this.laboLampes(st); else st.messages.push('WebGL indisponible : pas d\'eclairage');
+    if (ok) {
+      this.laboLampes(st);
+      st.sources = LightKit.sourcesLumineuses(this, { max: LABO_SOURCES });
+      st.max -= LABO_SOURCES;
+    } else st.messages.push('WebGL indisponible : pas d\'eclairage');
     // Décor éclairé : images du sol et décors posés (ni l'interface, ni les champignons qui brillent)
     st.decors = this.children.list.filter((o) => o.type === 'Image' && o.scrollFactorX === 1 && o.depth < CHARACTER_DEPTH
       && !o.__laboBrille && !(o.texture && /champignons_lumineux/.test(o.texture.key)));
@@ -220,9 +225,7 @@ class LaboLumiereScene extends Phaser.Scene {
     const X = (p, dx) => p * LABO_LARGEUR + dx;
     const fixe = () => ({});
     // ---- NUIT
-    const champis = [170, 590, 850, 1380, 1760].map((dx) => ({ x: X(0, dx), y: sol - 60 }));
-    this.laboGroupe(st, 0, 'champignons', { profondeur: 32, portee: 280, intensite: 0.7, couleur: 0x5cf0d0 }, champis,
-      (t, i) => ({ force: 0.75 + 0.25 * Math.sin(t / 1100 + i * 1.7) }));
+    // (feu de camp et champignons : sources automatiques de LightKit, cf. laboConstruire)
     const lucioles = [260, 560, 830, 1040, 1390, 1700].map((dx, i) => ({ x: X(0, dx), y: sol - 70 - (i * 37) % 100 }));
     st.lucioles = [];
     this.laboGroupe(st, 0, 'lucioles', { profondeur: 30, portee: 150, intensite: 0.7, couleur: 0xd8ff6a }, lucioles, (t, i, pos) => {
@@ -239,10 +242,6 @@ class LaboLumiereScene extends Phaser.Scene {
         return sp;
       });
     }
-    this.laboGroupe(st, 0, 'feu de camp', { profondeur: 55, portee: 520, intensite: 1.05, couleur: 0xffb35c }, [{ x: st.feuX, y: sol - 40 }], (t, i, pos) => {
-      const v = Math.sin(t / 90) * 0.4 + Math.sin(t / 37 + 1) * 0.35 + Math.sin(t / 211) * 0.25;
-      return { x: pos.x + v * 3, y: pos.y + v * 2, force: 0.86 + 0.14 * v };
-    }, true);
     const kai = (p) => ({ x: X(p, 1560), y: sol - 130 });
     this.laboGroupe(st, 0, 'derriere Kainati', { profondeur: -24, portee: 300, intensite: 0.9, couleur: 0xffb35c }, [kai(0)],
       (t, i, pos) => ({ x: pos.x + 160 * Math.sin(t / 2600) }), true);
@@ -278,6 +277,7 @@ class LaboLumiereScene extends Phaser.Scene {
     (st.eclairage && !st.origine ? LightKit.eclairer : LightKit.nePlusEclairer)(persos);
     (st.eclairage && st.decor ? LightKit.eclairer : LightKit.nePlusEclairer)(st.decors);
     if (st.eclairage) this.lights.enable(); else this.lights.disable();
+    if (st.sources) st.sources.actif(st.eclairage);
   }
 
   laboTouches(st) {
@@ -426,6 +426,10 @@ class LaboLumiereScene extends Phaser.Scene {
     for (const o of st.decors) o.setVisible(Math.abs(o.x - vueX) < demi + 160);
     for (const m of st.sprites) m.sp.setVisible(Math.abs(m.sp.x - vueX) < demi + 420);
     const x = this.player ? this.player.x : 0;
+    if (st.sources) {
+      if (st.image % 20 === 0) st.sources.scanner();
+      st.sources.maj(this.game.loop.delta / 1000);
+    }
     // Énergie toujours pleine : l'ours polaire reste disponible pendant les essais
     if (this.player && this.player.energy < ENERGY_MAX) { this.player.energy = ENERGY_MAX; this.registry.set('energy', ENERGY_MAX); }
     const poids = this.laboPoids(x);

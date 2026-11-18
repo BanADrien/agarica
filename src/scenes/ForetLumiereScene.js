@@ -99,6 +99,7 @@ class ForetLumiereScene extends Phaser.Scene {
       this.foretMasque(st);
       this.foretFaisceaux(st);
       this.foretPoussieres(st);
+      st.sources = LightKit.sourcesLumineuses(this, { max: 6 });
       this.foretRendu(st);
     }
     st.texte = document.createElement('pre');
@@ -191,9 +192,11 @@ class ForetLumiereScene extends Phaser.Scene {
 
   // Tout ce qui apparaît dans le monde passe par le même éclairage (ennemis compris) ; interface et lueurs exclues
   foretEclairer(st) {
+    st.sources.scanner();
     for (const o of this.children.list) {
       if (o.__foret) continue;
       o.__foret = true;
+      if (o.__lumiereEmissif !== undefined) continue;   // sources de lumière : jamais assombries
       if (o.scrollFactorX === 0 && o.depth >= ZOOM_PROFONDEUR_UI) continue;
       if (o.blendMode === Phaser.BlendModes.ADD) continue;
       if (o.type === 'Sprite' || o.type === 'Image') LightKit.eclairer(o);
@@ -205,6 +208,7 @@ class ForetLumiereScene extends Phaser.Scene {
     const st = this.__foret;
     if (!st.ok) return;
     if (++st.image % 12 === 1) this.foretEclairer(st);
+    st.sources.maj(delta / 1000);
     if (st.visible && st.image % 12 === 0) this.foretPanneau(st);
     if (this.player && this.player.energy < ENERGY_MAX) { this.player.energy = ENERGY_MAX; this.registry.set('energy', ENERGY_MAX); }
     const t = this.time.now / 1000, mq = st.masque, v = ZoomKit.vueVisible(this.cameras.main);
@@ -236,6 +240,7 @@ class ForetLumiereScene extends Phaser.Scene {
       st.eclairage = !st.eclairage;
       if (st.eclairage) this.lights.enable(); else this.lights.disable();
       st.faisceaux.setVisible(st.eclairage);
+      st.sources.actif(st.eclairage);
       for (const o of st.teintes) if (o.active) { if (st.eclairage) o.setTint(st.teinteFond); else o.clearTint(); }
     });
     sur('W', () => { st.visible = !st.visible; st.texte.style.display = st.visible ? '' : 'none'; });
