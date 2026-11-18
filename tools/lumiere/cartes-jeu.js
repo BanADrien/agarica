@@ -42,6 +42,13 @@ const CARTES = [
   ...transfoOurs('ours_polaire', 'ours_polaire_frames/ours_polaire_row2_#.png', 0.509),
   { nom: 'crapaud', echelle: 0.26, fps: 12, images: suite('crapaud_frames/crapaud_row0_#.png', 0, 1, 2, 3).concat('assets/sprites/crapaud_frames/crapaud_row1_0.png') },
   { nom: 'kainati_idle', echelle: 0.6, fps: 6, images: suite('kainati_frames/kainati_row0_#.png', 0, 1, 2, 3) },
+  // Ennemis courants et Xara des zones de forêt (échelles : `scale` du manifeste, XARA_SCALE)
+  ...[['idle', 0, 4, 8], ['attack', 1, 4, 10], ['death', 2, 5, 10]].map(([a, row, n, fps]) => ({ nom: `mousse_creature_${a}`, echelle: 0.26, fps, images: suite(`mousse_creature_frames/mousse_creature_row${row}_#.png`, ...Array(n).keys()) })),
+  ...[['idle', 0, 4, 6], ['run', 1, 5, 12], ['throw', 2, 4, 10]].map(([a, row, n, fps]) => ({ nom: `singe_corrompu_${a}`, echelle: 0.28, fps, images: suite(`singe_corrompu_frames/singe_corrompu_row${row}_#.png`, ...Array(n).keys()) })),
+  ...[['patrol', 0, 8], ['charge', 1, 14], ['bite', 2, 12]].map(([a, row, fps]) => ({ nom: `loup_sanguinaire_${a}`, echelle: 0.33, fps, images: suite(`loup_sanguinaire_frames/loup_sanguinaire_row${row}_#.png`, 0, 1, 2, 3) })),
+  { nom: 'xara_walk', echelle: 0.15, fps: 10, images: suite('xara_frames/xara_walk_#.png', 0, 1, 2, 6, 7, 8) },
+  { nom: 'xara_jump', echelle: 0.15, fps: 10, images: suite('xara_frames/xara_jump_#.png', 0, 1, 2, 3) },
+  { nom: 'xara_switch', echelle: 0.15, fps: 10, images: suite('xara_frames/xara_switch_#.png', 1, 2, 3).concat('assets/sprites/xara_frames/xara_swing_0.png') },
 ];
 
 const filtres = process.argv.slice(2);
