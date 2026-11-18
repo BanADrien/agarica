@@ -163,7 +163,7 @@ ne sont même pas chargées (`TOUJOURS` dans LightKit.js le jour où une vraie z
 | H / L | baisser / monter la valeur |
 | N | groupe de lampes suivant dans la partie |
 | Y | aller à la partie suivante |
-| Z | zoom x1, x1,5, x2 (rendu interne 1920 x 1080, caméra à zoom entier : pixels réguliers) |
+| Z | zoom x1, x1,3 (au départ), x1,5, x2 : caméra à zoom entier, rendu interne = vue x caméra (x1,3 : 740 x 416 x 3), pixels réguliers |
 | G | éclairage activé / désactivé (comparaison immédiate) |
 | O | sprites d'origine (personnages sans éclairage, décor toujours éclairé) |
 | V | décor éclairé à plat ou non |

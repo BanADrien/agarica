@@ -3,10 +3,11 @@
 // l'autre : NUIT (champignons, lucioles, feu de camp), SOLEIL (plein jour, auvent d'ombre), BANC D'ESSAI
 // (torche au pointeur, lune, tests en boucle). Mannequins immobiles à leur échelle du jeu dans chaque
 // partie. Seule cette scène active ce code : le jeu normal n'y passe jamais.
-// Touches : U / J réglage, H / L valeur, N groupe de lampes, Y partie suivante, Z zoom (x1, x1,5, x2),
+// Touches : U / J réglage, H / L valeur, N groupe de lampes, Y partie suivante, Z zoom (x1, x1,3, x1,5, x2),
 // G éclairage, O sprites d'origine, V décor éclairé, T écran net, C copier, W panneau.
-// Zoom : le labo rend en 1920 x 1080 avec une caméra à zoom ENTIER (2, 3, 4), donc x1,5 garde des pixels
-// réguliers ; l'interface passe par une 2e caméra. Taille d'origine rendue en quittant la zone.
+// Zoom : chaque niveau montre une vue du monde avec une caméra à zoom ENTIER, le rendu interne valant vue x caméra :
+// les pixels restent réguliers à tous les niveaux. L'interface passe par une 2e caméra. Taille d'origine rendue
+// en quittant la zone.
 // Panneau : élément HTML posé sur le canvas, donc indépendant des caméras et du zoom.
 // Formes à l'essai : grizzly (Maj), aigle (double saut), ours polaire (A). Rien n'est gardé : la sauvegarde
 // et le registre trouvés à l'entrée sont remis en sortant (cf. laboProtegerPartie).
@@ -18,7 +19,14 @@ const LABO_MANNEQUINS = [
   { id: 'crapaud', dx: 880, nuit: 1130, choix: (e) => e.anim === 'crapaud', echelle: () => CRAPAUD_SCALE, origineX: () => CRAPAUD_ORIGIN_X },
   { id: 'kainati', dx: 1560, choix: (e) => e.anim === 'kainati_idle', echelle: () => (getAssetManifest().kainati || {}).scale || 0.6 },
 ];
-const LABO_ZOOMS = [{ nom: 'x1', camera: 2 }, { nom: 'x1,5', camera: 3 }, { nom: 'x2', camera: 4 }];
+// vue : px du monde montrés ; rendu interne = vue x camera (x1,3 : 740 x 416 x 3 = 2220 x 1248, dimensions paires : centre de caméra sur un pixel entier)
+const LABO_ZOOMS = [
+  { nom: 'x1', camera: 2, vue: [960, 540] },
+  { nom: 'x1,3', camera: 3, vue: [740, 416] },
+  { nom: 'x1,5', camera: 3, vue: [640, 360] },
+  { nom: 'x2', camera: 4, vue: [480, 270] },
+];
+const LABO_ZOOM_DEPART = 1;   // x1,3 à l'entrée du labo
 const LABO_LARGEUR = 1920;   // largeur d'une partie (px du monde)
 const LABO_FONDU = 360;      // largeur du fondu entre deux parties
 const LABO_BAS_MONDE = 540;  // bas du monde : la caméra ne montre jamais en dessous
@@ -109,7 +117,7 @@ class LaboLumiereScene extends Phaser.Scene {
   laboConstruire() {
     const ok = LightKit.activer(this, { ambiance: 0x292a40 });
     const st = {
-      ok, zoom: 0, vus: new WeakSet(), groupes: [], lampes: [], ligne: 0, choix: [0, 0, 0], partie: 0, eclairage: true, origine: false, decor: true, net: false,
+      ok, zoom: LABO_ZOOM_DEPART, vus: new WeakSet(), groupes: [], lampes: [], ligne: 0, choix: [0, 0, 0], partie: 0, eclairage: true, origine: false, decor: true, net: false,
       visible: true, sprites: [], extras: [], decors: [], messages: [], note: '', image: 0, actives: 0,
       parties: LABO_PARTIES.map((p) => ({ ...p })), max: ok ? this.game.renderer.config.maxLights : 0,
     };
@@ -138,14 +146,23 @@ class LaboLumiereScene extends Phaser.Scene {
     this.laboPanneau(st);
   }
 
-  // Rendu interne 1920 x 1080 : caméra du monde à zoom entier, 2e caméra pour l'interface (repère 960 x 540)
+  // Rendu interne selon le zoom : caméra du monde à zoom entier, 2e caméra pour l'interface (repère 960 x 540)
   laboEcran(st) {
     const sc = this.game.scale;
     st.tailleJeu = [sc.gameSize.width, sc.gameSize.height];
-    sc.setGameSize(st.tailleJeu[0] * 2, st.tailleJeu[1] * 2);
     this.cameras.main.setLerp(1, 0);
-    st.camUi = this.cameras.add(0, 0, st.tailleJeu[0] * 2, st.tailleJeu[1] * 2).setOrigin(0, 0).setZoom(2);
+    st.camUi = this.cameras.add(0, 0, st.tailleJeu[0], st.tailleJeu[1]).setOrigin(0, 0);
+    this.laboRendu(st);
     this.laboRepartir(st);
+  }
+
+  // Rendu interne du niveau de zoom (vue x caméra) ; vrai s'il vient de changer
+  laboRendu(st) {
+    const n = LABO_ZOOMS[st.zoom], W = n.vue[0] * n.camera, H = n.vue[1] * n.camera, sc = this.game.scale;
+    const change = sc.gameSize.width !== W || sc.gameSize.height !== H;
+    if (change) sc.setGameSize(W, H);
+    st.camUi.setZoom(W / st.tailleJeu[0], H / st.tailleJeu[1]);
+    return change;
   }
 
   // Chaque objet est vu par une seule caméra : fixé à l'écran = interface, sinon monde
@@ -374,7 +391,9 @@ class LaboLumiereScene extends Phaser.Scene {
       return r.groupe ? (g ? g[r.id] ?? '-' : '-') : p[r.id];
     };
     const oui = (b) => (b ? 'oui' : 'non');
-    const lignes = [`LABO LUMIERE : ${p.nom}   [Y] partie suivante   [Z] zoom ${LABO_ZOOMS[st.zoom].nom}`, `groupe [N] : ${g ? `${g.nom} (${g.lampes.length})` : 'aucun'}`];
+    const z = LABO_ZOOMS[st.zoom], rendu = z.vue[0] * z.camera / st.tailleJeu[0];
+    const lignes = [`LABO LUMIERE : ${p.nom}   [Y] partie suivante   [Z] zoom ${z.nom}`,
+      `zoom reel x${(st.tailleJeu[0] / z.vue[0]).toFixed(2)} : vue ${z.vue[0]} x ${z.vue[1]}, rendu ${z.vue[0] * z.camera} x ${z.vue[1] * z.camera}, camera x${z.camera}`, `groupe [N] : ${g ? `${g.nom} (${g.lampes.length})` : 'aucun'}`];
     LABO_REGLAGES.forEach((r, i) => lignes.push(`${i === st.ligne ? '>' : ' '} ${r.id.padEnd(11)} ${aff(r)}`));
     lignes.push('U/J reglage  H/L valeur  C copier  W panneau');
     lignes.push(`G eclairage ${oui(st.eclairage)}  O origine ${oui(st.origine)}  V decor ${oui(st.decor)}  T net ${oui(st.net)}`);
@@ -384,12 +403,12 @@ class LaboLumiereScene extends Phaser.Scene {
     lignes.push('  Espace x2 aigle (tenir : plane, S : pique)');
     lignes.push('taille ecran, px ecran par case de carte :');
     for (const m of st.sprites.filter((s) => s.partie === st.partie)) {
-      lignes.push(`  ${m.id.padEnd(8)} ${Math.round(m.e.w * (m.e.np || 1))} x ${Math.round(m.e.h * (m.e.np || 1))}  ${((LightKit.pixelEcran(m.sp) || 0) / 2).toFixed(2)}`);
+      lignes.push(`  ${m.id.padEnd(8)} ${Math.round(m.e.w * (m.e.np || 1))} x ${Math.round(m.e.h * (m.e.np || 1))}  ${((LightKit.pixelEcran(m.sp) || 0) / rendu).toFixed(2)}`);
     }
     const j = this.player;
     if (j && j.frame) {
       const k = LightKit.pixelEcran(j);
-      lignes.push(`agarica : ${j.frame.texture.key} ${k ? (k / 2).toFixed(2) : 'SANS CARTE (eclairee a plat)'}`);
+      lignes.push(`agarica : ${j.frame.texture.key} ${k ? (k / rendu).toFixed(2) : 'SANS CARTE (eclairee a plat)'}`);
     }
     for (const m of st.messages) lignes.push(`! ${m}`);
     if (st.note) lignes.push(st.note);
@@ -413,6 +432,7 @@ class LaboLumiereScene extends Phaser.Scene {
 
   // Zoom et hauteur de la caméra : jamais sous le bas du monde. immediat : aussi sur Agarica en largeur, sans attendre
   laboCadrer(st, immediat) {
+    if (this.laboRendu(st)) immediat = true;
     const cam = this.cameras.main, zc = LABO_ZOOMS[st.zoom].camera, hVue = cam.height / zc, lVue = cam.width / zc;
     if (cam.zoom !== zc) cam.setZoom(zc);
     const bas = st.zoom === 0 ? LABO_BAS_MONDE : Math.min(LABO_BAS_MONDE, this.laboSol() + 60);
