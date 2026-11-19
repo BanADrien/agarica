@@ -41,6 +41,58 @@ const AmbianceEffets = (() => {
   }
 
   // Heure de la fin de journée : 0 à 1 en `duree` s ; en boucle (zone de test), elle revient doucement à 0
+  // Palette d'une image RGBA : couleurs des pixels opaques (alpha >= 128) avec leur nombre, de la plus sombre à la plus
+  // claire. Les couleurs trop rares (< `rare` du total) sont écartées quand il en reste assez.
+  const luminance = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b;
+  function paletteDe(data, { rare = 0.003 } = {}) {
+    const m = new Map();
+    let total = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 128) continue;
+      const k = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+      m.set(k, (m.get(k) || 0) + 1);
+      total++;
+    }
+    let liste = [...m].map(([k, n]) => ({ r: (k >> 16) & 255, g: (k >> 8) & 255, b: k & 255, n }));
+    const gardees = liste.filter((c) => c.n >= total * rare);
+    if (gardees.length >= 3) liste = gardees;
+    return liste.sort((a, b) => luminance(a.r, a.g, a.b) - luminance(b.r, b.g, b.b));
+  }
+
+  // Remappe les couleurs d'une image RGBA sur une palette cible, par rang de luminance : la part p des pixels la plus
+  // sombre de la source prend la part p la plus sombre de la cible (même nombre de pixels par couleur). L'ordre des
+  // valeurs est gardé, la sortie n'emploie que la palette (plus `ombres` : 2 tons sous la couleur la plus sombre, pour
+  // que l'herbe reste lisible devant le sol), et l'alpha ne change pas. Fonction pure : renvoie un nouveau tableau.
+  function remapperPalette(data, palette, { ombres = 0.2 } = {}) {
+    const sortie = new Uint8ClampedArray(data);
+    if (!palette.length) return sortie;
+    const d = palette[0], totalCible = palette.reduce((s, c) => s + c.n, 0);
+    const part = ombres > 0 ? (totalCible * ombres) / (1 - ombres) / 2 : 0;
+    const ton = (k) => ({ r: Math.round(d.r * k), g: Math.round(d.g * k), b: Math.round(d.b * k), n: part });
+    const cible = (part > 0 ? [ton(0.5), ton(0.72)] : []).concat(palette);
+    const total = cible.reduce((s, c) => s + c.n, 0);
+    const bornes = [];
+    let acc = 0;
+    for (const c of cible) { acc += c.n; bornes.push(acc / total); }
+    const source = paletteDe(data, { rare: 0 });
+    const nSource = source.reduce((s, c) => s + c.n, 0);
+    const choix = new Map();
+    let cumul = 0, j = 0;
+    for (const c of source) {
+      const milieu = (cumul + c.n / 2) / nSource;
+      cumul += c.n;
+      while (j < cible.length - 1 && bornes[j] < milieu) j++;
+      choix.set((c.r << 16) | (c.g << 8) | c.b, cible[j]);
+    }
+    for (let i = 0; i < sortie.length; i += 4) {
+      if (sortie[i + 3] === 0) continue;
+      const t = choix.get((sortie[i] << 16) | (sortie[i + 1] << 8) | sortie[i + 2]);
+      if (!t) continue;   // pixel à demi transparent écarté de la palette source : laissé tel quel
+      sortie[i] = t.r; sortie[i + 1] = t.g; sortie[i + 2] = t.b;
+    }
+    return sortie;
+  }
+
   function heureSoir(p, boucle) {
     return boucle ? (1 - Math.cos(Math.PI * 2 * (p % 1))) / 2 : Math.min(Math.max(p, 0), 1);
   }
@@ -374,10 +426,71 @@ void main() {
         const tex = scene.textures.get(cle), h = tex.source[0].height;
         cases.forEach(([x, l], i) => { if (!tex.has(nom + i)) tex.add(nom + i, 0, x, 0, l, h); });
       };
+      // Couleur de l'herbe du sol affiché : les herbes de surface du sol (`autotile-atlas-grass_*`, ou une case `grass*`
+      // remplacée par un autre atlas) donnent la palette ; bande et touffes y sont remappées par rang de luminance.
+      // Une texture par sol, gardée en cache ; on ne relit le sol que si ses herbes changent.
+      const courant = {};
+      let signature = null, attenteSol = 0;
+      const herbesDuSol = () => {
+        const vus = new Map();
+        for (const o of scene.children.list) {
+          if (!o.texture || !o.frame) continue;
+          const k = o.texture.key, f = o.frame.name;
+          if (!(k.startsWith('autotile-atlas-grass') || (o.__solCase && o.__solCase.startsWith('grass')))) continue;
+          const id = `${k}|${f}`;
+          if (!vus.has(id)) vus.set(id, o.frame);
+          if (vus.size >= 6) break;
+        }
+        return { cadres: [...vus.values()], signature: [...vus.keys()].sort().join(',') };
+      };
+      const pixels = (cadre) => {
+        const c = document.createElement('canvas');
+        c.width = cadre.cutWidth; c.height = cadre.cutHeight;
+        const x = c.getContext('2d', { willReadFrequently: true });
+        x.drawImage(cadre.source.image, cadre.cutX, cadre.cutY, cadre.cutWidth, cadre.cutHeight, 0, 0, c.width, c.height);
+        return x.getImageData(0, 0, c.width, c.height).data;
+      };
+      const recolorer = () => {
+        if (!scene.textures.exists('ambiance-herbe-bande') || !scene.textures.exists('ambiance-herbes')) return;
+        const sol = herbesDuSol();
+        if (!sol.cadres.length || sol.signature === signature) return;
+        signature = sol.signature;
+        const cache = (scene.__herbeCouleurs = scene.__herbeCouleurs || {});
+        let suffixe = cache[signature];
+        if (!suffixe) {
+          const tous = sol.cadres.map(pixels), n = tous.reduce((s, d) => s + d.length, 0);
+          const donnees = new Uint8ClampedArray(n);
+          let o = 0;
+          for (const d of tous) { donnees.set(d, o); o += d.length; }
+          const palette = paletteDe(donnees);
+          suffixe = cache[signature] = `@sol${Object.keys(cache).length}`;
+          for (const base of ['ambiance-herbe-bande', 'ambiance-herbes']) {
+            const tex = scene.textures.get(base), img = tex.getSourceImage();
+            const c = document.createElement('canvas');
+            c.width = img.width; c.height = img.height;
+            const x = c.getContext('2d', { willReadFrequently: true });
+            x.drawImage(img, 0, 0);
+            const im = x.getImageData(0, 0, c.width, c.height);
+            im.data.set(remapperPalette(im.data, palette, { ombres: r.ombres ?? 0.2 }));
+            x.putImageData(im, 0, 0);
+            const neuve = scene.textures.addCanvas(base + suffixe, c);
+            for (const nom of tex.getFrameNames()) {
+              const f = tex.get(nom);
+              neuve.add(nom, 0, f.cutX, f.cutY, f.cutWidth, f.cutHeight);
+            }
+            neuve.setFilter(Phaser.Textures.FilterMode.NEAREST);
+          }
+        }
+        courant['ambiance-herbe-bande'] = 'ambiance-herbe-bande' + suffixe;
+        courant['ambiance-herbes'] = 'ambiance-herbes' + suffixe;
+        for (const e of elements) {
+          e.o.setTexture(courant[e.cle], e.o.frame.name);
+        }
+      };
       const ajouter = (x, y, cle, cadre, souple, angleMax) => {
-        const o = scene.add.image(Math.round(x), y + r.enfonce, cle, cadre).setOrigin(0.5, 1)
+        const o = scene.add.image(Math.round(x), y + r.enfonce, courant[cle] || cle, cadre).setOrigin(0.5, 1)
           .setDepth(CHARACTER_DEPTH + 1).setFlipX(Math.random() < 0.5).setVisible(actif);
-        elements.push({ o, ph: Math.random() * 6.28, souple, angleMax });
+        elements.push({ o, cle, ph: Math.random() * 6.28, souple, angleMax });
       };
       // Aucune herbe devant un feu de camp (bûches et flammes) : trou sur sa largeur + `margeFeu`
       const trous = () => scene.children.list.filter((o) => o.active && o.texture && /campfire/.test(o.texture.key))
@@ -422,10 +535,11 @@ void main() {
       poser();
       return {
         nombre: () => elements.length,
-        activer: (oui) => { actif = oui; poser(); for (const e of elements) e.o.setVisible(oui).setAngle(0); },
+        activer: (oui) => { actif = oui; poser(); if (oui) recolorer(); for (const e of elements) e.o.setVisible(oui).setAngle(0); },
         image(dt, t) {
           if (!actif) return;
           poser();
+          if ((attenteSol -= dt) <= 0) { attenteSol = 0.5; recolorer(); }
           const p = scene.player, v = vue(ctrl);
           for (const e of elements) {
             const o = e.o;
@@ -613,7 +727,7 @@ void main() {
     rendu(ctrl);
   }
 
-  return { installer, basculer, enveloppe, evenements, heureSoir, melange, groupeOiseaux };
+  return { installer, basculer, enveloppe, evenements, heureSoir, melange, groupeOiseaux, paletteDe, remapperPalette };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AmbianceEffets;

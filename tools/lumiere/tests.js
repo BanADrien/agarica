@@ -573,6 +573,42 @@ function tGroupeOiseaux() {
   }
   return { ok: ok && tailles.size === 4, tailles: [...tailles].sort(), ecartMax };
 }
+// 25 : herbe du premier plan à la couleur de l'herbe du sol. Image source au hasard (alpha 0, 255 et à demi), palette cible
+// tirée d'une autre image : l'ordre des luminances est gardé, la sortie n'emploie que la palette (+ 2 ombres plus sombres
+// que sa couleur la plus sombre), l'alpha est intact, les pixels transparents ne changent pas.
+function tRemapPalette() {
+  let graine = 11;
+  const hasard = () => { graine = (graine * 16807) % 2147483647; return (graine - 1) / 2147483646; };
+  const lum = (r, g, b) => 0.3 * r + 0.59 * g + 0.11 * b;
+  const image = (n, couleurs) => {
+    const d = new Uint8ClampedArray(n * 4);
+    for (let i = 0; i < n; i++) {
+      const c = couleurs[Math.floor(hasard() * couleurs.length)], a = hasard();
+      d.set([c[0], c[1], c[2], a < 0.2 ? 0 : a < 0.25 ? 90 : 255], i * 4);
+    }
+    return d;
+  };
+  const tirer = (k) => Array.from({ length: k }, () => [Math.floor(hasard() * 256), Math.floor(hasard() * 256), Math.floor(hasard() * 256)]);
+  let ok = true, essais = 0;
+  for (let t = 0; t < 40; t++) {
+    const src = image(600, tirer(3 + Math.floor(hasard() * 12))), cible = image(400, tirer(2 + Math.floor(hasard() * 8)));
+    const pal = AmbianceEffets.paletteDe(cible), out = AmbianceEffets.remapperPalette(src, pal, { ombres: 0.2 });
+    const d = pal[0], permises = new Set(pal.map((c) => `${c.r},${c.g},${c.b}`));
+    for (const k of [0.5, 0.72]) permises.add(`${Math.round(d.r * k)},${Math.round(d.g * k)},${Math.round(d.b * k)}`);
+    const vu = new Map();
+    for (let i = 0; i < src.length; i += 4) {
+      if (out[i + 3] !== src[i + 3]) ok = false;
+      if (src[i + 3] === 0) { if (out[i] !== src[i] || out[i + 1] !== src[i + 1] || out[i + 2] !== src[i + 2]) ok = false; continue; }
+      if (src[i + 3] < 128) continue;   // à demi transparent : hors palette source, laissé tel quel
+      if (!permises.has(`${out[i]},${out[i + 1]},${out[i + 2]}`)) ok = false;
+      vu.set(lum(src[i], src[i + 1], src[i + 2]), lum(out[i], out[i + 1], out[i + 2]));
+    }
+    const paires = [...vu].sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < paires.length; i++) if (paires[i][1] < paires[i - 1][1] - 1e-9) ok = false;
+    essais++;
+  }
+  return { ok, essais };
+}
 function tAmbianceEffets() {
   const E = AmbianceEffets;
   const bornes = E.enveloppe(0, 0, 4) === 0 && E.enveloppe(4, 0, 4) === 0 && Math.abs(E.enveloppe(2, 0, 4) - 1) < 1e-9;
@@ -782,6 +818,8 @@ function main() {
     `dans le rayon ${mq.dans} ; hors du rayon ${mq.hors} ; sous le sol ${mq.sousSol} ; points differents selon la camera : ${mq.ecarts} / 400`);
   const ae = tAmbianceEffets();
   const go = tGroupeOiseaux();
+  const rp = tRemapPalette();
+  ajout('25 herbe a la couleur du sol : ordre, palette, alpha', 'AmbianceEffets.remapperPalette', rp.ok, `${rp.essais} images au hasard`);
   ajout('24 groupes d oiseaux : 1 a 4, departs en 0,7 s', 'AmbianceEffets.groupeOiseaux', go.ok, `tailles vues ${go.tailles.join(', ')} ; ecart max ${go.ecartMax.toFixed(3)} s`);
   ajout('23 effets d ambiance : rafales, nuages, soir', 'AmbianceEffets', ae.ok, `saut max ${ae.saut.toFixed(3)} par 1/100 s ; ${ae.vus} evenements sur 20 s`);
   ajout('22 la lumiere disparait avec son element', 'LightKit.sourcePresente', tSourcePresente(), 'casse, cache, transparent, desactive ou detruit : plus de lumiere');
