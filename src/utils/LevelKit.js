@@ -234,6 +234,40 @@ const ARBRE_GROUND_CLEARANCE = 75;
 // VISIBLE de chaque arbre posé sur la ligne de base `y` (monde) quand la
 // caméra est au plus bas, défilement vertical `scrollY` (1 = collé au monde,
 // < 1 = plan plus lointain qui descend moins vite quand on monte).
+// Arbre du fond dont le pied continue vers le bas : sous le contour sombre du bas de l'image, chaque colonne reprend la
+// couleur de son dernier pixel de terre (plafonnée, sombre), s'assombrit vite puis s'efface. Plus de bord net ni d'aplat
+// vide sous le plan d'arbres. Texture créée une fois par arbre et par longueur (arrondie à 64 px).
+function arbreAvecPied(scene, key, ext) {
+  ext = Math.min(1024, Math.max(64, Math.ceil(ext / 64) * 64));
+  const cle = `${key}-pied${ext}`;
+  const src = scene.textures.get(key).getSourceImage();
+  const W = src.width, H = src.height;
+  if (!scene.textures.exists(cle)) {
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H + ext;
+    const x = c.getContext('2d');
+    x.drawImage(src, 0, 0);
+    const d = x.getImageData(0, 0, W, H + ext), p = d.data, max3 = (i) => Math.max(p[i], p[i + 1], p[i + 2]);
+    for (let cx = 0; cx < W; cx++) {
+      let y0 = -1;
+      for (let y = H - 1; y >= Math.max(0, H - 24); y--) if (p[(y * W + cx) * 4 + 3] >= 128) { y0 = y; break; }
+      if (y0 < 0) continue;
+      let yc = y0;   // remonte le contour sombre du bas
+      while (yc > y0 - 6 && max3((yc * W + cx) * 4) < 30) yc--;
+      const i0 = (yc * W + cx) * 4, plafond = Math.min(1, 80 / Math.max(1, max3(i0)));
+      const r0 = p[i0] * plafond, g0 = p[i0 + 1] * plafond, b0 = p[i0 + 2] * plafond;
+      for (let y = yc + 1; y < H + ext; y++) {
+        const t = (y - yc) / (H + ext - yc), k = 0.4 + 0.6 * Math.pow(1 - Math.min(1, t * 3), 2);
+        const i = (y * W + cx) * 4;
+        p[i] = r0 * k; p[i + 1] = g0 * k; p[i + 2] = b0 * k; p[i + 3] = Math.round(255 * Math.min(1, 1.5 * (1 - t)));
+      }
+    }
+    x.putImageData(d, 0, 0);
+    scene.textures.addCanvas(cle, c);
+  }
+  return { cle, origineY: H / (H + ext) };
+}
+
 function addProceduralForest(scene, height, levelWidth, avoidRanges = [], canopyView = false, screenBottom = false, base = null) {
   // Ligne de base / ciel qui se révèle : prioritaires sur l'ancien ancrage au
   // bas de l'ÉCRAN (`treesAtScreenBottom`, incompatible avec une caméra qui monte).
@@ -250,8 +284,12 @@ function addProceduralForest(scene, height, levelWidth, avoidRanges = [], canopy
   scatterAlongLevel(scene, levelWidth, avoidRanges, ARBRE_SPACING_MIN, ARBRE_SPACING_MAX, (x) => {
     const variant = Phaser.Math.Between(0, ARBRE_COUNT - 1);
     const scale = ARBRE_BASE_SCALE * Phaser.Math.FloatBetween(0.85, 1.15);
-    const img = scene.add.image(x, groundY, `${ARBRE_TEXTURE_PREFIX}${variant}`)
-      .setOrigin(0.5, 1)
+    // Plan collé au monde verticalement : le pied des arbres est prolongé vers le bas (fondu sombre) pour qu'aucun
+    // bord net ni vide n'apparaisse sous eux quand la caméra descend (trou, bas du niveau)
+    const pied = !screenBottom && !base && !canopyView ? arbreAvecPied(scene, `${ARBRE_TEXTURE_PREFIX}${variant}`,
+      ((scene.physics && scene.physics.world ? Math.max(scene.physics.world.bounds.height, height) : height * 2) - groundY + 120) / scale) : null;
+    const img = scene.add.image(x, groundY, pied ? pied.cle : `${ARBRE_TEXTURE_PREFIX}${variant}`)
+      .setOrigin(0.5, pied ? pied.origineY : 1)
       .setScale(scale)
       .setFlipX(Math.random() < 0.5)
       // Au camp de Geralt, le pied du décor reste au bas du cadre.
