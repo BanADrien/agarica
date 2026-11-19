@@ -1060,6 +1060,11 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
   // champignons. Seuls les pixels vifs (chapeaux) restent émissifs : sans ça ils ne brillaient que sous un rayon de la canopée
   const MOTTES_LUMINEUSES = /^decor-sous-bois-(6|8|11)$|souche_champignons|champignon_etagere/;
   const SEUIL_MOTTES = 0.6;
+  // Plan d'arbres du fond : des champignons bleus sont peints au pied des troncs (arbres 3, 4, 6, 7, luminosité >= 0,74 ;
+  // feuillage bleuté <= 0,61). Seuls ces pixels restent émissifs : sinon ils ne s'allumaient qu'au passage d'une tache
+  // de lumière de la canopée, qui glisse sur ce plan lointain quand la caméra avance
+  const ARBRES_FOND = /^decor-arbre-\d+/;
+  const SEUIL_ARBRES_FOND = 0.72;
   const SEUIL_FLAMMES = 0.62;
   // RÈGLE : toute source visible déclare sa `forme` (clé de FORMES), calée sur les limites opaques de son image :
   // flamme = triangle, groupe large = rectangle, élément rond isolé = cercle. Jamais un point (test 20 de lumiere:tests).
@@ -1203,6 +1208,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
         // mottes à champignons lumineux du sous-bois : leurs chapeaux brillent toujours (sinon ils ne s'allument que sous un
         // rayon ou une tache de lumière qui passe), le reste de la motte reste éclairé comme le décor
         else if (MOTTES_LUMINEUSES.test(cle)) emissif(o, SEUIL_MOTTES);
+        else if (ARBRES_FOND.test(cle)) emissif(o, SEUIL_ARBRES_FOND);
         else if (o.blendMode === Phaser.BlendModes.ADD || EMISSIFS.test(cle)) emissif(o);
       }
       // Le halo en paliers remplace le halo doux et la flaque de lumière dessinés par le feu du jeu
