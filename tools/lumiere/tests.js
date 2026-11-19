@@ -17,6 +17,7 @@ const CPU = require('./cpu.js');
 const { lirePng } = require('./png.js');
 const GEO = require('./geo.js');
 const LightKit = require('../../src/utils/LightKit.js');
+const AmbianceEffets = require('../../src/utils/AmbianceEffets.js');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PAL = 4, CONTRE = 1.5;
@@ -553,6 +554,27 @@ function tAuSol() {
   const v1 = LightKit.partAuSol(sol, 60, 2), v1bis = LightKit.partAuSol(sol, 60, 2), v2 = LightKit.partAuSol(sol, 60, 3);
   return [...debut, v1 === 0.5, v1bis === 0.5, v2 === 0].every(Boolean);
 }
+// 23 : effets d'ambiance. Rafales et nuages montent et redescendent sans saut, à 0 entre deux ; l'heure du soir reste
+// dans [0, 1] et revient en boucle ; mélange de couleurs exact aux bornes.
+function tAmbianceEffets() {
+  const E = AmbianceEffets;
+  const bornes = E.enveloppe(0, 0, 4) === 0 && E.enveloppe(4, 0, 4) === 0 && Math.abs(E.enveloppe(2, 0, 4) - 1) < 1e-9;
+  let saut = 0, avant = 0, vus = 0, nul = true;
+  const ev = E.evenements({ entre: [5, 5], duree: 2 }, () => 0, 1);
+  for (let i = 0; i <= 2000; i++) {
+    const v = ev(i / 100);
+    saut = Math.max(saut, Math.abs(v - avant));
+    if (v > 0.99 && avant <= 0.99) vus++;
+    if (i / 100 > 3.05 && i / 100 < 7.95 && v !== 0) nul = false;
+    avant = v;
+  }
+  let soir = true;
+  for (let p = 0; p <= 3; p += 0.01) { const h = E.heureSoir(p, true), m = E.heureSoir(p, false); if (h < 0 || h > 1 || m < 0 || m > 1) soir = false; }
+  soir = soir && E.heureSoir(0, true) === 0 && Math.abs(E.heureSoir(0.5, true) - 1) < 1e-9 && E.heureSoir(5, false) === 1;
+  const couleurs = E.melange(0x102030, 0xffffff, 0) === 0x102030 && E.melange(0x102030, 0xffffff, 1) === 0xffffff;
+  return { ok: bornes && saut < 0.05 && vus >= 3 && nul && soir && couleurs, saut, vus };
+}
+
 // 22 : une lumière disparaît avec son élément (cassé, caché, transparent, désactivé, détruit)
 function tSourcePresente() {
   const o = (v) => ({ scene: {}, active: true, visible: true, alpha: 1, ...v });
@@ -741,6 +763,8 @@ function main() {
   const mq = tMasque();
   ajout('17 masque de canopee', 'rayon et camera', mq.dans === 1 && mq.hors === 0 && mq.sousSol === 0 && mq.ecarts === 0,
     `dans le rayon ${mq.dans} ; hors du rayon ${mq.hors} ; sous le sol ${mq.sousSol} ; points differents selon la camera : ${mq.ecarts} / 400`);
+  const ae = tAmbianceEffets();
+  ajout('23 effets d ambiance : rafales, nuages, soir', 'AmbianceEffets', ae.ok, `saut max ${ae.saut.toFixed(3)} par 1/100 s ; ${ae.vus} evenements sur 20 s`);
   ajout('22 la lumiere disparait avec son element', 'LightKit.sourcePresente', tSourcePresente(), 'casse, cache, transparent, desactive ou detruit : plus de lumiere');
   ajout('21 rien sous le sprite : seulement au sol', 'LightKit.partAuSol', tAuSol(), 'au sol : dessous sombre ; en l\'air : dessous eclaire, en fondu');
   ajout('19 source derriere le sprite : profondeur selon le plan', 'LightKit.zLampe', tProfondeurSource(), 'derriere un personnage : contre-jour ; decor ou source au premier plan : devant');

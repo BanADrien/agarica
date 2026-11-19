@@ -221,6 +221,16 @@ est rangé à sa première image : interface et effets additifs gardés tels que
 est démonté à l'arrêt de la scène. Ce qui est propre au test (panneau, touches, énergie pleine, formes prêtées) reste dans
 `ForetLumiereScene`.
 
+### Effets d'ambiance (AmbianceEffets)
+
+`src/utils/AmbianceEffets.js` ajoute 13 effets à une ambiance, chacun coupable : poussière dans les rayons, ombres de feuilles
+mouvantes (uniform `uTaches` du masque, coupé par défaut), rafales, nuages, lucioles qui éclairent (source `luciole`, forme
+cercle), brume éclairée, fonds bleutés et voilés, gouttes et flaques, feuilles qui tombent, fougères qui s'écartent, animaux
+furtifs, fin de journée, clairière (canopée ouverte dans le masque). Réglages : `src/data/ambiance_effets.js`. Une ambiance les
+active avec `effets: AMBIANCE_EFFETS.foret` dans `AMBIANCES_LUMIERE` (aucune ne le fait encore) ; la zone de test
+`foret_ambiance` (`?zone=foret_ambiance` ou Options > Zones de test) les essaie tous : U / J choisir, H couper, L activer.
+Images chargées à la demande : `assets/sprites/oiseau_foret.png` (4 cases de 48 x 47) et `assets/vfx/ambiance/flaque_eau.png`.
+
 Cartes : rien au démarrage. En entrant dans une zone à ambiance, celles d'Agarica se chargent en fond, puis chaque sprite demande
 les cartes de son animation à son premier affichage (éclairé à plat en attendant). Nouvel ennemi courant : l'ajouter à
 `tools/lumiere/cartes-jeu.js`, puis `npm run lumiere:cartes -- <nom>`.

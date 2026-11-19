@@ -25,6 +25,7 @@ const AmbianceKit = (() => {
 precision highp float;
 uniform sampler2D uMainSampler;
 uniform float uFaisceau;
+uniform vec3 uCouleur;
 varying vec2 outTexCoord;
 ${LightKit.FRAG_MASQUE}
 void main() {
@@ -33,11 +34,12 @@ void main() {
   if (k <= 0.0) discard;
   float h = clamp(1.0 - m.y / 640.0, 0.3, 1.0);
   float a = k * h * uFaisceau;
-  gl_FragColor = vec4(vec3(1.0, 0.92, 0.66) * a, a);
+  gl_FragColor = vec4(uCouleur * a, a);
 }`,
       });
       this.masque = null;
       this.faisceau = 0;
+      this.couleur = [1, 0.92, 0.66];   // lumière des faisceaux (AmbianceEffets la réchauffe en fin de journée)
     }
 
     onRender(scene, camera) {
@@ -46,8 +48,10 @@ void main() {
       const M = camera.matrix;
       this.set1i('uMasque', 1);
       this.set1f('uFaisceau', this.faisceau);
+      this.set3f('uCouleur', ...this.couleur);
       this.set4f('uMasqueGeo', mq.pente, mq.u0, mq.cel, mq.n);
       this.set4f('uMasqueAnim', mq.amp, mq.t, mq.bande, 1);
+      this.set4f('uTaches', ...(mq.taches || [0, 1, 0, 0]));
       this.set2f('uMasqueHaut', mq.haut, mq.plage);
       this.set4f('uMondeEcran', 1 / M.a, camera.scrollX - M.e / M.a, camera.scrollY - M.f / M.d, this.renderer.height);
     }
@@ -107,6 +111,8 @@ void main() {
     st.sources = LightKit.sourcesLumineuses(scene, { max: 6 });
     appliquerRendu(st);
     ranger(st);
+    // Effets d'ambiance supplémentaires (src/data/ambiance_effets.js) : seulement ceux que l'ambiance déclare
+    if (v.effets && typeof AmbianceEffets !== 'undefined') AmbianceEffets.installer(st, v.effets);
     const surAjout = (o) => st.fraiches.push(o);
     const surRendu = () => ranger(st);
     const surImage = (t, delta) => image(st, delta);
@@ -162,6 +168,15 @@ void main() {
       for (let i = a; i < b && i < n; i++) d[i * 4] = i - a < 2 || b - 1 - i < 2 ? 128 : 255;
       u += l + vide * (0.3 + 1.4 * hasard());
     }
+    // Clairières (AmbianceEffets) : la canopée s'ouvre franchement au-dessus du sol de x0 à x1, bords déchiquetés
+    for (const c of st.clairieres || []) {
+      const ys = c.sol ?? 448;
+      for (let i = 0; i < n; i++) {
+        const x = U0 + (i + 0.5) * CELLULE + pente * ys;
+        const bord = Math.min(x - c.x0, c.x1 - x);
+        if (bord > 0) d[i * 4] = bord < 6 + 18 * (d[i * 4 + 2] / 255) ? Math.max(d[i * 4], 128) : 255;
+      }
+    }
     ctx.putImageData(im, 0, 0);
     tex.refresh();
     tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -169,6 +184,7 @@ void main() {
       tex: tex.source[0].glTexture, pente, u0: U0, cel: CELLULE, n, amp: v.balancement, t: 0, bande: BANDE, haut, plage,
       lire: (w) => { const i = Math.min(n - 1, Math.max(0, Math.floor(w * n))) * 4; return { r: d[i] / 255, g: d[i + 1] / 255, b: d[i + 2] / 255 }; },
     };
+    if (st.taches) st.masque.taches = st.taches;
     LightKit.reglerRendu(scene, { masque: st.masque });
     const pl = scene.game.renderer.pipelines.get(NOM_PIPELINE);
     if (pl) pl.masque = st.masque;
@@ -256,7 +272,7 @@ void main() {
       d.x += d.vx * dt; d.y += d.vy * dt;
       const wx = v.left + (((d.x + 8 * Math.sin(t * 0.7 + d.ph)) % l) + l) % l, wy = v.top + ((d.y % h) + h) % h;
       d.p.setPosition(Math.round(wx), Math.round(wy));
-      const k = st.eclairage ? LightKit.masqueSoleil({ x: wx, y: wy }, mq) : 0;
+      const k = st.eclairage && st.poussiereActive !== false ? LightKit.masqueSoleil({ x: wx, y: wy }, mq) * (st.facteurRayons ?? 1) : 0;
       d.p.setAlpha(k * (0.45 + 0.45 * Math.sin(t * 1.3 + d.ph) ** 2));
     }
   }
