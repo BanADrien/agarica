@@ -254,31 +254,37 @@ void main() {
       const pl = pipelineBrume(scene.game);
       pl.masque = st.masque;
       const cle = scene.textures.exists('item-couche_nappe_brume') ? 'item-couche_nappe_brume' : null;
+      // Nappes fixes dans le monde, chacune posée une fois sur le sol sous son milieu : ni la caméra ni le joueur ne
+      // les déplacent (elles ne sautent plus avec Agarica). Profondeur entre le voile des fonds (-0,75) et le premier
+      // plan (0) : la brume reste derrière les blocs de terre, les champignons lumineux et le feu, sans les ternir.
       const morceaux = [];
-      let largeur = 0, decalage = 0, niveau = null;
       if (cle) {
-        for (let i = 0; i < 3; i++) {
-          const im = marquer(scene.add.image(0, 0, cle).setOrigin(0, 0.5).setDepth(CHARACTER_DEPTH - 1).setPipeline(NOM_BRUME));
-          im.setDisplaySize(im.width * 0.7, r.hauteur);
-          largeur = im.displayWidth;
-          morceaux.push(im);
+        // la nappe est découpée en 4 tranches posées chacune sur le sol sous leur milieu : elle suit les marches du terrain
+        const tex = scene.textures.get(cle), src = tex.getSourceImage(), N = 4, sw = Math.floor(src.width / N);
+        for (let i = 0; i < N; i++) if (!tex.has('tranche' + i)) tex.add('tranche' + i, 0, i * sw, 0, sw, src.height);
+        const largeur = sw * 0.7;
+        const fin = scene.physics && scene.physics.world ? scene.physics.world.bounds.width : 4000;
+        for (let x = 0, i = 0; x < fin; x += largeur, i++) {
+          const y = typeof groundStandYAt === 'function' ? groundStandYAt(scene, x + largeur / 2, r.sol) : r.sol;
+          if (y === null || y === undefined) continue;   // au-dessus d'un trou : pas de nappe
+          const im = marquer(scene.add.image(x, y - r.hauteur * 0.3, cle, 'tranche' + (i % N)).setOrigin(0, 0.5).setDepth(-0.6)
+            .setPipeline(NOM_BRUME));
+          im.setDisplaySize(largeur, r.hauteur);
+          morceaux.push({ im, x });
         }
       }
       return {
-        activer: (oui) => { for (const m of morceaux) m.setVisible(oui); },
-        image(dt) {
+        activer: (oui) => { for (const m of morceaux) m.im.setVisible(oui); },
+        image(dt, t) {
           if (!morceaux.length) return;
           pl.masque = st.masque;
           pl.reglages.sombre = rgb(r.sombre);
           pl.reglages.claire = rgb(melange(r.claire, 0xffb070, ctrl.heure * 0.6));
           pl.reglages.alphas = [r.alpha, r.alphaRayon, st.eclairage ? ctrl.rayons : 0];
-          decalage = (decalage + r.vitesse * (1 + 3 * ctrl.vent) * dt) % largeur;
-          const v = vue(ctrl), x0 = Math.floor((v.left - decalage) / largeur) * largeur + decalage;
-          // nappe posée sur le sol sous le centre de la vue (zones à plusieurs hauteurs), suivi lent sans à-coup
-          const s = sol(scene, (v.left + v.right) / 2);
-          niveau = niveau === null ? s : niveau + (s - niveau) * Math.min(1, dt * 2);
-          const y = niveau - r.hauteur * 0.3;
-          morceaux.forEach((m, i) => m.setPosition(Math.round(x0 + i * largeur), Math.round(y)));
+          // dérive lente sur place, commune à toutes les nappes (bout à bout, sans trou), poussée par le vent
+          const amp = r.vitesse * 4 * (1 + 3 * ctrl.vent);
+          const dx = Math.round(Math.sin(t * 0.08) * amp);
+          for (const m of morceaux) m.im.x = m.x + dx;
         },
       };
     },
@@ -520,7 +526,8 @@ void main() {
             fin = null; avant = -1;
           } else if (y !== null) {
             if (avant === -1 && x > 0 && !libre(x - l, x, feux)) bord(x + 3, y);
-            ajouter(x + l / 2, y, 'ambiance-herbe-bande', 'b' + v, B.souple, B.angle); avant = v; fin = [x + l, y];
+            // bande enfoncée un peu plus que les touffes : son bas irrégulier se perd dans l'herbe des cellules du sol
+            ajouter(x + l / 2, y + (B.enfonce || 0), 'ambiance-herbe-bande', 'b' + v, B.souple, B.angle); avant = v; fin = [x + l, y];
           } else { avant = -1; fin = null; }
           x += l;
         }

@@ -60,7 +60,7 @@ const AMBIANCE_EFFETS = {
     // (`vent`, en plus d'une ondulation `ondule`, multiplié par `souple`) et quand Agarica passe (`angle`, à moins
     // de `portee` px de leur bord)
     herbes: {
-      bande: { fichier: 'assets/decors/ambiance/herbe_bande.png', cases: [[0, 48], [48, 48], [96, 48]], souple: 0.4, angle: 5 },
+      bande: { fichier: 'assets/decors/ambiance/herbe_bande.png', cases: [[0, 48], [48, 48], [96, 48]], souple: 0.4, angle: 5, enfonce: 2 },
       touffes: {
         fichier: 'assets/decors/ambiance/herbes_hautes.png',
         cases: [[0, 14, 4], [21, 18, 5], [45, 25, 4], [76, 29, 2], [109, 32, 1], [146, 23, 4]],
