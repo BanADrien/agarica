@@ -110,6 +110,7 @@ uniform vec4 uMasqueGeo;    // pente, debut, taille d'une cellule, nombre de cel
 uniform vec4 uMasqueAnim;   // balancement (px), temps, bande eclairee sous l'arrivee, actif
 uniform vec2 uMasqueHaut;   // hauteur du debut du masque, plage de hauteurs couverte (px du monde)
 uniform vec4 uMondeEcran;   // px du monde par px du canvas, decalage x, decalage y, hauteur du canvas
+uniform vec4 uTaches;       // ombres de feuilles dans les rayons : force (0 = coupe), taille (px du monde), decalage x, y
 vec2 pointMonde() {
   return vec2(gl_FragCoord.x, uMondeEcran.w - gl_FragCoord.y) * uMondeEcran.x + uMondeEcran.yz;
 }
@@ -125,14 +126,33 @@ float masqueSoleil(vec2 m) {
   if (m.y > uMasqueHaut.x + c.g * uMasqueHaut.y + uMasqueAnim.z) return 0.0;
   return c.r;
 }
+// Ombres des feuilles qui glissent dans les rayons : bruit de valeur sur une grille de 2 px du monde (pixel art)
+float bruitTaches(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
+  float b = fract(sin(dot(i + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5453);
+  float c = fract(sin(dot(i + vec2(0.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+  float d = fract(sin(dot(i + vec2(1.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+float taches(vec2 m) {
+  if (uTaches.x <= 0.0) return 1.0;
+  vec2 p = floor(m / 2.0) * 2.0 / uTaches.y + uTaches.zw;
+  float n = bruitTaches(p) * 0.65 + bruitTaches(p * 2.13 + 7.31) * 0.35;
+  return 1.0 - uTaches.x * smoothstep(0.5, 0.58, n);
+}
 // Moyenne du masque autour du point : bords fondus pour les faisceaux et les taches du decor (r : rayon en px du monde)
 float masqueDoux(vec2 m, float r) {
   float s = masqueSoleil(m) * 2.0;
   s += masqueSoleil(m + vec2(-1.0, -0.35) * r) + masqueSoleil(m + vec2(1.0, 0.35) * r);
   s += masqueSoleil(m + vec2(-0.66, 0.25) * r) + masqueSoleil(m + vec2(0.66, -0.25) * r);
   s += masqueSoleil(m + vec2(-0.33, -0.2) * r) + masqueSoleil(m + vec2(0.33, 0.2) * r);
-  return s / 8.0;
+  return s / 8.0 * taches(m);
 }`;
+
+  // uTaches par défaut : ombres de feuilles coupées (force 0). masque.taches = [force, taille, dx, dy] les allume.
+  const TACHES_COUPEES = [0, 1, 0, 0];
 
   // masqueSoleil() du shader, ligne à ligne. M : { lire(v) -> { r, g, b }, pente, u0, cel, n, amp, t, bande, haut, plage }
   function masqueSoleilJs(m, M) {
@@ -699,6 +719,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
             pl.masqueTex = mq.tex;
             pl.set1i('uMasque', 6);
             pl.set4f('uMasqueAnim', mq.amp, mq.t, mq.bande, 1);
+            pl.set4f('uTaches', ...(mq.taches || TACHES_COUPEES));
             pl.set4f('uMasqueGeo', mq.pente, mq.u0, mq.cel, mq.n);
             pl.set2f('uMasqueHaut', mq.haut, mq.plage);
             pl.set4f('uMondeEcran', 1 / Mc.a, camera.scrollX - Mc.e / Mc.a, camera.scrollY - Mc.f / Mc.d, this.renderer.height);
@@ -790,6 +811,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
         this.set1f('uEmissif', go.__lumiereEmissif || 0);
         const mq = this._reglages.masque;
         this.set4f('uMasqueAnim', mq ? mq.amp : 0, mq ? mq.t : 0, mq ? mq.bande : 0, mq ? 1 : 0);
+        this.set4f('uTaches', ...((mq && mq.taches) || TACHES_COUPEES));
         if (mq) {
           const Mc = this._camera.matrix;
           this.set1i('uMasque', 6);
@@ -1030,6 +1052,8 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
     // profondeur : pour le décor du même plan ; arriere : pour un personnage affiché devant la source (contre-jour seul)
     feu: { forme: 'triangle', base: 0.45, couleur: 0xffc46e, intensite: 0.85, gainDecor: 1.4, gainContre: 1.2, gainCote: 1.3, portee: 317, profondeur: 60, arriere: -18, cote: { de: 0, a: 24, z: 8, zFace: 30 }, vacille: 0.1, halo: 280 },
     champignon: { forme: 'rectangle', couleur: 0x1caada, intensite: 0.85, portee: 112, profondeur: 30, arriere: -14, vacille: 0.05, halo: 0 },
+    // Luciole qui éclaire vraiment : petite, sa lumière suit son clignotement (suitAlpha) et s'éteint avec elle
+    luciole: { forme: 'cercle', couleur: 0xd8ffb0, intensite: 0.55, portee: 64, profondeur: 14, arriere: -10, vacille: 0.12, halo: 0, suitAlpha: true },
   };
 
   // Limites opaques d'une image RGBA : colonnes et lignes extrêmes ; haut : première ligne assez pleine (15 % de la plus
@@ -1194,12 +1218,25 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
         }
         const b = s.o.getBounds(), y = b.y + b.height * 0.6;
         const flamme = 1 + s.def.vacille * (0.5 * Math.sin(t * 7.3 + s.ph) + 0.3 * Math.sin(t * 13.1 + s.ph * 2) + 0.2 * Math.sin(t * 3.1 + s.ph));
-        s.L.setPosition(s.o.x, y).setVisible(s.allumee).setIntensity(s.def.intensite * s.force * flamme);
+        const clignote = s.def.suitAlpha ? s.o.alpha : 1;
+        s.L.setPosition(s.o.x, y).setVisible(s.allumee).setIntensity(s.def.intensite * s.force * flamme * clignote);
         if (s.halo) s.halo.setPosition(Math.round(s.o.x), Math.round(y)).setVisible(actives).setAlpha(0.24 * s.force * flamme);
       }
     };
+    // Source ajoutée ou retirée à la main (lucioles d'AmbianceEffets) : mêmes règles que celles trouvées par scanner()
+    const retirer = (o) => {
+      const i = liste.findIndex((s) => s.o === o);
+      if (i < 0) return;
+      const s = liste[i];
+      scene.lights.removeLight(s.L);
+      if (s.halo) s.halo.destroy();
+      liste.splice(i, 1);
+    };
     scanner();
-    return { liste, scanner, maj, actif: (oui) => { actives = oui; } };
+    return {
+      liste, scanner, maj, ajouter, retirer, actif: (oui) => { actives = oui; },
+      get max() { return max; }, set max(v) { max = v; },
+    };
   }
 
   // A une carte (sprite préparé par tools/sections.js) ? Utile pour n'éclairer que ceux-là.
