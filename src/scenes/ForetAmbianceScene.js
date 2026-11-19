@@ -3,6 +3,25 @@
 // Touches : U / J choisir, H / L couper / activer (vitesse du soir : moins / plus ; ligne « tout » : tout couper /
 // tout activer), W panneau, G éclairage coupé.
 
+// Propositions de sol, essayées ICI seulement (les vraies zones gardent assets/decors/tuiles.png) : un atlas par
+// proposition, même disposition que tuiles.png (cases de 24 px, cf. tools/cut_tuiles.py) ; `frange` : hauteur (px) des
+// herbes de surface de cet atlas. Ligne « sol » du panneau : 0 = sol actuel, 1 à 6 = propositions.
+const SOLS_ESSAI = [
+  { nom: 'terre et racines', fichier: 'assets/decors/sols_essai/terre-racines.png', frange: 9 },
+  { nom: 'mousse epaisse', fichier: 'assets/decors/sols_essai/mousse-epaisse.png', frange: 12 },
+  { nom: 'feuilles mortes', fichier: 'assets/decors/sols_essai/feuilles-mortes.png', frange: 12 },
+  { nom: 'schiste froid', fichier: 'assets/decors/sols_essai/schiste-froid.png', frange: 12 },
+  { nom: 'tourbe et champignons', fichier: 'assets/decors/sols_essai/tourbe-champignons.png', frange: 11 },
+  { nom: 'argile et galets', fichier: 'assets/decors/sols_essai/argile-galets.png', frange: 8 },
+];
+const SOL_ESSAI_CASES = {
+  A1: [0, 0], A2: [1, 0], A3: [2, 0], A4: [0, 1], A5: [1, 1], A6: [2, 1], A7: [0, 2], A8: [1, 2], A9: [2, 2], B: [0, 3],
+  C1: [3, 0], C2: [4, 0], C3: [5, 0], C4: [5, 1], C5: [5, 2], C6: [5, 3], C7: [5, 4],
+  D1: [3, 1], D2: [4, 1], D3: [3, 2], D4: [4, 2], D5: [3, 3], D6: [4, 3],
+};
+// herbes de surface dans ces atlas : x, y, largeur (hauteur = frange)
+const SOL_ESSAI_HERBES = { grass_mid: [24, 72, 24], grass_left: [22, 120, 26], grass_right: [72, 120, 26], grass_single: [0, 100, 28] };
+
 class ForetAmbianceScene extends Phaser.Scene {
   constructor() {
     super('ForetAmbianceScene');
@@ -30,7 +49,7 @@ class ForetAmbianceScene extends Phaser.Scene {
     const st = AmbianceKit.installer(this, data, AMBIANCES_LUMIERE.foret);
     // fin de journée en boucle et accélérée pour pouvoir la juger (x20 : une boucle en 30 s)
     const ctrl = AmbianceEffets.installer(st, AMBIANCE_EFFETS.foret, { boucleSoir: true, vitesseSoir: 20 });
-    const p = { st, ctrl, visible: true, ligne: 0 };
+    const p = { st, ctrl, visible: true, ligne: 0, sol: 0 };
     this.__foretAmb = p;
     LaboLumiereScene.prototype.laboFormes.call(this);
     p.texte = document.createElement('pre');
@@ -47,7 +66,8 @@ class ForetAmbianceScene extends Phaser.Scene {
   ambLignes() {
     const ctrl = this.__foretAmb.ctrl;
     const effets = ctrl ? AMBIANCE_EFFETS_LISTE.filter((e) => ctrl.effets[e.id]) : [];
-    return [...effets.map((e) => ({ ...e, type: 'effet' })), { id: 'vitesse', type: 'vitesse' }, { id: 'tout', type: 'tout' }];
+    return [...effets.map((e) => ({ ...e, type: 'effet' })), { id: 'sol', type: 'sol' }, { id: 'vitesse', type: 'vitesse' },
+      { id: 'tout', type: 'tout' }];
   }
 
   ambTouches() {
@@ -57,6 +77,7 @@ class ForetAmbianceScene extends Phaser.Scene {
       const l = this.ambLignes()[p.ligne], ctrl = p.ctrl;
       if (!l || !ctrl) return;
       if (l.type === 'effet') AmbianceEffets.basculer(ctrl, l.id, sens > 0);
+      else if (l.type === 'sol') this.ambSol(Phaser.Math.Wrap(p.sol + sens, 0, SOLS_ESSAI.length + 1));
       else if (l.type === 'vitesse') ctrl.vitesseSoir = Phaser.Math.Clamp(ctrl.vitesseSoir * (sens > 0 ? 2 : 0.5), 1, 160);
       else for (const id of Object.keys(ctrl.effets)) AmbianceEffets.basculer(ctrl, id, sens > 0);
     };
@@ -68,6 +89,38 @@ class ForetAmbianceScene extends Phaser.Scene {
     sur('W', () => { p.visible = !p.visible; p.texte.style.display = p.visible ? '' : 'none'; });
   }
 
+  // Sol n (0 = actuel) : chaque case et chaque herbe du sol reprend la même case dans l'atlas de la proposition ;
+  // positions, tailles, teintes et collisions ne changent pas
+  ambSol(n) {
+    const p = this.__foretAmb;
+    p.sol = n;
+    const cle = n ? `sol-essai-${n}` : null;
+    if (cle && !this.textures.exists(cle)) {
+      this.load.image(cle, SOLS_ESSAI[n - 1].fichier);
+      this.load.once(`filecomplete-image-${cle}`, () => { if (p.sol === n) this.ambSol(n); });
+      this.load.start();
+      return;
+    }
+    if (cle) {
+      const tex = this.textures.get(cle), fr = SOLS_ESSAI[n - 1].frange;
+      for (const [nom, [cx, cy]] of Object.entries(SOL_ESSAI_CASES)) if (!tex.has(nom)) tex.add(nom, 0, cx * 24, cy * 24, 24, 24);
+      for (const [nom, [x, y, l]] of Object.entries(SOL_ESSAI_HERBES)) if (!tex.has(nom)) tex.add(nom, 0, x, y, l, fr);
+    }
+    const prefixe = 'autotile-atlas-';
+    for (const o of this.children.list) {
+      if (!o.texture) continue;
+      if (!o.__solCase) {
+        if (!o.texture.key.startsWith(prefixe)) continue;
+        o.__solCase = o.texture.key.slice(prefixe.length);
+      }
+      const herbe = o.__solCase.startsWith('grass');
+      if (!herbe && !SOL_ESSAI_CASES[o.__solCase]) continue;
+      if (cle) o.setTexture(cle, o.__solCase); else o.setTexture(prefixe + o.__solCase);
+      if (!herbe) o.setDisplaySize(GROUND_TILE_SIZE, GROUND_TILE_SIZE);
+    }
+    this.ambPanneau();
+  }
+
   ambPanneau() {
     const p = this.__foretAmb;
     if (!p || !p.texte) return;
@@ -76,6 +129,7 @@ class ForetAmbianceScene extends Phaser.Scene {
     this.ambLignes().forEach((l, i) => {
       const c = i === p.ligne ? '>' : ' ';
       if (l.type === 'effet') lignes.push(`${c} ${ctrl.actif[l.id] ? 'oui' : 'non'}  ${l.nom}`);
+      else if (l.type === 'sol') lignes.push(`${c} sol ${p.sol} : ${p.sol ? SOLS_ESSAI[p.sol - 1].nom : 'actuel'}  (H / L)`);
       else if (l.type === 'vitesse') lignes.push(`${c} soir x${ctrl.vitesseSoir}  (heure ${ctrl.heure.toFixed(2)})`);
       else lignes.push(`${c} TOUT   H : tout couper   L : tout activer`);
     });
