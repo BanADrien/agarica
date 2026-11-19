@@ -255,7 +255,7 @@ void main() {
       pl.masque = st.masque;
       const cle = scene.textures.exists('item-couche_nappe_brume') ? 'item-couche_nappe_brume' : null;
       const morceaux = [];
-      let largeur = 0, decalage = 0;
+      let largeur = 0, decalage = 0, niveau = null;
       if (cle) {
         for (let i = 0; i < 3; i++) {
           const im = marquer(scene.add.image(0, 0, cle).setOrigin(0, 0.5).setDepth(CHARACTER_DEPTH - 1).setPipeline(NOM_BRUME));
@@ -274,7 +274,10 @@ void main() {
           pl.reglages.alphas = [r.alpha, r.alphaRayon, st.eclairage ? ctrl.rayons : 0];
           decalage = (decalage + r.vitesse * (1 + 3 * ctrl.vent) * dt) % largeur;
           const v = vue(ctrl), x0 = Math.floor((v.left - decalage) / largeur) * largeur + decalage;
-          const y = (r.sol ?? 448) - r.hauteur * 0.3;
+          // nappe posée sur le sol sous le centre de la vue (zones à plusieurs hauteurs), suivi lent sans à-coup
+          const s = sol(scene, (v.left + v.right) / 2);
+          niveau = niveau === null ? s : niveau + (s - niveau) * Math.min(1, dt * 2);
+          const y = niveau - r.hauteur * 0.3;
           morceaux.forEach((m, i) => m.setPosition(Math.round(x0 + i * largeur), Math.round(y)));
         },
       };
@@ -455,15 +458,16 @@ void main() {
         const sol = herbesDuSol();
         if (!sol.cadres.length || sol.signature === signature) return;
         signature = sol.signature;
-        const cache = (scene.__herbeCouleurs = scene.__herbeCouleurs || {});
+        // cache du jeu entier (les textures le sont aussi) : une zone suivante qui a le même sol reprend ses textures
+        const cache = (scene.game.__herbeCouleurs = scene.game.__herbeCouleurs || {});
         let suffixe = cache[signature];
-        if (!suffixe) {
+        if (!suffixe || !scene.textures.exists('ambiance-herbe-bande' + suffixe)) {
           const tous = sol.cadres.map(pixels), n = tous.reduce((s, d) => s + d.length, 0);
           const donnees = new Uint8ClampedArray(n);
           let o = 0;
           for (const d of tous) { donnees.set(d, o); o += d.length; }
           const palette = paletteDe(donnees);
-          suffixe = cache[signature] = `@sol${Object.keys(cache).length}`;
+          suffixe = suffixe || (cache[signature] = `@sol${Object.keys(cache).length}`);
           for (const base of ['ambiance-herbe-bande', 'ambiance-herbes']) {
             const tex = scene.textures.get(base), img = tex.getSourceImage();
             const c = document.createElement('canvas');
@@ -473,6 +477,7 @@ void main() {
             const im = x.getImageData(0, 0, c.width, c.height);
             im.data.set(remapperPalette(im.data, palette, { ombres: r.ombres ?? 0.2 }));
             x.putImageData(im, 0, 0);
+            if (scene.textures.exists(base + suffixe)) scene.textures.remove(base + suffixe);
             const neuve = scene.textures.addCanvas(base + suffixe, c);
             for (const nom of tex.getFrameNames()) {
               const f = tex.get(nom);
@@ -573,7 +578,19 @@ void main() {
       });
       const animsOiseau = () => especes.length > 0 && pretes().length === especes.length;
       // groupes de 1 à 4 oiseaux posés côte à côte ; tout le groupe s'envole quand Agarica approche
-      const groupes = (r.groupes || []).map((x) => ({ x, etat: 'pose', t: 0, oiseaux: [] }));
+      // places fixes (`groupes`) ou semées le long du niveau (`groupesAuto` : un groupe tous les `entre` px, sur un sol
+      // posé, loin des feux de camp et des bords du niveau)
+      const placesAuto = (A) => {
+        const largeur = scene.physics && scene.physics.world ? scene.physics.world.bounds.width : 4000;
+        const feux = scene.children.list.filter((o) => o.active && o.texture && /campfire/.test(o.texture.key)).map((o) => o.x);
+        const xs = [];
+        for (let x = A.marge + Math.random() * A.entre[0]; x < largeur - A.marge; x += A.entre[0] + Math.random() * (A.entre[1] - A.entre[0])) {
+          const y = typeof groundStandYAt === 'function' ? groundStandYAt(scene, x, 448) : 448;
+          if (y !== null && !feux.some((f) => Math.abs(f - x) < A.marge / 2)) xs.push(Math.round(x));
+        }
+        return xs;
+      };
+      const groupes = (r.groupes || (r.groupesAuto ? placesAuto(r.groupesAuto) : [])).map((x) => ({ x, etat: 'pose', t: 0, oiseaux: [] }));
       const poserGroupe = (G) => {
         for (const b of G.oiseaux) b.o.destroy();
         const g = groupeOiseaux(r.groupe);
@@ -592,8 +609,8 @@ void main() {
         for (const G of groupes) if (!G.oiseaux.length) poserGroupe(G);
       };
       poserOiseaux();
-      // silhouette : forme du loup du joueur (course), toute sombre, sur le plan des arbres lointains
-      const cleSil = scene.anims.exists('loup-run') ? 'loup-run' : null;
+      // silhouette (facultative, `silhouette`) : forme du loup du joueur (course), toute sombre, sur le plan des arbres lointains
+      const cleSil = r.silhouette && scene.anims.exists('loup-run') ? 'loup-run' : null;
       const voile = ctrl.effets.profondeur && ctrl.effets.profondeur.voile;
       const sil = cleSil ? marquer(scene.add.sprite(0, 0, 'loup-run-0').setOrigin(0.5, 1).setScrollFactor(r.silhouette.parallaxe, 1)
         .setTint(0x080b14).setAlpha(0).setScale(0.5).setDepth(0)) : null;
@@ -603,7 +620,7 @@ void main() {
         if (arbre) sil.setScrollFactor(r.silhouette.parallaxe, arbre.scrollFactorY);
         sil.play(cleSil);
       }
-      const course = evenements({ entre: r.silhouette.entre, duree: 5 }, Math.random, 4);
+      const course = sil ? evenements({ entre: r.silhouette.entre, duree: 5 }, Math.random, 4) : null;
       let sens = 1, enCourse = false, prog = 0;
       return {
         activer: (oui) => {
