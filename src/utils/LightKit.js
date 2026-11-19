@@ -192,6 +192,13 @@ float epaule(float v) {
 `;
 
   const FRAG_SOURCES = `// Source de decor derriere un personnage : la carte contre-jour ne compte pas sur les plans tournes vers le spectateur
+// Pixel d'un chapeau de champignon lumineux peint : bleu ou cyan vif et saturé, ou reflet presque blanc (uEmissif < 0).
+// Le masque vient des couleurs du dessin lui-même : il suit l'objet partout, quel que soit son placement.
+bool chapeauLumineux(vec3 c) {
+  float lum = dot(c, vec3(0.3, 0.59, 0.11));
+  return (c.b > 0.59 && c.b - c.r > 0.235 && c.g > 0.43 && lum > 0.5) || min(c.r, min(c.g, c.b)) > 0.8;
+}
+
 float expositionDecor(vec3 n, float ex) {
   return min(ex * 1.5, 1.0) * (1.0 - smoothstep(0.9, 0.97, n.z));
 }
@@ -402,6 +409,7 @@ void main() {
   float m = max(c.r, max(c.g, c.b));
   if (m > 0.0) c *= epaule(m) / m;
   if (uEmissif > 0.0 && max(dessin.r, max(dessin.g, dessin.b)) >= uEmissif * base.a) c = dessin;
+  else if (uEmissif < 0.0 && chapeauLumineux(dessin / max(base.a, 0.001))) c = dessin;
   vec4 color = vec4(c, base.a) * texel;
   if (outTintEffect == 1.0) color.rgb = outTint.bgr * outTint.a * base.a;   // setTintFill
   else if (outTintEffect == 2.0) color = texel;
@@ -697,7 +705,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
             const f = L.intensity * (L.attenuation ? L.attenuation(go) : 1);
             soleils++;
             sr += L.color.r * f; sg += L.color.g * f; sb += L.color.b * f;
-          } else if (Math.abs(L.x - go.x) <= atteinte && Math.abs(L.y - go.y) <= atteinte) atteintes.push(L);
+          } else if (!planLointain(go) && Math.abs(L.x - go.x) <= atteinte && Math.abs(L.y - go.y) <= atteinte) atteintes.push(L);
         }
         if (soleils + atteintes.length > maxi) return false;
         const avecMasque = sr > 0 || sg > 0 || sb > 0, avecLampes = atteintes.length > 0;
@@ -868,7 +876,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
             this.set3f(nomS + 'couleur', L.color.r * f, L.color.g * f, L.color.b * f);
             continue;
           }
-          if (Math.abs(L.x - go.x) > atteinte || Math.abs(L.y - go.y) > atteinte) continue;
+          if (planLointain(go) || Math.abs(L.x - go.x) > atteinte || Math.abs(L.y - go.y) > atteinte) continue;
           if (this.envoyerLampe(this, nb++, L, go, G) < 15) derriere = 1;
         }
         this.set1i('uNbLumieres', nb);
@@ -1056,15 +1064,20 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
   // additif). Le feu de camp est à part : ses flammes restent vives, ses bûches reçoivent la lumière du feu.
   const EMISSIFS = /champignons_lumineux|mousse_lumineuse|lanterne_allumee|luciole|cristal|portail|^item-fx_|juice-glow|halo|lueur|glow/;
   const FEU_DE_CAMP = /^decor-campfire-/;
-  // Décor à petits champignons lumineux : sous-bois 6, 8 et 11 (mottes, voir Cassables.js), souches et étagères à
-  // champignons. Seuls les pixels vifs (chapeaux) restent émissifs : sans ça ils ne brillaient que sous un rayon de la canopée
-  const MOTTES_LUMINEUSES = /^decor-sous-bois-(6|8|11)$|souche_champignons|champignon_etagere/;
-  const SEUIL_MOTTES = 0.6;
-  // Plan d'arbres du fond : des champignons bleus sont peints au pied des troncs (arbres 3, 4, 6, 7, luminosité >= 0,74 ;
-  // feuillage bleuté <= 0,61). Seuls ces pixels restent émissifs : sinon ils ne s'allumaient qu'au passage d'une tache
-  // de lumière de la canopée, qui glisse sur ce plan lointain quand la caméra avance
-  const ARBRES_FOND = /^decor-arbre-\d+/;
-  const SEUIL_ARBRES_FOND = 0.72;
+  // Décor où sont peints des champignons lumineux bleus : mottes du sous-bois 6, 8 et 11 (voir Cassables.js), souches à
+  // champignons, pied des arbres du fond. Seuls les pixels de couleur chapeau (chapeauLumineux() du shader, mode
+  // uEmissif < 0) restent émissifs : un seuil de luminosité allumait aussi la mousse verte des souches et les étagères
+  // orange, qui ne sont pas lumineuses. Le masque vient du dessin : il suit l'objet quel que soit son placement.
+  const CHAPEAUX_PEINTS = /^decor-sous-bois-(6|8|11)$|souche_champignons|^decor-arbre-\d+/;
+  const EMISSIF_CHAPEAUX = -1;
+  // Plan lointain (défilement < 1) : les lampes posées dans le monde (feu, champignons, lucioles) ne l'éclairent pas. Leur
+  // position, ramenée dans le repère de l'objet sans la parallaxe, tombait ailleurs et glissait avec la caméra.
+  const planLointain = (go) => go.scrollFactorX < 1 || go.scrollFactorY < 1;
+  // Même test que chapeauLumineux() du shader (couleurs 0 à 1, non prémultipliées), pour lumiere:tests
+  function chapeauLumineuxJs(r, g, b) {
+    const lum = 0.3 * r + 0.59 * g + 0.11 * b;
+    return (b > 0.59 && b - r > 0.235 && g > 0.43 && lum > 0.5) || Math.min(r, g, b) > 0.8;
+  }
   const SEUIL_FLAMMES = 0.62;
   // RÈGLE : toute source visible déclare sa `forme` (clé de FORMES), calée sur les limites opaques de son image :
   // flamme = triangle, groupe large = rectangle, élément rond isolé = cercle. Jamais un point (test 20 de lumiere:tests).
@@ -1205,10 +1218,9 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
         const cle = o.texture.key;
         if (FEU_DE_CAMP.test(cle)) { emissif(o, SEUIL_FLAMMES); ajouter(o, 'feu'); }
         else if (/champignons_lumineux/.test(cle)) { emissif(o); ajouter(o, 'champignon'); }
-        // mottes à champignons lumineux du sous-bois : leurs chapeaux brillent toujours (sinon ils ne s'allument que sous un
-        // rayon ou une tache de lumière qui passe), le reste de la motte reste éclairé comme le décor
-        else if (MOTTES_LUMINEUSES.test(cle)) emissif(o, SEUIL_MOTTES);
-        else if (ARBRES_FOND.test(cle)) emissif(o, SEUIL_ARBRES_FOND);
+        // champignons bleus peints (mottes, souches, pied des arbres du fond) : leurs chapeaux brillent toujours (sinon ils ne
+        // s'allument que sous un rayon qui passe), le reste de l'objet reste éclairé comme le décor
+        else if (CHAPEAUX_PEINTS.test(cle)) emissif(o, EMISSIF_CHAPEAUX);
         else if (o.blendMode === Phaser.BlendModes.ADD || EMISSIFS.test(cle)) emissif(o);
       }
       // Le halo en paliers remplace le halo doux et la flaque de lumière dessinés par le feu du jeu
@@ -1371,7 +1383,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
 
   return {
     NOM_PIPELINE, DEFAUTS, SOLEIL, FRAG_MASQUE, masqueSoleil: masqueSoleilJs, PRESETS, AMBIANCES, FRAG, FRAG_ECLAIRAGE,
-    zLampe, partAuSol, sourcePresente, FORMES, SOURCES, formeMonde, limitesAlpha, chargerCartes, filtrerCartes, demanderCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
+    zLampe, partAuSol, sourcePresente, planLointain, chapeauLumineuxJs, FORMES, SOURCES, formeMonde, limitesAlpha, chargerCartes, filtrerCartes, demanderCartes, activer, desactiver, eclairer, nePlusEclairer, aDesCartes, cleDe, pixelEcran,
     ajouterLumiere, ajouterSoleil, emissif, sourcesLumineuses, deplacer, regler, suivre, retirerLumiere, ambiance, reglerRendu, modeTest, porteeConseillee,
   };
 })();

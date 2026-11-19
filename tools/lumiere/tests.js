@@ -646,6 +646,37 @@ function tSourcePresente() {
   return [LightKit.sourcePresente(o()), !LightKit.sourcePresente(o({ visible: false })), !LightKit.sourcePresente(o({ alpha: 0 })),
     !LightKit.sourcePresente(o({ active: false })), !LightKit.sourcePresente(o({ scene: undefined })), !LightKit.sourcePresente(null)].every(Boolean);
 }
+// 27 : chapeaux peints. Sur les arbres du fond, aucun pixel lumineux dans le haut (couronne), des chapeaux dans le bas ;
+// sur la souche, la mousse verte ne brille pas ; un plan à défilement < 1 ne reçoit aucune lampe du monde.
+function tChapeaux() {
+  const D = path.join(ROOT, 'assets', 'decors');
+  let hautArbres = 0, arbres = 0, mousse = 0;
+  for (let i = 0; i < 8; i++) {
+    const f = path.join(D, 'arbres_frames', `arbre_${i}.png`);
+    if (!fs.existsSync(f)) continue;
+    const { width: w, height: h, data } = lirePng(f);
+    let top = h, bot = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3] > 127) { top = Math.min(top, y); bot = Math.max(bot, y); }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const k = (y * w + x) * 4;
+        if (data[k + 3] < 128 || !LightKit.chapeauLumineuxJs(data[k] / 255, data[k + 1] / 255, data[k + 2] / 255)) continue;
+        arbres++;
+        if ((y - top) / (bot - top + 1) < 0.6) hautArbres++;
+      }
+    }
+  }
+  const s = path.join(D, 'deco_item_frames', 'foret_sombre', 'foret_sombre_souche_champignons.png');
+  if (fs.existsSync(s)) {
+    const { data } = lirePng(s);
+    for (let k = 0; k < data.length; k += 4) {
+      const r = data[k], g = data[k + 1], b = data[k + 2];
+      if (data[k + 3] > 127 && g > r + 40 && g > b + 40 && LightKit.chapeauLumineuxJs(r / 255, g / 255, b / 255)) mousse++;
+    }
+  }
+  const lointain = LightKit.planLointain({ scrollFactorX: 0.35, scrollFactorY: 1 }) && !LightKit.planLointain({ scrollFactorX: 1, scrollFactorY: 1 });
+  return { ok: hautArbres === 0 && arbres > 1000 && mousse === 0 && lointain, hautArbres, arbres, mousse, lointain };
+}
 function tProfondeurSource() {
   const L = { profondeur: 60, arriere: -18, sourceObjet: { depth: 0 } };
   return [LightKit.zLampe(L, { depth: 10 }, true, 1) <= -15, LightKit.zLampe(L, { depth: 10 }, true, 2) <= -15,
@@ -835,6 +866,9 @@ function main() {
   const ae = tAmbianceEffets();
   const go = tGroupeOiseaux();
   const rp = tRemapPalette();
+  const cp = tChapeaux();
+  ajout('27 champignons peints : seuls les chapeaux brillent, aucune lampe sur un plan lointain', 'LightKit.chapeauLumineuxJs / planLointain', cp.ok,
+    `pixels lumineux dans les 60 % hauts des arbres : ${cp.hautArbres} ; dans les arbres : ${cp.arbres} ; mousse verte des souches : ${cp.mousse} ; plan lointain sans lampe : ${cp.lointain}`);
   ajout('26 souffle de l epee dans l herbe', 'AmbianceEffets.souffleAngle', tSouffle(), 'sens du coup, devant > derriere, rebond amorti, fini en 0,9 s');
   ajout('25 herbe a la couleur du sol : ordre, palette, alpha', 'AmbianceEffets.remapperPalette', rp.ok, `${rp.essais} images au hasard`);
   ajout('24 groupes d oiseaux : 1 a 4, departs en 0,7 s', 'AmbianceEffets.groupeOiseaux', go.ok, `tailles vues ${go.tailles.join(', ')} ; ecart max ${go.ecartMax.toFixed(3)} s`);
