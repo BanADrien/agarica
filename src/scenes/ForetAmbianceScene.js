@@ -5,14 +5,11 @@
 
 // Propositions de sol, essayées ICI seulement (les vraies zones gardent assets/decors/tuiles.png) : un atlas par
 // proposition, même disposition que tuiles.png (cases de 24 px, cf. tools/cut_tuiles.py) ; `frange` : hauteur (px) des
-// herbes de surface de cet atlas. Numéros de la planche de propositions (la 3, « feuilles mortes », écartée par
-// l'utilisateur, n'est plus proposée) ; 0 = sol actuel. Ctrl + Gauche / Droite passe au sol précédent / suivant.
+// herbes de surface de cet atlas. Numéros des planches de propositions ; 0 = sol actuel. Première série : seule la 5
+// est gardée par l'utilisateur (1, 2, 3, 4, 6 écartées) ; la deuxième série, dans le style de 0 et 5, prend 7 à 12.
+// Ctrl + Gauche / Droite passe au sol précédent / suivant.
 const SOLS_ESSAI = {
-  1: { nom: 'terre et racines', fichier: 'assets/decors/sols_essai/terre-racines.png', frange: 9 },
-  2: { nom: 'mousse epaisse', fichier: 'assets/decors/sols_essai/mousse-epaisse.png', frange: 12 },
-  4: { nom: 'schiste froid', fichier: 'assets/decors/sols_essai/schiste-froid.png', frange: 12 },
   5: { nom: 'tourbe et champignons', fichier: 'assets/decors/sols_essai/tourbe-champignons.png', frange: 11 },
-  6: { nom: 'argile et galets', fichier: 'assets/decors/sols_essai/argile-galets.png', frange: 8 },
 };
 const SOLS_ORDRE = [0, ...Object.keys(SOLS_ESSAI).map(Number)];
 const SOL_ESSAI_CASES = {
