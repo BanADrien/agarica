@@ -26,6 +26,20 @@ const AmbianceEffets = (() => {
     };
   }
 
+  // Groupe d'oiseaux posés : taille de taille[0] à taille[1], écart entre voisins (px) et décalage de départ de chacun
+  // (s) quand le groupe s'envole ; le premier part tout de suite, le dernier au plus `ecart` s après
+  function groupeOiseaux({ taille = [1, 4], ecart = 0.7, espace = [9, 15] } = {}, hasard = Math.random) {
+    const n = taille[0] + Math.min(taille[1] - taille[0], Math.floor(hasard() * (taille[1] - taille[0] + 1)));
+    const decalages = [0];
+    for (let i = 1; i < n; i++) decalages.push(hasard() * ecart);
+    // ordre de départ mélangé : le premier oiseau posé n'est pas forcément le premier à partir
+    for (let i = n - 1; i > 0; i--) { const j = Math.floor(hasard() * (i + 1)); [decalages[i], decalages[j]] = [decalages[j], decalages[i]]; }
+    const places = [0];
+    for (let i = 1; i < n; i++) places.push(places[i - 1] + espace[0] + hasard() * (espace[1] - espace[0]));
+    const milieu = places[n - 1] / 2;
+    return { n, decalages, places: places.map((p) => Math.round(p - milieu)) };
+  }
+
   // Heure de la fin de journée : 0 à 1 en `duree` s ; en boucle (zone de test), elle revient doucement à 0
   function heureSoir(p, boucle) {
     return boucle ? (1 - Math.cos(Math.PI * 2 * (p % 1))) / 2 : Math.min(Math.max(p, 0), 1);
@@ -238,24 +252,11 @@ void main() {
       };
     },
 
-    // Flaques posées au sol (éclairées comme le décor) avec un reflet qui ne brille que sous un rayon ; gouttes qui
-    // tombent de la canopée, visibles surtout en traversant un rayon
+    // Gouttes qui tombent de la canopée, visibles surtout en traversant un rayon
     gouttes(ctrl, r) {
       const { scene } = ctrl;
-      const flaques = [], gouttes = [];
+      const gouttes = [];
       let actif = false;
-      charger(scene, 'ambiance-flaque', r.flaque);
-      const poser = () => {
-        if (!scene.textures.exists('ambiance-flaque')) return;
-        for (const x of r.flaques) {
-          const y = sol(scene, x);
-          const f = scene.add.image(x, y + 5, 'ambiance-flaque').setOrigin(0.5, 1).setDepth(1).setVisible(actif);
-          const reflet = marquer(scene.add.image(x, y + 5, 'ambiance-flaque').setOrigin(0.5, 1).setDepth(1.1).setVisible(actif)
-            .setBlendMode(Phaser.BlendModes.ADD).setTint(0xcfe4ff).setAlpha(0));
-          flaques.push({ f, reflet, x, y });
-        }
-      };
-      poser();
       for (let i = 0; i < r.nombre; i++) {
         const g = marquer(scene.add.image(0, 0, '__WHITE').setDisplaySize(1, 3).setTint(0xd6ecff)
           .setBlendMode(Phaser.BlendModes.ADD).setDepth(CHARACTER_DEPTH + 2).setAlpha(0));
@@ -264,16 +265,10 @@ void main() {
       return {
         activer: (oui) => {
           actif = oui;
-          for (const p of flaques) { p.f.setVisible(oui); p.reflet.setVisible(oui); }
           for (const d of gouttes) d.g.setVisible(oui);
         },
-        image(dt, t) {
+        image(dt) {
           if (!actif) return;
-          if (!flaques.length) poser();
-          for (const p of flaques) {
-            const k = (lum(ctrl, p.x - 10, p.y - 2) + lum(ctrl, p.x, p.y - 2) + lum(ctrl, p.x + 10, p.y - 2)) / 3;
-            p.reflet.setAlpha(k * (0.3 + 0.1 * Math.sin(t * 2.3 + p.x)));
-          }
           const v = vue(ctrl), w = v.right - v.left, h = v.bottom - v.top;
           for (const d of gouttes) {
             d.y += d.v * dt / h;
@@ -350,27 +345,92 @@ void main() {
       };
     },
 
+    // Herbes hautes au premier plan, DEVANT les personnages : touffes posées le long du sol, par bandes irrégulières
+    // séparées de trous, qui cachent les pieds d'Agarica par endroits. Elles ondulent au vent, plient pendant une rafale
+    // et s'écartent d'Agarica ; éclairées comme le décor (rayons, feu). Planche : une touffe par case, pied en bas.
+    herbes(ctrl, r) {
+      const { scene } = ctrl;
+      const touffes = [];
+      let actif = false;
+      charger(scene, 'ambiance-herbes', r.fichier);
+      const poser = () => {
+        if (touffes.length || !scene.textures.exists('ambiance-herbes')) return;
+        const tex = scene.textures.get('ambiance-herbes');
+        r.cases.forEach(([x, l], i) => { if (!tex.has('h' + i)) tex.add('h' + i, 0, x, 0, l, tex.source[0].height); });
+        const poids = r.cases.map((c) => c[2]), total = poids.reduce((a, b) => a + b, 0);
+        const tirer = () => { let v = Math.random() * total; for (let i = 0; i < poids.length; i++) if ((v -= poids[i]) < 0) return i; return 0; };
+        const largeur = scene.physics && scene.physics.world ? scene.physics.world.bounds.width : 4000;
+        const entre = (a) => a[0] + Math.random() * (a[1] - a[0]);
+        let x = entre(r.trou), finBande = x + entre(r.bande);
+        while (x < largeur) {
+          const y = typeof groundStandYAt === 'function' ? groundStandYAt(scene, x, r.sol) : null;
+          // pas de touffe au bord d'une fosse ni d'une marche : le sol doit être le même un peu à gauche et à droite
+          const g = y !== null ? groundStandYAt(scene, x - 8, r.sol) : null, d = y !== null ? groundStandYAt(scene, x + 8, r.sol) : null;
+          if (y !== null && g === y && d === y) {
+            const o = scene.add.image(Math.round(x), y + r.enfonce, 'ambiance-herbes', 'h' + tirer()).setOrigin(0.5, 1)
+              .setDepth(CHARACTER_DEPTH + 1).setFlipX(Math.random() < 0.5).setVisible(actif);
+            touffes.push({ o, ph: Math.random() * 6.28, souple: 0.6 + 0.8 * Math.random() });
+          }
+          x += entre(r.pas);
+          if (x > finBande) { x += entre(r.trou); finBande = x + entre(r.bande); }
+        }
+      };
+      poser();
+      return {
+        nombre: () => touffes.length,
+        activer: (oui) => { actif = oui; poser(); for (const t of touffes) t.o.setVisible(oui).setAngle(0); },
+        image(dt, t) {
+          if (!actif) return;
+          poser();
+          const p = scene.player, v = vue(ctrl);
+          for (const h of touffes) {
+            const o = h.o;
+            if (o.x < v.left - 40 || o.x > v.right + 40) continue;
+            // ondulation légère en continu, pliée par la rafale, écartée par Agarica
+            let cible = (r.ondule + ctrl.vent * r.vent) * h.souple * Math.sin(t * (1.6 + ctrl.vent) + h.ph + o.x * 0.04) + ctrl.vent * r.vent * 0.6;
+            if (p) {
+              const dx = o.x - p.x, zone = r.portee;
+              if (Math.abs(dx) < zone && Math.abs(p.y - o.y) < 40) cible += Math.sign(dx || 1) * r.angle * (1 - Math.abs(dx) / zone);
+            }
+            o.setAngle(o.angle + (cible - o.angle) * Math.min(1, dt * 10));
+          }
+        },
+      };
+    },
+
     // Oiseaux posés qui s'envolent quand Agarica approche ; silhouette d'animal qui traverse au loin
     animaux(ctrl, r) {
       const { scene, st } = ctrl;
-      const oiseaux = [];
       let actif = false;
-      const oiseau = r.oiseau || {};
-      charger(scene, 'ambiance-oiseau', oiseau.fichier, oiseau.fichier ? { largeur: oiseau.largeur, hauteur: oiseau.hauteur } : null);
-      const animsOiseau = () => {
-        if (!scene.textures.exists('ambiance-oiseau') || scene.textures.get('ambiance-oiseau').frameTotal < 4) return false;
-        if (!scene.anims.exists('ambiance-oiseau-vol')) {
-          scene.anims.create({ key: 'ambiance-oiseau-vol', frames: [{ key: 'ambiance-oiseau', frame: 1 }, { key: 'ambiance-oiseau', frame: 2 }],
-            frameRate: 12, repeat: -1 });
+      // espèces : une planche de 4 cases chacune (posé, ailes hautes, ailes basses, posé) ; un groupe = une seule espèce
+      const especes = (r.especes || []).map((e, i) => ({ ...e, cle: `ambiance-oiseau-${i}`, vol: `ambiance-oiseau-vol-${i}` }));
+      for (const e of especes) charger(scene, e.cle, e.fichier, { largeur: e.largeur, hauteur: e.hauteur });
+      const pretes = () => especes.filter((e) => {
+        if (!scene.textures.exists(e.cle) || scene.textures.get(e.cle).frameTotal < 4) return false;
+        if (!scene.anims.exists(e.vol)) {
+          scene.anims.create({ key: e.vol, frames: [{ key: e.cle, frame: 1 }, { key: e.cle, frame: 2 }], frameRate: 12, repeat: -1 });
         }
         return true;
+      });
+      const animsOiseau = () => especes.length > 0 && pretes().length === especes.length;
+      // groupes de 1 à 4 oiseaux posés côte à côte ; tout le groupe s'envole quand Agarica approche
+      const groupes = (r.groupes || []).map((x) => ({ x, etat: 'pose', t: 0, oiseaux: [] }));
+      const poserGroupe = (G) => {
+        for (const b of G.oiseaux) b.o.destroy();
+        const g = groupeOiseaux(r.groupe);
+        const choix = pretes(), e = choix[Math.floor(Math.random() * choix.length)];
+        G.espece = e;
+        G.oiseaux = g.places.map((dx, i) => {
+          const x = G.x + dx;
+          const o = scene.add.sprite(x, sol(scene, x), e.cle, 0).setOrigin(0.5, 1).setDepth(CHARACTER_DEPTH - 1)
+            .setFlipX(Math.random() < 0.5).setVisible(actif);
+          return { o, x, depart: g.decalages[i], parti: false };
+        });
+        G.etat = 'pose'; G.t = 0;
       };
       const poserOiseaux = () => {
-        if (oiseaux.length || !animsOiseau()) return;
-        for (const x of r.oiseaux) {
-          const o = scene.add.sprite(x, sol(scene, x), 'ambiance-oiseau', 0).setOrigin(0.5, 1).setDepth(CHARACTER_DEPTH - 1).setVisible(actif);
-          oiseaux.push({ o, x, etat: 'pose', t: 0 });
-        }
+        if (!animsOiseau()) return;
+        for (const G of groupes) if (!G.oiseaux.length) poserGroupe(G);
       };
       poserOiseaux();
       // silhouette : forme du loup du joueur (course), toute sombre, sur le plan des arbres lointains
@@ -389,28 +449,31 @@ void main() {
       return {
         activer: (oui) => {
           actif = oui;
-          for (const b of oiseaux) b.o.setVisible(oui && b.etat !== 'parti');
+          for (const G of groupes) for (const b of G.oiseaux) b.o.setVisible(oui && !b.parti);
           if (sil) sil.setVisible(oui);
         },
         image(dt, t) {
           if (!actif) return;
           poserOiseaux();
           const p = scene.player;
-          for (const b of oiseaux) {
-            const dx = b.x - (p ? p.x : -9999);
-            if (b.etat === 'pose' && Math.abs(dx) < 120) {
-              b.etat = 'vol'; b.t = 0; b.sens = Math.sign(dx || 1); b.o.setFlipX(b.sens < 0).play('ambiance-oiseau-vol');
-            } else if (b.etat === 'vol') {
-              b.t += dt;
-              b.o.x += b.sens * (60 + 90 * b.t) * dt;
-              b.o.y -= (50 + 60 * b.t) * dt;
-              b.o.setAlpha(Math.max(0, 1 - (b.t - 1.6) / 0.8));
-              if (b.t > 2.4) { b.etat = 'parti'; b.o.setVisible(false); b.t = 0; }
-            } else if (b.etat === 'parti') {
-              b.t += dt;
-              if (b.t > 14 && Math.abs(dx) > 420) {
-                b.etat = 'pose'; b.o.stop().setFrame(0).setFlipX(false).setAlpha(1).setVisible(true).setPosition(b.x, sol(scene, b.x));
+          const px = p ? p.x : -9999;
+          for (const G of groupes) {
+            if (G.etat === 'pose' && G.oiseaux.some((o) => Math.abs(o.x - px) < r.approche)) { G.etat = 'vol'; G.t = 0; }
+            if (G.etat === 'vol') {
+              G.t += dt;
+              for (const o of G.oiseaux) {
+                const t = G.t - o.depart;
+                if (t < 0 || o.parti) continue;
+                if (!o.sens) { o.sens = Math.sign(o.x - px || 1); o.o.setFlipX(o.sens < 0).play(G.espece.vol); }
+                o.o.x += o.sens * (60 + 90 * t) * dt;
+                o.o.y -= (50 + 60 * t) * dt;
+                o.o.setAlpha(Math.max(0, 1 - (t - 1.6) / 0.8));
+                if (t > 2.4) { o.parti = true; o.o.setVisible(false); }
               }
+              if (G.oiseaux.every((o) => o.parti)) { G.etat = 'parti'; G.t = 0; }
+            } else if (G.etat === 'parti') {
+              G.t += dt;
+              if (G.t > r.retour && Math.abs(G.x - px) > 420) poserGroupe(G);
             }
           }
           if (!sil) return;
@@ -505,7 +568,7 @@ void main() {
     rendu(ctrl);
   }
 
-  return { installer, basculer, enveloppe, evenements, heureSoir, melange };
+  return { installer, basculer, enveloppe, evenements, heureSoir, melange, groupeOiseaux };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AmbianceEffets;

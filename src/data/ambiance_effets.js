@@ -11,12 +11,23 @@ const AMBIANCE_EFFETS_LISTE = [
   { id: 'lucioles', nom: 'Lucioles qui eclairent' },
   { id: 'brume', nom: 'Brume eclairee par les rayons' },
   { id: 'profondeur', nom: 'Fonds bleutes et voiles' },
-  { id: 'gouttes', nom: 'Gouttes et flaques qui brillent' },
+  { id: 'gouttes', nom: 'Gouttes qui brillent' },
   { id: 'feuilles', nom: 'Feuilles qui tombent' },
   { id: 'fougeres', nom: 'Fougeres qui s\'ecartent' },
+  { id: 'herbes', nom: 'Herbes hautes devant Agarica' },
   { id: 'animaux', nom: 'Animaux furtifs' },
   { id: 'soir', nom: 'Lumiere de fin de journee' },
   { id: 'clairiere', nom: 'Clairiere' },
+];
+
+// Espèces d'oiseaux de la forêt (assets/sprites/oiseaux_foret/) ; un groupe n'en mélange jamais deux
+const OISEAUX_FORET_ESPECES = [
+  { nom: 'anguleux-graphique', fichier: 'assets/sprites/oiseaux_foret/anguleux-graphique.png', largeur: 18, hauteur: 15 },
+  { nom: 'merle-elance', fichier: 'assets/sprites/oiseaux_foret/merle-elance.png', largeur: 21, hauteur: 17 },
+  { nom: 'mesange-sobre', fichier: 'assets/sprites/oiseaux_foret/mesange-sobre.png', largeur: 19, hauteur: 19 },
+  { nom: 'nocturne-violet', fichier: 'assets/sprites/oiseaux_foret/nocturne-violet.png', largeur: 19, hauteur: 16 },
+  { nom: 'rouge-gorge-tamise', fichier: 'assets/sprites/oiseaux_foret/rouge-gorge-tamise.png', largeur: 18, hauteur: 19 },
+  { nom: 'troglodyte-rond', fichier: 'assets/sprites/oiseaux_foret/troglodyte-rond.png', largeur: 18, hauteur: 18 },
 ];
 
 const AMBIANCE_EFFETS = {
@@ -37,17 +48,31 @@ const AMBIANCE_EFFETS = {
     brume: { alpha: 0.3, alphaRayon: 0.34, hauteur: 70, sol: 448, sombre: 0x1c2436, claire: 0xb9b69c, vitesse: 4 },
     // fonds (parallaxe < 1) : teinte bleutée plus forte au loin, voile au-dessus des plans lointains
     profondeur: { bleu: 0x8ea4d8, voile: 0x2c3a5c, voileAlpha: 0.22 },
-    // flaques (x du monde, posées sur le sol) et gouttes qui tombent de la canopée
-    gouttes: { flaques: [1180, 1460, 2040, 2620], nombre: 16, flaque: 'assets/vfx/ambiance/flaque_eau.png' },
+    // gouttes qui tombent de la canopée, visibles dans les rayons
+    gouttes: { nombre: 16 },
     // feuilles qui tombent, rafale : `rafale` de plus
     feuilles: { nombre: 10, rafale: 8 },
     // sous-bois qui s'écarte d'Agarica et plie au vent (angle max en degrés)
     fougeres: { angle: 9, portee: 46, vent: 4 },
-    // oiseaux qui s'envolent quand on approche (x du monde), silhouette qui traverse au loin toutes les `entre` s
+    // herbes hautes au premier plan (devant les personnages) : planche de touffes (`cases` : [x, largeur, poids du tirage]),
+    // touffe tous les `pas` px par bandes de `bande` px séparées de trous de `trou` px ; angle max au vent (`vent`, en
+    // degrés, en plus d'une ondulation `ondule`) et quand Agarica passe (`angle`, à moins de `portee` px)
+    herbes: {
+      fichier: 'assets/decors/ambiance/herbes_hautes.png',
+      cases: [[0, 14, 4], [21, 18, 5], [45, 25, 4], [76, 29, 2], [109, 32, 1], [146, 23, 4]],
+      pas: [7, 15], bande: [60, 190], trou: [40, 140], sol: 448, enfonce: 2,
+      ondule: 1.2, vent: 5, angle: 10, portee: 30,
+    },
+    // groupes d'oiseaux posés (x du monde du centre de chaque groupe) : 1 à 4 oiseaux côte à côte, qui s'envolent
+    // ensemble quand Agarica approche à moins de `approche` px, chacun avec un décalage de 0 à `ecart` s ; un groupe
+    // parti revient après `retour` s, quand Agarica est loin. Silhouette qui traverse au loin toutes les `entre` s
     animaux: {
-      oiseaux: [900, 1750, 2350],
-      // planche de 4 cases : posé, ailes hautes, ailes basses, posé (cf. assets/sprites/oiseau_foret.png)
-      oiseau: { fichier: 'assets/sprites/oiseau_foret.png', largeur: 48, hauteur: 47 },
+      groupes: [1750],
+      groupe: { taille: [1, 4], ecart: 0.7, espace: [9, 15] },
+      approche: 120,
+      retour: 42,
+      // 6 espèces, une planche de 4 cases chacune : posé, ailes hautes, ailes basses, posé (largeur x hauteur d'une case)
+      especes: OISEAUX_FORET_ESPECES,
       silhouette: { entre: [18, 30], parallaxe: 0.45 },
     },
     // heure de 0 (après-midi) à 1 (fin de journée) en `duree` s ; la zone de test l'accélère

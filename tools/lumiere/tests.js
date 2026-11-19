@@ -556,6 +556,23 @@ function tAuSol() {
 }
 // 23 : effets d'ambiance. Rafales et nuages montent et redescendent sans saut, à 0 entre deux ; l'heure du soir reste
 // dans [0, 1] et revient en boucle ; mélange de couleurs exact aux bornes.
+// 24 : groupes d'oiseaux : 1 à 4 oiseaux, le premier part tout de suite, le dernier au plus 0,7 s après, places distinctes
+function tGroupeOiseaux() {
+  let graine = 7;
+  const hasard = () => { graine = (graine * 16807) % 2147483647; return (graine - 1) / 2147483646; };
+  const tailles = new Set();
+  let ecartMax = 0, ok = true;
+  for (let i = 0; i < 2000; i++) {
+    const g = AmbianceEffets.groupeOiseaux({ taille: [1, 4], ecart: 0.7, espace: [9, 15] }, hasard);
+    tailles.add(g.n);
+    const e = Math.max(...g.decalages) - Math.min(...g.decalages);
+    ecartMax = Math.max(ecartMax, e);
+    if (g.n < 1 || g.n > 4 || g.decalages.length !== g.n || g.places.length !== g.n) ok = false;
+    if (Math.min(...g.decalages) !== 0 || e > 0.7 + 1e-9) ok = false;
+    if (new Set(g.places).size !== g.n) ok = false;
+  }
+  return { ok: ok && tailles.size === 4, tailles: [...tailles].sort(), ecartMax };
+}
 function tAmbianceEffets() {
   const E = AmbianceEffets;
   const bornes = E.enveloppe(0, 0, 4) === 0 && E.enveloppe(4, 0, 4) === 0 && Math.abs(E.enveloppe(2, 0, 4) - 1) < 1e-9;
@@ -764,6 +781,8 @@ function main() {
   ajout('17 masque de canopee', 'rayon et camera', mq.dans === 1 && mq.hors === 0 && mq.sousSol === 0 && mq.ecarts === 0,
     `dans le rayon ${mq.dans} ; hors du rayon ${mq.hors} ; sous le sol ${mq.sousSol} ; points differents selon la camera : ${mq.ecarts} / 400`);
   const ae = tAmbianceEffets();
+  const go = tGroupeOiseaux();
+  ajout('24 groupes d oiseaux : 1 a 4, departs en 0,7 s', 'AmbianceEffets.groupeOiseaux', go.ok, `tailles vues ${go.tailles.join(', ')} ; ecart max ${go.ecartMax.toFixed(3)} s`);
   ajout('23 effets d ambiance : rafales, nuages, soir', 'AmbianceEffets', ae.ok, `saut max ${ae.saut.toFixed(3)} par 1/100 s ; ${ae.vus} evenements sur 20 s`);
   ajout('22 la lumiere disparait avec son element', 'LightKit.sourcePresente', tSourcePresente(), 'casse, cache, transparent, desactive ou detruit : plus de lumiere');
   ajout('21 rien sous le sprite : seulement au sol', 'LightKit.partAuSol', tAuSol(), 'au sol : dessous sombre ; en l\'air : dessous eclaire, en fondu');

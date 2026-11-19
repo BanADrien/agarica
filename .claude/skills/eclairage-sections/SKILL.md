@@ -223,13 +223,17 @@ est démonté à l'arrêt de la scène. Ce qui est propre au test (panneau, touc
 
 ### Effets d'ambiance (AmbianceEffets)
 
-`src/utils/AmbianceEffets.js` ajoute 13 effets à une ambiance, chacun coupable : poussière dans les rayons, ombres de feuilles
+`src/utils/AmbianceEffets.js` ajoute 14 effets à une ambiance, chacun coupable : poussière dans les rayons, ombres de feuilles
 mouvantes (uniform `uTaches` du masque, coupé par défaut), rafales, nuages, lucioles qui éclairent (source `luciole`, forme
-cercle), brume éclairée, fonds bleutés et voilés, gouttes et flaques, feuilles qui tombent, fougères qui s'écartent, animaux
-furtifs, fin de journée, clairière (canopée ouverte dans le masque). Réglages : `src/data/ambiance_effets.js`. Une ambiance les
+cercle), brume éclairée, fonds bleutés et voilés, gouttes, feuilles qui tombent, fougères qui s'écartent, herbes hautes au premier
+plan (devant les personnages, cachent les pieds), animaux furtifs (groupes de 1 à 4 oiseaux d'une même espèce parmi 6, départs
+étalés sur 0,7 s au plus, `groupeOiseaux`, test 24), fin de journée, clairière (canopée ouverte dans le masque). Réglages : `src/data/ambiance_effets.js`. Une ambiance les
 active avec `effets: AMBIANCE_EFFETS.foret` dans `AMBIANCES_LUMIERE` (aucune ne le fait encore) ; la zone de test
 `foret_ambiance` (`?zone=foret_ambiance` ou Options > Zones de test) les essaie tous : U / J choisir, H couper, L activer.
-Images chargées à la demande : `assets/sprites/oiseau_foret.png` (4 cases de 48 x 47) et `assets/vfx/ambiance/flaque_eau.png`.
+Images chargées à la demande : `assets/sprites/oiseaux_foret/*.png` (une planche de 4 cases par espèce) et
+`assets/decors/ambiance/herbes_hautes.png` (une touffe par case, cases dans `AMBIANCE_EFFETS.foret.herbes.cases`). La zone de
+test a aussi une ligne « sol », changée par Ctrl + Gauche / Droite (0 = sol actuel, 1, 2, 4, 5, 6 = propositions `assets/decors/sols_essai/`, même disposition que
+`assets/decors/tuiles.png`) : réservée au test, les vraies zones gardent leur sol.
 
 Cartes : rien au démarrage. En entrant dans une zone à ambiance, celles d'Agarica se chargent en fond, puis chaque sprite demande
 les cartes de son animation à son premier affichage (éclairé à plat en attendant). Nouvel ennemi courant : l'ajouter à
