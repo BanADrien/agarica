@@ -26,6 +26,24 @@ const AmbianceEffets = (() => {
     };
   }
 
+  // Souffle des coups d'épée sur une plante en (x, y) au temps t (s) : angle en degrés, dans le sens du coup. Fort tout
+  // de suite, petit rebond amorti, fini en `duree` s ; force qui baisse avec la distance (`devant` px devant Agarica,
+  // `derriere` px derrière, à moitié), seulement à moins de `hauteur` px du sol du coup. 0 sans souffle en cours.
+  function souffleAngle(souffles, x, y, t, r) {
+    if (!souffles || !souffles.length) return 0;
+    let a = 0;
+    for (const s of souffles) {
+      if (Math.abs(y - s.y) > r.hauteur) continue;
+      const dx = (x - s.x) * s.sens;
+      const f = dx >= 0 ? 1 - dx / r.devant : 0.5 * (1 + dx / r.derriere);
+      if (f <= 0) continue;
+      const age = t - s.t0 - Math.abs(dx) / 600;   // le souffle met un instant à arriver
+      if (age < 0 || age > r.duree) continue;
+      a += s.sens * r.angle * f * Math.exp(-age * 5) * Math.cos(age * 10);
+    }
+    return a;
+  }
+
   // Groupe d'oiseaux posés : taille de taille[0] à taille[1], écart entre voisins (px) et décalage de départ de chacun
   // (s) quand le groupe s'envole ; le premier part tout de suite, le dernier au plus `ecart` s après
   function groupeOiseaux({ taille = [1, 4], ecart = 0.7, espace = [9, 15] } = {}, hasard = Math.random) {
@@ -400,7 +418,7 @@ void main() {
       let actif = false;
       return {
         nombre: plantes.length,
-        activer: (oui) => { actif = oui; if (!oui) for (const o of plantes) o.setAngle(0); },
+        activer: (oui) => { actif = oui; if (!oui) for (const o of plantes) { o.__angleBase = 0; o.setAngle(0); } },
         image(dt, t) {
           if (!actif) return;
           const p = scene.player, v = vue(ctrl);
@@ -411,7 +429,65 @@ void main() {
               const dx = o.x - p.x, zone = r.portee + o.displayWidth / 2;
               if (Math.abs(dx) < zone && Math.abs(p.y - o.y) < 60) cible += Math.sign(dx || 1) * r.angle * (1 - Math.abs(dx) / zone);
             }
-            o.setAngle(o.angle + (cible - o.angle) * Math.min(1, dt * 9));
+            // vent et passage d'Agarica lissés ; souffle d'un coup d'épée ajouté tel quel (couché tout de suite, rebond amorti)
+            o.__angleBase = (o.__angleBase ?? 0) + (cible - (o.__angleBase ?? 0)) * Math.min(1, dt * 9);
+            const souffle = ctrl.souffles.length && ctrl.actif.souffle ? 0.8 * souffleAngle(ctrl.souffles, o.x, o.y, t, ctrl.r.souffle) : 0;
+            o.setAngle(o.__angleBase + souffle);
+          }
+        },
+      };
+    },
+
+    // Souffle des coups d'épée (événement `agarica-coup` de Player.js) : l'herbe, les fougères et le sous-bois se
+    // couchent dans le sens du coup puis reviennent (souffleAngle, lu par `herbes` et `fougeres`) ; quelques brins de
+    // 1 à 2 px, aux couleurs de l'herbe du sol, jaillissent de l'herbe touchée. Rien pour un coup donné loin du sol.
+    // Hors des coups : aucun calcul (liste vide).
+    souffle(ctrl, r) {
+      const { scene } = ctrl;
+      let actif = false;
+      const brins = [];
+      const couleurBrin = () => {
+        const pal = ctrl.paletteHerbe;
+        // verts seulement (l'herbe des cellules peut contenir des chapeaux de champignons cyan)
+        const verts = (pal || []).filter((c) => c.g >= c.r && c.g >= c.b);
+        if (!verts.length) return 0x3f6b34;
+        const c = verts[Math.floor(verts.length * (0.35 + 0.6 * Math.random()))] || verts[verts.length - 1];
+        return (c.r << 16) | (c.g << 8) | c.b;
+      };
+      const coup = (ev) => {
+        if (!actif || !ev || ev.dir === 'down') return;
+        const ySol = sol(scene, ev.x);
+        if (!ev.auSol && ySol - ev.y > r.solMax) return;   // en l'air, loin du sol
+        ctrl.souffles.push({ x: ev.x, y: ySol, sens: ev.sens >= 0 ? 1 : -1, t0: ctrl.t });
+        const herbe = ctrl.effets.herbes && ctrl.actif.herbes;
+        if (!herbe) return;
+        const n = r.brins[0] + Math.floor(Math.random() * (r.brins[1] - r.brins[0] + 1));
+        for (let i = 0; i < n; i++) {
+          const dx = ev.sens * (8 + Math.random() * (r.devant * 0.6));
+          const o = marquer(scene.add.image(Math.round(ev.x + dx), ySol - 2 - Math.random() * 6, '__WHITE')
+            .setDisplaySize(1, Math.random() < 0.5 ? 1 : 2).setTint(couleurBrin()).setDepth(CHARACTER_DEPTH + 2));
+          brins.push({ o, vx: ev.sens * (30 + Math.random() * 90), vy: -(70 + Math.random() * 110), vie: 0, duree: 0.45 + Math.random() * 0.35, ySol });
+        }
+      };
+      scene.events.on('agarica-coup', coup);
+      scene.events.once('shutdown', () => scene.events.off('agarica-coup', coup));
+      return {
+        activer: (oui) => {
+          actif = oui;
+          if (!oui) { ctrl.souffles.length = 0; for (const b of brins) b.o.destroy(); brins.length = 0; }
+        },
+        image(dt, t) {
+          if (ctrl.souffles.length) {
+            for (let i = ctrl.souffles.length - 1; i >= 0; i--) if (t - ctrl.souffles[i].t0 > r.duree + 0.3) ctrl.souffles.splice(i, 1);
+          }
+          for (let i = brins.length - 1; i >= 0; i--) {
+            const b = brins[i];
+            b.vie += dt;
+            b.vy += 420 * dt;
+            b.o.x += b.vx * dt;
+            b.o.y = Math.min(b.ySol, b.o.y + b.vy * dt);
+            b.o.setAlpha(Math.max(0, 1 - Math.max(0, b.vie / b.duree - 0.6) / 0.4));
+            if (b.vie >= b.duree) { b.o.destroy(); brins.splice(i, 1); }
           }
         },
       };
@@ -479,6 +555,7 @@ void main() {
           let o = 0;
           for (const d of tous) { donnees.set(d, o); o += d.length; }
           const palette = paletteDe(donnees);
+          (scene.game.__herbePalettes = scene.game.__herbePalettes || {})[signature] = palette;
           suffixe = suffixe || (cache[signature] = `@sol${Object.keys(cache).length}`);
           for (const base of ['ambiance-herbe-bande', 'ambiance-herbes']) {
             const tex = scene.textures.get(base), img = tex.getSourceImage();
@@ -498,6 +575,8 @@ void main() {
             neuve.setFilter(Phaser.Textures.FilterMode.NEAREST);
           }
         }
+        // couleurs de l'herbe du sol affiché : brins soulevés par le souffle des coups d'épée
+        ctrl.paletteHerbe = (scene.game.__herbePalettes || {})[signature] || ctrl.paletteHerbe;
         courant['ambiance-herbe-bande'] = 'ambiance-herbe-bande' + suffixe;
         courant['ambiance-herbes'] = 'ambiance-herbes' + suffixe;
         for (const e of elements) {
@@ -553,7 +632,7 @@ void main() {
       poser();
       return {
         nombre: () => elements.length,
-        activer: (oui) => { actif = oui; poser(); if (oui) recolorer(); for (const e of elements) e.o.setVisible(oui).setAngle(0); },
+        activer: (oui) => { actif = oui; poser(); if (oui) recolorer(); for (const e of elements) { e.base = 0; e.o.setVisible(oui).setAngle(0); } },
         image(dt, t) {
           if (!actif) return;
           poser();
@@ -569,7 +648,10 @@ void main() {
               const dx = o.x - p.x, zone = r.portee + o.displayWidth / 2;
               if (Math.abs(dx) < zone && Math.abs(p.y - o.y) < 40) cible += Math.sign(dx || 1) * e.angleMax * (1 - Math.abs(dx) / zone);
             }
-            o.setAngle(o.angle + (cible - o.angle) * Math.min(1, dt * 10));
+            e.base = (e.base ?? 0) + (cible - (e.base ?? 0)) * Math.min(1, dt * 10);
+            const souffle = ctrl.souffles.length && ctrl.actif.souffle
+              ? Math.min(1.2, Math.max(0.6, e.souple)) * souffleAngle(ctrl.souffles, o.x, o.y, t, ctrl.r.souffle) : 0;
+            o.setAngle(e.base + souffle);
           }
         },
       };
@@ -725,7 +807,7 @@ void main() {
     if (!st || !st.ok) return null;
     const scene = st.scene;
     const ctrl = { st, scene, r: reglages, actif: {}, effets: {}, vent: 0, nuage: 1, heure: 0, rayons: 1, t: 0,
-      soirEnBoucle: boucleSoir, vitesseSoir };
+      soirEnBoucle: boucleSoir, vitesseSoir, souffles: [], paletteHerbe: null };
     for (const { id } of AMBIANCE_EFFETS_LISTE) {
       if (!reglages[id] || !FABRIQUES[id]) continue;
       ctrl.effets[id] = FABRIQUES[id](ctrl, reglages[id]);
@@ -757,7 +839,7 @@ void main() {
     rendu(ctrl);
   }
 
-  return { installer, basculer, enveloppe, evenements, heureSoir, melange, groupeOiseaux, paletteDe, remapperPalette };
+  return { installer, basculer, enveloppe, evenements, heureSoir, melange, groupeOiseaux, paletteDe, remapperPalette, souffleAngle };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AmbianceEffets;

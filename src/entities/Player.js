@@ -2174,6 +2174,10 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       } else {
         juiceSquash(this, 1.05, 0.96, 140);
         playSfx('slash', { dir: this.slashDir });
+        // Coup d'épée : souffle dans l'herbe et le sous-bois devant elle (AmbianceEffets, effet `souffle`)
+        if (this.scene && this.scene.events) {
+          this.scene.events.emit('agarica-coup', { x: this.x, y: this.y, sens: this.slashFacing, dir: this.slashDir, auSol: !!this.onGround });
+        }
       }
       this.attackCooldownEndTime = now + this.attackCooldown;
     }

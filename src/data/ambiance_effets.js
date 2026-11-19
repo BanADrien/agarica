@@ -15,6 +15,7 @@ const AMBIANCE_EFFETS_LISTE = [
   { id: 'feuilles', nom: 'Feuilles qui tombent' },
   { id: 'fougeres', nom: 'Fougeres qui s\'ecartent' },
   { id: 'herbes', nom: 'Herbes devant Agarica (bande + touffes)' },
+  { id: 'souffle', nom: 'Souffle de l\'epee dans l\'herbe' },
   { id: 'animaux', nom: 'Animaux furtifs' },
   { id: 'soir', nom: 'Lumiere de fin de journee' },
   { id: 'clairiere', nom: 'Clairiere' },
@@ -69,6 +70,10 @@ const AMBIANCE_EFFETS = {
       // margeFeu : px laissés sans herbe de chaque côté d'un feu de camp (en plus de sa largeur)
       sol: 448, enfonce: 2, ondule: 1.2, vent: 5, portee: 18, margeFeu: 4,
     },
+    // souffle d'un coup d'épée : herbe et sous-bois couchés jusqu'à `angle` degrés, `devant` px devant Agarica et
+    // `derriere` px derrière (à moitié), à moins de `hauteur` px du sol du coup, retour amorti en `duree` s ; `brins`
+    // (min, max) brins d'herbe soulevés ; rien pour un coup à plus de `solMax` px au-dessus du sol
+    souffle: { angle: 34, devant: 90, derriere: 25, hauteur: 60, duree: 0.9, brins: [6, 12], solMax: 24 },
     // groupes d'oiseaux posés (x du monde du centre de chaque groupe) : 1 à 4 oiseaux côte à côte, qui s'envolent
     // ensemble quand Agarica approche à moins de `approche` px, chacun avec un décalage de 0 à `ecart` s ; un groupe
     // parti revient après `retour` s, quand Agarica est loin. Silhouette qui traverse au loin toutes les `entre` s

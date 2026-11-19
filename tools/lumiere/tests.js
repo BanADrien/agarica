@@ -545,6 +545,18 @@ function tSousSprite(sp) {
   return { dessous, allumes, dessus, coupes };
 }
 // 21 : la règle ne vaut qu'au sol : en l'air le dessous reçoit la lumière, avec un fondu sans saut, une seule avance par image.
+// 26 : souffle d'un coup d'épée sur l'herbe : sens du coup, plus fort devant que derrière, nul loin ou en hauteur,
+// petit rebond amorti puis fini en `duree` s, nul sans coup
+function tSouffle() {
+  const r = { angle: 26, devant: 90, derriere: 25, hauteur: 60, duree: 0.9 };
+  const A = (s, x, y, t) => AmbianceEffets.souffleAngle(s, x, y, t, r);
+  const droite = [{ x: 100, y: 448, sens: 1, t0: 0 }], gauche = [{ x: 100, y: 448, sens: -1, t0: 0 }];
+  const devant = A(droite, 130, 448, 0.06), derriere = A(droite, 90, 448, 0.06);
+  let mini = 0;
+  for (let t = 0; t <= 0.9; t += 0.01) mini = Math.min(mini, A(droite, 130, 448, t));
+  return [devant > 10, derriere > 0 && derriere < devant, A(gauche, 70, 448, 0.06) < -10, A(droite, 200, 448, 0.06) === 0,
+    A(droite, 130, 300, 0.06) === 0, mini < 0 && mini > -devant * 0.4, A(droite, 130, 448, 1.0) === 0, A([], 130, 448, 0.06) === 0].every(Boolean);
+}
 function tAuSol() {
   const air = { body: { blocked: { down: false }, touching: { down: false } } };
   const sol = { body: { blocked: { down: true }, touching: { down: false } } };
@@ -823,6 +835,7 @@ function main() {
   const ae = tAmbianceEffets();
   const go = tGroupeOiseaux();
   const rp = tRemapPalette();
+  ajout('26 souffle de l epee dans l herbe', 'AmbianceEffets.souffleAngle', tSouffle(), 'sens du coup, devant > derriere, rebond amorti, fini en 0,9 s');
   ajout('25 herbe a la couleur du sol : ordre, palette, alpha', 'AmbianceEffets.remapperPalette', rp.ok, `${rp.essais} images au hasard`);
   ajout('24 groupes d oiseaux : 1 a 4, departs en 0,7 s', 'AmbianceEffets.groupeOiseaux', go.ok, `tailles vues ${go.tailles.join(', ')} ; ecart max ${go.ecartMax.toFixed(3)} s`);
   ajout('23 effets d ambiance : rafales, nuages, soir', 'AmbianceEffets', ae.ok, `saut max ${ae.saut.toFixed(3)} par 1/100 s ; ${ae.vus} evenements sur 20 s`);
