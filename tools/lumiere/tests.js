@@ -645,7 +645,11 @@ function tProfondeurSource() {
     LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 200, facingDir: -1 }, true, 1) === 30,
     LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 200, facingDir: 1 }, true, 1) === 8,
     LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 200 }, true, 1) === 8,
-    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 110, facingDir: -1 }, true, 1) <= -15].every(Boolean);
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 26, a: 80, z: 8, zFace: 30 } }, { depth: 10, x: 110, facingDir: -1 }, true, 1) <= -15,
+    // grand corps (100 px) qui couvre la source : derrière elle avec le centre à 40 px ; un corps étroit au même endroit est à côté
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 0, a: 24, z: 8, zFace: 30 } },
+      { depth: 10, x: 140, displayOriginX: 50, scaleX: 1, frame: { texture: { key: 'test-grand' }, name: 'f', cutWidth: 100, cutHeight: 50, realWidth: 100 } }, true, 1) <= -15,
+    LightKit.zLampe({ ...L, x: 100, cote: { de: 0, a: 24, z: 8, zFace: 30 } }, { depth: 10, x: 140 }, true, 1) === 8].every(Boolean);
 }
 
 // 20 : sources visibles. La lumière part du point de la forme le plus proche du pixel ; jamais d'un point unique.

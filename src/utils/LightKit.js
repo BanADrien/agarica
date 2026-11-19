@@ -943,17 +943,29 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
     return go.__lumiereAuSol;
   }
 
+  // Centre et demi-largeur du corps visible d'un objet dans le monde (limites opaques de sa frame courante, en cache).
+  // Sans frame lisible : son x, largeur nulle.
+  function corpsMonde(go) {
+    if (!go.frame || !go.frame.texture) return { cx: go.x, demi: 0 };
+    const lim = limitesFrame(go.frame), W = go.frame.realWidth ?? go.frame.cutWidth;
+    const mx = (x) => go.x + ((go.flipX ? W - x : x) - (go.displayOriginX ?? 0)) * (go.scaleX ?? 1);
+    const a = mx(lim.x0), b = mx(lim.x1);
+    return { cx: (a + b) / 2, demi: Math.abs(b - a) / 2 };
+  }
+
   function zLampeCalcul(L, go, perso, k) {
     if (perso && L.sourceObjet && L.sourceObjet.depth < go.depth) {
       const dos = Math.min(L.arriere / k, -15);
       if (!L.cote) return dos;
-      // avec une forme : écart mesuré depuis son bord
-      const ecart = L.forme ? Math.abs(L.forme.cx - go.x) - L.forme.demi : Math.abs(L.x - go.x);
+      // Écart entre le bord de la forme et le bord du CORPS (et non son centre) : un grand personnage (grizzly) dont le
+      // corps couvre la source reste derrière elle, contour seul, même si son centre en est loin
+      const corps = corpsMonde(go);
+      const ecart = (L.forme ? Math.abs(L.forme.cx - corps.cx) - L.forme.demi : Math.abs(L.x - corps.cx)) - corps.demi;
       const t = Math.min(Math.max((ecart - L.cote.de) / (L.cote.a - L.cote.de), 0), 1);
       // Personnage tourné vers la source : la lampe passe devant lui, son visage et sa poitrine reçoivent la lumière.
       // Le sens vient de facingDir / facing, car flipX dépend du sens dans lequel chaque animation est dessinée.
       const sens = go.facingDir ?? go.facing, cx = L.forme ? L.forme.cx : L.x;
-      const tourne = L.cote.zFace !== undefined && !!sens && sens * (cx - go.x) > 0;
+      const tourne = L.cote.zFace !== undefined && !!sens && sens * (cx - corps.cx) > 0;
       return dos + ((tourne ? L.cote.zFace : L.cote.z) - dos) * t * t * (3 - 2 * t);
     }
     return (L.profondeur ?? DEFAUTS.profondeur) / k;
@@ -1051,7 +1063,7 @@ ${lampes ? `  vec4 cjm = vec4(0.5, 0.5, 0.0, 1.0);
   const SOURCES = {
     // profondeur : pour le décor du même plan ; arriere : pour un personnage affiché devant la source (contre-jour seul)
     feu: { forme: 'triangle', base: 0.45, couleur: 0xffc46e, intensite: 0.85, gainDecor: 1.4, gainContre: 1.2, gainCote: 1.3, portee: 317, profondeur: 60, arriere: -18, cote: { de: 0, a: 24, z: 8, zFace: 30 }, vacille: 0.1, halo: 280 },
-    champignon: { forme: 'rectangle', couleur: 0x1caada, intensite: 0.85, portee: 112, profondeur: 30, arriere: -14, vacille: 0.05, halo: 0 },
+    champignon: { forme: 'rectangle', couleur: 0x1caada, intensite: 1.3, portee: 112, profondeur: 30, arriere: -14, vacille: 0.05, halo: 0 },
     // Luciole qui éclaire vraiment : petite, sa lumière suit son clignotement (suitAlpha) et s'éteint avec elle
     luciole: { forme: 'cercle', couleur: 0xd8ffb0, intensite: 0.55, portee: 64, profondeur: 14, arriere: -10, vacille: 0.12, halo: 0, suitAlpha: true },
   };
