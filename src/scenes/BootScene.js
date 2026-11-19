@@ -681,7 +681,8 @@ class BootScene extends Phaser.Scene {
       }
       const entry = storyZoneEntry(zone);
       // Labo d'éclairage : hors de la liste des zones de l'histoire
-      const key = zone === 'labo_lumiere' ? 'LaboLumiereScene' : zone === 'foret_lumiere' ? 'ForetLumiereScene' : entry ? entry.scene : zone;
+      const horsHistoire = { labo_lumiere: 'LaboLumiereScene', foret_lumiere: 'ForetLumiereScene', foret_ambiance: 'ForetAmbianceScene' };
+      const key = horsHistoire[zone] || (entry ? entry.scene : zone);
       if (this.scene.get(key)) {
         this.scene.start(key, params.has('enter') ? { enterId: params.get('enter') } : undefined);
         return;

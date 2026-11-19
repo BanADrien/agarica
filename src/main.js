@@ -65,6 +65,8 @@ const config = {
     LaboLumiereScene,
     // Forêt de lumière : seulement par ?zone=foret_lumiere&lumiere.
     ForetLumiereScene,
+    // Forêt d'ambiance : ?zone=foret_ambiance ou Options > Zones de test.
+    ForetAmbianceScene,
     EndScreenScene,
     EditorScene, PlaytestScene,
     CampfireMenuScene,

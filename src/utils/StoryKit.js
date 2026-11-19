@@ -422,6 +422,9 @@ const LEGACY_TEST_ZONES = [
   { scene: 'ZonetestScene', name: 'Zone test' },
   // Familles d'animaux : les quatre ours (cf. src/data/zone_ours_data.js).
   { scene: 'ZoneOursScene', name: 'Zone des ours' },
+  // Éclairage : réglages des rayons (cf. src/scenes/ForetLumiereScene.js) et effets d'ambiance un par un
+  { scene: 'ForetLumiereScene', name: 'Forêt de lumière' },
+  { scene: 'ForetAmbianceScene', name: "Forêt d'ambiance" },
 ];
 
 // `sceneOrKey` : scène Phaser, clé de scène ('BosquetScene') ou id de zone ('bosquet').
