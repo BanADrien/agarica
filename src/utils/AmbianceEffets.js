@@ -345,52 +345,80 @@ void main() {
       };
     },
 
-    // Herbes hautes au premier plan, DEVANT les personnages : touffes posées le long du sol, par bandes irrégulières
-    // séparées de trous, qui cachent les pieds d'Agarica par endroits. Elles ondulent au vent, plient pendant une rafale
-    // et s'écartent d'Agarica ; éclairées comme le décor (rayons, feu). Planche : une touffe par case, pied en bas.
+    // Herbes au premier plan, DEVANT les personnages : une bande d'herbe continue le long du sol (variantes de tuile
+    // enchaînées au hasard, bords compatibles) qui cache le bas des pieds partout, et par endroits, sans régularité,
+    // des touffes plus hautes. Tout ondule au vent, plie pendant une rafale et s'écarte d'Agarica ; éclairé comme le
+    // décor (rayons, feu). Planches : une case par variante ou par touffe, pied en bas.
     herbes(ctrl, r) {
       const { scene } = ctrl;
-      const touffes = [];
+      const elements = [];
       let actif = false;
-      charger(scene, 'ambiance-herbes', r.fichier);
+      const B = r.bande, T = r.touffes;
+      charger(scene, 'ambiance-herbe-bande', B.fichier);
+      charger(scene, 'ambiance-herbes', T.fichier);
+      const entre = (a) => a[0] + Math.random() * (a[1] - a[0]);
+      const solA = (x) => (typeof groundStandYAt === 'function' ? groundStandYAt(scene, x, r.sol) : null);
+      // sol plat de x0 à x1 (ni fosse ni marche) : hauteur du sol, sinon null
+      const plat = (x0, x1) => {
+        const y = solA(x0);
+        if (y === null) return null;
+        for (const x of [x0 + (x1 - x0) / 2, x1]) if (solA(x) !== y) return null;
+        return y;
+      };
+      const cadres = (cle, cases, nom) => {
+        const tex = scene.textures.get(cle), h = tex.source[0].height;
+        cases.forEach(([x, l], i) => { if (!tex.has(nom + i)) tex.add(nom + i, 0, x, 0, l, h); });
+      };
+      const ajouter = (x, y, cle, cadre, souple, angleMax) => {
+        const o = scene.add.image(Math.round(x), y + r.enfonce, cle, cadre).setOrigin(0.5, 1)
+          .setDepth(CHARACTER_DEPTH + 1).setFlipX(Math.random() < 0.5).setVisible(actif);
+        elements.push({ o, ph: Math.random() * 6.28, souple, angleMax });
+      };
       const poser = () => {
-        if (touffes.length || !scene.textures.exists('ambiance-herbes')) return;
-        const tex = scene.textures.get('ambiance-herbes');
-        r.cases.forEach(([x, l], i) => { if (!tex.has('h' + i)) tex.add('h' + i, 0, x, 0, l, tex.source[0].height); });
-        const poids = r.cases.map((c) => c[2]), total = poids.reduce((a, b) => a + b, 0);
-        const tirer = () => { let v = Math.random() * total; for (let i = 0; i < poids.length; i++) if ((v -= poids[i]) < 0) return i; return 0; };
+        if (elements.length || !scene.textures.exists('ambiance-herbe-bande') || !scene.textures.exists('ambiance-herbes')) return;
+        cadres('ambiance-herbe-bande', B.cases, 'b');
+        cadres('ambiance-herbes', T.cases, 'h');
         const largeur = scene.physics && scene.physics.world ? scene.physics.world.bounds.width : 4000;
-        const entre = (a) => a[0] + Math.random() * (a[1] - a[0]);
-        let x = entre(r.trou), finBande = x + entre(r.bande);
+        // bande : tuiles bout à bout, variante au hasard (jamais deux fois la même de suite)
+        let x = 0, avant = -1;
+        while (B.cases.length && x < largeur) {
+          let v = Math.floor(Math.random() * B.cases.length);
+          if (v === avant && B.cases.length > 1) v = (v + 1) % B.cases.length;
+          const l = B.cases[v][1], y = plat(x + 1, x + l - 1);
+          if (y !== null) { ajouter(x + l / 2, y, 'ambiance-herbe-bande', 'b' + v, B.souple, B.angle); avant = v; }
+          else avant = -1;
+          x += l;
+        }
+        // touffes hautes : 1 ou 2 côte à côte, espacées au hasard ; les plus hautes plus rares
+        const poids = T.cases.map((c) => c[2]), total = poids.reduce((p, q) => p + q, 0);
+        const tirer = () => { let v = Math.random() * total; for (let i = 0; i < poids.length; i++) if ((v -= poids[i]) < 0) return i; return 0; };
+        x = entre(T.entre);
         while (x < largeur) {
-          const y = typeof groundStandYAt === 'function' ? groundStandYAt(scene, x, r.sol) : null;
-          // pas de touffe au bord d'une fosse ni d'une marche : le sol doit être le même un peu à gauche et à droite
-          const g = y !== null ? groundStandYAt(scene, x - 8, r.sol) : null, d = y !== null ? groundStandYAt(scene, x + 8, r.sol) : null;
-          if (y !== null && g === y && d === y) {
-            const o = scene.add.image(Math.round(x), y + r.enfonce, 'ambiance-herbes', 'h' + tirer()).setOrigin(0.5, 1)
-              .setDepth(CHARACTER_DEPTH + 1).setFlipX(Math.random() < 0.5).setVisible(actif);
-            touffes.push({ o, ph: Math.random() * 6.28, souple: 0.6 + 0.8 * Math.random() });
+          const n = Math.random() < T.paire ? 2 : 1;
+          for (let k = 0; k < n; k++) {
+            const xi = x + k * entre([8, 14]), y = plat(xi - 8, xi + 8);
+            if (y !== null) ajouter(xi, y, 'ambiance-herbes', 'h' + tirer(), 0.6 + 0.8 * Math.random(), T.angle);
           }
-          x += entre(r.pas);
-          if (x > finBande) { x += entre(r.trou); finBande = x + entre(r.bande); }
+          x += entre(T.entre);
         }
       };
       poser();
       return {
-        nombre: () => touffes.length,
-        activer: (oui) => { actif = oui; poser(); for (const t of touffes) t.o.setVisible(oui).setAngle(0); },
+        nombre: () => elements.length,
+        activer: (oui) => { actif = oui; poser(); for (const e of elements) e.o.setVisible(oui).setAngle(0); },
         image(dt, t) {
           if (!actif) return;
           poser();
           const p = scene.player, v = vue(ctrl);
-          for (const h of touffes) {
-            const o = h.o;
+          for (const e of elements) {
+            const o = e.o;
             if (o.x < v.left - 40 || o.x > v.right + 40) continue;
             // ondulation légère en continu, pliée par la rafale, écartée par Agarica
-            let cible = (r.ondule + ctrl.vent * r.vent) * h.souple * Math.sin(t * (1.6 + ctrl.vent) + h.ph + o.x * 0.04) + ctrl.vent * r.vent * 0.6;
+            let cible = (r.ondule + ctrl.vent * r.vent) * e.souple * Math.sin(t * (1.6 + ctrl.vent) + e.ph + o.x * 0.04)
+              + ctrl.vent * r.vent * 0.6 * e.souple;
             if (p) {
-              const dx = o.x - p.x, zone = r.portee;
-              if (Math.abs(dx) < zone && Math.abs(p.y - o.y) < 40) cible += Math.sign(dx || 1) * r.angle * (1 - Math.abs(dx) / zone);
+              const dx = o.x - p.x, zone = r.portee + o.displayWidth / 2;
+              if (Math.abs(dx) < zone && Math.abs(p.y - o.y) < 40) cible += Math.sign(dx || 1) * e.angleMax * (1 - Math.abs(dx) / zone);
             }
             o.setAngle(o.angle + (cible - o.angle) * Math.min(1, dt * 10));
           }

@@ -14,7 +14,7 @@ const AMBIANCE_EFFETS_LISTE = [
   { id: 'gouttes', nom: 'Gouttes qui brillent' },
   { id: 'feuilles', nom: 'Feuilles qui tombent' },
   { id: 'fougeres', nom: 'Fougeres qui s\'ecartent' },
-  { id: 'herbes', nom: 'Herbes hautes devant Agarica' },
+  { id: 'herbes', nom: 'Herbes devant Agarica (bande + touffes)' },
   { id: 'animaux', nom: 'Animaux furtifs' },
   { id: 'soir', nom: 'Lumiere de fin de journee' },
   { id: 'clairiere', nom: 'Clairiere' },
@@ -54,14 +54,19 @@ const AMBIANCE_EFFETS = {
     feuilles: { nombre: 10, rafale: 8 },
     // sous-bois qui s'écarte d'Agarica et plie au vent (angle max en degrés)
     fougeres: { angle: 9, portee: 46, vent: 4 },
-    // herbes hautes au premier plan (devant les personnages) : planche de touffes (`cases` : [x, largeur, poids du tirage]),
-    // touffe tous les `pas` px par bandes de `bande` px séparées de trous de `trou` px ; angle max au vent (`vent`, en
-    // degrés, en plus d'une ondulation `ondule`) et quand Agarica passe (`angle`, à moins de `portee` px)
+    // herbes au premier plan (devant les personnages) : bande continue le long du sol (variantes `cases` : [x, largeur]
+    // dans la planche, enchaînées au hasard) et touffes hautes posées sans régularité (`cases` : [x, largeur, poids du
+    // tirage], une touffe tous les `entre` px, par deux avec la probabilité `paire`) ; angle max (degrés) au vent
+    // (`vent`, en plus d'une ondulation `ondule`, multiplié par `souple`) et quand Agarica passe (`angle`, à moins
+    // de `portee` px de leur bord)
     herbes: {
-      fichier: 'assets/decors/ambiance/herbes_hautes.png',
-      cases: [[0, 14, 4], [21, 18, 5], [45, 25, 4], [76, 29, 2], [109, 32, 1], [146, 23, 4]],
-      pas: [7, 15], bande: [60, 190], trou: [40, 140], sol: 448, enfonce: 2,
-      ondule: 1.2, vent: 5, angle: 10, portee: 30,
+      bande: { fichier: 'assets/decors/ambiance/herbe_bande.png', cases: [[0, 48], [48, 48], [96, 48]], souple: 0.4, angle: 5 },
+      touffes: {
+        fichier: 'assets/decors/ambiance/herbes_hautes.png',
+        cases: [[0, 14, 4], [21, 18, 5], [45, 25, 4], [76, 29, 2], [109, 32, 1], [146, 23, 4]],
+        entre: [70, 260], paire: 0.35, angle: 10,
+      },
+      sol: 448, enfonce: 2, ondule: 1.2, vent: 5, portee: 18,
     },
     // groupes d'oiseaux posés (x du monde du centre de chaque groupe) : 1 à 4 oiseaux côte à côte, qui s'envolent
     // ensemble quand Agarica approche à moins de `approche` px, chacun avec un décalage de 0 à `ecart` s ; un groupe
