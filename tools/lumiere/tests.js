@@ -872,6 +872,17 @@ function main() {
   ajout('26 souffle de l epee dans l herbe', 'AmbianceEffets.souffleAngle', tSouffle(), 'sens du coup, devant > derriere, rebond amorti, fini en 0,9 s');
   ajout('25 herbe a la couleur du sol : ordre, palette, alpha', 'AmbianceEffets.remapperPalette', rp.ok, `${rp.essais} images au hasard`);
   ajout('24 groupes d oiseaux : 1 a 4, departs en 0,7 s', 'AmbianceEffets.groupeOiseaux', go.ok, `tailles vues ${go.tailles.join(', ')} ; ecart max ${go.ecartMax.toFixed(3)} s`);
+  // envol : toujours vers le haut et du côté du groupe, de plus en plus loin ; en 4 s il a quitté une vue de 740 x 416
+  const vo = [1, -1].every((s) => {
+    let px = 0, py = 0, ok = true;
+    for (let t = 0.1; t <= 4; t += 0.1) {
+      const d = AmbianceEffets.volOiseau(t, s, 0.92, 0.9);
+      if (Math.sign(d.x) !== s || d.y >= 0 || Math.abs(d.x) <= Math.abs(px) || d.y >= py) ok = false;
+      px = d.x; py = d.y;
+    }
+    return ok && (Math.abs(px) > 740 || -py > 416);
+  });
+  ajout('24 envol des oiseaux : monte et s eloigne jusqu a sortir de la vue', 'AmbianceEffets.volOiseau', vo, 'du cote du groupe, vers le haut, hors d une vue 740 x 416 en 4 s');
   ajout('23 effets d ambiance : rafales, nuages, soir', 'AmbianceEffets', ae.ok, `saut max ${ae.saut.toFixed(3)} par 1/100 s ; ${ae.vus} evenements sur 20 s`);
   ajout('22 la lumiere disparait avec son element', 'LightKit.sourcePresente', tSourcePresente(), 'casse, cache, transparent, desactive ou detruit : plus de lumiere');
   ajout('21 rien sous le sprite : seulement au sol', 'LightKit.partAuSol', tAuSol(), 'au sol : dessous sombre ; en l\'air : dessous eclaire, en fondu');

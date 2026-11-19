@@ -46,6 +46,12 @@ const AmbianceEffets = (() => {
 
   // Groupe d'oiseaux posés : taille de taille[0] à taille[1], écart entre voisins (px) et décalage de départ de chacun
   // (s) quand le groupe s'envole ; le premier part tout de suite, le dernier au plus `ecart` s après
+  // Envol d'un oiseau, t secondes après son départ : il monte en battant des ailes et s'éloigne en diagonale, de plus en
+  // plus vite, jusqu'à sortir de la vue. sens = côté du groupe (+1 droite) ; k, monte : léger écart propre à l'oiseau
+  function volOiseau(t, sens, k = 1, monte = 1) {
+    return { x: sens * k * (70 * t + 55 * t * t), y: -monte * (55 * t + 30 * t * t) };
+  }
+
   function groupeOiseaux({ taille = [1, 4], ecart = 0.7, espace = [9, 15] } = {}, hasard = Math.random) {
     const n = taille[0] + Math.min(taille[1] - taille[0], Math.floor(hasard() * (taille[1] - taille[0] + 1)));
     const decalages = [0];
@@ -728,23 +734,31 @@ void main() {
           poserOiseaux();
           const p = scene.player;
           const px = p ? p.x : -9999;
+          const vv = vue(ctrl), hors = (x, y, m) => x < vv.left - m || x > vv.right + m || y < vv.top - m || y > vv.bottom + m;
           for (const G of groupes) {
-            if (G.etat === 'pose' && G.oiseaux.some((o) => Math.abs(o.x - px) < r.approche)) { G.etat = 'vol'; G.t = 0; }
+            if (G.etat === 'pose' && G.oiseaux.some((o) => Math.abs(o.x - px) < r.approche)) {
+              // tout le groupe part du même côté, à l'opposé d'Agarica ; chaque oiseau garde un léger écart de vitesse et d'angle
+              G.etat = 'vol'; G.t = 0;
+              const milieu = G.oiseaux.reduce((s, o) => s + o.x, 0) / G.oiseaux.length;
+              G.sens = Math.sign(milieu - px || 1);
+              for (const o of G.oiseaux) { o.k = 0.92 + 0.16 * Math.random(); o.monte = 0.9 + 0.2 * Math.random(); }
+            }
             if (G.etat === 'vol') {
               G.t += dt;
               for (const o of G.oiseaux) {
                 const t = G.t - o.depart;
                 if (t < 0 || o.parti) continue;
-                if (!o.sens) { o.sens = Math.sign(o.x - px || 1); o.o.setFlipX(o.sens < 0).play(G.espece.vol); }
-                o.o.x += o.sens * (60 + 90 * t) * dt;
-                o.o.y -= (50 + 60 * t) * dt;
-                o.o.setAlpha(Math.max(0, 1 - (t - 1.6) / 0.8));
-                if (t > 2.4) { o.parti = true; o.o.setVisible(false); }
+                if (o.x0 === undefined) { o.x0 = o.o.x; o.y0 = o.o.y; o.o.setFlipX(G.sens < 0).play(G.espece.vol); }
+                const d = volOiseau(t, G.sens, o.k, o.monte);
+                o.o.setPosition(o.x0 + d.x, o.y0 + d.y);
+                // retiré seulement une fois sorti de la vue (marge), sans fondu ; garde-fou si la vue le suit trop longtemps
+                if (hors(o.o.x, o.o.y, 40) || t > 12) { o.parti = true; o.o.setVisible(false); }
               }
               if (G.oiseaux.every((o) => o.parti)) { G.etat = 'parti'; G.t = 0; }
             } else if (G.etat === 'parti') {
               G.t += dt;
-              if (G.t > r.retour && Math.abs(G.x - px) > 420) poserGroupe(G);
+              // retour du groupe hors de la vue : il ne réapparaît jamais sous les yeux du joueur
+              if (G.t > r.retour && hors(G.x, vv.top + 1, 80)) poserGroupe(G);
             }
           }
           if (!sil) return;
@@ -754,7 +768,7 @@ void main() {
           // traverse le cadre en 5 s : un objet de parallaxe p à l'abscisse x paraît au bord gauche quand
           // x = scrollX * p + (gauche de la vue - scrollX)
           prog = Math.min(1, prog + dt / 5);
-          const cam = scene.cameras.main, vv = vue(ctrl), w = vv.right - vv.left, k = sens > 0 ? -0.1 + 1.2 * prog : 1.1 - 1.2 * prog;
+          const cam = scene.cameras.main, w = vv.right - vv.left, k = sens > 0 ? -0.1 + 1.2 * prog : 1.1 - 1.2 * prog;
           sil.setPosition(cam.scrollX * r.silhouette.parallaxe + (vv.left - cam.scrollX) + k * w, arbre ? arbre.y : 471);
           sil.setAlpha(Math.min(1, v * 3) * 0.85);
         },
@@ -839,7 +853,7 @@ void main() {
     rendu(ctrl);
   }
 
-  return { installer, basculer, enveloppe, evenements, heureSoir, melange, groupeOiseaux, paletteDe, remapperPalette, souffleAngle };
+  return { installer, basculer, enveloppe, evenements, heureSoir, melange, groupeOiseaux, volOiseau, paletteDe, remapperPalette, souffleAngle };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = AmbianceEffets;
