@@ -379,19 +379,31 @@ void main() {
           .setDepth(CHARACTER_DEPTH + 1).setFlipX(Math.random() < 0.5).setVisible(actif);
         elements.push({ o, ph: Math.random() * 6.28, souple, angleMax });
       };
+      // Aucune herbe devant un feu de camp (bûches et flammes) : trou sur sa largeur + `margeFeu`
+      const trous = () => scene.children.list.filter((o) => o.active && o.texture && /campfire/.test(o.texture.key))
+        .map((o) => { const b = o.getBounds(); return [b.left - (r.margeFeu || 0), b.right + (r.margeFeu || 0)]; });
+      const libre = (x0, x1, T0) => !T0.some(([a, b]) => x1 > a && x0 < b);
       const poser = () => {
         if (elements.length || !scene.textures.exists('ambiance-herbe-bande') || !scene.textures.exists('ambiance-herbes')) return;
         cadres('ambiance-herbe-bande', B.cases, 'b');
         cadres('ambiance-herbes', T.cases, 'h');
         const largeur = scene.physics && scene.physics.world ? scene.physics.world.bounds.width : 4000;
-        // bande : tuiles bout à bout, variante au hasard (jamais deux fois la même de suite)
-        let x = 0, avant = -1;
+        const feux = trous();
+        // bande : tuiles bout à bout, variante au hasard (jamais deux fois la même de suite). Au bord d'un trou de feu,
+        // une touffe basse (première case des touffes) couvre la fin de la tuile : pas de coupure nette
+        let x = 0, avant = -1, fin = null;
+        const bord = (xb, y) => ajouter(xb, y, 'ambiance-herbes', 'h0', 0.6, T.angle);
         while (B.cases.length && x < largeur) {
           let v = Math.floor(Math.random() * B.cases.length);
           if (v === avant && B.cases.length > 1) v = (v + 1) % B.cases.length;
           const l = B.cases[v][1], y = plat(x + 1, x + l - 1);
-          if (y !== null) { ajouter(x + l / 2, y, 'ambiance-herbe-bande', 'b' + v, B.souple, B.angle); avant = v; }
-          else avant = -1;
+          if (!libre(x, x + l, feux)) {
+            if (fin) bord(fin[0] - 3, fin[1]);
+            fin = null; avant = -1;
+          } else if (y !== null) {
+            if (avant === -1 && x > 0 && !libre(x - l, x, feux)) bord(x + 3, y);
+            ajouter(x + l / 2, y, 'ambiance-herbe-bande', 'b' + v, B.souple, B.angle); avant = v; fin = [x + l, y];
+          } else { avant = -1; fin = null; }
           x += l;
         }
         // touffes hautes : 1 ou 2 côte à côte, espacées au hasard ; les plus hautes plus rares
@@ -402,7 +414,7 @@ void main() {
           const n = Math.random() < T.paire ? 2 : 1;
           for (let k = 0; k < n; k++) {
             const xi = x + k * entre([8, 14]), y = plat(xi - 8, xi + 8);
-            if (y !== null) ajouter(xi, y, 'ambiance-herbes', 'h' + tirer(), 0.6 + 0.8 * Math.random(), T.angle);
+            if (y !== null && libre(xi - 10, xi + 10, feux)) ajouter(xi, y, 'ambiance-herbes', 'h' + tirer(), 0.6 + 0.8 * Math.random(), T.angle);
           }
           x += entre(T.entre);
         }

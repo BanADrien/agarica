@@ -66,7 +66,8 @@ const AMBIANCE_EFFETS = {
         cases: [[0, 14, 4], [21, 18, 5], [45, 25, 4], [76, 29, 2], [109, 32, 1], [146, 23, 4]],
         entre: [70, 260], paire: 0.35, angle: 10,
       },
-      sol: 448, enfonce: 2, ondule: 1.2, vent: 5, portee: 18,
+      // margeFeu : px laissés sans herbe de chaque côté d'un feu de camp (en plus de sa largeur)
+      sol: 448, enfonce: 2, ondule: 1.2, vent: 5, portee: 18, margeFeu: 4,
     },
     // groupes d'oiseaux posés (x du monde du centre de chaque groupe) : 1 à 4 oiseaux côte à côte, qui s'envolent
     // ensemble quand Agarica approche à moins de `approche` px, chacun avec un décalage de 0 à `ecart` s ; un groupe
