@@ -265,8 +265,14 @@ void main() {
         const largeur = sw * 0.7;
         const fin = scene.physics && scene.physics.world ? scene.physics.world.bounds.width : 4000;
         for (let x = 0, i = 0; x < fin; x += largeur, i++) {
-          const y = typeof groundStandYAt === 'function' ? groundStandYAt(scene, x + largeur / 2, r.sol) : r.sol;
-          if (y === null || y === undefined) continue;   // au-dessus d'un trou : pas de nappe
+          // posée sur le sol le PLUS BAS de sa largeur : jamais en l'air au sommet d'un pilier ou d'un bloc en hauteur,
+          // qui la cachent puisqu'elle passe derrière eux
+          let y = null;
+          for (let k = 0; k <= 6; k++) {
+            const yk = typeof groundStandYAt === 'function' ? groundStandYAt(scene, x + (largeur * k) / 6, r.sol) : r.sol;
+            if (yk !== null && yk !== undefined && (y === null || yk > y)) y = yk;
+          }
+          if (y === null) continue;   // au-dessus d'un trou : pas de nappe
           const im = marquer(scene.add.image(x, y - r.hauteur * 0.3, cle, 'tranche' + (i % N)).setOrigin(0, 0.5).setDepth(-0.6)
             .setPipeline(NOM_BRUME));
           im.setDisplaySize(largeur, r.hauteur);
