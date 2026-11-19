@@ -236,8 +236,13 @@ void main() {
       const base = (o) => (o.__profBase === null ? multiplie(st.teinteFond, o.__ambianceTeinte0 ?? 0xffffff) : o.__profBase);
       const voile = marquer(scene.add.image(0, 0, '__WHITE').setOrigin(0, 0).setScrollFactor(0).setDisplaySize(ZOOM_LARGEUR, ZOOM_HAUTEUR)
         .setTint(r.voile).setAlpha(r.voileAlpha).setDepth(0));
-      const dernier = fonds.filter((o) => o.depth === 0).pop();
-      if (dernier) scene.children.moveAbove(voile, dernier);
+      // Fonds séparés du premier plan par la profondeur, et non par l'ordre d'ajout (qui mélangeait les deux) : le voile
+      // passe entre eux, sous les halos des feux (-0,5). Rien du premier plan (feu, sous-bois) ne passe sous le voile.
+      const ranger = () => {
+        for (const o of scene.children.list) if (o.scrollFactorX > 0 && o.scrollFactorX < 1 && o.depth === 0) o.setDepth(-1);
+      };
+      ranger();
+      voile.setDepth(-0.75);
       let actif = false, attente = 0;
       const teindre = () => {
         for (const o of fonds) {
@@ -248,7 +253,7 @@ void main() {
       return {
         voile,
         activer: (oui) => { actif = oui; voile.setVisible(oui); teindre(); },
-        image(dt) { if ((attente -= dt) <= 0) { attente = 0.25; teindre(); } },
+        image(dt) { if ((attente -= dt) <= 0) { attente = 0.25; ranger(); teindre(); } },
       };
     },
 
