@@ -87,3 +87,12 @@ const AMBIANCE_EFFETS = {
     clairiere: { x0: 1900, x1: 2330, sol: 448 },
   },
 };
+
+// Zones de jeu de la forêt sombre : les effets de la zone de test, sans la fin de journée, la clairière (propre au
+// terrain de test) ni la silhouette lointaine ; groupes d'oiseaux semés d'eux-mêmes le long du sol, un tous les
+// 900 à 1500 px, loin des feux et des bords du niveau
+AMBIANCE_EFFETS.foretJeu = (() => {
+  const { soir, clairiere, animaux, ...reste } = AMBIANCE_EFFETS.foret;
+  const { groupes, silhouette, ...oiseaux } = animaux;
+  return { ...reste, animaux: { ...oiseaux, groupesAuto: { entre: [900, 1500], marge: 300 } } };
+})();

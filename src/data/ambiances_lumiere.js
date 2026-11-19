@@ -20,10 +20,13 @@ const AMBIANCES_LUMIERE = {
   },
 };
 
+// foretSombre : la forêt avec ses effets d'ambiance (src/data/ambiance_effets.js, chargé avant ce fichier)
+AMBIANCES_LUMIERE.foretSombre = { ...AMBIANCES_LUMIERE.foret, effets: typeof AMBIANCE_EFFETS !== 'undefined' ? AMBIANCE_EFFETS.foretJeu : undefined };
+
 // Ambiance de chaque zone (clé de scène -> nom dans AMBIANCES_LUMIERE). Une zone absente de cette liste garde son rendu.
 const AMBIANCE_PAR_ZONE = {
-  ForetSombre1Scene: 'foret',
-  ForetSombre2Scene: 'foret',
+  ForetSombre1Scene: 'foretSombre',
+  ForetSombre2Scene: 'foretSombre',
   ForetFlottante1Scene: 'foret',
   ForetCorrompue1Scene: 'foret',
 };
